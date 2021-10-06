@@ -37,9 +37,3 @@ namespace Lucy {
 
 	extern Application* CreateEditorApplication(const ApplicationArgs& args);
 }
-
-
-
-
-
-

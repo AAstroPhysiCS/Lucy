@@ -18,8 +18,10 @@ namespace Lucy {
 	void EditorLayer::OnEvent()
 	{
 	}
+
 	void EditorLayer::Destroy()
 	{
 		delete s_Instance;
 	}
+
 }

@@ -33,7 +33,7 @@ namespace Lucy {
 				layer->Update();
 			}
 			
-			rendererAPI->SwapBuffers(m_Window->GetRaw());
+			rendererAPI->SwapBuffers(m_Window->Raw());
 			m_Window->Update();
 		}
 	}

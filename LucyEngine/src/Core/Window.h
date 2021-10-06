@@ -24,7 +24,7 @@ namespace Lucy {
 		virtual void Update() = 0;
 		virtual void Init() = 0;
 
-		GLFWwindow* GetRaw() {
+		GLFWwindow* Raw() {
 			return m_Window;
 		}
 
