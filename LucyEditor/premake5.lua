@@ -1,5 +1,5 @@
 project "LucyEditor"
-    location "LucyEditor"
+    location "."
     kind "ConsoleApp"
     language "C++"
 
@@ -13,7 +13,9 @@ project "LucyEditor"
 
     includedirs {
         "../LucyEngine/vendor/spdlog/include",
-        "../LucyEngine/src"
+        "../LucyEngine/src",
+        "../LucyEngine/vendor/GLFW/include",
+        "../LucyEngine/vendor/Glad/include"
     }
 
     links {
@@ -24,7 +26,6 @@ project "LucyEditor"
         cppdialect "C++17"
         staticruntime "On"
         systemversion "latest"
-
 
         defines {
             LUCY_WINDOWS

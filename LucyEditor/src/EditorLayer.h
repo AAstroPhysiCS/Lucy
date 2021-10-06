@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Layer.h"
+#include "Core/Layer.h"
+#include "Renderer/Renderer.h"
 
 namespace Lucy {
 
@@ -18,12 +19,9 @@ namespace Lucy {
 			return s_Instance;
 		}
 
-		void OnUpdate() override;
-		void OnEvent() override;
-		
-		void Destroy() override {
-			delete s_Instance;
-		}
+		void Update();
+		void OnEvent();
+		void Destroy();
 
 	private:
 		static EditorLayer* s_Instance;

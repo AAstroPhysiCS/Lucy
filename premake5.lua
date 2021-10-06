@@ -13,6 +13,7 @@ workspace "LucyEngine"
 
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 
-include "LucyEditor"
+include "LucyEngine/vendor/Glad"
+include "LucyEngine/vendor/GLFW"
 include "LucyEngine"
-
+include "LucyEditor"

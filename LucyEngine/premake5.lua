@@ -1,5 +1,5 @@
 project "LucyEngine"
-    location "LucyEngine"
+    location "."
     kind "StaticLib"
     language "C++"
 
@@ -13,7 +13,13 @@ project "LucyEngine"
 
     includedirs {
         "vendor/spdlog/include",
-        "../LucyEditor/src"
+        "vendor/GLFW/include",
+        "vendor/Glad/include"
+    }
+
+    links {
+        "GLFW",
+        "Glad"
     }
 
     filter "system:windows"

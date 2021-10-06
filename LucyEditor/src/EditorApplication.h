@@ -1,27 +1,25 @@
 #pragma once
 
-#include "Application.h"
-#include "Renderer.h"
+#include "Renderer/Renderer.h"
+#include "EditorLayer.h"
+
+#include "Core/Application.h"
+#include "Core/Window.h"
 
 namespace Lucy {
 
 	class EditorApplication : public Application
 	{
 	public:
-		EditorApplication(const ApplicationArgs& args, const ApplicationSpecification& specs = {"LucyEditor", 1366, 768});
-		~EditorApplication() = default;
 		
-		void OnRun() const override;
-
+		EditorApplication(const ApplicationArgs& args);
+		
+		void Run() const;
 	private:
-		void OnEvent() const override;
-		bool m_Running;
-	};
 
-	//Creates an application with parameters
-	Application* CreateEditorApplication(const ApplicationArgs& args, const ApplicationSpecification& specs) {
-		return new EditorApplication(args, specs);
-	}
+		bool m_Running;
+		ScopeLucy<Window> m_Window;
+	};
 
 	//Creates an application with default parameters
 	Application* CreateEditorApplication(const ApplicationArgs& args) {
