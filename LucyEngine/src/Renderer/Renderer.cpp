@@ -42,9 +42,9 @@ namespace Lucy {
 			const char* renderer = (const char*)glGetString(GL_RENDERER);
 			const char* version = (const char*)glGetString(GL_VERSION);
 
-			Logger::Log(LoggerInfo::LUCY_INFO, vendor);
-			Logger::Log(LoggerInfo::LUCY_INFO, renderer);
-			Logger::Log(LoggerInfo::LUCY_INFO, version);
+			Logger::Log(LoggerInfo::LUCY_INFO, std::string("Vendor ").append(vendor));
+			Logger::Log(LoggerInfo::LUCY_INFO, std::string("Renderer ").append(renderer));
+			Logger::Log(LoggerInfo::LUCY_INFO, std::string("GL Version ").append(version));
 		}
 	}
 

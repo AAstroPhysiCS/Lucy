@@ -2,6 +2,7 @@
 
 #include "Renderer/Renderer.h"
 #include "EditorLayer.h"
+#include "ImGuiLayer.h"
 
 #include "Core/Application.h"
 #include "Core/Window.h"
@@ -13,8 +14,9 @@ namespace Lucy {
 	public:
 		
 		EditorApplication(const ApplicationArgs& args);
+		~EditorApplication();
 		
-		void Run() const;
+		void Run();
 	private:
 
 		bool m_Running;

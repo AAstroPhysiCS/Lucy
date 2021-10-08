@@ -26,5 +26,3 @@ namespace Lucy {
 		std::vector<Layer*> m_LayerStack;
 	};
 }
-
-

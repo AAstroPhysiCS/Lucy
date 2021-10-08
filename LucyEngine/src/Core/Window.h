@@ -23,6 +23,7 @@ namespace Lucy {
 
 		virtual void Update() = 0;
 		virtual void Init() = 0;
+		virtual void Destroy() = 0;
 
 		GLFWwindow* Raw() {
 			return m_Window;
@@ -39,10 +40,9 @@ namespace Lucy {
 	class WinWindow : public Window {
 
 	private:
-		void Update() override;
-		void Init() override;
-
+		void Update();
+		void Init();
+		void Destroy();
 	};
 
 }
-

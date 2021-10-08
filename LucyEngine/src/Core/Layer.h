@@ -8,7 +8,9 @@ namespace Lucy {
 		Layer() = default;
 		virtual ~Layer() = default;
 
-		virtual void Update() = 0;
+		virtual void Begin() = 0;
+		virtual void End() = 0;
+		virtual void OnRender() = 0;
 		virtual void OnEvent() = 0;
 		virtual void Destroy() = 0;
 	};

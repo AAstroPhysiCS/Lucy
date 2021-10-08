@@ -15,7 +15,8 @@ project "LucyEditor"
         "../LucyEngine/vendor/spdlog/include",
         "../LucyEngine/src",
         "../LucyEngine/vendor/GLFW/include",
-        "../LucyEngine/vendor/Glad/include"
+        "../LucyEngine/vendor/Glad/include",
+        "../LucyEngine/vendor/ImGui"
     }
 
     links {

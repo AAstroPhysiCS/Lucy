@@ -10,7 +10,7 @@ namespace Lucy {
 		return window;
 #else
 		LUCY_CRITICAL("Operating system not being supported!")
-			LUCY_ASSERT(false);
+		LUCY_ASSERT(false);
 #endif
 	}
 
@@ -23,6 +23,8 @@ namespace Lucy {
 
 		glfwWindowHint(GLFW_RESIZABLE, m_Specs.Resizable);
 		glfwWindowHint(GLFW_DOUBLEBUFFER, m_Specs.DoubleBuffered);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 
 		switch (m_Specs.WindowMode) {
 			case FULLSCREEN: {
@@ -47,6 +49,11 @@ namespace Lucy {
 	void WinWindow::Update()
 	{
 		glfwPollEvents();
+	}
+
+	void WinWindow::Destroy()
+	{
+		glfwDestroyWindow(m_Window);
 	}
 
 }

@@ -19,7 +19,8 @@ project "LucyEngine"
 
     links {
         "GLFW",
-        "Glad"
+        "Glad",
+        "ImGui"
     }
 
     filter "system:windows"

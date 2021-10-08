@@ -19,7 +19,9 @@ namespace Lucy {
 			return s_Instance;
 		}
 
-		void Update();
+		void Begin();
+		void End();
+		void OnRender();
 		void OnEvent();
 		void Destroy();
 
