@@ -2,8 +2,6 @@
 
 namespace Lucy {
 
-	EditorLayer* EditorLayer::s_Instance = nullptr;
-
 	void EditorLayer::Begin()
 	{
 		auto& rendererAPI = Renderer::GetRendererAPI();
@@ -22,14 +20,45 @@ namespace Lucy {
 		//later
 	}
 
-	void EditorLayer::OnEvent()
+	void EditorLayer::OnEvent(Event& e)
 	{
-		//later
+
+		/*
+		EventDispatcher* dispatcher = EventDispatcher::GetInstance();
+		dispatcher->Dispatch<KeyEvent>(e, []()  {
+			Logger::Log(LoggerInfo::LUCY_INFO, "HELLO");
+		});
+
+		dispatcher->Dispatch<KeyEvent>(e, []() {
+			Logger::Log(LoggerInfo::LUCY_INFO, "fuck");
+		});
+
+		switch (e.GetType()) {
+			case EventType::KeyEvent:
+				Logger::Log(LoggerInfo::LUCY_INFO, "KeyEvent triggered!");
+				break;
+			case EventType::MouseEvent:
+				Logger::Log(LoggerInfo::LUCY_INFO, "MouseEvent triggered!");
+				break;
+			case EventType::WindowResizeEvent:
+				Logger::Log(LoggerInfo::LUCY_INFO, "WindowResizeEvent triggered!");
+				break;
+			case EventType::ScrollEvent:
+				Logger::Log(LoggerInfo::LUCY_INFO, "ScrollEvent triggered!");
+				break;
+			case EventType::CursorPosEvent:
+				Logger::Log(LoggerInfo::LUCY_INFO, "CursorPosEvent triggered!");
+				break;
+			case EventType::CharCallbackEvent:
+				Logger::Log(LoggerInfo::LUCY_INFO, "CharCallbackEvent triggered!");
+				break;
+		}
+		*/
 	}
 
 	void EditorLayer::Destroy()
 	{
-		delete s_Instance;
+		EventDispatcher::GetInstance()->Destroy();
 	}
 
 }

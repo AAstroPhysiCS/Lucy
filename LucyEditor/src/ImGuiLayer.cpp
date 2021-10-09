@@ -2,9 +2,6 @@
 
 namespace Lucy {
 
-	ImGuiLayer* ImGuiLayer::s_Instance = nullptr;
-
-
 	void ImGuiLayer::Init(GLFWwindow* window)
 	{
 		ImGui::CreateContext();
@@ -22,7 +19,7 @@ namespace Lucy {
 		io.DisplaySize = { (float) width, (float) height };
 
 		ImGui_ImplGlfw_InitForOpenGL(window, true);
-		ImGui_ImplOpenGL3_Init("#version 450");
+		ImGui_ImplOpenGL3_Init("#version 460");
 	}
 
 	void ImGuiLayer::Begin()
@@ -81,8 +78,9 @@ namespace Lucy {
 		ImGui::ShowDemoWindow();
 	}
 
-	void ImGuiLayer::OnEvent()
+	void ImGuiLayer::OnEvent(Event& e)
 	{
+
 	}
 
 	void ImGuiLayer::Destroy()

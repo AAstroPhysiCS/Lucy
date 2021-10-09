@@ -6,11 +6,8 @@ namespace Lucy {
 	EditorApplication::EditorApplication(const ApplicationArgs& args)
 		: Application(args)
 	{
-		m_LayerStack.Push(EditorLayer::GetInstance());
+		m_LayerStack.Push({ &EditorLayer::GetInstance(), &ImGuiLayer::GetInstance() });
 
-		ImGuiLayer* imGuiLayerInstance = ImGuiLayer::GetInstance();
-		m_LayerStack.Push(imGuiLayerInstance);
-		
 		m_Running = true;
 
 		WindowSpecification w_Specs;
@@ -26,7 +23,7 @@ namespace Lucy {
 		m_Window->Init();
 		Renderer::Init(RendererContext::OPENGL);
 
-		imGuiLayerInstance->Init(m_Window->Raw()); //needs to be initialized after the render context
+		ImGuiLayer::GetInstance().Init(m_Window->Raw());
 	}
 
 	EditorApplication::~EditorApplication()
@@ -40,17 +37,21 @@ namespace Lucy {
 	void EditorApplication::Run()
 	{
 		auto& rendererAPI = Renderer::GetRendererAPI();
-		
+
 		while (m_Running && !glfwWindowShouldClose(m_Window->Raw())) {
 
 			for (Layer* layer : m_LayerStack.GetStack()) {
+
+				for (Event* event : EventDispatcher::GetInstance()->GetEventPool())
+					layer->OnEvent(*event);
+
 				layer->Begin();
 				layer->OnRender();
 				layer->End();
 			}
 
 			rendererAPI->SwapBuffers(m_Window->Raw());
-			m_Window->Update();
+			m_Window->PollEvents();
 
 			GLenum state = glGetError();
 			if (state != GL_NO_ERROR) Logger::Log(LoggerInfo::LUCY_CRITICAL, state);

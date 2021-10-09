@@ -12,15 +12,10 @@ namespace Lucy {
 		LayerStack() = default;
 		~LayerStack() = default;
 
-		void Push(Layer* layer) {
-			m_LayerStack.push_back(layer);
-		}
+		void Push(std::initializer_list<Layer*> list);
+		void Pop();
 
-		void Pop() {
-			m_LayerStack.pop_back();
-		}
-
-		std::vector<Layer*> GetStack() const { return m_LayerStack; }
+		std::vector<Layer*> GetStack() const;
 
 	private:
 		std::vector<Layer*> m_LayerStack;

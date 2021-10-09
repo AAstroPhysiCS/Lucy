@@ -46,6 +46,24 @@ namespace Lucy {
 			}
 		}
 
+		template<typename T>
+		static void LogInfo(T&& log) {
+			s_Logger->set_level((spdlog::level::level_enum)LoggerInfo::LUCY_INFO);
+			s_Logger->info(log);
+		}
+
+		template<typename T>
+		static void LogCritical(T&& log) {
+			s_Logger->set_level((spdlog::level::level_enum)LoggerInfo::LUCY_CRITICAL);
+			s_Logger->critical(log);
+		}
+
+		template<typename T>
+		static void LogWarning(T&& log) {
+			s_Logger->set_level((spdlog::level::level_enum)LoggerInfo::LUCY_WARN);
+			s_Logger->warn(log);
+		}
+
 	private:
 		Logger() = delete;
 		~Logger() = delete;

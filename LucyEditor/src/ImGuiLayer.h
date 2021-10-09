@@ -1,10 +1,12 @@
 #pragma once
 
-#include "Core/Layer.h"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "GLFW/glfw3.h"
+
+#include "Core/Layer.h"
+#include "Events/Event.h"
 
 namespace Lucy {
 	class ImGuiLayer : public Layer
@@ -12,8 +14,8 @@ namespace Lucy {
 
 	public:
 
-		static ImGuiLayer* GetInstance() {
-			if (!s_Instance) s_Instance = new ImGuiLayer();
+		static ImGuiLayer& GetInstance() {
+			static ImGuiLayer s_Instance;
 			return s_Instance;
 		}
 
@@ -21,14 +23,12 @@ namespace Lucy {
 		void Begin();
 		void End();
 		void OnRender();
-		void OnEvent();
+		void OnEvent(Event& e);
 		void Destroy();
 
 	private:
 		ImGuiLayer() = default;
 
 		uint32_t m_Time = 0;
-
-		static ImGuiLayer* s_Instance;
 	};
 }

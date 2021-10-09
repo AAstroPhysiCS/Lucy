@@ -3,9 +3,13 @@
 #include "Base.h"
 #include <GLFW/glfw3.h>
 
+#include "../Events/EventDispatcher.h"
+#include "../Events/InputEvent.h"
+#include "../Events/WindowEvent.h"
+
 namespace Lucy {
 
-	enum WindowMode {
+	enum class WindowMode {
 		FULLSCREEN, WINDOWED
 	};
 
@@ -13,7 +17,7 @@ namespace Lucy {
 		uint32_t Width, Height;
 		bool VSync, Resizable, DoubleBuffered;
 		std::string Name;
-		WindowMode WindowMode = WindowMode::WINDOWED;
+		Lucy::WindowMode WindowMode = WindowMode::WINDOWED;
 	};
 
 	class Window
@@ -21,26 +25,23 @@ namespace Lucy {
 	public:
 		virtual ~Window() = default;
 
-		virtual void Update() = 0;
+		virtual void PollEvents() = 0;
 		virtual void Init() = 0;
 		virtual void Destroy() = 0;
 
-		GLFWwindow* Raw() {
-			return m_Window;
-		}
+		GLFWwindow* Raw();
 
 		static ScopeLucy<Window> Create(const WindowSpecification& specs);
 
 	protected:
 		WindowSpecification m_Specs;
 		GLFWwindow* m_Window;
-
 	};
 
 	class WinWindow : public Window {
 
 	private:
-		void Update();
+		void PollEvents();
 		void Init();
 		void Destroy();
 	};
