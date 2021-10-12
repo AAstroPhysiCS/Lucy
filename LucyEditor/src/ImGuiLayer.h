@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -7,6 +9,7 @@
 
 #include "Core/Layer.h"
 #include "Events/Event.h"
+#include "UI/Panel.h"
 
 namespace Lucy {
 	class ImGuiLayer : public Layer
@@ -27,8 +30,10 @@ namespace Lucy {
 		void Destroy();
 
 	private:
-		ImGuiLayer() = default;
+		ImGuiLayer();
 
 		uint32_t m_Time = 0;
+
+		std::vector<Panel*> m_Panels;
 	};
 }

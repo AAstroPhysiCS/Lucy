@@ -6,8 +6,8 @@ namespace Lucy {
 	{
 		auto& rendererAPI = Renderer::GetRendererAPI();
 
-		rendererAPI->ClearColor(0.0f, 0.0f, 0.0f, 1.0f); //delete after a separate framebuffer initialization
-		rendererAPI->Clear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+		//rendererAPI->ClearColor(0.0f, 0.0f, 0.0f, 1.0f); //delete after a separate framebuffer initialization
+		//rendererAPI->Clear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 	}
 
 	void EditorLayer::End()

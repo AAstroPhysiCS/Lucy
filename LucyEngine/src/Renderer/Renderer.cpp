@@ -1,9 +1,12 @@
 #include "Renderer.h"
 
+#include "Context/OpenGLRendererAPI.h"
+
 namespace Lucy {
 
 	RendererContext Renderer::m_RendererContext;
 	RefLucy<RendererAPI> Renderer::m_RendererAPI;
+	Scene Renderer::m_Scene;
 
 	void Renderer::Init(RendererContext rendererContext)
 	{
@@ -17,7 +20,7 @@ namespace Lucy {
 
 		PrintInfo();
 
-		m_RendererAPI = RendererAPI::Create<OpenGLRendererAPI>();
+		m_RendererAPI = RendererAPI::Create();
 	}
 
 	void Renderer::Destroy()
@@ -33,6 +36,11 @@ namespace Lucy {
 	RefLucy<RendererAPI> Renderer::GetRendererAPI()
 	{
 		return m_RendererAPI;
+	}
+
+	Scene& Renderer::GetActiveScene()
+	{
+		return m_Scene;
 	}
 
 	void Renderer::PrintInfo()

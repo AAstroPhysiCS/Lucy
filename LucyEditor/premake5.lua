@@ -16,7 +16,9 @@ project "LucyEditor"
         "../LucyEngine/src",
         "../LucyEngine/vendor/GLFW/include",
         "../LucyEngine/vendor/Glad/include",
-        "../LucyEngine/vendor/ImGui"
+        "../LucyEngine/vendor/ImGui",
+        "../LucyEngine/vendor/glm",
+        "../LucyEngine/vendor/entt/include"
     }
 
     links {

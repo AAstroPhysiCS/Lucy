@@ -6,10 +6,11 @@ namespace Lucy {
 	class Layer
 	{
 
-	public:
+	protected:
 		Layer() = default;
 		virtual ~Layer() = default;
 
+	public:
 		virtual void Begin() = 0;
 		virtual void End() = 0;
 		virtual void OnRender() = 0;

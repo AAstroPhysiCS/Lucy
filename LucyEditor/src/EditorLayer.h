@@ -9,11 +9,6 @@
 namespace Lucy {
 
 	class EditorLayer : public Layer {
-
-	private:
-		EditorLayer() = default;
-		~EditorLayer() = default;
-
 	public:
 		
 		static EditorLayer& GetInstance() {
@@ -26,6 +21,10 @@ namespace Lucy {
 		void OnRender();
 		void OnEvent(Event& e);
 		void Destroy();
+
+	private:
+		EditorLayer() = default;
+
 	};
 
 }

@@ -1,10 +1,11 @@
 #pragma once
 
 #include "glad/glad.h"
-#include "RendererAPI.h"
+#include "Context/RendererAPI.h"
 
 #include "../Core/Base.h"
-#include "OpenGL/OpenGLRendererAPI.h"
+
+#include "../Scene/Scene.h"
 
 namespace Lucy {
 
@@ -22,12 +23,16 @@ namespace Lucy {
 		static RendererContext GetCurrentContext();
 		static RefLucy<RendererAPI> GetRendererAPI();
 
+		static Scene& GetActiveScene();
+
 	private:
 		
 		static void PrintInfo();
 		
 		static RendererContext m_RendererContext;
 		static RefLucy<RendererAPI> m_RendererAPI;
+
+		static Scene m_Scene;
 
 		Renderer() = delete;
 		~Renderer() = delete;

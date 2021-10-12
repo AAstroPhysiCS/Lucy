@@ -8,19 +8,23 @@ project "LucyEngine"
 
     files {
         "src/**.h",
+        "src/**.hpp",
         "src/**.cpp"
     }
 
     includedirs {
         "vendor/spdlog/include",
         "vendor/GLFW/include",
-        "vendor/Glad/include"
+        "vendor/Glad/include",
+        "vendor/entt/include",
+        "vendor/glm"
     }
 
     links {
         "GLFW",
         "Glad",
-        "ImGui"
+        "ImGui",
+        "glm"
     }
 
     filter "system:windows"

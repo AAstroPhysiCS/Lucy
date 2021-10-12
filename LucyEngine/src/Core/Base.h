@@ -35,7 +35,7 @@ namespace Lucy {
 	template<typename T>
 	using RefLucy = std::shared_ptr<T>;
 	template<typename T, typename ... Args>
-	constexpr inline RefLucy<T> CreateRef(const Args&& ... args)
+	constexpr inline RefLucy<T> CreateRef(Args&& ... args)
 	{
 		return std::make_shared<T>(std::forward<Args>(args)...);
 	}
@@ -44,7 +44,7 @@ namespace Lucy {
 	template<typename T>
 	using ScopeLucy = std::unique_ptr<T>;
 	template<typename T, typename ... Args>
-	constexpr inline ScopeLucy<T> CreateScope(const Args&& ... args) {
+	constexpr inline ScopeLucy<T> CreateScope(Args&& ... args) {
 		return std::make_unique<T>(std::forward<Args>(args)...);
 	}
 
