@@ -4,33 +4,45 @@
 
 namespace Lucy {
 
-	RendererContext Renderer::m_RendererContext;
 	RefLucy<RendererAPI> Renderer::m_RendererAPI;
 	Scene Renderer::m_Scene;
+	RefLucy<RenderContext> Renderer::m_RenderContext;
+	RefLucy<FrameBuffer> Renderer::m_MainFrameBuffer;
+	std::vector<RenderFunc> Renderer::m_RenderQueue;
 
-	void Renderer::Init(RendererContext rendererContext)
+	void Renderer::Init(RenderContextType renderContext)
 	{
-		m_RendererContext = rendererContext;
-
-		if (rendererContext == RendererContext::OPENGL && !gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-			Destroy();
-			LUCY_CRITICAL("OpenGL init failed!");
-			LUCY_ASSERT(false);
-		}
-
-		PrintInfo();
-
+		m_RenderContext = RenderContext::Create(renderContext);
+		m_RenderContext->PrintInfo();
 		m_RendererAPI = RendererAPI::Create();
+
+		//FrameBufferSpecification specs;
+		//specs.multiSampled = true;
+
+		//m_MainFrameBuffer = FrameBuffer::Create(specs);
+	}
+
+	inline void Renderer::Submit(const RenderFunc&& func)
+	{
+		m_RenderQueue.push_back(func);
+	}
+
+	inline void Renderer::SubmitMesh()
+	{
+		//later
+		Submit([]() {
+		});
+	}
+
+	void Renderer::Dispatch() {
+		for (RenderFunc func : m_RenderQueue) {
+			func();
+		}
 	}
 
 	void Renderer::Destroy()
 	{
 		glfwTerminate();
-	}
-
-	RendererContext Renderer::GetCurrentContext()
-	{
-		return m_RendererContext;
 	}
 
 	RefLucy<RendererAPI> Renderer::GetRendererAPI()
@@ -43,17 +55,14 @@ namespace Lucy {
 		return m_Scene;
 	}
 
-	void Renderer::PrintInfo()
+	RenderContextType Renderer::GetCurrentRenderContextType()
 	{
-		if (m_RendererContext == RendererContext::OPENGL) {
-			const char* vendor = (const char*)glGetString(GL_VENDOR);
-			const char* renderer = (const char*)glGetString(GL_RENDERER);
-			const char* version = (const char*)glGetString(GL_VERSION);
+		return m_RenderContext->GetRenderContextType();
+	}
 
-			Logger::Log(LoggerInfo::LUCY_INFO, std::string("Vendor ").append(vendor));
-			Logger::Log(LoggerInfo::LUCY_INFO, std::string("Renderer ").append(renderer));
-			Logger::Log(LoggerInfo::LUCY_INFO, std::string("GL Version ").append(version));
-		}
+	RefLucy<FrameBuffer>& Renderer::GetMainFrameBuffer()
+	{
+		return m_MainFrameBuffer;
 	}
 
 }

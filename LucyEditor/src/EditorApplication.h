@@ -12,13 +12,11 @@ namespace Lucy {
 	class EditorApplication : public Application
 	{
 	public:
-		
 		EditorApplication(const ApplicationArgs& args);
 		~EditorApplication();
 		
 		void Run();
 	private:
-
 		bool m_Running;
 		ScopeLucy<Window> m_Window;
 	};

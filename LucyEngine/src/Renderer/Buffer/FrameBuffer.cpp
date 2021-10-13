@@ -1,15 +1,16 @@
 #include "FrameBuffer.h"
 
 #include "OpenGL/OpenGLFrameBuffer.h"
+#include "../Renderer.h"
 
 namespace Lucy {
 	
-	RefLucy<FrameBuffer> Lucy::FrameBuffer::Create(FrameBufferSpecification& specs)
+	RefLucy<FrameBuffer> FrameBuffer::Create(FrameBufferSpecification& specs)
 	{
-		switch (Renderer::GetCurrentContext()) {
-		case RendererContext::OPENGL:
-			return CreateRef<OpenGLFrameBuffer>(specs);
-			break;
+		switch (Renderer::GetCurrentRenderContextType()) {
+			case RenderContextType::OPENGL:
+				return CreateRef<OpenGLFrameBuffer>(specs);
+				break;
 		}
 	}
 

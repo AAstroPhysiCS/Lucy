@@ -17,7 +17,8 @@ project "LucyEngine"
         "vendor/GLFW/include",
         "vendor/Glad/include",
         "vendor/entt/include",
-        "vendor/glm"
+        "vendor/glm",
+        "vendor/stb/include"
     }
 
     links {

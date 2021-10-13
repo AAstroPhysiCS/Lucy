@@ -6,11 +6,11 @@ namespace Lucy {
 	
 	RefLucy<IndexBuffer> IndexBuffer::Create(uint32_t size, void* data)
 	{
-		switch (Renderer::GetCurrentContext()) {
-		case RendererContext::OPENGL:
+		switch (Renderer::GetCurrentRenderContextType()) {
+		case RenderContextType::OPENGL:
 			return CreateRef<OpenGLIndexBuffer>(size, data);
 			break;
-		case RendererContext::VULKAN:
+		case RenderContextType::VULKAN:
 			LUCY_CRITICAL("Vulkan not supported");
 			LUCY_ASSERT(false);
 			break;

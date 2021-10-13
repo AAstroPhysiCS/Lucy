@@ -23,10 +23,7 @@ namespace Lucy {
 			s_Events.push_back((Event*) &evtFnc);
 		}
 
-		static EventDispatcher* GetInstance() {
-			if (!s_Instance) s_Instance = new EventDispatcher();
-			return s_Instance;
-		}
+		static EventDispatcher& GetInstance();
 
 		template <class E>
 		constexpr static void Dispatch(Event& evt, std::function<void()> fnc) {
@@ -47,11 +44,8 @@ namespace Lucy {
 		}
 
 		static std::vector<Event*>& GetEventPool();
-		static void Destroy();
-
 	private:
 
 		static std::vector<Event*> s_Events;
-		static EventDispatcher* s_Instance;
 	};
 }

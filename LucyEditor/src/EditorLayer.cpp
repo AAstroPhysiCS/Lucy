@@ -1,38 +1,32 @@
 #include "EditorLayer.h"
 
+#include "Scene/Components.h"
+
 namespace Lucy {
 
 	void EditorLayer::Begin()
 	{
-		auto& rendererAPI = Renderer::GetRendererAPI();
 
-		//rendererAPI->ClearColor(0.0f, 0.0f, 0.0f, 1.0f); //delete after a separate framebuffer initialization
-		//rendererAPI->Clear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+		Scene& scene = Renderer::GetActiveScene();
+		auto& meshView = scene.registry.view<MeshComponent>();
+
+		for (auto entity : meshView) {
+			MeshComponent& meshComponent = scene.registry.get<MeshComponent>(entity);
+		}
 	}
 
 	void EditorLayer::End()
 	{
-		//later
+		Renderer::Dispatch();
 	}
 
 	void EditorLayer::OnRender()
 	{
-		//later
+
 	}
 
 	void EditorLayer::OnEvent(Event& e)
 	{
-
-		/*
-		EventDispatcher* dispatcher = EventDispatcher::GetInstance();
-		dispatcher->Dispatch<KeyEvent>(e, []()  {
-			Logger::Log(LoggerInfo::LUCY_INFO, "HELLO");
-		});
-
-		dispatcher->Dispatch<KeyEvent>(e, []() {
-			Logger::Log(LoggerInfo::LUCY_INFO, "fuck");
-		});
-
 		switch (e.GetType()) {
 			case EventType::KeyEvent:
 				Logger::Log(LoggerInfo::LUCY_INFO, "KeyEvent triggered!");
@@ -53,12 +47,10 @@ namespace Lucy {
 				Logger::Log(LoggerInfo::LUCY_INFO, "CharCallbackEvent triggered!");
 				break;
 		}
-		*/
 	}
 
 	void EditorLayer::Destroy()
 	{
-		EventDispatcher::GetInstance()->Destroy();
-	}
 
+	}
 }

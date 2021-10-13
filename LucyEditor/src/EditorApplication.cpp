@@ -21,7 +21,7 @@ namespace Lucy {
 		m_Window = Window::Create(w_Specs);
 
 		m_Window->Init();
-		Renderer::Init(RendererContext::OPENGL);
+		Renderer::Init(RenderContextType::OPENGL);
 
 		ImGuiLayer::GetInstance().Init(m_Window->Raw());
 	}
@@ -42,7 +42,7 @@ namespace Lucy {
 
 			for (Layer* layer : m_LayerStack.GetStack()) {
 
-				for (Event* event : EventDispatcher::GetInstance()->GetEventPool())
+				for (Event* event : EventDispatcher::GetInstance().GetEventPool())
 					layer->OnEvent(*event);
 
 				layer->Begin();
