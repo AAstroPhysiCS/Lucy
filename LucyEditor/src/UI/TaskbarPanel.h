@@ -3,6 +3,7 @@
 #include "UI/Panel.h"
 
 namespace Lucy {
+
 	class TaskbarPanel : public Panel
 	{
 	public:

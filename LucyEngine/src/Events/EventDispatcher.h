@@ -8,10 +8,10 @@
 #include "Event.h"
 
 namespace Lucy {
+
 	class EventDispatcher
 	{
 	public:
-
 		template <class E>
 		constexpr void PushEvent(const E evtFnc) {
 
@@ -43,9 +43,8 @@ namespace Lucy {
 			}
 		}
 
-		static std::vector<Event*>& GetEventPool();
+		inline static std::vector<Event*>& GetEventPool() { return s_Events; }
 	private:
-
 		static std::vector<Event*> s_Events;
 	};
 }

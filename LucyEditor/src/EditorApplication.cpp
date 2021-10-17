@@ -19,10 +19,9 @@ namespace Lucy {
 		w_Specs.VSync = false;
 
 		m_Window = Window::Create(w_Specs);
-
 		m_Window->Init();
+		
 		Renderer::Init(RenderContextType::OPENGL);
-
 		ImGuiLayer::GetInstance().Init(m_Window->Raw());
 	}
 

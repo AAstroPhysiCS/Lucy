@@ -12,11 +12,10 @@
 #include "UI/Panel.h"
 
 namespace Lucy {
+
 	class ImGuiLayer : public Layer
 	{
-
 	public:
-
 		static ImGuiLayer& GetInstance() {
 			static ImGuiLayer s_Instance;
 			return s_Instance;
@@ -28,12 +27,10 @@ namespace Lucy {
 		void OnRender();
 		void OnEvent(Event& e);
 		void Destroy();
-
 	private:
 		ImGuiLayer();
 
 		uint32_t m_Time = 0;
-
 		std::vector<Panel*> m_Panels;
 	};
 }

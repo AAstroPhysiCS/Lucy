@@ -16,5 +16,4 @@ namespace Lucy {
 	{
 		glClear(bitField);
 	}
-
 }

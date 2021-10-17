@@ -11,19 +11,17 @@ namespace Lucy {
 			case RenderContextType::OPENGL:
 				return CreateRef<OpenGLTexture2D>(specs);
 				break;
+			default:
+				LUCY_CRITICAL("Other API's not supported!");
+				LUCY_ASSERT(false);
+				break;
 		}
 	}
 	
-	uint32_t Texture2D::GetID()
-	{
-		return m_Id;
-	}
-
 	Texture2D::Texture2D(TextureSpecification& specs)
 		: m_Specs(specs)
 	{
 		m_Width = specs.width;
 		m_Height = specs.height;
 	}
-
 }

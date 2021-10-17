@@ -5,9 +5,9 @@
 #include <vector>
 
 namespace Lucy {
+
 	class LayerStack
 	{
-
 	public:
 		LayerStack() = default;
 		~LayerStack() = default;
@@ -16,7 +16,6 @@ namespace Lucy {
 		void Pop();
 
 		std::vector<Layer*> GetStack() const;
-
 	private:
 		std::vector<Layer*> m_LayerStack;
 	};

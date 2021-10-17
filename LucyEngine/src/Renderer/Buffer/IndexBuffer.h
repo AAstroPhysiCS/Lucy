@@ -5,10 +5,10 @@
 #include "../Renderer.h"
 
 namespace Lucy {
+
 	class IndexBuffer : public Buffer
 	{
 	public:
-
 		virtual ~IndexBuffer() = default;
 
 		virtual void Bind() = 0;
@@ -16,7 +16,6 @@ namespace Lucy {
 		void SetData(void* data);
 		
 		static RefLucy<IndexBuffer> Create(uint32_t size, void* data);
-
 	protected:
 		IndexBuffer(uint32_t size, void* data);
 		void* m_Data;

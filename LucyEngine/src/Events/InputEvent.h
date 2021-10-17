@@ -67,13 +67,12 @@ namespace Lucy {
 
 	struct MouseEvent : Event {
 		
-	MouseEvent(int32_t button, int32_t action, int32_t mods)
+		MouseEvent(int32_t button, int32_t action, int32_t mods)
 			: m_Button(button), m_Action(action), m_Mods(mods) {
 			m_Type = EventType::MouseEvent;
 		}
 
 		std::function<void(int32_t, int32_t, int32_t)> dispatchFunc;
-
 	private:
 		int32_t m_Button;
 		int32_t m_Action;

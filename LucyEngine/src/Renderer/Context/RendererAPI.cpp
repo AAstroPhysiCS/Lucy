@@ -1,10 +1,10 @@
-
 #include "RendererAPI.h"
 
 #include "../Renderer.h"
 #include "OpenGLRendererAPI.h"
 
 namespace Lucy {
+	
 	RefLucy<RendererAPI> RendererAPI::Create() {
 		switch (Renderer::GetCurrentRenderContextType()) {
 			case RenderContextType::OPENGL:

@@ -4,6 +4,7 @@
 #include <iostream>
 
 namespace Lucy {
+
 	class UUID
 	{
 		UUID();

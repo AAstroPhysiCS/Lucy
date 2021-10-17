@@ -36,5 +36,4 @@ namespace Lucy {
 		Logger::Log(LoggerInfo::LUCY_INFO, std::string("Renderer ").append(renderer));
 		Logger::Log(LoggerInfo::LUCY_INFO, std::string("GL Version ").append(version));
 	}
-
 }

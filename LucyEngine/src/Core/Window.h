@@ -45,5 +45,4 @@ namespace Lucy {
 		void Init();
 		void Destroy();
 	};
-
 }

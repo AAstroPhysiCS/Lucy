@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 namespace Lucy {
+
 	enum class KeyCode : uint16_t
 	{
 		// From glfw3.h
@@ -139,7 +140,3 @@ namespace Lucy {
 		Menu = 348
 	};
 }
-
-
-
-

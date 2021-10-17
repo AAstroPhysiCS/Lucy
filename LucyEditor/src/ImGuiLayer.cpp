@@ -4,6 +4,8 @@
 #include "UI/TaskbarPanel.h"
 #include "UI/ViewportPanel.h"
 
+#include <iostream>
+
 namespace Lucy {
 
 	ImGuiLayer::ImGuiLayer()
@@ -22,6 +24,7 @@ namespace Lucy {
 		//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+		io.IniFilename = "lucyconfig.ini";
 		//io.ConfigFlags |= ImGuiConfigFlags_ViewportsNoTaskBarIcons;
 		//io.ConfigFlags |= ImGuiConfigFlags_ViewportsNoMerge;
 

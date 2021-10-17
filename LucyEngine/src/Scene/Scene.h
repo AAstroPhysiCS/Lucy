@@ -11,13 +11,11 @@ namespace Lucy {
 	class Scene
 	{
 	public:
-
 		Scene() = default;
 
 		Entity CreateEntity(std::string& path);
 		Entity CreateEntity();
 		void RemoveEntity(Entity& e);
-
 	private:
 		entt::registry registry;
 

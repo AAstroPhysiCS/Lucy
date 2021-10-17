@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 namespace Lucy {
+
 	enum class MouseCode : uint8_t
 	{
 
@@ -22,4 +23,3 @@ namespace Lucy {
 		ButtonMiddle = Button2
 	};
 }
-

@@ -67,6 +67,5 @@ namespace Lucy {
 	private:
 		Logger() = delete;
 		~Logger() = delete;
-
 	};
 }

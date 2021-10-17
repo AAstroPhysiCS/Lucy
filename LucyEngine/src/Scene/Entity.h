@@ -16,9 +16,7 @@ namespace Lucy {
 
 		entt::entity m_Entity;
 		Scene* m_Scene;
-
 	public:
-
 		bool operator==(Entity& other) {
 			return GetComponent<UUIDComponent>().GetUUID() == other.GetComponent<UUIDComponent>().GetUUID();
 		}
@@ -34,6 +32,5 @@ namespace Lucy {
 		}
 
 		friend class Scene;
-
 	};
 }

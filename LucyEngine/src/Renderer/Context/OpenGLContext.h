@@ -3,6 +3,7 @@
 #include "RenderContext.h"
 
 namespace Lucy {
+
 	class OpenGLContext : public RenderContext
 	{
 	public:

@@ -1,12 +1,16 @@
+#include <iostream>
 #include "EditorLayer.h"
 
+#include "Renderer/Renderer.h"
+#include "Scene/Scene.h"
 #include "Scene/Components.h"
+#include "Renderer/Buffer/FrameBuffer.h"
+#include "Renderer/Buffer/OpenGL/OpenGLFrameBuffer.h"
 
 namespace Lucy {
 
 	void EditorLayer::Begin()
 	{
-
 		Scene& scene = Renderer::GetActiveScene();
 		auto& meshView = scene.registry.view<MeshComponent>();
 
@@ -17,12 +21,21 @@ namespace Lucy {
 
 	void EditorLayer::End()
 	{
+		auto& mainFrameBuffer = Renderer::GetMainFrameBuffer();
+		mainFrameBuffer->Bind();
+		
+		Renderer::Submit([&]() {
+			glClearColor(1.0f, 0.5f, 0.5f, 1.0f);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			mainFrameBuffer->Blit();
+		});
+		
 		Renderer::Dispatch();
+		mainFrameBuffer->Unbind();
 	}
 
 	void EditorLayer::OnRender()
 	{
-
 	}
 
 	void EditorLayer::OnEvent(Event& e)
@@ -51,6 +64,5 @@ namespace Lucy {
 
 	void EditorLayer::Destroy()
 	{
-
 	}
 }

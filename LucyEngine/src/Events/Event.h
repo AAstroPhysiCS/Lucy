@@ -10,9 +10,7 @@ namespace Lucy {
 	class Event {
 	public:
 		EventType GetType() { return m_Type; }
-	
 	protected:
 		EventType m_Type;
 	};
-
 }

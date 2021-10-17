@@ -14,7 +14,6 @@ namespace Lucy {
 
 	UUID::UUID()
 	{
-
 		std::stringstream ss;
 		int i;
 		ss << std::hex;
@@ -41,5 +40,4 @@ namespace Lucy {
 
 		m_UUIDAsString = ss.str();
 	}
-
 }

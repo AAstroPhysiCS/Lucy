@@ -18,5 +18,4 @@ namespace Lucy {
 		: m_Specs(specs)
 	{
 	}
-
 }

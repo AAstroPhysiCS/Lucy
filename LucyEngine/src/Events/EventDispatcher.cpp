@@ -9,8 +9,4 @@ namespace Lucy {
 		static EventDispatcher s_Instance;
 		return s_Instance;
 	}
-
-	std::vector<Event*>& EventDispatcher::GetEventPool() {
-		return s_Events;
-	}
 }

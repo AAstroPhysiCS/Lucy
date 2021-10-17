@@ -14,25 +14,19 @@ namespace Lucy {
 	class Application
 	{
 	public:
-	
 		Application(const ApplicationArgs& args);
-
 		virtual ~Application() { 
 			for (Layer* layers : m_LayerStack.GetStack()) {
 				layers->Destroy();
 			}
 		}
-
-		virtual void Run() = 0;
-
-	protected:
 		
+		virtual void Run() = 0;
+	protected:
 		ApplicationArgs m_Args;
-
 		LayerStack m_LayerStack;
 
 		friend extern int main(int argc, char** argv);
-
 	};
 
 	extern Application* CreateEditorApplication(const ApplicationArgs& args);

@@ -33,5 +33,4 @@ namespace Lucy {
 	private:
 		GLFWwindow* m_Window;
 	};
-
 }

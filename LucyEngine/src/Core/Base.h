@@ -23,15 +23,14 @@
 		#define LUCY_CRITICAL(arg) Lucy::Logger::Log(Lucy::LoggerInfo::LUCY_CRITICAL, arg)
 		#define LUCY_INFO(arg) Lucy::Logger::Log(Lucy::LoggerInfo::LUCY_INFO, arg)
 
-		#define LUCY_ASSERT(arg) if(!arg) \
+		#define LUCY_ASSERT(arg) if(!arg) { \
 							LUCY_CRITICAL("Assert failed!"); \
-							LUCY_DEBUG_BREAK
+							LUCY_DEBUG_BREAK }
 	#endif
 
 #endif
 
 namespace Lucy {
-	
 	template<typename T>
 	using RefLucy = std::shared_ptr<T>;
 	template<typename T, typename ... Args>
@@ -47,5 +46,4 @@ namespace Lucy {
 	constexpr inline ScopeLucy<T> CreateScope(Args&& ... args) {
 		return std::make_unique<T>(std::forward<Args>(args)...);
 	}
-
 }

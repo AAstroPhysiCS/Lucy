@@ -44,5 +44,4 @@ namespace Lucy {
 
 		ImGui::End();
 	}
-
 }

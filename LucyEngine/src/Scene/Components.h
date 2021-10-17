@@ -9,7 +9,6 @@
 namespace Lucy {
 
 	struct TransformComponent {
-
 		TransformComponent() = default;
 		TransformComponent(glm::mat4& mat)
 			: m_Mat(mat) {
@@ -24,7 +23,6 @@ namespace Lucy {
 	};
 
 	struct MeshComponent {
-
 		MeshComponent(std::string& path)
 			: m_Path(path) {
 		}
@@ -35,16 +33,13 @@ namespace Lucy {
 	};
 
 	struct UUIDComponent {
-
 		UUIDComponent() = default;
 		UUIDComponent(UUID& uuid)
 			: m_UUID(uuid) {
 		}
 		UUIDComponent(const UUIDComponent& other) = default;
 
-		std::string& GetUUID() {
-			return m_UUID.m_UUIDAsString;
-		}
+		inline std::string& GetUUID() { return m_UUID.m_UUIDAsString; }
 
 	private:
 		UUID m_UUID;
@@ -52,20 +47,14 @@ namespace Lucy {
 	};
 
 	struct TagComponent {
-
 		TagComponent() = default;
 		TagComponent(std::string& tag)
 			: m_Tag(tag) {
 		}
 		TagComponent(const TagComponent& other) = default;
 
-		std::string& GetTag() {
-			return m_Tag;
-		}
-
+		inline std::string& GetTag() { return m_Tag; }
 	private:
 		std::string m_Tag = "Empty Entity";
 	};
-
 }
-

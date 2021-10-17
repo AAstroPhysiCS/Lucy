@@ -3,6 +3,7 @@
 #include "../VertexBuffer.h"
 
 namespace Lucy {
+
 	class OpenGLVertexBuffer : public VertexBuffer
 	{
 	public:

@@ -18,5 +18,4 @@ namespace Lucy {
 	{
 		return m_LayerStack;
 	}
-
 }

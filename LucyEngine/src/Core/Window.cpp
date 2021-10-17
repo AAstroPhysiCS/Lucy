@@ -107,5 +107,4 @@ namespace Lucy {
 	{
 		glfwDestroyWindow(m_Window);
 	}
-
 }

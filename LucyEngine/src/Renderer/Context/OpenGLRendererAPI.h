@@ -14,5 +14,4 @@ namespace Lucy {
 		void ClearColor(float r, float g, float b, float a);
 		void SwapBuffers(GLFWwindow* window);
 	};
-
 }

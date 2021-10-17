@@ -1,5 +1,7 @@
 #pragma once
 
+#define STB_IMAGE_IMPLEMENTATION
+
 #include "../../Core/Base.h"
 
 namespace Lucy {
@@ -15,17 +17,18 @@ namespace Lucy {
 	};
 
 	struct TextureParameter {
-		uint32_t R, S, T;
-		uint32_t min, mag;
+		uint32_t R = 0, S = 0, T = 0;
+		uint32_t min = 0, mag = 0;
 	};
 
 	struct TextureSpecification {
-		const char* path;
+		const char* path = nullptr;
 		Lucy::PixelType pixelType = Lucy::PixelType::UnsignedByte;
 		TextureFormat format;
 		TextureParameter parameter;
-		int32_t width, height; //gets replaced if path is available
+		int32_t width = 0, height = 0; //gets replaced if path is available
 		bool generateMipmap;
+		uint32_t attachmentIndex;
 	};
 
 	class Texture2D
@@ -37,16 +40,16 @@ namespace Lucy {
 		virtual void Unbind() = 0;
 		virtual void Destroy() = 0;
 
-		uint32_t GetID();
+		inline uint32_t GetID() const { return m_Id; }
 
 	protected:
 		Texture2D(TextureSpecification& specs);
 
 		TextureSpecification m_Specs;
-		uint32_t m_Id;
+		uint32_t m_Id = 0;
+		int32_t m_Channels = 0;
 		int32_t m_Width;
 		int32_t m_Height;
-		int32_t m_Channels;
 	};
 }
 

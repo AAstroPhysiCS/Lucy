@@ -1,28 +1,25 @@
 #pragma once
 
-#include "Buffer.h"
 #include "../../Core/Base.h"
+#include "Buffer.h"
+#include "../Texture/Texture.h"
 
 namespace Lucy {
+
+	class RenderBuffer;
 
 	struct TextureSpecification;
 
 	struct FrameBufferSpecification {
-
 		bool multiSampled;
-		
-		uint32_t texelDataType = 0;
-		uint32_t paramMinFilter = -1, paramMagFilter = -1;
-		uint32_t wrapS = -1, wrapT = -1, wrapR = -1;
-
 		bool disableReadWriteBuffer;
 		bool isStorage;
-		uint32_t level = -1;
+		int32_t level = 0;
 
-		uint32_t textureSize;
-		TextureSpecification* textureSpecs;
+		std::vector<TextureSpecification> textureSpecs;
+		TextureSpecification blittedTextureSpecs;
 
-		//RenderBuffer* renderBuffer;
+		RefLucy<RenderBuffer> renderBuffer;
 	};
 
 	class FrameBuffer
@@ -33,13 +30,17 @@ namespace Lucy {
 		virtual void Bind() = 0;
 		virtual void Unbind() = 0;
 		virtual void Destroy() = 0;
+		virtual void Blit() = 0;
+
+		uint32_t GetID() const { return m_Id; }
+		RefLucy<FrameBuffer>& GetBlitted() { return m_Blitted; }
 		
 		static RefLucy<FrameBuffer> Create(FrameBufferSpecification& specs);
 	protected:
 		FrameBuffer(FrameBufferSpecification& specs);
+		
 		uint32_t m_Id;
-
-	private:
 		FrameBufferSpecification m_Specs;
+		RefLucy<FrameBuffer> m_Blitted;
 	};
 }
