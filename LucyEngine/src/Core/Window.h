@@ -1,7 +1,9 @@
 #pragma once
 
 #include "Base.h"
-#include <GLFW/glfw3.h>
+#include "GLFW/glfw3.h"
+
+#include "../Renderer/Buffer/Buffer.h"
 
 #include "../Events/EventDispatcher.h"
 #include "../Events/InputEvent.h"
@@ -29,17 +31,18 @@ namespace Lucy {
 		virtual void Init() = 0;
 		virtual void Destroy() = 0;
 
+		void SetEventCallback(std::function<void(Event*)>);
 		GLFWwindow* Raw();
 
 		static ScopeLucy<Window> Create(const WindowSpecification& specs);
-
 	protected:
 		WindowSpecification m_Specs;
 		GLFWwindow* m_Window;
+
+		static std::function<void(Event*)> s_EventFunc;
 	};
 
 	class WinWindow : public Window {
-
 	private:
 		void PollEvents();
 		void Init();

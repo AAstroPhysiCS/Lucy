@@ -1,13 +1,17 @@
 #pragma once
 
-#ifndef defined(_WIN64)
-	#define LUCY_WINDOWS
-#endif
-
 #include <memory>
 #include <iostream>
 #include <vector>
 #include <cstdint>
+#include <map>
+#include <set>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+#include <any>
+#include <functional>
+#include <algorithm>
 
 #include "Logger.h"
 #include "Application.h"
@@ -30,11 +34,16 @@
 
 #endif
 
+#define As(arg, T) std::static_pointer_cast<T>(arg)
+
 namespace Lucy {
+
+	using Func = std::function<void()>;
+
 	template<typename T>
 	using RefLucy = std::shared_ptr<T>;
 	template<typename T, typename ... Args>
-	constexpr inline RefLucy<T> CreateRef(Args&& ... args)
+	inline RefLucy<T> CreateRef(Args&& ... args)
 	{
 		return std::make_shared<T>(std::forward<Args>(args)...);
 	}
@@ -43,7 +52,7 @@ namespace Lucy {
 	template<typename T>
 	using ScopeLucy = std::unique_ptr<T>;
 	template<typename T, typename ... Args>
-	constexpr inline ScopeLucy<T> CreateScope(Args&& ... args) {
+	inline ScopeLucy<T> CreateScope(Args&& ... args) {
 		return std::make_unique<T>(std::forward<Args>(args)...);
 	}
-}
+ }

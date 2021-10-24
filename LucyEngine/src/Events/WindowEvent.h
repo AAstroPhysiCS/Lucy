@@ -14,6 +14,9 @@ namespace Lucy {
 			m_Type = EventType::WindowResizeEvent;
 		}
 
+		inline int32_t GetWidth() const { return m_Width; }
+		inline int32_t GetHeight() const { return m_Height; }
+
 		std::function<void(int32_t, int32_t)> dispatchFunc;
 
 	private:

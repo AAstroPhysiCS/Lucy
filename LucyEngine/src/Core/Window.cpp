@@ -2,6 +2,8 @@
 
 namespace Lucy {
 
+	std::function<void(Event*)> Window::s_EventFunc;
+
 	ScopeLucy<Window> Window::Create(const WindowSpecification& specs)
 	{
 #ifdef  LUCY_WINDOWS
@@ -46,6 +48,11 @@ namespace Lucy {
 		glfwSwapInterval(m_Specs.VSync);
 	}
 
+	void Window::SetEventCallback(std::function<void(Event*)> func)
+	{
+		s_EventFunc = func;
+	}
+
 	GLFWwindow* Window::Raw()
 	{
 		return m_Window;
@@ -53,53 +60,43 @@ namespace Lucy {
 
 	void WinWindow::PollEvents()
 	{
-		//Clearing
-		EventDispatcher& evtDispatcher = EventDispatcher::GetInstance();
-		evtDispatcher.GetEventPool().clear();
-
 		glfwPollEvents();
 
 		//Adding events
-		glfwSetWindowSizeCallback(m_Window, [](GLFWwindow* window, int width, int height) {
-			EventDispatcher& evtDispatcher = EventDispatcher::GetInstance();
+		glfwSetWindowSizeCallback(m_Window, [](GLFWwindow* window, int32_t width, int32_t height) {
 			WindowResizeEvent evt{ width, height };
-			evtDispatcher.PushEvent<WindowResizeEvent>(evt);
+			s_EventFunc(&evt);
 		});
 
 		glfwSetWindowCloseCallback(m_Window, [](GLFWwindow* window) {
-			EventDispatcher& evtDispatcher = EventDispatcher::GetInstance();
 			WindowCloseEvent evt{ window };
-			evtDispatcher.PushEvent<WindowCloseEvent>(evt);
+			s_EventFunc(&evt);
 		});
 
-		glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int key, int scanCode, int action, int mods) {
-			EventDispatcher& evtDispatcher = EventDispatcher::GetInstance();
+		glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int32_t key, int32_t scanCode, int32_t action, int32_t mods) {
+			if (action == GLFW_RELEASE) return;
 			KeyEvent evt{ key, scanCode, action, mods };
-			evtDispatcher.PushEvent<KeyEvent>(evt);
+			s_EventFunc(&evt);
 		});
 
 		glfwSetCharCallback(m_Window, [](GLFWwindow* window, uint32_t codePoint) {
-			EventDispatcher& evtDispatcher = EventDispatcher::GetInstance();
 			CharCallbackEvent evt{ codePoint };
-			evtDispatcher.PushEvent<CharCallbackEvent>(evt);
+			s_EventFunc(&evt);
 		});
 
 		glfwSetScrollCallback(m_Window, [](GLFWwindow* window, double xOffset, double yOffset) {
-			EventDispatcher& evtDispatcher = EventDispatcher::GetInstance();
 			ScrollEvent evt{ xOffset, yOffset };
-			evtDispatcher.PushEvent<ScrollEvent>(evt);
+			s_EventFunc(&evt);
 		});
 
 		glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xPos, double yPos) {
-			EventDispatcher& evtDispatcher = EventDispatcher::GetInstance();
 			CursorPosEvent evt{ xPos, yPos };
-			evtDispatcher.PushEvent<CursorPosEvent>(evt);
+			s_EventFunc(&evt);
 		});
 
-		glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int button, int action, int mods) {
-			EventDispatcher& evtDispatcher = EventDispatcher::GetInstance();
+		glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int32_t button, int32_t action, int32_t mods) {
 			MouseEvent evt{ button, action, mods };
-			evtDispatcher.PushEvent<MouseEvent>(evt);
+			s_EventFunc(&evt);
 		});
 	}
 

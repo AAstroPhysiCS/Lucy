@@ -14,7 +14,7 @@ namespace Lucy {
 
 	void OpenGLContext::Init()
 	{
-		if (m_RenderContextType == RenderContextType::OPENGL && !gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+		if (m_RenderContextType == RenderContextType::OpenGL && !gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
 			Destroy();
 			LUCY_CRITICAL("OpenGL init failed!");
 			LUCY_ASSERT(false);

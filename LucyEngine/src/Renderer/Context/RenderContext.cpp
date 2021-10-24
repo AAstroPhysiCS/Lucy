@@ -17,7 +17,7 @@ namespace Lucy {
 	RefLucy<RenderContext> RenderContext::Create(RenderContextType type)
 	{
 		switch (type) {
-			case RenderContextType::OPENGL:
+			case RenderContextType::OpenGL:
 				return CreateRef<OpenGLContext>(type);
 				break;
 			default:

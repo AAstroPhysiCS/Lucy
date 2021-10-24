@@ -1,9 +1,10 @@
 #pragma once
 
-#include <stdint.h>
+#include <cstdint>
 #include <functional>
 
 #include "Event.h"
+#include "KeyCodes.h"
 
 namespace Lucy {
 
@@ -16,6 +17,9 @@ namespace Lucy {
 
 		std::function<void(double, double)> dispatchFunc;
 
+		inline double GetXPos() const { return m_XPos; }
+		inline double GetYPos() const { return m_YPos; }
+
 	private:
 		double m_XPos;
 		double m_YPos;
@@ -27,6 +31,9 @@ namespace Lucy {
 			: m_XOffset(xOffset), m_YOffset(yOffset) {
 			m_Type = EventType::ScrollEvent;
 		}
+
+		inline double GetXOffset() const { return m_XOffset; }
+		inline double GetYOffset() const { return m_YOffset; }
 
 		std::function<void(double, double)> dispatchFunc;
 
@@ -41,6 +48,8 @@ namespace Lucy {
 			: m_CodePoint(codePoint) {
 			m_Type = EventType::CharCallbackEvent;
 		}
+
+		inline int32_t GetCodePoint() const { return m_CodePoint; }
 
 		std::function<void(uint32_t)> dispatchFunc;
 	
@@ -57,12 +66,20 @@ namespace Lucy {
 
 		std::function<void(int32_t, int32_t, int32_t, int32_t)> dispatchFunc;
 
+		inline constexpr bool operator==(KeyCode keyCode) {
+			return m_Key == (uint16_t) keyCode;
+		}
+
+		inline int32_t GetKey() const { return m_Key; }
+		inline int32_t GetScanCode() const { return m_ScanCode; }
+		inline int32_t GetAction() const { return m_Action; }
+		inline int32_t GetMods() const { return m_Mods; }
+
 	private:
 		int32_t m_Key;
 		int32_t m_ScanCode;
 		int32_t m_Action;
 		int32_t m_Mods;
-
 	};
 
 	struct MouseEvent : Event {
@@ -71,6 +88,10 @@ namespace Lucy {
 			: m_Button(button), m_Action(action), m_Mods(mods) {
 			m_Type = EventType::MouseEvent;
 		}
+
+		inline int32_t GetButton() const { return m_Button; }
+		inline int32_t GetAction() const { return m_Action; }
+		inline int32_t GetMods() const { return m_Mods; }
 
 		std::function<void(int32_t, int32_t, int32_t)> dispatchFunc;
 	private:

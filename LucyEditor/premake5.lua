@@ -25,20 +25,26 @@ project "LucyEditor"
         "LucyEngine"
     }
 
-    filter "system:windows"
+    filter "platforms:win64"
         cppdialect "C++17"
         staticruntime "On"
         systemversion "latest"
 
         defines {
-            LUCY_WINDOWS
+            "LUCY_WINDOWS"
         }
     
     filter "configurations:Debug"
-        defines "LUCY_DEBUG"
+        defines {
+            "LUCY_DEBUG",
+            "GLFW_INCLUDE_NONE"
+        }
         symbols "On"
 
     filter "configurations:Release"
-        defines "LUCY_RELEASE"
+        defines {
+            "LUCY_RELEASE",
+            "GLFW_INCLUDE_NONE"
+        }
         symbols "On"
         optimize "On"

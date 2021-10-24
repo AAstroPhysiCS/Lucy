@@ -18,10 +18,10 @@ namespace Lucy {
 	RefLucy<VertexBuffer> VertexBuffer::Create(uint32_t size, void* data)
 	{
 		switch (Renderer::GetCurrentRenderContextType()) {
-			case RenderContextType::OPENGL:
+			case RenderContextType::OpenGL:
 				return CreateRef<OpenGLVertexBuffer>(size, data);
 				break;
-			case RenderContextType::VULKAN:
+			case RenderContextType::Vulkan:
 				LUCY_CRITICAL("Vulkan not supported");
 				LUCY_ASSERT(false);
 				break;

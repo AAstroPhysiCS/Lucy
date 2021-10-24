@@ -1,9 +1,9 @@
-#include <glad/glad.h>
-
 #include "OpenGLFrameBuffer.h"
 #include "OpenGLRenderBuffer.h"
 #include "../../Texture/Texture.h"
 #include "../../Renderer.h"
+
+#include <glad/glad.h>
 
 namespace Lucy {
 
@@ -15,17 +15,17 @@ namespace Lucy {
 			glCreateFramebuffers(1, &m_Id);
 			Bind();
 
-			for (uint32_t i = 0; i < specs.textureSpecs.size(); i++) {
-				auto textureSpec = specs.textureSpecs[i];
+			for (uint32_t i = 0; i < specs.TextureSpecs.size(); i++) {
+				auto textureSpec = specs.TextureSpecs[i];
 				RefLucy<Texture2D> texture = Texture2D::Create(textureSpec);
 				texture->Bind();
-				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + textureSpec.attachmentIndex, GL_TEXTURE_2D, texture->GetID(), 0);
+				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + textureSpec.AttachmentIndex, GL_TEXTURE_2D, texture->GetID(), 0);
 				texture->Unbind();
 				m_Textures.push_back(texture);
 			}
 
-			if (specs.renderBuffer) {
-				RefLucy<OpenGLRenderBuffer>& renderBuffer = std::static_pointer_cast<OpenGLRenderBuffer>(specs.renderBuffer);
+			if (specs.RenderBuffer) {
+				RefLucy<OpenGLRenderBuffer>& renderBuffer = As(specs.RenderBuffer, OpenGLRenderBuffer);
 				renderBuffer->Bind();
 				renderBuffer->AttachToFramebuffer();
 				renderBuffer->Unbind();
@@ -36,10 +36,10 @@ namespace Lucy {
 		});
 
 		//we have to blit it if blit texture is defined
-		if (specs.blittedTextureSpecs.width != 0 && specs.blittedTextureSpecs.height != 0) {
+		if (specs.BlittedTextureSpecs.Width != 0 && specs.BlittedTextureSpecs.Height != 0) {
 			FrameBufferSpecification blittedSpec;
-			blittedSpec.multiSampled = false;
-			blittedSpec.textureSpecs.push_back(specs.blittedTextureSpecs);
+			blittedSpec.MultiSampled = false;
+			blittedSpec.TextureSpecs.push_back(specs.BlittedTextureSpecs);
 			m_Blitted = FrameBuffer::Create(blittedSpec);
 		}
 	}
@@ -61,7 +61,7 @@ namespace Lucy {
 
 	void OpenGLFrameBuffer::Blit()
 	{
-		glBlitNamedFramebuffer(m_Id, m_Blitted->GetID(), 0, 0, m_Specs.renderBuffer->GetWidth(), m_Specs.renderBuffer->GetHeight(), 0, 0, m_Specs.renderBuffer->GetWidth(), m_Specs.renderBuffer->GetHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
+		glBlitNamedFramebuffer(m_Id, m_Blitted->GetID(), 0, 0, m_Specs.RenderBuffer->GetWidth(), m_Specs.RenderBuffer->GetHeight(), 0, 0, m_Specs.RenderBuffer->GetWidth(), m_Specs.RenderBuffer->GetHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
 	}
 
 	bool OpenGLFrameBuffer::CheckStatus()

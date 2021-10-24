@@ -14,7 +14,7 @@ namespace Lucy {
 		void Unbind();
 		void AttachToFramebuffer();
 
-		inline uint32_t GetInternalFormat() const { return m_Specs.internalFormat; }
-		inline uint32_t GetAttachment() const { return m_Specs.attachment; }
+		inline uint32_t GetInternalFormat() const { return m_Specs.InternalFormat; }
+		inline uint32_t GetAttachment() const { return m_Specs.Attachment; }
 	};
 }

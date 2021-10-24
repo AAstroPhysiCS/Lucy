@@ -1,5 +1,6 @@
 #include <iostream>
 #include "EditorLayer.h"
+#include "Core/Base.h"
 
 #include "Renderer/Renderer.h"
 #include "Scene/Scene.h"
@@ -7,7 +8,17 @@
 #include "Renderer/Buffer/FrameBuffer.h"
 #include "Renderer/Buffer/OpenGL/OpenGLFrameBuffer.h"
 
+#include "Events/KeyCodes.h"
+
+#include "Renderer/RenderCommand.h"
+#include "glad/glad.h"
+
 namespace Lucy {
+
+	void EditorLayer::Init(GLFWwindow* window)
+	{
+		m_Window = window;
+	}
 
 	void EditorLayer::Begin()
 	{
@@ -21,21 +32,22 @@ namespace Lucy {
 
 	void EditorLayer::End()
 	{
-		auto& mainFrameBuffer = Renderer::GetMainFrameBuffer();
-		mainFrameBuffer->Bind();
-		
-		Renderer::Submit([&]() {
-			glClearColor(1.0f, 0.5f, 0.5f, 1.0f);
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-			mainFrameBuffer->Blit();
-		});
-		
 		Renderer::Dispatch();
-		mainFrameBuffer->Unbind();
+
+		GLenum state = glGetError();
+		if (state != GL_NO_ERROR) Logger::Log(LoggerInfo::LUCY_CRITICAL, state);
 	}
 
 	void EditorLayer::OnRender()
 	{
+		auto& mainFrameBuffer = Renderer::GetMainFrameBuffer();
+		Renderer::Submit([&]() {
+			mainFrameBuffer->Bind();
+			RenderCommand::ClearColor(1.0f, 0.5f, 0.5f, 1.0f);
+			RenderCommand::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			mainFrameBuffer->Blit();
+			mainFrameBuffer->Unbind();
+		});
 	}
 
 	void EditorLayer::OnEvent(Event& e)
@@ -60,6 +72,13 @@ namespace Lucy {
 				Logger::Log(LoggerInfo::LUCY_INFO, "CharCallbackEvent triggered!");
 				break;
 		}
+
+		EventDispatcher& dispatcher = EventDispatcher::GetInstance();
+		dispatcher.Dispatch<KeyEvent>(e, EventType::KeyEvent, [=](KeyEvent& e) {
+			if (e == KeyCode::Escape) {
+				glfwSetWindowShouldClose(m_Window, GL_TRUE);
+			}
+		});
 	}
 
 	void EditorLayer::Destroy()

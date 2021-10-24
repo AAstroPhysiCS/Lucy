@@ -5,6 +5,8 @@
 #include "Events/EventDispatcher.h"
 #include "Events/InputEvent.h"
 
+#include "GLFW/glfw3.h"
+
 namespace Lucy {
 
 	class EditorLayer : public Layer {
@@ -16,10 +18,13 @@ namespace Lucy {
 
 		void Begin();
 		void End();
+		void Init(GLFWwindow* window);
 		void OnRender();
 		void OnEvent(Event& e);
 		void Destroy();
 	private:
 		EditorLayer() = default;
+
+		GLFWwindow* m_Window = nullptr;
 	};
 }

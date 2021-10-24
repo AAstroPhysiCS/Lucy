@@ -1,5 +1,7 @@
 #include "OpenGLIndexBuffer.h"
 
+#include "glad/glad.h"
+
 namespace Lucy {
 	
 	OpenGLIndexBuffer::OpenGLIndexBuffer(uint32_t size, void* data)

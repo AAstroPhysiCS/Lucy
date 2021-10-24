@@ -1,5 +1,14 @@
-#include "EditorApplication.h"
 #include <iostream>
+
+#include "EditorApplication.h"
+
+#include "EditorLayer.h"
+#include "ImGuiLayer.h"
+
+#include "Renderer/Renderer.h"
+#include "Renderer/RenderCommand.h"
+
+#include "glad/glad.h"
 
 namespace Lucy {
 
@@ -20,8 +29,10 @@ namespace Lucy {
 
 		m_Window = Window::Create(w_Specs);
 		m_Window->Init();
-		
-		Renderer::Init(RenderContextType::OPENGL);
+		m_Window->SetEventCallback(std::bind(&EditorApplication::OnEvent, this, std::placeholders::_1));
+
+		Renderer::Init(RenderContextType::OpenGL);
+		EditorLayer::GetInstance().Init(m_Window->Raw());
 		ImGuiLayer::GetInstance().Init(m_Window->Raw());
 	}
 
@@ -35,25 +46,23 @@ namespace Lucy {
 
 	void EditorApplication::Run()
 	{
-		auto& rendererAPI = Renderer::GetRendererAPI();
-
 		while (m_Running && !glfwWindowShouldClose(m_Window->Raw())) {
 
 			for (Layer* layer : m_LayerStack.GetStack()) {
-
-				for (Event* event : EventDispatcher::GetInstance().GetEventPool())
-					layer->OnEvent(*event);
-
 				layer->Begin();
 				layer->OnRender();
 				layer->End();
 			}
 
-			rendererAPI->SwapBuffers(m_Window->Raw());
+			RenderCommand::SwapBuffers(m_Window->Raw());
 			m_Window->PollEvents();
+		}
+	}
 
-			GLenum state = glGetError();
-			if (state != GL_NO_ERROR) Logger::Log(LoggerInfo::LUCY_CRITICAL, state);
+	void EditorApplication::OnEvent(Event* e)
+	{
+		for (Layer* layer : m_LayerStack.GetStack()) {
+			layer->OnEvent(*e);
 		}
 	}
 }

@@ -7,6 +7,10 @@ workspace "LucyEngine"
         "Release"
     }
 
+    platforms {
+        "win64"
+    }
+
     flags {
         "MultiProcessorCompile"
     }

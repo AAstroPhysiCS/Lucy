@@ -1,5 +1,7 @@
 #include "OpenGLRendererAPI.h"
 
+#include "glad/glad.h"
+
 namespace Lucy {
 
 	void OpenGLRendererAPI::SwapBuffers(GLFWwindow* window)

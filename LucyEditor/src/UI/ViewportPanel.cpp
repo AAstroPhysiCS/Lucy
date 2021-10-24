@@ -22,7 +22,7 @@ namespace Lucy {
 		ImGui::Begin("Viewport", &pOpen, flags);
 		ImGui::PopStyleVar(2);
 
-		auto& blittedFrameBuffer = std::static_pointer_cast<OpenGLFrameBuffer>(Renderer::GetMainFrameBuffer()->GetBlitted());
+		auto& blittedFrameBuffer = As(Renderer::GetMainFrameBuffer()->GetBlitted(), OpenGLFrameBuffer);
 		auto& texture = blittedFrameBuffer->GetTexture(0);
 
 		ImVec2& size = ImGui::GetWindowSize();

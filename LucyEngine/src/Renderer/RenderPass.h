@@ -7,18 +7,18 @@
 namespace Lucy {
 
 	struct RenderPassSpecification {
-		RefLucy<FrameBuffer> frameBuffer;
-		Pipeline* pipeline = nullptr;
+		RefLucy<FrameBuffer> FrameBuffer;
+		RefLucy<Pipeline> Pipeline;
 
 		struct ClearColor {
 			float r = 0, g = 0, b = 0, a = 0;
-		} clearColor;
+		} ClearColor;
 	};
 
 	class RenderPass
 	{
 	public:
-		static RenderPass Create(RenderPassSpecification& specs);
+		static RefLucy<RenderPass>& Create(RenderPassSpecification& specs);
 		static void Begin(RefLucy<RenderPass>& renderPass);
 		static void End(RefLucy<RenderPass>& renderPass);
 

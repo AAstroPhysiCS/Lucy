@@ -8,7 +8,7 @@ namespace Lucy {
 	RefLucy<Texture2D> Texture2D::Create(TextureSpecification& specs)
 	{
 		switch (Renderer::GetCurrentRenderContextType()) {
-			case RenderContextType::OPENGL:
+			case RenderContextType::OpenGL:
 				return CreateRef<OpenGLTexture2D>(specs);
 				break;
 			default:
@@ -21,7 +21,7 @@ namespace Lucy {
 	Texture2D::Texture2D(TextureSpecification& specs)
 		: m_Specs(specs)
 	{
-		m_Width = specs.width;
-		m_Height = specs.height;
+		m_Width = specs.Width;
+		m_Height = specs.Height;
 	}
 }

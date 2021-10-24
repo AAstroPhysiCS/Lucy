@@ -1,9 +1,5 @@
 #pragma once
 
-#include "Renderer/Renderer.h"
-#include "EditorLayer.h"
-#include "ImGuiLayer.h"
-
 #include "Core/Application.h"
 #include "Core/Window.h"
 
@@ -16,6 +12,7 @@ namespace Lucy {
 		~EditorApplication();
 		
 		void Run();
+		void OnEvent(Event* e);
 	private:
 		bool m_Running;
 		ScopeLucy<Window> m_Window;

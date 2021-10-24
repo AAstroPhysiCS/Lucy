@@ -5,8 +5,8 @@
 namespace Lucy {
 
 	enum class RenderContextType {
-		OPENGL,
-		VULKAN
+		OpenGL,
+		Vulkan
 	};
 
 	class RenderContext

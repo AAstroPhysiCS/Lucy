@@ -1,4 +1,5 @@
 #include "OpenGLVertexBuffer.h"
+#include "glad/glad.h"
 
 namespace Lucy {
 	

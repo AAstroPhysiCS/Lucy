@@ -6,6 +6,9 @@ namespace Lucy {
 
 	class Buffer
 	{
+	public:
+		inline void* GetData() const { return m_Data; }
+
 	protected:
 		Buffer(uint32_t size);
 

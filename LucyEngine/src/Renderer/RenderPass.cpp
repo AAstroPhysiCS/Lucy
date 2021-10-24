@@ -8,11 +8,11 @@ namespace Lucy {
 		m_Specs = specs;
 	}
 
-	RenderPass RenderPass::Create(RenderPassSpecification& specs)
+	RefLucy<RenderPass>& RenderPass::Create(RenderPassSpecification& specs)
 	{
 		switch (Renderer::GetCurrentRenderContextType()) {
-		case RenderContextType::OPENGL:
-			return RenderPass(specs);
+		case RenderContextType::OpenGL:
+			return CreateRef<RenderPass>(specs);
 			break;
 		default:
 			LUCY_CRITICAL("Other API's are not supported!");
@@ -23,13 +23,13 @@ namespace Lucy {
 
 	void RenderPass::Begin(RefLucy<RenderPass>& renderPass)
 	{
-		auto& frameBuffer = renderPass->m_Specs.frameBuffer;
+		auto& frameBuffer = renderPass->m_Specs.FrameBuffer;
 		frameBuffer->Bind();
 	}
 
 	void RenderPass::End(RefLucy<RenderPass>& renderPass)
 	{
-		auto& frameBuffer = renderPass->m_Specs.frameBuffer;
+		auto& frameBuffer = renderPass->m_Specs.FrameBuffer;
 		frameBuffer->Unbind();
 	}
 }

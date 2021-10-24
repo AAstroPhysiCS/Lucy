@@ -43,7 +43,6 @@ namespace Lucy {
 
 	private:
 		UUID m_UUID;
-
 	};
 
 	struct TagComponent {

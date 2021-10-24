@@ -1,8 +1,7 @@
 #pragma once
 
-#include "../../Core/Base.h"
-#include "Buffer.h"
 #include "../Texture/Texture.h"
+#include "../../Core/Base.h"
 
 namespace Lucy {
 
@@ -11,15 +10,15 @@ namespace Lucy {
 	struct TextureSpecification;
 
 	struct FrameBufferSpecification {
-		bool multiSampled;
-		bool disableReadWriteBuffer;
-		bool isStorage;
-		int32_t level = 0;
+		bool MultiSampled;
+		bool DisableReadWriteBuffer;
+		bool IsStorage;
+		int32_t Level = 0;
 
-		std::vector<TextureSpecification> textureSpecs;
-		TextureSpecification blittedTextureSpecs;
+		std::vector<TextureSpecification> TextureSpecs;
+		TextureSpecification BlittedTextureSpecs;
 
-		RefLucy<RenderBuffer> renderBuffer;
+		RefLucy<RenderBuffer> RenderBuffer;
 	};
 
 	class FrameBuffer

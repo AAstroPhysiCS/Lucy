@@ -9,11 +9,11 @@ namespace Lucy {
 	{
 		glCreateRenderbuffers(1, &m_Id);
 		Bind();
-		if (specs.samples != 0) {
-			glRenderbufferStorageMultisample(GL_RENDERBUFFER, specs.samples, specs.internalFormat, specs.width, specs.height);
+		if (specs.Samples != 0) {
+			glRenderbufferStorageMultisample(GL_RENDERBUFFER, specs.Samples, specs.InternalFormat, specs.Width, specs.Height);
 		}
 		else {
-			glRenderbufferStorage(GL_RENDERBUFFER, specs.internalFormat, specs.width, specs.height);
+			glRenderbufferStorage(GL_RENDERBUFFER, specs.InternalFormat, specs.Width, specs.Height);
 		}
 		Unbind();
 	}
@@ -30,6 +30,6 @@ namespace Lucy {
 
 	void OpenGLRenderBuffer::AttachToFramebuffer()
 	{
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, m_Specs.attachment, GL_RENDERBUFFER, m_Id);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, m_Specs.Attachment, GL_RENDERBUFFER, m_Id);
 	}
 }

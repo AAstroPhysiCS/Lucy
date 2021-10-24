@@ -12,23 +12,23 @@ namespace Lucy {
 	};
 
 	struct TextureFormat {
-		uint32_t internalFormat;
-		uint32_t format;
+		uint32_t InternalFormat;
+		uint32_t Format;
 	};
 
 	struct TextureParameter {
 		uint32_t R = 0, S = 0, T = 0;
-		uint32_t min = 0, mag = 0;
+		uint32_t Min = 0, Mag = 0;
 	};
 
 	struct TextureSpecification {
-		const char* path = nullptr;
-		Lucy::PixelType pixelType = Lucy::PixelType::UnsignedByte;
-		TextureFormat format;
-		TextureParameter parameter;
-		int32_t width = 0, height = 0; //gets replaced if path is available
-		bool generateMipmap;
-		uint32_t attachmentIndex;
+		const char* Path = nullptr;
+		Lucy::PixelType PixelType = Lucy::PixelType::UnsignedByte;
+		TextureFormat Format;
+		TextureParameter Parameter;
+		int32_t Width = 0, Height = 0; //gets replaced if path is available
+		bool GenerateMipmap;
+		uint32_t AttachmentIndex;
 	};
 
 	class Texture2D

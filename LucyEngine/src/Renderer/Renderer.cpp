@@ -10,8 +10,10 @@
 #include "../Utils.h"
 
 #include "RenderPass.h"
+#include "Shader/Shader.h"
 
 #include <iostream>
+#include "glad/glad.h"
 
 namespace Lucy {
 
@@ -19,7 +21,7 @@ namespace Lucy {
 	RefLucy<RenderContext> Renderer::m_RenderContext;
 	RefLucy<FrameBuffer> Renderer::m_MainFrameBuffer;
 
-	std::vector<RenderFunc> Renderer::m_RenderQueue;
+	std::vector<Func> Renderer::m_RenderQueue;
 	Scene Renderer::m_Scene;
 
 	void Renderer::Init(RenderContextType renderContext)
@@ -33,56 +35,70 @@ namespace Lucy {
 		//------------ Main Framebuffer ------------
 		{
 			RenderBufferSpecification renderBufferSpecs;
-			renderBufferSpecs.attachment = GL_DEPTH_STENCIL_ATTACHMENT;
-			renderBufferSpecs.internalFormat = GL_DEPTH24_STENCIL8;
-			renderBufferSpecs.width = width;
-			renderBufferSpecs.height = height;
-			renderBufferSpecs.samples = 4;
+			renderBufferSpecs.Attachment = GL_DEPTH_STENCIL_ATTACHMENT;
+			renderBufferSpecs.InternalFormat = GL_DEPTH24_STENCIL8;
+			renderBufferSpecs.Width = width;
+			renderBufferSpecs.Height = height;
+			renderBufferSpecs.Samples = 4;
 
 			TextureSpecification textureAntialiased;
-			textureAntialiased.width = width;
-			textureAntialiased.height = height;
-			textureAntialiased.attachmentIndex = 0;
-			textureAntialiased.format = { GL_RGBA8, GL_RGBA };
-			textureAntialiased.pixelType = PixelType::UnsignedByte;
+			textureAntialiased.Width = width;
+			textureAntialiased.Height = height;
+			textureAntialiased.AttachmentIndex = 0;
+			textureAntialiased.Format = { GL_RGBA8, GL_RGBA };
+			textureAntialiased.PixelType = PixelType::UnsignedByte;
 
 			TextureSpecification finalTextureSpec;
-			finalTextureSpec.width = width;
-			finalTextureSpec.height = height;
-			finalTextureSpec.generateMipmap = true;
-			finalTextureSpec.attachmentIndex = 0;
-			finalTextureSpec.parameter.min = GL_LINEAR;
-			finalTextureSpec.parameter.mag = GL_LINEAR;
-			finalTextureSpec.format = { GL_RGBA8, GL_RGBA };
-			finalTextureSpec.pixelType = PixelType::UnsignedByte;
+			finalTextureSpec.Width = width;
+			finalTextureSpec.Height = height;
+			finalTextureSpec.GenerateMipmap = true;
+			finalTextureSpec.AttachmentIndex = 0;
+			finalTextureSpec.Parameter.Min = GL_LINEAR;
+			finalTextureSpec.Parameter.Mag = GL_LINEAR;
+			finalTextureSpec.Format = { GL_RGBA8, GL_RGBA };
+			finalTextureSpec.PixelType = PixelType::UnsignedByte;
 
 			FrameBufferSpecification frameBufferSpecs;
-			frameBufferSpecs.multiSampled = true;
-			frameBufferSpecs.renderBuffer = RenderBuffer::Create(renderBufferSpecs);
-			frameBufferSpecs.textureSpecs.push_back(textureAntialiased);
-			frameBufferSpecs.blittedTextureSpecs = finalTextureSpec;
+			frameBufferSpecs.MultiSampled = true;
+			frameBufferSpecs.RenderBuffer = RenderBuffer::Create(renderBufferSpecs);
+			frameBufferSpecs.TextureSpecs.push_back(textureAntialiased);
+			frameBufferSpecs.BlittedTextureSpecs = finalTextureSpec;
 
 			m_MainFrameBuffer = FrameBuffer::Create(frameBufferSpecs);
 		}
 
-		//------------ Geometry ------------
+		//------------ Shaders ------------
 		{
-
-			PipelineSpecification geometryPipelineSpecs;
-			Pipeline geometryPipeline(geometryPipelineSpecs);
-
-			RenderPassSpecification geometryPassSpecs;
-			geometryPassSpecs.frameBuffer = m_MainFrameBuffer;
-			geometryPassSpecs.pipeline = &geometryPipeline;
-			geometryPassSpecs.clearColor = { 1.0f, 0.0f, 0.0f, 1.0f };
-
-			RenderPass geometryPass = RenderPass::Create(geometryPassSpecs);
+			RefLucy<Shader> testShader = Shader::Create("assets/shaders/LucyBasicShader.glsl");
 		}
 
-		Renderer::Dispatch(); //just for init
+		//------------ Geometry ------------
+		{
+			PipelineSpecification geometryPipelineSpecs;
+			
+			std::vector<ShaderLayoutElement> vertexLayout = {
+					{ "a_Vertex", 3 },
+					{ "a_Color", 4 }
+			};
+			
+			geometryPipelineSpecs.VertexShaderLayout = VertexShaderLayout(vertexLayout);
+			geometryPipelineSpecs.Topology = Topology::LINES;
+			geometryPipelineSpecs.Rasterization = { false, 1.0f, GL_FILL };
+
+			RefLucy<Pipeline> geometryPipeline = Pipeline::Create(geometryPipelineSpecs);
+
+			RenderPassSpecification geometryPassSpecs;
+			geometryPassSpecs.FrameBuffer = m_MainFrameBuffer;
+			geometryPassSpecs.Pipeline = geometryPipeline;
+			geometryPassSpecs.ClearColor = { 1.0f, 0.0f, 0.0f, 1.0f };
+
+			RefLucy<RenderPass> geometryPass = RenderPass::Create(geometryPassSpecs);
+		}
+
+		Renderer::Dispatch(); //just for init functions
 	}
 
-	void Renderer::Submit(const RenderFunc&& func)
+	void Renderer::Submit(const Func&& func)
 	{
 		m_RenderQueue.push_back(func);
 	}
@@ -95,7 +111,7 @@ namespace Lucy {
 	}
 
 	void Renderer::Dispatch() {
-		for (RenderFunc func : m_RenderQueue) {
+		for (Func func : m_RenderQueue) {
 			func();
 		}
 		m_RenderQueue.clear();
