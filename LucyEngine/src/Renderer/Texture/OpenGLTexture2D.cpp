@@ -24,7 +24,7 @@ namespace Lucy {
 
 			specs.Format.InternalFormat = specs.Format.Format;
 
-			if (!data) LUCY_CRITICAL(std::string("Failed to load a texture. Texture name: ").append(specs.Path));
+			if (!data) LUCY_CRITICAL(std::string("Failed to load a texture. Texture path: ").append(specs.Path));
 		}
 		
 		LUCY_ASSERT(m_Width != 0 && m_Height != 0);

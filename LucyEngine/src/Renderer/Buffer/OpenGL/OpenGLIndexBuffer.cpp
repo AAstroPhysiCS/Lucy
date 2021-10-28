@@ -4,8 +4,8 @@
 
 namespace Lucy {
 	
-	OpenGLIndexBuffer::OpenGLIndexBuffer(uint32_t size, void* data)
-		: IndexBuffer(size, data)
+	OpenGLIndexBuffer::OpenGLIndexBuffer(uint32_t size)
+		: IndexBuffer(size)
 	{
 		glCreateBuffers(1, &m_Id);
 	}

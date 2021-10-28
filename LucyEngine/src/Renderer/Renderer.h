@@ -9,6 +9,7 @@
 namespace Lucy {
 	
 	class FrameBuffer;
+	class ShaderLibrary;
 
 	class Renderer
 	{
@@ -19,21 +20,23 @@ namespace Lucy {
 		static void Destroy();
 
 		inline static Scene& GetActiveScene() { return m_Scene; }
-		inline static RenderContextType GetCurrentRenderContextType() { return m_RenderContext->GetRenderContextType(); }
-
-		inline static RefLucy<FrameBuffer>& GetMainFrameBuffer() { return m_MainFrameBuffer; }
+		inline static RenderContextType GetCurrentRenderContextType() { return s_RenderContext->GetRenderContextType(); }
+		inline static RefLucy<FrameBuffer>& GetMainFrameBuffer() { return s_MainFrameBuffer; }
+		inline static ShaderLibrary& GetShaderLibrary(){ return m_ShaderLibrary; }
 
 		static void Submit(const Func&& func);
 		static void SubmitMesh();
 
 		static void Dispatch();
 	private:
-		static RefLucy<RendererAPI> m_RendererAPI;
-		static RefLucy<RenderContext> m_RenderContext;
-		static RefLucy<FrameBuffer> m_MainFrameBuffer;
+		static RefLucy<RendererAPI> s_RendererAPI;
+		static RefLucy<RenderContext> s_RenderContext;
+		static RefLucy<FrameBuffer> s_MainFrameBuffer;
 		
 		static Scene m_Scene;
-		static std::vector<Func> m_RenderQueue;
+		static std::vector<Func> s_RenderQueue;
+
+		static ShaderLibrary m_ShaderLibrary;
 
 		friend class RenderCommand;
 

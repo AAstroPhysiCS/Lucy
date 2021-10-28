@@ -5,9 +5,10 @@
 
 namespace Lucy {
 
-	OpenGLShader::OpenGLShader(const std::string& path)
-		: Shader(path)
+	OpenGLShader::OpenGLShader(const std::string& path, const std::string& name)
+		: Shader(path, name)
 	{
+		Load();
 	}
 
 	void OpenGLShader::Load()
@@ -57,8 +58,9 @@ namespace Lucy {
 			LUCY_CRITICAL(buffer);
 		}
 #elif LUCY_RELEASE
-		glGetShaderiv(vertexId, GL_COMPILE_STATUS, 0);
-		glGetShaderiv(fragmentId, GL_COMPILE_STATUS, 0);
+		GLint err;
+		glGetShaderiv(vertexId, GL_COMPILE_STATUS, &err);
+		glGetShaderiv(fragmentId, GL_COMPILE_STATUS, &err);
 #endif
 
 		glAttachShader(m_Program, vertexId);

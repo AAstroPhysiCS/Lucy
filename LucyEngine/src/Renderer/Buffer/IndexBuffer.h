@@ -1,24 +1,23 @@
 #pragma once
 
 #include "Buffer.h"
-
 #include "../Renderer.h"
 
 namespace Lucy {
 
-	class IndexBuffer : public Buffer
+	class IndexBuffer : public Buffer<uint32_t>
 	{
 	public:
-		virtual ~IndexBuffer() = default;
-
 		virtual void Bind() = 0;
 		virtual void Unbind() = 0;
-		void SetData(void* data);
+		void SetData(uint32_t* data, size_t size, uint32_t offset);
 		
-		static RefLucy<IndexBuffer> Create(uint32_t size, void* data);
+		static RefLucy<IndexBuffer> Create(uint32_t size);
+		static RefLucy<IndexBuffer> Create();
 	protected:
-		IndexBuffer(uint32_t size, void* data);
-		void* m_Data;
+		IndexBuffer() = default;
+		IndexBuffer(uint32_t size);
+		virtual ~IndexBuffer() = default;
 	};
 }
 

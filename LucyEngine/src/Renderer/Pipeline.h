@@ -27,7 +27,7 @@ namespace Lucy {
 	class Pipeline
 	{
 	public:
-		static RefLucy<Pipeline>& Create(PipelineSpecification& specs);
+		static RefLucy<Pipeline> Create(PipelineSpecification& specs);
 		
 		Pipeline(PipelineSpecification& specs);
 	private:

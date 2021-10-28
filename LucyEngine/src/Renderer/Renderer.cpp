@@ -11,24 +11,27 @@
 
 #include "RenderPass.h"
 #include "Shader/Shader.h"
+#include "Mesh.h"
 
 #include <iostream>
 #include "glad/glad.h"
 
 namespace Lucy {
 
-	RefLucy<RendererAPI> Renderer::m_RendererAPI;
-	RefLucy<RenderContext> Renderer::m_RenderContext;
-	RefLucy<FrameBuffer> Renderer::m_MainFrameBuffer;
+	RefLucy<RendererAPI> Renderer::s_RendererAPI;
+	RefLucy<RenderContext> Renderer::s_RenderContext;
+	RefLucy<FrameBuffer> Renderer::s_MainFrameBuffer;
 
-	std::vector<Func> Renderer::m_RenderQueue;
+	std::vector<Func> Renderer::s_RenderQueue;
+
 	Scene Renderer::m_Scene;
+	ShaderLibrary Renderer::m_ShaderLibrary;
 
 	void Renderer::Init(RenderContextType renderContext)
 	{
-		m_RenderContext = RenderContext::Create(renderContext);
-		m_RenderContext->PrintInfo();
-		m_RendererAPI = RendererAPI::Create();
+		s_RenderContext = RenderContext::Create(renderContext);
+		s_RenderContext->PrintInfo();
+		s_RendererAPI = RendererAPI::Create();
 
 		auto [width, height] = Utils::ReadSizeFromIni("Viewport");
 
@@ -64,12 +67,12 @@ namespace Lucy {
 			frameBufferSpecs.TextureSpecs.push_back(textureAntialiased);
 			frameBufferSpecs.BlittedTextureSpecs = finalTextureSpec;
 
-			m_MainFrameBuffer = FrameBuffer::Create(frameBufferSpecs);
+			s_MainFrameBuffer = FrameBuffer::Create(frameBufferSpecs);
 		}
 
 		//------------ Shaders ------------
 		{
-			RefLucy<Shader> testShader = Shader::Create("assets/shaders/LucyBasicShader.glsl");
+			Shader::Create("LucyBasicShader", "assets/shaders/LucyBasicShader.glsl");
 		}
 
 		//------------ Geometry ------------
@@ -85,22 +88,24 @@ namespace Lucy {
 			geometryPipelineSpecs.Topology = Topology::LINES;
 			geometryPipelineSpecs.Rasterization = { false, 1.0f, GL_FILL };
 
-			RefLucy<Pipeline> geometryPipeline = Pipeline::Create(geometryPipelineSpecs);
+			RefLucy<Pipeline>& geometryPipeline = Pipeline::Create(geometryPipelineSpecs);
 
 			RenderPassSpecification geometryPassSpecs;
-			geometryPassSpecs.FrameBuffer = m_MainFrameBuffer;
+			geometryPassSpecs.FrameBuffer = s_MainFrameBuffer;
 			geometryPassSpecs.Pipeline = geometryPipeline;
 			geometryPassSpecs.ClearColor = { 1.0f, 0.0f, 0.0f, 1.0f };
 
-			RefLucy<RenderPass> geometryPass = RenderPass::Create(geometryPassSpecs);
+			RefLucy<RenderPass>& geometryPass = RenderPass::Create(geometryPassSpecs);
 		}
+
+		RefLucy<Mesh> mesh = Mesh::Create("assets/models/Sponza/Sponza.gltf");
 
 		Renderer::Dispatch(); //just for init functions
 	}
 
 	void Renderer::Submit(const Func&& func)
 	{
-		m_RenderQueue.push_back(func);
+		s_RenderQueue.push_back(func);
 	}
 
 	void Renderer::SubmitMesh()
@@ -111,10 +116,10 @@ namespace Lucy {
 	}
 
 	void Renderer::Dispatch() {
-		for (Func func : m_RenderQueue) {
+		for (Func func : s_RenderQueue) {
 			func();
 		}
-		m_RenderQueue.clear();
+		s_RenderQueue.clear();
 	}
 
 	void Renderer::Destroy()

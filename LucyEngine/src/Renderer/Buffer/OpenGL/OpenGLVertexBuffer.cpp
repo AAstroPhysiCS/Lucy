@@ -3,8 +3,8 @@
 
 namespace Lucy {
 	
-	OpenGLVertexBuffer::OpenGLVertexBuffer(uint32_t size, void* data)
-		: VertexBuffer(size, data)
+	OpenGLVertexBuffer::OpenGLVertexBuffer(uint32_t size)
+		: VertexBuffer(size)
 	{
 		glCreateBuffers(1, &m_Id);
 	}

@@ -18,14 +18,16 @@ project "LucyEngine"
         "vendor/Glad/include",
         "vendor/entt/include",
         "vendor/glm",
-        "vendor/stb/include"
+        "vendor/stb/include",
+        "vendor/assimp/include"
     }
 
     links {
         "GLFW",
         "Glad",
         "ImGui",
-        "glm"
+        "glm",
+        "assimp"
     }
 
     filter "platforms:win64"
@@ -35,6 +37,10 @@ project "LucyEngine"
 
         defines {
            "LUCY_WINDOWS"
+        }
+
+        postbuildcommands {
+            "{COPY} vendor/assimp/assimp.lib vendor/bin/" .. outputdir .. "/assimp/"
         }
 
     filter "configurations:Debug"

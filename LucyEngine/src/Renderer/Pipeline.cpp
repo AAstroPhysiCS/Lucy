@@ -2,7 +2,7 @@
 
 namespace Lucy {
 	
-	RefLucy<Pipeline>& Pipeline::Create(PipelineSpecification& specs)
+	RefLucy<Pipeline> Pipeline::Create(PipelineSpecification& specs)
 	{
 		switch (Renderer::GetCurrentRenderContextType()) {
 		case RenderContextType::OpenGL:
@@ -16,7 +16,7 @@ namespace Lucy {
 	}
 
 	Pipeline::Pipeline(PipelineSpecification& specs)
+		: m_Specs(specs)
 	{
-		m_Specs = specs;
 	}
 }

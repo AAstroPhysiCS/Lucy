@@ -5,8 +5,8 @@
 namespace Lucy {
 
 	RenderContext::RenderContext(RenderContextType type)
+		: m_RenderContextType(type)
 	{
-		m_RenderContextType = type;
 	}
 
 	RenderContextType RenderContext::GetRenderContextType()

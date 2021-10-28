@@ -18,20 +18,20 @@
 
 #ifdef LUCY_WINDOWS
 
-	#ifdef LUCY_DEBUG
+	#define LUCY_WARN(arg) Lucy::Logger::Log(Lucy::LoggerInfo::LUCY_WARN, arg)
+	#define LUCY_CRITICAL(arg) Lucy::Logger::Log(Lucy::LoggerInfo::LUCY_CRITICAL, arg)
+	#define LUCY_INFO(arg) Lucy::Logger::Log(Lucy::LoggerInfo::LUCY_INFO, arg)
 
+	#ifdef LUCY_DEBUG
 		//for potential platform diversion (in android for example its some asm instruction)
 		#define LUCY_DEBUG_BREAK __debugbreak();
-
-		#define LUCY_WARN(arg) Lucy::Logger::Log(Lucy::LoggerInfo::LUCY_WARN, arg)
-		#define LUCY_CRITICAL(arg) Lucy::Logger::Log(Lucy::LoggerInfo::LUCY_CRITICAL, arg)
-		#define LUCY_INFO(arg) Lucy::Logger::Log(Lucy::LoggerInfo::LUCY_INFO, arg)
 
 		#define LUCY_ASSERT(arg) if(!arg) { \
 							LUCY_CRITICAL("Assert failed!"); \
 							LUCY_DEBUG_BREAK }
+	#elif LUCY_RELEASE
+		#define LUCY_ASSERT(arg)
 	#endif
-
 #endif
 
 #define As(arg, T) std::static_pointer_cast<T>(arg)

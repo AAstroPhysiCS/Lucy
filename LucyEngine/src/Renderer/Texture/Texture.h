@@ -21,6 +21,12 @@ namespace Lucy {
 		uint32_t Min = 0, Mag = 0;
 	};
 
+	//Helper struct for materials
+	struct TextureType {
+		uint32_t Type;
+		std::string Name;
+	};
+
 	struct TextureSpecification {
 		const char* Path = nullptr;
 		Lucy::PixelType PixelType = Lucy::PixelType::UnsignedByte;

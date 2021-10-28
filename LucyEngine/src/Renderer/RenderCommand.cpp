@@ -16,16 +16,16 @@ namespace Lucy {
 
 	void RenderCommand::ClearColor(float r, float g, float b, float a)
 	{
-		Renderer::m_RendererAPI->ClearColor(r, g, b, a);
+		Renderer::s_RendererAPI->ClearColor(r, g, b, a);
 	}
 
 	void RenderCommand::Clear(uint32_t bitField)
 	{
-		Renderer::m_RendererAPI->Clear(bitField);
+		Renderer::s_RendererAPI->Clear(bitField);
 	}
 
 	void RenderCommand::SwapBuffers(GLFWwindow* window)
 	{
-		Renderer::m_RendererAPI->SwapBuffers(window);
+		Renderer::s_RendererAPI->SwapBuffers(window);
 	}
 }

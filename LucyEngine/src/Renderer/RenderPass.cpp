@@ -4,11 +4,11 @@
 namespace Lucy {
 
 	RenderPass::RenderPass(RenderPassSpecification& specs)
+		: m_Specs(specs)
 	{
-		m_Specs = specs;
 	}
 
-	RefLucy<RenderPass>& RenderPass::Create(RenderPassSpecification& specs)
+	RefLucy<RenderPass> RenderPass::Create(RenderPassSpecification& specs)
 	{
 		switch (Renderer::GetCurrentRenderContextType()) {
 		case RenderContextType::OpenGL:

@@ -74,7 +74,6 @@ namespace Lucy {
 		});
 
 		glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int32_t key, int32_t scanCode, int32_t action, int32_t mods) {
-			if (action == GLFW_RELEASE) return;
 			KeyEvent evt{ key, scanCode, action, mods };
 			s_EventFunc(&evt);
 		});

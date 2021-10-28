@@ -18,7 +18,8 @@ project "LucyEditor"
         "../LucyEngine/vendor/Glad/include",
         "../LucyEngine/vendor/ImGui",
         "../LucyEngine/vendor/glm",
-        "../LucyEngine/vendor/entt/include"
+        "../LucyEngine/vendor/entt/include",
+        "../LucyEngine/vendor/assimp/include"
     }
 
     links {
@@ -32,6 +33,10 @@ project "LucyEditor"
 
         defines {
             "LUCY_WINDOWS"
+        }
+
+        postbuildcommands {
+            "{COPY} ../LucyEngine/vendor/assimp/assimp-vc142-mt.dll ../bin/" .. outputdir .. "/%{prj.name}"
         }
     
     filter "configurations:Debug"

@@ -10,13 +10,9 @@ namespace Lucy {
 
 	class Entity
 	{
-
-	private:
+	public:
 		Entity(Scene* scene, entt::entity& entity);
 
-		entt::entity m_Entity;
-		Scene* m_Scene;
-	public:
 		bool operator==(Entity& other) {
 			return GetComponent<UUIDComponent>().GetUUID() == other.GetComponent<UUIDComponent>().GetUUID();
 		}
@@ -30,6 +26,9 @@ namespace Lucy {
 		T& GetComponent() {
 			return m_Scene->registry.get<T>(m_Entity);
 		}
+	private:
+		entt::entity m_Entity;
+		Scene* m_Scene;
 
 		friend class Scene;
 	};

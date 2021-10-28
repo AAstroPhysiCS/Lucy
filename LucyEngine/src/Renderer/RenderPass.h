@@ -18,7 +18,7 @@ namespace Lucy {
 	class RenderPass
 	{
 	public:
-		static RefLucy<RenderPass>& Create(RenderPassSpecification& specs);
+		static RefLucy<RenderPass> Create(RenderPassSpecification& specs);
 		static void Begin(RefLucy<RenderPass>& renderPass);
 		static void End(RefLucy<RenderPass>& renderPass);
 

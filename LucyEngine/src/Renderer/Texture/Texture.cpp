@@ -19,9 +19,7 @@ namespace Lucy {
 	}
 	
 	Texture2D::Texture2D(TextureSpecification& specs)
-		: m_Specs(specs)
+		: m_Specs(specs), m_Width(specs.Width), m_Height(specs.Height)
 	{
-		m_Width = specs.Width;
-		m_Height = specs.Height;
 	}
 }
