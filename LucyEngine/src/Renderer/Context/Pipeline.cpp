@@ -1,12 +1,12 @@
-#include "Pipeline.h"
+#include "OpenGLPipeline.h"
 
 namespace Lucy {
 	
 	RefLucy<Pipeline> Pipeline::Create(PipelineSpecification& specs)
 	{
-		switch (Renderer::GetCurrentRenderContextType()) {
-		case RenderContextType::OpenGL:
-			return CreateRef<Pipeline>(specs);
+		switch (Renderer::GetCurrentRenderAPI()) {
+		case RenderAPI::OpenGL:
+			return CreateRef<OpenGLPipeline>(specs);
 			break;
 		default:
 			LUCY_CRITICAL("Other API's not supported!");

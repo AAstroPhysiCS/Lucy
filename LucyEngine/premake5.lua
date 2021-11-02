@@ -19,7 +19,8 @@ project "LucyEngine"
         "vendor/entt/include",
         "vendor/glm",
         "vendor/stb/include",
-        "vendor/assimp/include"
+        "vendor/assimp/include",
+        "vendor/nativefiledialog/include"
     }
 
     links {
@@ -27,7 +28,8 @@ project "LucyEngine"
         "Glad",
         "ImGui",
         "glm",
-        "assimp"
+        "vendor/assimp/assimp.lib",
+        "vendor/nativefiledialog/nfd.lib"
     }
 
     filter "platforms:win64"
@@ -37,10 +39,6 @@ project "LucyEngine"
 
         defines {
            "LUCY_WINDOWS"
-        }
-
-        postbuildcommands {
-            "{COPY} vendor/assimp/assimp.lib vendor/bin/" .. outputdir .. "/assimp/"
         }
 
     filter "configurations:Debug"

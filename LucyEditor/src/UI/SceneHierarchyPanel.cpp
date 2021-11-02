@@ -2,46 +2,56 @@
 
 #include "imgui.h"
 
-#include "Scene/Entity.h"
 #include "Renderer/Renderer.h"
+#include "Scene/Entity.h"
+
+#include "../EditorLayer.h"
 
 namespace Lucy {
-	
+
 	SceneHierarchyPanel& SceneHierarchyPanel::GetInstance()
 	{
 		static SceneHierarchyPanel s_Instance;
 		return s_Instance;
 	}
-	
+
 	void SceneHierarchyPanel::Render()
 	{
-
 		ImGui::Begin("Scene Hierarchy");
-
-		auto& scene = Renderer::GetActiveScene();
-		auto view = scene.registry.view<UUIDComponent, TagComponent>();
 		
+		auto& scene = EditorLayer::GetInstance().GetScene();
+		auto& view = scene.View<UUIDComponent, TagComponent>();
+
+		uint32_t id = 0;
 		for (auto entity : view) {
-			TagComponent& tag = view.get<TagComponent>(entity);
+			Entity e = { &scene, entity };
+			TagComponent& tag = e.GetComponent<TagComponent>();
 			std::string& name = tag.GetTag();
 
-			UUIDComponent& uuidComponent = view.get<UUIDComponent>(entity);
-			std::string& uuid = uuidComponent.GetUUID();
-		
-			ImGui::Text(name.c_str());
-			ImGui::Text(uuid.c_str());
+			ImGui::PushID(id);
+			if (ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_OpenOnArrow)) {
+				//parenting
+				ImGui::TreePop();
+			}
+			if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
+				m_EntityContext = e;
+			}
+			ImGui::PopID();
+			
+			id++;
 		}
 
 		if (ImGui::BeginPopupContextWindow("Entity menu")) {
-			
-			if (ImGui::Button("Create Entity")) {
-				Entity e = Renderer::GetActiveScene().CreateEntity();
-			}
+
+			if (ImGui::Button("Create Entity"))
+				scene.CreateEntity();
 			ImGui::Separator();
-			
+			if (ImGui::Button("Create Mesh"))
+				scene.CreateMesh();
+
 			ImGui::EndPopup();
 		}
-
+		
 		ImGui::End();
 	}
 }

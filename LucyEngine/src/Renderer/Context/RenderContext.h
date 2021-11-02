@@ -4,7 +4,7 @@
 
 namespace Lucy {
 
-	enum class RenderContextType {
+	enum class RenderAPI {
 		OpenGL,
 		Vulkan
 	};
@@ -15,13 +15,13 @@ namespace Lucy {
 		virtual void Init() = 0;
 		virtual void Destroy() = 0;
 		virtual void PrintInfo() = 0;
-		RenderContextType GetRenderContextType();
+		RenderAPI GetRenderAPI();
 
-		static RefLucy<RenderContext> Create(RenderContextType type);
+		static RefLucy<RenderContext> Create(RenderAPI type);
 
 	protected:
-		RenderContext(RenderContextType type);
-		RenderContextType m_RenderContextType;
+		RenderContext(RenderAPI type);
+		RenderAPI m_RenderContextType;
 	};
 }
 

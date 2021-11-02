@@ -1,16 +1,17 @@
 #include "VertexBuffer.h"
 
 #include "OpenGL/OpenGLVertexBuffer.h"
+#include "../Renderer.h"
 
 namespace Lucy {
 
 	RefLucy<VertexBuffer> VertexBuffer::Create(uint32_t size)
 	{
-		switch (Renderer::GetCurrentRenderContextType()) {
-		case RenderContextType::OpenGL:
+		switch (Renderer::GetCurrentRenderAPI()) {
+		case RenderAPI::OpenGL:
 			return CreateRef<OpenGLVertexBuffer>(size);
 			break;
-		case RenderContextType::Vulkan:
+		case RenderAPI::Vulkan:
 			LUCY_CRITICAL("Vulkan not supported");
 			LUCY_ASSERT(false);
 			break;
@@ -19,11 +20,11 @@ namespace Lucy {
 
 	RefLucy<VertexBuffer> VertexBuffer::Create()
 	{
-		switch (Renderer::GetCurrentRenderContextType()) {
-		case RenderContextType::OpenGL:
+		switch (Renderer::GetCurrentRenderAPI()) {
+		case RenderAPI::OpenGL:
 			return CreateRef<OpenGLVertexBuffer>();
 			break;
-		case RenderContextType::Vulkan:
+		case RenderAPI::Vulkan:
 			LUCY_CRITICAL("Vulkan not supported");
 			LUCY_ASSERT(false);
 			break;
@@ -33,14 +34,8 @@ namespace Lucy {
 	VertexBuffer::VertexBuffer(uint32_t size)
 		: Buffer<float>(size)
 	{
-		m_Data = new float[size];
-	}
-
-	void VertexBuffer::SetData(float* data, size_t size, uint32_t offset)
-	{
-		delete[] m_Data;
-		m_Data = new float[size];
-		memcpy(m_Data + offset, data, size * sizeof(float));
+		m_Data.resize(size);
+		m_DataHead = m_Data.data();
 	}
 }
 

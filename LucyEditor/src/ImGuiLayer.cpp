@@ -24,7 +24,7 @@ namespace Lucy {
 		m_Panels.push_back(&PropertiesPanel::GetInstance());
 	}
 
-	void ImGuiLayer::Init(GLFWwindow* window)
+	void ImGuiLayer::Init(RefLucy<Window>& window)
 	{
 		ImGui::CreateContext();
 
@@ -37,10 +37,10 @@ namespace Lucy {
 		io.Fonts->AddFontFromFileTTF("assets/fonts/ComicMono.ttf", 13);
 
 		int32_t width, height;
-		glfwGetWindowSize(window, &width, &height);
+		glfwGetWindowSize(window->Raw(), &width, &height);
 		io.DisplaySize = { (float)width, (float)height };
 
-		ImGui_ImplGlfw_InitForOpenGL(window, true);
+		ImGui_ImplGlfw_InitForOpenGL(window->Raw(), true);
 		ImGui_ImplOpenGL3_Init("#version 460");
 	}
 
@@ -145,11 +145,11 @@ namespace Lucy {
 			io.DisplaySize = { (float) e.GetWidth(), (float) e.GetHeight() };
 			io.DisplayFramebufferScale = { 1.0f, 1.0f };
 
-			switch (Renderer::GetCurrentRenderContextType()) {
-				case RenderContextType::OpenGL:
+			switch (Renderer::GetCurrentRenderAPI()) {
+				case RenderAPI::OpenGL:
 					glViewport(0, 0, e.GetWidth(), e.GetHeight());
 					break;
-				case RenderContextType::Vulkan:
+				case RenderAPI::Vulkan:
 					LUCY_CRITICAL("Vulkan not supported");
 					LUCY_ASSERT(false);
 					break;

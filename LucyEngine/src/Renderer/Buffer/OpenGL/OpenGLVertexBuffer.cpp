@@ -18,4 +18,21 @@ namespace Lucy {
 	{
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
+
+	void OpenGLVertexBuffer::Load()
+	{
+		Bind();
+		glBufferData(GL_ARRAY_BUFFER, m_Data.size() * sizeof(float), m_Data.data(), GL_STATIC_DRAW);
+		Unbind();
+	}
+
+	void OpenGLVertexBuffer::Destroy()
+	{
+		glDeleteBuffers(1, &m_Id);
+	}
+
+	void OpenGLVertexBuffer::AddData(std::vector<float>& dataToAdd)
+	{
+		m_Data.insert(m_Data.end(), dataToAdd.begin(), dataToAdd.end());
+	}
 }

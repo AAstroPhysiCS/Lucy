@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Buffer/OpenGL/OpenGLVertexBuffer.h"
-#include "Buffer/OpenGL/OpenGLIndexBuffer.h"
+#include "Buffer/VertexBuffer.h"
+#include "Buffer/IndexBuffer.h"
 
 #include "assimp/Importer.hpp"
 #include "assimp/scene.h"
@@ -20,13 +20,15 @@ namespace Lucy {
 		std::vector<glm::vec3> BiTangents;
 		std::vector<glm::vec2> TextureCoords;
 
-		glm::mat4 Transform;
-		uint32_t MaterialIndex;
+		std::vector<uint32_t> Faces;
 
-		uint32_t VertexCount;
-		uint32_t IndexCount;
-		uint32_t BaseVertexCount;
-		uint32_t BaseIndexCount;
+		glm::mat4 Transform;
+		uint32_t MaterialIndex = 0;
+
+		uint32_t VertexCount = 0;
+		uint32_t IndexCount = 0;
+		uint32_t BaseVertexCount = 0;
+		uint32_t BaseIndexCount = 0;
 	};
 
 	class Mesh
@@ -34,13 +36,19 @@ namespace Lucy {
 	public:
 		Mesh(const std::string& path);
 		Mesh(const Mesh& other) = default;
+		~Mesh();
 		
 		static RefLucy<Mesh> Create(const std::string& path);
 
 		inline std::string& GetPath() { return m_Path; }
-	private:
+		inline std::vector<Submesh>& GetSubmeshes() { return m_Submeshes; }
+		inline std::vector<Material>& GetMaterials() { return m_Materials; }
 
-		void LoadData(const aiScene* scene, uint32_t& totalSize);
+		void Bind();
+		void Unbind();
+	private:
+		void LoadBuffers();
+		void LoadData(const aiScene* scene, uint32_t& totalSize, uint32_t& totalIndexSize);
 		void LoadMaterials(const aiScene* scene);
 		void TraverseHierarchy(const aiNode* node, const aiNode* rootNode);
 		
@@ -50,6 +58,9 @@ namespace Lucy {
 		std::vector<Submesh> m_Submeshes;
 		std::vector<Material> m_Materials;
 		std::string m_Path;
+
+		bool m_Loaded = false;
+		uint32_t m_Vao = -1; //OpenGL only
 	};
 }
 

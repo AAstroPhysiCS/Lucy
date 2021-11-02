@@ -48,7 +48,6 @@ namespace Lucy {
 		return std::make_shared<T>(std::forward<Args>(args)...);
 	}
 
-
 	template<typename T>
 	using ScopeLucy = std::unique_ptr<T>;
 	template<typename T, typename ... Args>

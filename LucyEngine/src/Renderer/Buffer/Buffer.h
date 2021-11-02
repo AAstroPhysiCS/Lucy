@@ -8,23 +8,16 @@ namespace Lucy {
 	class Buffer
 	{
 	public:
-		inline T* GetData() const { return m_Data; }
+		inline T* GetData() const { return m_DataHead; }
 
 	protected:
 		Buffer(uint32_t size)
-			: m_Size(size)
-		{
-		}
-
-		~Buffer()
-		{
-			delete[] m_Data;
-		}
-		
+			: m_AllocSize(size) {}
 		Buffer() = default;
+		~Buffer() = default;
 
-		uint32_t m_Size = 0;
+		uint32_t m_AllocSize = 0;
 		uint32_t m_Id = 0;
-		T* m_Data = nullptr;
+		T* m_DataHead = nullptr;
 	};
 }

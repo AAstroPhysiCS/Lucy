@@ -51,4 +51,14 @@ namespace Utils {
 
 		return Size{ std::atoi(vec[0].c_str()), std::atoi(vec[1].c_str()) };
 	}
+
+	void OpenDialog(std::string& outString, const DialogFilter filterList[], size_t count, const char* defaultPath)
+	{
+		char* outPath;
+		nfdresult_t result = NFD_OpenDialog(&outPath, (nfdfilteritem_t*)filterList, count, defaultPath);
+		if (result == NFD_OKAY) {
+			outString = std::string(outPath);
+			NFD_FreePath((nfdu8char_t*)outPath);
+		}
+	}
 }

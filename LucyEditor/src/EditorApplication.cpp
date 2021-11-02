@@ -8,6 +8,7 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/RenderCommand.h"
 
+#include "../nativefiledialog/include/nfd.h"
 #include "glad/glad.h"
 
 namespace Lucy {
@@ -31,30 +32,29 @@ namespace Lucy {
 		m_Window->Init();
 		m_Window->SetEventCallback(std::bind(&EditorApplication::OnEvent, this, std::placeholders::_1));
 
-		Renderer::Init(RenderContextType::OpenGL);
-		EditorLayer::GetInstance().Init(m_Window->Raw());
-		ImGuiLayer::GetInstance().Init(m_Window->Raw());
+		Renderer::Init(m_Window, RenderAPI::OpenGL);
+		EditorLayer::GetInstance().Init(m_Window);
+		ImGuiLayer::GetInstance().Init(m_Window);
+
+		LUCY_ASSERT(NFD_Init() == NFD_OKAY);
 	}
 
 	EditorApplication::~EditorApplication()
 	{
 		m_Running = false;
-
+		//layers are being destroyed in the base class
 		m_Window->Destroy();
-		Renderer::Destroy();
+		NFD_Quit();
 	}
 
 	void EditorApplication::Run()
 	{
 		while (m_Running && !glfwWindowShouldClose(m_Window->Raw())) {
-
 			for (Layer* layer : m_LayerStack.GetStack()) {
 				layer->Begin();
 				layer->OnRender();
 				layer->End();
 			}
-
-			RenderCommand::SwapBuffers(m_Window->Raw());
 			m_Window->PollEvents();
 		}
 	}

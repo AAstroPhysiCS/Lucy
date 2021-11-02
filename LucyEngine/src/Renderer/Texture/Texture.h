@@ -27,6 +27,8 @@ namespace Lucy {
 		std::string Name;
 	};
 
+	typedef uint32_t TextureSlot;
+
 	struct TextureSpecification {
 		const char* Path = nullptr;
 		Lucy::PixelType PixelType = Lucy::PixelType::UnsignedByte;
@@ -35,6 +37,7 @@ namespace Lucy {
 		int32_t Width = 0, Height = 0; //gets replaced if path is available
 		bool GenerateMipmap;
 		uint32_t AttachmentIndex;
+		int32_t Slot = -1;
 	};
 
 	class Texture2D
@@ -47,6 +50,7 @@ namespace Lucy {
 		virtual void Destroy() = 0;
 
 		inline uint32_t GetID() const { return m_Id; }
+		inline int32_t GetSlot() const { return m_Specs.Slot; }
 
 	protected:
 		Texture2D(TextureSpecification& specs);

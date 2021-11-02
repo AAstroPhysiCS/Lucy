@@ -2,6 +2,7 @@
 
 #include "../Core/Base.h"
 #include "Texture/Texture.h"
+#include "Shader/Shader.h"
 
 #include "glm/glm.hpp"
 #include "assimp/scene.h"
@@ -23,12 +24,18 @@ namespace Lucy {
 	class Material
 	{
 	public:
-		Material(aiMaterial* aiMaterial, std::string& importedFilePath);
+		Material(RefLucy<Shader> shader, aiMaterial* aiMaterial, std::string& importedFilePath);
+
+		void Bind();
+		void Unbind();
+
+		inline RefLucy<Shader> GetShader() const { return m_Shader; }
 
 	private:
-		void LoadTexture(aiMaterial* aiMaterial, TextureType type, std::string& importedFilePath);
+		void LoadTexture(aiMaterial* aiMaterial, TextureSlot slot, TextureType type, std::string& importedFilePath);
 
 		MaterialData m_MaterialData;
+		RefLucy<Shader> m_Shader;
 		std::vector<RefLucy<Texture2D>> m_Textures;
 	};
 }

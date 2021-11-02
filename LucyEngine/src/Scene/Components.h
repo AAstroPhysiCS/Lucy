@@ -5,6 +5,7 @@
 #include "glm/glm.hpp"
 
 #include "UUID.h"
+#include "../Renderer/Mesh.h"
 
 namespace Lucy {
 
@@ -15,6 +16,11 @@ namespace Lucy {
 		}
 		TransformComponent(const TransformComponent& other) = default;
 
+		inline glm::mat4& GetMatrix() { return m_Mat; }
+		inline glm::vec3& GetPosition() { return m_Position; }
+		inline glm::vec3& GetRotation() { return m_Rotation; }
+		inline glm::vec3& GetScale() { return m_Scale; }
+
 	private:
 		glm::mat4 m_Mat = glm::mat4();
 		glm::vec3 m_Position = glm::vec3();
@@ -23,13 +29,18 @@ namespace Lucy {
 	};
 
 	struct MeshComponent {
+		MeshComponent() = default;
 		MeshComponent(std::string& path)
-			: m_Path(path) {
+			: m_Mesh(Mesh::Create(path)) {
 		}
 		MeshComponent(const MeshComponent& other) = default;
 
+		void SetMesh(RefLucy<Mesh>&& mesh) { m_Mesh = std::move(mesh); }
+		
+		inline RefLucy<Mesh>& GetMesh() { return m_Mesh; }
+		inline bool IsValid() { return m_Mesh.get() != nullptr && m_Mesh->GetSubmeshes().size() != 0; }
 	private:
-		std::string m_Path;
+		RefLucy<Mesh> m_Mesh;
 	};
 
 	struct UUIDComponent {
@@ -48,8 +59,9 @@ namespace Lucy {
 	struct TagComponent {
 		TagComponent() = default;
 		TagComponent(std::string& tag)
-			: m_Tag(tag) {
-		}
+			: m_Tag(tag) {}
+		TagComponent(const char* tag)
+			: m_Tag(tag) {}
 		TagComponent(const TagComponent& other) = default;
 
 		inline std::string& GetTag() { return m_Tag; }

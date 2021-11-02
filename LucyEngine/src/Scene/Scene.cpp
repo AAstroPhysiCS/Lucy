@@ -5,31 +5,29 @@
 
 namespace Lucy {
 
-	Entity Scene::CreateEntity(std::string& path)
+	Entity Scene::CreateMesh(std::string& path)
 	{
-		entt::entity entity = registry.create();
-
-		Entity e{ this, entity };
-
-		e.AddComponent<UUIDComponent>();
-		e.AddComponent<TransformComponent>();
-		e.AddComponent<TagComponent>();
-
+		Entity& e = CreateEntity();
 		e.AddComponent<MeshComponent>(path);
-	
+		return e;
+	}
+
+	Entity Scene::CreateMesh()
+	{
+		Entity& e = CreateEntity();
+		e.AddComponent<TagComponent>("Empty Mesh");
+		e.AddComponent<MeshComponent>();
 		return e;
 	}
 
 	Entity Scene::CreateEntity()
 	{
 		entt::entity entity = registry.create();
-
 		Entity e{ this, entity };
 
 		e.AddComponent<UUIDComponent>();
 		e.AddComponent<TransformComponent>();
 		e.AddComponent<TagComponent>();
-
 		return e;
 	}
 

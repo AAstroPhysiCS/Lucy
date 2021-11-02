@@ -12,5 +12,10 @@ namespace Lucy {
 
 		void Bind();
 		void Unbind();
+		void AddData(std::vector<uint32_t>& dataToAdd);
+		void Load();
+		void Destroy();
+	private:
+		uint32_t m_DynamicOffset = 0;
 	};
 }

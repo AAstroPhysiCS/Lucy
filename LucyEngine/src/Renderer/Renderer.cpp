@@ -9,9 +9,9 @@
 #include "Texture/Texture.h"
 #include "../Utils.h"
 
-#include "RenderPass.h"
 #include "Shader/Shader.h"
-#include "Mesh.h"
+#include "RenderPass.h"
+#include "RenderCommand.h"
 
 #include <iostream>
 #include "glad/glad.h"
@@ -20,20 +20,28 @@ namespace Lucy {
 
 	RefLucy<RendererAPI> Renderer::s_RendererAPI;
 	RefLucy<RenderContext> Renderer::s_RenderContext;
-	RefLucy<FrameBuffer> Renderer::s_MainFrameBuffer;
+	RefLucy<RenderPass> Renderer::s_GeometryPass;
+	RefLucy<Window> Renderer::s_Window;
 
 	std::vector<Func> Renderer::s_RenderQueue;
+	std::vector<MeshDrawCommand> Renderer::s_MeshDrawCommand;
 
-	Scene Renderer::m_Scene;
-	ShaderLibrary Renderer::m_ShaderLibrary;
+	ShaderLibrary Renderer::s_ShaderLibrary;
 
-	void Renderer::Init(RenderContextType renderContext)
+	void Renderer::Init(RefLucy<Window> window, RenderAPI renderContext)
 	{
 		s_RenderContext = RenderContext::Create(renderContext);
 		s_RenderContext->PrintInfo();
+
 		s_RendererAPI = RendererAPI::Create();
+		s_Window = window;
 
 		auto [width, height] = Utils::ReadSizeFromIni("Viewport");
+
+		//------------ Shaders ------------
+		{
+			Shader::Create("LucyPBR", "assets/shaders/LucyPBR.glsl");
+		}
 
 		//------------ Main Framebuffer ------------
 		{
@@ -67,38 +75,26 @@ namespace Lucy {
 			frameBufferSpecs.TextureSpecs.push_back(textureAntialiased);
 			frameBufferSpecs.BlittedTextureSpecs = finalTextureSpec;
 
-			s_MainFrameBuffer = FrameBuffer::Create(frameBufferSpecs);
-		}
-
-		//------------ Shaders ------------
-		{
-			Shader::Create("LucyBasicShader", "assets/shaders/LucyBasicShader.glsl");
-		}
-
-		//------------ Geometry ------------
-		{
 			PipelineSpecification geometryPipelineSpecs;
-			
+
 			std::vector<ShaderLayoutElement> vertexLayout = {
-					{ "a_Vertex", 3 },
-					{ "a_Color", 4 }
+					{ "a_Pos", ShaderDataSize::Float3 },
+					{ "a_TextureCoords", ShaderDataSize::Float2 },
+					{ "a_Normals", ShaderDataSize::Float3 },
+					{ "a_Tangents", ShaderDataSize::Float3 },
+					{ "a_BiTangents", ShaderDataSize::Float3 }
 			};
-			
+
 			geometryPipelineSpecs.VertexShaderLayout = VertexShaderLayout(vertexLayout);
-			geometryPipelineSpecs.Topology = Topology::LINES;
+			geometryPipelineSpecs.Topology = Topology::TRIANGLES;
 			geometryPipelineSpecs.Rasterization = { false, 1.0f, GL_FILL };
 
-			RefLucy<Pipeline>& geometryPipeline = Pipeline::Create(geometryPipelineSpecs);
-
 			RenderPassSpecification geometryPassSpecs;
-			geometryPassSpecs.FrameBuffer = s_MainFrameBuffer;
-			geometryPassSpecs.Pipeline = geometryPipeline;
-			geometryPassSpecs.ClearColor = { 1.0f, 0.0f, 0.0f, 1.0f };
-
-			RefLucy<RenderPass>& geometryPass = RenderPass::Create(geometryPassSpecs);
+			geometryPassSpecs.FrameBuffer = FrameBuffer::Create(frameBufferSpecs);
+			geometryPassSpecs.Pipeline = Pipeline::Create(geometryPipelineSpecs);
+			geometryPassSpecs.ClearColor = { 1.0f, 0.5f, 0.5f, 1.0f };
+			s_GeometryPass = RenderPass::Create(geometryPassSpecs);
 		}
-
-		RefLucy<Mesh> mesh = Mesh::Create("assets/models/Sponza/Sponza.gltf");
 
 		Renderer::Dispatch(); //just for init functions
 	}
@@ -108,11 +104,53 @@ namespace Lucy {
 		s_RenderQueue.push_back(func);
 	}
 
-	void Renderer::SubmitMesh()
+	void Renderer::SubmitMesh(RefLucy<Mesh>& mesh, const glm::mat4& entityTransform)
 	{
-		//later
-		Submit([]() {
+		Submit([=]() {
+			s_MeshDrawCommand.push_back(MeshDrawCommand(mesh, entityTransform));
 		});
+	}
+
+	void Renderer::GeometryPass()
+	{
+		RenderCommand::Begin(s_GeometryPass);
+
+		for (MeshDrawCommand meshComponent : s_MeshDrawCommand) {
+
+			RefLucy<Mesh> mesh = meshComponent.Mesh;
+			const glm::mat4& entityTransform = meshComponent.EntityTransform;
+
+			std::vector<Material>& materials = mesh->GetMaterials();
+			std::vector<Submesh>& submeshes = mesh->GetSubmeshes();
+
+			mesh->Bind();
+
+			for (uint32_t i = 0; i < submeshes.size(); i++) {
+				Submesh& submesh = submeshes[i];
+				Material& material = materials[i];
+				RefLucy<Shader>& shader = material.GetShader();
+
+				material.Bind();
+				shader->SetMat4("u_ModelMatrix", entityTransform * submesh.Transform);
+				shader->SetMat4("u_ViewMatrix", entityTransform * submesh.Transform);
+				shader->SetMat4("u_ProjectionMatrix", entityTransform * submesh.Transform);
+				RenderCommand::DrawElementsBaseVertex(submesh.IndexCount, submesh.BaseIndexCount, submesh.BaseVertexCount);
+				material.Unbind();
+			}
+			
+			mesh->Unbind();
+		}
+
+		RenderCommand::End(s_GeometryPass);
+	}
+
+	void Renderer::BeginScene(const Scene& scene)
+	{
+	}
+
+	void Renderer::EndScene()
+	{
+		GeometryPass();
 	}
 
 	void Renderer::Dispatch() {
@@ -122,8 +160,16 @@ namespace Lucy {
 		s_RenderQueue.clear();
 	}
 
+	void Renderer::ClearDrawCommands()
+	{
+		s_MeshDrawCommand.clear();
+	}
+
 	void Renderer::Destroy()
 	{
+		for (RefLucy<Shader> shader : s_ShaderLibrary.m_Shaders) {
+			shader->Destroy();
+		}
 		glfwTerminate();
 	}
 }

@@ -6,8 +6,8 @@
 namespace Lucy {
 	
 	RefLucy<RendererAPI> RendererAPI::Create() {
-		switch (Renderer::GetCurrentRenderContextType()) {
-			case RenderContextType::OpenGL:
+		switch (Renderer::GetCurrentRenderAPI()) {
+			case RenderAPI::OpenGL:
 				return CreateRef<OpenGLRendererAPI>();
 			default:
 				LUCY_CRITICAL("API not supported!");

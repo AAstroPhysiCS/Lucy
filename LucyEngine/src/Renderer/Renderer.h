@@ -2,12 +2,16 @@
 
 #include "../Core/Base.h"
 #include "../Scene/Scene.h"
+#include "../Core/Window.h"
 
 #include "Context/RendererAPI.h"
 #include "Context/RenderContext.h"
 
+#include "DrawCommand.h"
+
 namespace Lucy {
 	
+	class RenderPass;
 	class FrameBuffer;
 	class ShaderLibrary;
 
@@ -16,27 +20,37 @@ namespace Lucy {
 		using Func = std::function<void()>;
 
 	public:
-		static void Init(RenderContextType rendererContext);
+		static void Init(RefLucy<Window> window, RenderAPI rendererContext);
 		static void Destroy();
 
-		inline static Scene& GetActiveScene() { return m_Scene; }
-		inline static RenderContextType GetCurrentRenderContextType() { return s_RenderContext->GetRenderContextType(); }
-		inline static RefLucy<FrameBuffer>& GetMainFrameBuffer() { return s_MainFrameBuffer; }
-		inline static ShaderLibrary& GetShaderLibrary(){ return m_ShaderLibrary; }
+		inline static RenderAPI GetCurrentRenderAPI() { return s_RenderContext->GetRenderAPI(); }
+		inline static RefLucy<RenderPass>& GetGeometryPass() { return s_GeometryPass; }
+		inline static ShaderLibrary& GetShaderLibrary(){ return s_ShaderLibrary; }
 
+		inline static auto GetViewportSize() {
+			struct Size { uint32_t Width, Height; };
+			return Size { s_Window->GetWidth(), s_Window->GetHeight() };
+		}
+
+		static void BeginScene(const Scene& scene);
+		static void EndScene();
 		static void Submit(const Func&& func);
-		static void SubmitMesh();
+		static void SubmitMesh(RefLucy<Mesh>& mesh, const glm::mat4& entityTransform);
+
+		static void GeometryPass();
 
 		static void Dispatch();
+		static void ClearDrawCommands();
 	private:
 		static RefLucy<RendererAPI> s_RendererAPI;
 		static RefLucy<RenderContext> s_RenderContext;
-		static RefLucy<FrameBuffer> s_MainFrameBuffer;
+		static RefLucy<RenderPass> s_GeometryPass;
+		static RefLucy<Window> s_Window;
 		
-		static Scene m_Scene;
 		static std::vector<Func> s_RenderQueue;
+		static std::vector<MeshDrawCommand> s_MeshDrawCommand;
 
-		static ShaderLibrary m_ShaderLibrary;
+		static ShaderLibrary s_ShaderLibrary;
 
 		friend class RenderCommand;
 

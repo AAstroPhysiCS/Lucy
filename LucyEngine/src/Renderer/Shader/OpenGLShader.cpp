@@ -8,7 +8,9 @@ namespace Lucy {
 	OpenGLShader::OpenGLShader(const std::string& path, const std::string& name)
 		: Shader(path, name)
 	{
-		Load();
+		Renderer::Submit([&]() {
+			Load();
+		});
 	}
 
 	void OpenGLShader::Load()
@@ -44,6 +46,7 @@ namespace Lucy {
 
 			LUCY_CRITICAL("Shader LOG: ");
 			LUCY_CRITICAL(buffer);
+			LUCY_ASSERT(false);
 		}
 
 		glGetShaderiv(fragmentId, GL_COMPILE_STATUS, &err);
@@ -56,6 +59,7 @@ namespace Lucy {
 
 			LUCY_CRITICAL("Shader LOG: ");
 			LUCY_CRITICAL(buffer);
+			LUCY_ASSERT(false);
 		}
 #elif LUCY_RELEASE
 		GLint err;
@@ -86,6 +90,69 @@ namespace Lucy {
 	void OpenGLShader::Destroy()
 	{
 		glDeleteProgram(m_Program);
+	}
+
+	void OpenGLShader::SetMat4(const char* name, glm::mat4& mat)
+	{
+		if (!m_UniformLocations.count(name)) {
+			m_UniformLocations.insert({ name, glGetUniformLocation(m_Program, name) });
+		}
+		uint32_t loc = m_UniformLocations.find(name)->second;
+		glUniformMatrix4fv(loc, 1, false, glm::value_ptr(mat));
+	}
+
+	void OpenGLShader::SetMat3(const char* name, glm::mat3& mat)
+	{
+		if (!m_UniformLocations.count(name)) {
+			m_UniformLocations.insert({ name, glGetUniformLocation(m_Program, name) });
+		}
+		uint32_t loc = m_UniformLocations.find(name)->second;
+		glUniformMatrix3fv(loc, 1, false, glm::value_ptr(mat));
+	}
+
+	void OpenGLShader::SetVec4(const char* name, glm::vec4& vec)
+	{
+		if (!m_UniformLocations.count(name)) {
+			m_UniformLocations.insert({ name, glGetUniformLocation(m_Program, name) });
+		}
+		uint32_t loc = m_UniformLocations.find(name)->second;
+		glUniform4f(loc, vec.x, vec.y, vec.z, vec.w);
+	}
+
+	void OpenGLShader::SetVec3(const char* name, glm::vec3& vec)
+	{
+		if (!m_UniformLocations.count(name)) {
+			m_UniformLocations.insert({ name, glGetUniformLocation(m_Program, name) });
+		}
+		uint32_t loc = m_UniformLocations.find(name)->second;
+		glUniform3f(loc, vec.x, vec.y, vec.z);
+	}
+
+	void OpenGLShader::SetVec2(const char* name, glm::vec2& vec)
+	{
+		if (!m_UniformLocations.count(name)) {
+			m_UniformLocations.insert({ name, glGetUniformLocation(m_Program, name) });
+		}
+		uint32_t loc = m_UniformLocations.find(name)->second;
+		glUniform2f(loc, vec.x, vec.y);
+	}
+
+	void OpenGLShader::SetFloat(const char* name, float value)
+	{
+		if (!m_UniformLocations.count(name)) {
+			m_UniformLocations.insert({ name, glGetUniformLocation(m_Program, name) });
+		}
+		uint32_t loc = m_UniformLocations.find(name)->second;
+		glUniform1f(loc, value);
+	}
+
+	void OpenGLShader::SetInt(const char* name, int32_t value)
+	{
+		if (!m_UniformLocations.count(name)) {
+			m_UniformLocations.insert({ name, glGetUniformLocation(m_Program, name) });
+		}
+		uint32_t loc = m_UniformLocations.find(name)->second;
+		glUniform1i(loc, value);
 	}
 
 	std::string OpenGLShader::LoadVertexData(std::vector<std::string>& lines)

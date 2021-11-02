@@ -7,8 +7,8 @@ namespace Lucy {
 	
 	RefLucy<FrameBuffer> FrameBuffer::Create(FrameBufferSpecification& specs)
 	{
-		switch (Renderer::GetCurrentRenderContextType()) {
-			case RenderContextType::OpenGL:
+		switch (Renderer::GetCurrentRenderAPI()) {
+			case RenderAPI::OpenGL:
 				return CreateRef<OpenGLFrameBuffer>(specs);
 				break;
 		}

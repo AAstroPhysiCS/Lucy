@@ -2,6 +2,9 @@
 
 #include <vector>
 
+#include "Core/Base.h"
+#include "Core/Window.h"
+
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -21,7 +24,7 @@ namespace Lucy {
 			return s_Instance;
 		}
 
-		void Init(GLFWwindow* window);
+		void Init(RefLucy<Window>& window);
 		void Begin();
 		void End();
 		void OnRender();

@@ -1,5 +1,12 @@
 #include "Mesh.h"
 
+#include "../Core/Timer.h"
+#include "Renderer.h"
+
+#include "RenderPass.h"
+#include "RenderCommand.h"
+#include "Context/OpenGLPipeline.h"
+
 namespace Lucy {
 
 	constexpr static uint32_t ASSIMP_FLAGS = aiProcess_CalcTangentSpace |
@@ -19,6 +26,8 @@ namespace Lucy {
 	Mesh::Mesh(const std::string& path)
 		: m_Path(path)
 	{
+		ScopedTimer scopedTimer;
+
 		Assimp::Importer importer;
 		const aiScene* scene = importer.ReadFile(path, ASSIMP_FLAGS);
 
@@ -28,20 +37,23 @@ namespace Lucy {
 			return;
 		}
 
-		uint32_t totalSize = 0;
-		m_IndexBuffer = IndexBuffer::Create();
-		LoadData(scene, totalSize);
+		uint32_t totalVertexSize = 0, totalIndexSize = 0;
+		LoadData(scene, totalVertexSize, totalIndexSize);
 		LoadMaterials(scene);
 		TraverseHierarchy(scene->mRootNode, nullptr);
-
-		m_VertexBuffer = VertexBuffer::Create(totalSize * 15);
-		float* dataPtr = m_VertexBuffer->GetData();
-		uint32_t vertPtr = 0;
 		
+		m_IndexBuffer = IndexBuffer::Create(totalIndexSize);
+		for (Submesh& submesh : m_Submeshes) {
+			m_IndexBuffer->AddData(submesh.Faces);
+		}
+		m_VertexBuffer = VertexBuffer::Create(totalVertexSize * 15);
+		float* dataPtr = m_VertexBuffer->GetData();
+
+		uint32_t vertPtr = 0;
 		for (Submesh& submesh : m_Submeshes) {
 			auto& vertices = submesh.Vertices;
-			auto& normals = submesh.Normals;
 			auto& textureCoords = submesh.TextureCoords;
+			auto& normals = submesh.Normals;
 			auto& tangents = submesh.Tangents;
 			auto& biTangents = submesh.BiTangents;
 
@@ -69,20 +81,67 @@ namespace Lucy {
 		}
 	}
 
-	RefLucy<Mesh> Mesh::Create(const std::string& path)
+	Mesh::~Mesh()
 	{
-		switch (Renderer::GetCurrentRenderContextType()) {
-		case RenderContextType::OpenGL:
-			return CreateRef<Mesh>(path);
-			break;
-		case RenderContextType::Vulkan:
-			LUCY_CRITICAL("Vulkan not supported");
-			LUCY_ASSERT(false);
-			break;
+		m_VertexBuffer->Destroy();
+		m_IndexBuffer->Destroy();
+
+		if (Renderer::GetCurrentRenderAPI() == RenderAPI::OpenGL) {
+			glDeleteVertexArrays(1, &m_Vao);
 		}
 	}
 
-	void Mesh::LoadData(const aiScene* scene, uint32_t& totalSize)
+	RefLucy<Mesh> Mesh::Create(const std::string& path)
+	{
+		switch (Renderer::GetCurrentRenderAPI()) {
+			case RenderAPI::OpenGL:
+				return CreateRef<Mesh>(path);
+				break;
+			case RenderAPI::Vulkan:
+				LUCY_CRITICAL("Vulkan not supported");
+				LUCY_ASSERT(false);
+				break;
+		}
+	}
+
+	void Mesh::Bind()
+	{
+		if (!m_Loaded)
+			LoadBuffers();
+
+		if (Renderer::GetCurrentRenderAPI() == RenderAPI::OpenGL) {
+			glBindVertexArray(m_Vao);
+			m_IndexBuffer->Bind();
+		}
+	}
+
+	void Mesh::Unbind()
+	{
+		if (Renderer::GetCurrentRenderAPI() == RenderAPI::OpenGL) {
+			glBindVertexArray(0);
+			m_IndexBuffer->Unbind();
+		}
+	}
+
+	void Mesh::LoadBuffers()
+	{
+		if (Renderer::GetCurrentRenderAPI() == RenderAPI::OpenGL) {
+			glCreateVertexArrays(1, &m_Vao);
+			glBindVertexArray(m_Vao);
+
+			RefLucy<OpenGLPipeline>& pipeline = As(RenderCommand::s_ActiveRenderPass->GetPipeline(), OpenGLPipeline);
+			pipeline->UploadVertexLayout(As(m_VertexBuffer, OpenGLVertexBuffer));
+
+			m_VertexBuffer->Load();
+			m_IndexBuffer->Load();
+			
+			glBindVertexArray(0);
+		}
+
+		m_Loaded = true;
+	}
+
+	void Mesh::LoadData(const aiScene* scene, uint32_t& totalVertexSize, uint32_t& totalIndexSize)
 	{
 		aiMesh** meshes = scene->mMeshes;
 		uint32_t meshCount = scene->mNumMeshes;
@@ -101,49 +160,52 @@ namespace Lucy {
 			baseVertexCount += submesh.VertexCount;
 			baseIndexCount += submesh.IndexCount;
 
+			totalVertexSize += submesh.VertexCount;
+			totalIndexSize += submesh.IndexCount;
+
 			uint32_t sizeVertices = submesh.VertexCount;
-			totalSize += sizeVertices;
 
 			if (mesh->HasPositions()) {
 				aiVector3D* vertices = mesh->mVertices;
 				submesh.Vertices.resize(sizeVertices);
-				memcpy(submesh.Vertices.data(), vertices, sizeVertices * sizeof(aiVector3D));
+				memcpy(submesh.Vertices.data(), vertices, sizeVertices);
 			}
 
 			if (mesh->HasNormals()) {
 				aiVector3D* normals = mesh->mNormals;
 				submesh.Normals.resize(sizeVertices);
-				memcpy(submesh.Normals.data(), normals, sizeVertices * sizeof(aiVector3D));
+				memcpy(submesh.Normals.data(), normals, sizeVertices);
 			}
 
 			if (mesh->HasTextureCoords(0)) {
 				aiVector3D* textureCoords = mesh->mTextureCoords[0];
 				submesh.TextureCoords.resize(sizeVertices);
-				memcpy(submesh.TextureCoords.data(), textureCoords, sizeVertices * sizeof(aiVector2D));
+				for (uint32_t j = 0; j < sizeVertices / 3; j++) {
+					submesh.TextureCoords.push_back({ textureCoords[j].x, textureCoords[j].y });
+				}
 			}
 
 			if (mesh->HasTangentsAndBitangents()) {
 				aiVector3D* tangents = mesh->mTangents;
 				submesh.Tangents.resize(sizeVertices);
-				memcpy(submesh.Tangents.data(), tangents, sizeVertices * sizeof(aiVector3D));
+				memcpy(submesh.Tangents.data(), tangents, sizeVertices);
 
 				aiVector3D* biTangents = mesh->mBitangents;
 				submesh.BiTangents.resize(sizeVertices);
-				memcpy(submesh.BiTangents.data(), biTangents, sizeVertices * sizeof(aiVector3D));
+				memcpy(submesh.BiTangents.data(), biTangents, sizeVertices);
 			}
 
 			submesh.MaterialIndex = mesh->mMaterialIndex;
 
-			std::vector<uint32_t> indices;
 			if (mesh->HasFaces()) {
+				submesh.Faces.reserve(submesh.IndexCount);
 				for (uint32_t i = 0; i < mesh->mNumFaces; i++) {
 					aiFace aiFace = mesh->mFaces[i];
 					for (uint32_t j = 0; j < aiFace.mNumIndices; j++) {
-						indices.push_back(aiFace.mIndices[j]);
+						submesh.Faces.emplace_back(aiFace.mIndices[j]);
 					}
 				}
 			}
-			m_IndexBuffer->SetData(indices.data(), indices.size(), 0);
 
 			//TODO: Animation
 
@@ -156,9 +218,11 @@ namespace Lucy {
 		aiMaterial** materials = scene->mMaterials;
 		size_t materialSize = scene->mNumMaterials;
 
+		m_Materials.reserve(materialSize);
+
 		for (uint32_t i = 0; i < materialSize; i++) {
 			aiMaterial* material = materials[i];
-			m_Materials.push_back(Material(material, m_Path));
+			m_Materials.emplace_back(Renderer::GetShaderLibrary().GetShader("LucyPBR"), material, m_Path);
 		}
 	}
 
@@ -170,8 +234,8 @@ namespace Lucy {
 		}
 
 		for (uint32_t i = 0; i < node->mNumMeshes; i++) {
-			Submesh submesh = m_Submeshes[node->mMeshes[i]];
-			submesh.Transform = *(glm::mat4*)&transform;
+			Submesh& submesh = m_Submeshes[node->mMeshes[i]];
+			submesh.Transform = glm::mat4(1.0f);
 		}
 
 		for (uint32_t i = 0; i < node->mNumChildren; i++) {
@@ -179,5 +243,4 @@ namespace Lucy {
 			TraverseHierarchy(childrenNode, node);
 		}
 	}
-	
 }

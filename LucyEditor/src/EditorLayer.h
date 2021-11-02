@@ -1,11 +1,12 @@
 #pragma once
 
 #include "Core/Layer.h"
+#include "Core/Base.h"
+#include "Core/Window.h"
+#include "Scene/Scene.h"
 
 #include "Events/EventDispatcher.h"
 #include "Events/InputEvent.h"
-
-#include "GLFW/glfw3.h"
 
 namespace Lucy {
 
@@ -18,13 +19,17 @@ namespace Lucy {
 
 		void Begin();
 		void End();
-		void Init(GLFWwindow* window);
+		void Init(RefLucy<Window> window);
 		void OnRender();
 		void OnEvent(Event& e);
 		void Destroy();
+
+		inline Scene& GetScene() { return m_Scene; }
+
 	private:
 		EditorLayer() = default;
 
-		GLFWwindow* m_Window = nullptr;
+		RefLucy<Window> m_Window;
+		Scene m_Scene;
 	};
 }

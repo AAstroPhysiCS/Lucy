@@ -15,7 +15,7 @@ namespace Lucy {
 		void OnEvent(Event* e);
 	private:
 		bool m_Running;
-		ScopeLucy<Window> m_Window;
+		RefLucy<Window> m_Window;
 	};
 
 	//Creates an application with default parameters

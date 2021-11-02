@@ -10,8 +10,8 @@ namespace Lucy {
 
 	RefLucy<RenderPass> RenderPass::Create(RenderPassSpecification& specs)
 	{
-		switch (Renderer::GetCurrentRenderContextType()) {
-		case RenderContextType::OpenGL:
+		switch (Renderer::GetCurrentRenderAPI()) {
+		case RenderAPI::OpenGL:
 			return CreateRef<RenderPass>(specs);
 			break;
 		default:

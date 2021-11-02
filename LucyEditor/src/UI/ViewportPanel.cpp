@@ -2,6 +2,7 @@
 #include "imgui.h"
 
 #include "Renderer/Renderer.h"
+#include "Renderer/RenderPass.h"
 #include "Renderer/Buffer/OpenGL/OpenGLFrameBuffer.h"
 
 namespace Lucy {
@@ -22,7 +23,7 @@ namespace Lucy {
 		ImGui::Begin("Viewport", &pOpen, flags);
 		ImGui::PopStyleVar(2);
 
-		auto& blittedFrameBuffer = As(Renderer::GetMainFrameBuffer()->GetBlitted(), OpenGLFrameBuffer);
+		auto& blittedFrameBuffer = As(Renderer::GetGeometryPass()->GetFrameBuffer()->GetBlitted(), OpenGLFrameBuffer);
 		auto& texture = blittedFrameBuffer->GetTexture(0);
 
 		ImVec2& size = ImGui::GetWindowSize();

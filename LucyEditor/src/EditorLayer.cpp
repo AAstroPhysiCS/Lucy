@@ -1,8 +1,8 @@
 #include <iostream>
 #include "EditorLayer.h"
-#include "Core/Base.h"
 
 #include "Renderer/Renderer.h"
+#include "Renderer/RenderPass.h"
 #include "Scene/Entity.h"
 #include "Scene/Components.h"
 #include "Renderer/Buffer/FrameBuffer.h"
@@ -15,40 +15,38 @@
 
 namespace Lucy {
 
+	void EditorLayer::Init(RefLucy<Window> window)
+	{
+		m_Window = window;
+	}
+
 	void EditorLayer::Begin()
 	{
-		Scene& scene = Renderer::GetActiveScene();
-		auto& meshView = scene.registry.view<MeshComponent>();
+		auto& meshView = m_Scene.View<MeshComponent>();
 
 		for (auto entity : meshView) {
-			Entity e{ &scene, entity };
+			Entity e { &m_Scene, entity };
 			MeshComponent& meshComponent = e.GetComponent<MeshComponent>();
+			if (!meshComponent.IsValid()) continue;
+			
+			Renderer::SubmitMesh(meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
 		}
 	}
 
 	void EditorLayer::End()
 	{
-		Renderer::Dispatch();
-
 		GLenum state = glGetError();
 		if (state != GL_NO_ERROR) Logger::Log(LoggerInfo::LUCY_CRITICAL, state);
 	}
 
-	void EditorLayer::Init(GLFWwindow* window)
-	{
-		m_Window = window;
-	}
-
 	void EditorLayer::OnRender()
 	{
-		auto& mainFrameBuffer = Renderer::GetMainFrameBuffer();
-		Renderer::Submit([&]() {
-			mainFrameBuffer->Bind();
-			RenderCommand::ClearColor(1.0f, 0.5f, 0.5f, 1.0f);
-			RenderCommand::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-			mainFrameBuffer->Blit();
-			mainFrameBuffer->Unbind();
-		});
+		Renderer::BeginScene(m_Scene);
+		Renderer::Dispatch();
+		Renderer::EndScene();
+
+		RenderCommand::SwapBuffers(m_Window->Raw());
+		Renderer::ClearDrawCommands();
 	}
 
 	void EditorLayer::OnEvent(Event& e)
@@ -71,12 +69,13 @@ namespace Lucy {
 		EventDispatcher& dispatcher = EventDispatcher::GetInstance();
 		dispatcher.Dispatch<KeyEvent>(e, EventType::KeyEvent, [&](KeyEvent& e) {
 			if (e == KeyCode::Escape) {
-				glfwSetWindowShouldClose(m_Window, GL_TRUE);
+				glfwSetWindowShouldClose(m_Window->Raw(), GL_TRUE);
 			}
 		});
 	}
 
 	void EditorLayer::Destroy()
 	{
+		Renderer::Destroy();
 	}
 }

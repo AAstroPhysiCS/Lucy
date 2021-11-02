@@ -12,8 +12,8 @@ namespace Lucy {
 
 	RefLucy<Shader> Shader::Create(const std::string& name, const std::string& path)
 	{
-		switch (Renderer::GetCurrentRenderContextType()) {
-			case RenderContextType::OpenGL:
+		switch (Renderer::GetCurrentRenderAPI()) {
+			case RenderAPI::OpenGL:
 				auto ref = CreateRef<OpenGLShader>(path, name);
 				Renderer::GetShaderLibrary().PushShader(ref);
 				return ref;

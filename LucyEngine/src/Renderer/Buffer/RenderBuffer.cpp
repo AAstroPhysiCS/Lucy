@@ -12,8 +12,8 @@ namespace Lucy {
 
 	RefLucy<RenderBuffer> RenderBuffer::Create(RenderBufferSpecification& specs)
 	{
-		switch (Renderer::GetCurrentRenderContextType()) {
-			case RenderContextType::OpenGL:
+		switch (Renderer::GetCurrentRenderAPI()) {
+			case RenderAPI::OpenGL:
 				return CreateRef<OpenGLRenderBuffer>(specs);
 				break;
 		}

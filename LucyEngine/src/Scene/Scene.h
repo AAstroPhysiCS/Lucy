@@ -12,15 +12,20 @@ namespace Lucy {
 	{
 	public:
 		Scene() = default;
+		Scene(const Scene& other) = default;
+		//Scene(Scene&& other) = default;
 
-		Entity CreateEntity(std::string& path);
+		Entity CreateMesh(std::string& path);
+		Entity CreateMesh();
 		Entity CreateEntity();
 		void RemoveEntity(Entity& e);
+
+		template <typename ... T>
+		inline auto View() { return registry.view<T...>(); }
 	private:
 		entt::registry registry;
 
 		friend class Entity;
-		friend class SceneHierarchyPanel;
 		friend class EditorLayer;
 	};
 }

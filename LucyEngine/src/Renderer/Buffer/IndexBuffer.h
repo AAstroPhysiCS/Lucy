@@ -1,7 +1,7 @@
 #pragma once
 
+#include "../../Core/Base.h"
 #include "Buffer.h"
-#include "../Renderer.h"
 
 namespace Lucy {
 
@@ -10,7 +10,9 @@ namespace Lucy {
 	public:
 		virtual void Bind() = 0;
 		virtual void Unbind() = 0;
-		void SetData(uint32_t* data, size_t size, uint32_t offset);
+		virtual void AddData(std::vector<uint32_t>& dataToAdd) = 0;
+		virtual void Load() = 0;
+		virtual void Destroy() = 0;
 		
 		static RefLucy<IndexBuffer> Create(uint32_t size);
 		static RefLucy<IndexBuffer> Create();
@@ -18,6 +20,8 @@ namespace Lucy {
 		IndexBuffer() = default;
 		IndexBuffer(uint32_t size);
 		virtual ~IndexBuffer() = default;
+
+		std::vector<uint32_t> m_Data;
 	};
 }
 

@@ -36,7 +36,8 @@ project "LucyEditor"
         }
 
         postbuildcommands {
-            "{COPY} ../LucyEngine/vendor/assimp/assimp-vc142-mt.dll ../bin/" .. outputdir .. "/%{prj.name}"
+            "{COPY} ../LucyEngine/vendor/assimp/assimp-vc142-mt.dll ../bin/" .. outputdir .. "/%{prj.name}",
+            "{COPY} ../LucyEngine/vendor/nativefiledialog/nfd.lib ../bin/" .. outputdir .. "/%{prj.name}"
         }
     
     filter "configurations:Debug"

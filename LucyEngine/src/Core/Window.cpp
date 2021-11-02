@@ -4,15 +4,15 @@ namespace Lucy {
 
 	std::function<void(Event*)> Window::s_EventFunc;
 
-	ScopeLucy<Window> Window::Create(const WindowSpecification& specs)
+	RefLucy<Window> Window::Create(const WindowSpecification& specs)
 	{
 #ifdef  LUCY_WINDOWS
-		ScopeLucy<Window> window = CreateScope<WinWindow>();
+		RefLucy<Window> window = CreateRef<WinWindow>();
 		window->m_Specs = specs;
 		return window;
 #else
 		LUCY_CRITICAL("Operating system not being supported!")
-			LUCY_ASSERT(false);
+		LUCY_ASSERT(false);
 #endif
 	}
 

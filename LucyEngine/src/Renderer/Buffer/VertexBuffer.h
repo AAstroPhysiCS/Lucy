@@ -2,8 +2,8 @@
 
 #include <vector>
 
+#include "../../Core/Base.h"
 #include "Buffer.h"
-#include "../Renderer.h"
 
 namespace Lucy {
 
@@ -12,7 +12,9 @@ namespace Lucy {
 	public:
 		virtual void Bind() = 0;
 		virtual void Unbind() = 0;
-		void SetData(float* data, size_t size, uint32_t offset);
+		virtual void AddData(std::vector<float>& dataToAdd) = 0;
+		virtual void Load() = 0;
+		virtual void Destroy() = 0;
 
 		static RefLucy<VertexBuffer> Create(uint32_t size);
 		static RefLucy<VertexBuffer> Create();
@@ -20,6 +22,8 @@ namespace Lucy {
 		VertexBuffer() = default;
 		VertexBuffer(uint32_t size);
 		virtual ~VertexBuffer() = default;
+
+		std::vector<float> m_Data;
 	};
 }
 
