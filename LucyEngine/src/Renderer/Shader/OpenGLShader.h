@@ -8,12 +8,11 @@
 #include "../../Utils.h"
 
 namespace Lucy {
-	class OpenGLShader : public Shader
-	{
+	class OpenGLShader : public Shader {
 	public:
 		OpenGLShader(const std::string& path, const std::string& name);
 		virtual ~OpenGLShader() = default;
-		
+
 		void Bind();
 		void Unbind();
 

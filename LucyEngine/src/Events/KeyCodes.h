@@ -4,8 +4,7 @@
 
 namespace Lucy {
 
-	enum class KeyCode : uint16_t
-	{
+	enum class KeyCode : uint16_t {
 		// From glfw3.h
 
 		Space = 32,

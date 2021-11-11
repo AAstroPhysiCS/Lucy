@@ -3,10 +3,9 @@
 #include <glad/glad.h>
 
 namespace Lucy {
-	
+
 	OpenGLRenderBuffer::OpenGLRenderBuffer(RenderBufferSpecification& specs)
-		: RenderBuffer(specs)
-	{
+		: RenderBuffer(specs) {
 		glCreateRenderbuffers(1, &m_Id);
 		Bind();
 		if (specs.Samples != 0) {
@@ -18,18 +17,15 @@ namespace Lucy {
 		Unbind();
 	}
 
-	void OpenGLRenderBuffer::Bind()
-	{
+	void OpenGLRenderBuffer::Bind() {
 		glBindRenderbuffer(GL_RENDERBUFFER, m_Id);
 	}
 
-	void OpenGLRenderBuffer::Unbind()
-	{
+	void OpenGLRenderBuffer::Unbind() {
 		glBindRenderbuffer(GL_RENDERBUFFER, 0);
 	}
 
-	void OpenGLRenderBuffer::AttachToFramebuffer()
-	{
+	void OpenGLRenderBuffer::AttachToFramebuffer() {
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, m_Specs.Attachment, GL_RENDERBUFFER, m_Id);
 	}
 }

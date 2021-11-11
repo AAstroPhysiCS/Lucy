@@ -4,18 +4,16 @@
 #include "../Renderer.h"
 
 namespace Lucy {
-	
-	RefLucy<FrameBuffer> FrameBuffer::Create(FrameBufferSpecification& specs)
-	{
+
+	RefLucy<FrameBuffer> FrameBuffer::Create(FrameBufferSpecification& specs) {
 		switch (Renderer::GetCurrentRenderAPI()) {
-			case RenderAPI::OpenGL:
-				return CreateRef<OpenGLFrameBuffer>(specs);
-				break;
+		case RenderAPI::OpenGL:
+			return CreateRef<OpenGLFrameBuffer>(specs);
+			break;
 		}
 	}
 
 	FrameBuffer::FrameBuffer(FrameBufferSpecification& specs)
-		: m_Specs(specs)
-	{
+		: m_Specs(specs) {
 	}
 }

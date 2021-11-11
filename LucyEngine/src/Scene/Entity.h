@@ -8,8 +8,7 @@
 
 namespace Lucy {
 
-	class Entity
-	{
+	class Entity {
 	public:
 		Entity() = default;
 		Entity(Scene* scene, entt::entity& entity);
@@ -25,7 +24,7 @@ namespace Lucy {
 		}
 
 		bool IsValid() {
-			if ((ENTT_ID_TYPE) m_Entity == std::numeric_limits<ENTT_ID_TYPE>::max()) return false;
+			if ((ENTT_ID_TYPE)m_Entity == std::numeric_limits<ENTT_ID_TYPE>::max()) return false;
 			return m_Scene->registry.valid(m_Entity);
 		}
 
@@ -40,9 +39,9 @@ namespace Lucy {
 			LUCY_ASSERT(IsValid());
 			return m_Scene->registry.get<T>(m_Entity);
 		}
-		
+
 	private:
-		entt::entity m_Entity = (entt::entity) std::numeric_limits<uint32_t>::max();
+		entt::entity m_Entity = (entt::entity)std::numeric_limits<uint32_t>::max();
 		Scene* m_Scene;
 
 		friend class Scene;

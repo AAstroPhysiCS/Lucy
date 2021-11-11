@@ -7,8 +7,7 @@ namespace Lucy {
 
 	class OpenGLShader;
 
-	class Shader
-	{
+	class Shader {
 	public:
 		static RefLucy<Shader> Create(const std::string& path, const std::string& name);
 

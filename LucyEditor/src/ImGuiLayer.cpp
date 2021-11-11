@@ -10,6 +10,7 @@
 #include "Events/EventDispatcher.h"
 
 #include "Renderer/Renderer.h"
+#include "Renderer/RenderPass.h"
 #include "glad/glad.h"
 
 #include <iostream>
@@ -147,7 +148,9 @@ namespace Lucy {
 
 			switch (Renderer::GetCurrentRenderAPI()) {
 				case RenderAPI::OpenGL:
+					Renderer::GetGeometryPass()->GetFrameBuffer()->Bind();
 					glViewport(0, 0, e.GetWidth(), e.GetHeight());
+					Renderer::GetGeometryPass()->GetFrameBuffer()->Unbind();
 					break;
 				case RenderAPI::Vulkan:
 					LUCY_CRITICAL("Vulkan not supported");

@@ -6,87 +6,61 @@ namespace Lucy {
 
 	RenderPass* RenderCommand::s_ActiveRenderPass = nullptr;
 
-	void RenderCommand::Begin(RefLucy<RenderPass> renderPass)
-	{
+	void RenderCommand::Begin(RefLucy<RenderPass> renderPass) {
 		RenderPass::Begin(renderPass);
 		s_ActiveRenderPass = renderPass.get();
 
 		auto& frameBuffer = renderPass->GetFrameBuffer();
 		auto [r, g, b, a] = renderPass->GetClearColor();
 
-		frameBuffer->Bind();
-		RenderCommand::ClearColor(r, g, b, a);
-		RenderCommand::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		if (frameBuffer->GetBlitted().get())
 			frameBuffer->Blit();
+		RenderCommand::ClearColor(r, g, b, a);
+		RenderCommand::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
 
-	void RenderCommand::End(RefLucy<RenderPass> renderPass)
-	{
-		renderPass->GetFrameBuffer()->Unbind();
+	void RenderCommand::End(RefLucy<RenderPass> renderPass) {
 		RenderPass::End(renderPass);
 		s_ActiveRenderPass = nullptr;
 	}
 
-	void RenderCommand::ClearColor(float r, float g, float b, float a)
-	{
+	void RenderCommand::ClearColor(float r, float g, float b, float a) {
 		Renderer::s_RendererAPI->ClearColor(r, g, b, a);
 	}
 
-	void RenderCommand::Clear(uint32_t bitField)
-	{
+	void RenderCommand::Clear(uint32_t bitField) {
 		Renderer::s_RendererAPI->Clear(bitField);
 	}
 
-	//ugly code (TODO: Change this)
 	GLenum GetGLMode(Topology topology) {
-		switch (Renderer::GetCurrentRenderAPI()) {
-			case RenderAPI::OpenGL:
-				switch (topology) {
-					case Topology::LINES:
-						return GL_LINES;
-						break;
-					case Topology::POINTS:
-						return GL_POINTS;
-						break;
-					case Topology::TRIANGLES:
-						return GL_TRIANGLES;
-						break;
-				}
-				break;
-			case RenderAPI::Vulkan:
-				LUCY_CRITICAL("Vulkan not supported");
-				LUCY_ASSERT(false);
-				break;
+		if (Renderer::GetCurrentRenderAPI() == RenderAPI::OpenGL) {
+			switch (topology) {
+				case Topology::LINES:
+					return GL_LINES;
+					break;
+				case Topology::POINTS:
+					return GL_POINTS;
+					break;
+				case Topology::TRIANGLES:
+					return GL_TRIANGLES;
+					break;
+			}
 		}
 	}
 
-	uint32_t GetIndicesType() {
-		switch (Renderer::GetCurrentRenderAPI()) {
-			case RenderAPI::OpenGL:
-				return GL_UNSIGNED_INT;
-				break;
-			case RenderAPI::Vulkan:
-				LUCY_CRITICAL("Vulkan not supported");
-				LUCY_ASSERT(false);
-				break;
-		}
-	}
-
-	void RenderCommand::DrawElements(uint32_t count, uint32_t indices)
-	{
+	void RenderCommand::DrawElements(uint32_t count, uint32_t indices) {
 		if (!s_ActiveRenderPass) LUCY_ASSERT(false);
-		Renderer::s_RendererAPI->DrawElements(GetGLMode(s_ActiveRenderPass->GetPipeline()->GetTopology()), count, GetIndicesType(), (const void*) indices);
+		if (Renderer::GetCurrentRenderAPI() == RenderAPI::OpenGL)
+			Renderer::s_RendererAPI->DrawElements(GetGLMode(s_ActiveRenderPass->GetPipeline()->GetTopology()), count, GL_UNSIGNED_INT, (const void*)(indices * sizeof(uint32_t)));
 	}
 
-	void RenderCommand::DrawElementsBaseVertex(uint32_t count, uint32_t indices, int32_t basevertex)
-	{
+	void RenderCommand::DrawElementsBaseVertex(uint32_t count, uint32_t indices, int32_t basevertex) {
 		if (!s_ActiveRenderPass) LUCY_ASSERT(false);
-		Renderer::s_RendererAPI->DrawElementsBaseVertex(GetGLMode(s_ActiveRenderPass->GetPipeline()->GetTopology()), count, GetIndicesType(), (const void*) (indices * sizeof(uint32_t)), basevertex);
+		if (Renderer::GetCurrentRenderAPI() == RenderAPI::OpenGL)
+			Renderer::s_RendererAPI->DrawElementsBaseVertex(GetGLMode(s_ActiveRenderPass->GetPipeline()->GetTopology()), count, GL_UNSIGNED_INT, (const void*)(indices * sizeof(uint32_t)), basevertex);
 	}
 
-	void RenderCommand::SwapBuffers(GLFWwindow* window)
-	{
+	void RenderCommand::SwapBuffers(GLFWwindow* window) {
 		Renderer::s_RendererAPI->SwapBuffers(window);
 	}
 }

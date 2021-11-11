@@ -5,8 +5,7 @@
 
 namespace Lucy {
 
-	class UUID
-	{
+	class UUID {
 		UUID();
 
 		std::string m_UUIDAsString = "0";

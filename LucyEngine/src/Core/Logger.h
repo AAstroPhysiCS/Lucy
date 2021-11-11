@@ -17,8 +17,7 @@ namespace Lucy {
 		LUCY_NLEVELS
 	};
 
-	class Logger
-	{
+	class Logger {
 	public:
 		inline static std::shared_ptr<spdlog::logger> s_Logger;
 

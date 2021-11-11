@@ -27,9 +27,9 @@ namespace Lucy {
 	std::vector<MeshDrawCommand> Renderer::s_MeshDrawCommand;
 
 	ShaderLibrary Renderer::s_ShaderLibrary;
+	Camera* Renderer::s_ActiveCamera = nullptr;
 
-	void Renderer::Init(RefLucy<Window> window, RenderAPI renderContext)
-	{
+	void Renderer::Init(RefLucy<Window> window, RenderAPI renderContext) {
 		s_RenderContext = RenderContext::Create(renderContext);
 		s_RenderContext->PrintInfo();
 
@@ -79,6 +79,7 @@ namespace Lucy {
 
 			std::vector<ShaderLayoutElement> vertexLayout = {
 					{ "a_Pos", ShaderDataSize::Float3 },
+					{ "a_ID", ShaderDataSize::Float1 },
 					{ "a_TextureCoords", ShaderDataSize::Float2 },
 					{ "a_Normals", ShaderDataSize::Float3 },
 					{ "a_Tangents", ShaderDataSize::Float3 },
@@ -92,33 +93,29 @@ namespace Lucy {
 			RenderPassSpecification geometryPassSpecs;
 			geometryPassSpecs.FrameBuffer = FrameBuffer::Create(frameBufferSpecs);
 			geometryPassSpecs.Pipeline = Pipeline::Create(geometryPipelineSpecs);
-			geometryPassSpecs.ClearColor = { 1.0f, 0.5f, 0.5f, 1.0f };
+			geometryPassSpecs.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
 			s_GeometryPass = RenderPass::Create(geometryPassSpecs);
 		}
 
 		Renderer::Dispatch(); //just for init functions
 	}
 
-	void Renderer::Submit(const Func&& func)
-	{
+	void Renderer::Submit(const Func&& func) {
 		s_RenderQueue.push_back(func);
 	}
 
-	void Renderer::SubmitMesh(RefLucy<Mesh>& mesh, const glm::mat4& entityTransform)
-	{
+	void Renderer::SubmitMesh(RefLucy<Mesh>& mesh, const glm::mat4& entityTransform) {
 		Submit([=]() {
 			s_MeshDrawCommand.push_back(MeshDrawCommand(mesh, entityTransform));
 		});
 	}
 
-	void Renderer::GeometryPass()
-	{
+	void Renderer::GeometryPass() {
 		RenderCommand::Begin(s_GeometryPass);
 
 		for (MeshDrawCommand meshComponent : s_MeshDrawCommand) {
 
-			RefLucy<Mesh> mesh = meshComponent.Mesh;
-			const glm::mat4& entityTransform = meshComponent.EntityTransform;
+			RefLucy<Mesh>& mesh = meshComponent.Mesh;
 
 			std::vector<Material>& materials = mesh->GetMaterials();
 			std::vector<Submesh>& submeshes = mesh->GetSubmeshes();
@@ -131,25 +128,28 @@ namespace Lucy {
 				RefLucy<Shader>& shader = material.GetShader();
 
 				material.Bind();
-				shader->SetMat4("u_ModelMatrix", entityTransform * submesh.Transform);
-				shader->SetMat4("u_ViewMatrix", entityTransform * submesh.Transform);
-				shader->SetMat4("u_ProjectionMatrix", entityTransform * submesh.Transform);
+				shader->SetMat4("u_ModelMatrix", meshComponent.EntityTransform * submesh.Transform);
+				shader->SetMat4("u_ViewMatrix", s_ActiveCamera->GetViewMatrix());
+				shader->SetMat4("u_ProjMatrix", s_ActiveCamera->GetProjectionMatrix());
 				RenderCommand::DrawElementsBaseVertex(submesh.IndexCount, submesh.BaseIndexCount, submesh.BaseVertexCount);
 				material.Unbind();
 			}
-			
+
 			mesh->Unbind();
 		}
 
 		RenderCommand::End(s_GeometryPass);
 	}
 
-	void Renderer::BeginScene(const Scene& scene)
-	{
+	void Renderer::BeginScene(Scene& scene) {
+		EditorCamera& camera = scene.GetEditorCamera();
+		camera.UpdateProjection();
+		camera.UpdateView();
+
+		s_ActiveCamera = &camera;
 	}
 
-	void Renderer::EndScene()
-	{
+	void Renderer::EndScene() {
 		GeometryPass();
 	}
 
@@ -160,13 +160,11 @@ namespace Lucy {
 		s_RenderQueue.clear();
 	}
 
-	void Renderer::ClearDrawCommands()
-	{
+	void Renderer::ClearDrawCommands() {
 		s_MeshDrawCommand.clear();
 	}
 
-	void Renderer::Destroy()
-	{
+	void Renderer::Destroy() {
 		for (RefLucy<Shader> shader : s_ShaderLibrary.m_Shaders) {
 			shader->Destroy();
 		}

@@ -1,10 +1,6 @@
 #include "SceneHierarchyPanel.h"
-
 #include "imgui.h"
-
 #include "Renderer/Renderer.h"
-#include "Scene/Entity.h"
-
 #include "../EditorLayer.h"
 
 namespace Lucy {

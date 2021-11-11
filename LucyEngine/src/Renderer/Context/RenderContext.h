@@ -9,8 +9,7 @@ namespace Lucy {
 		Vulkan
 	};
 
-	class RenderContext
-	{
+	class RenderContext {
 	public:
 		virtual void Init() = 0;
 		virtual void Destroy() = 0;

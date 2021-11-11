@@ -8,7 +8,8 @@ namespace Lucy {
 	struct MeshDrawCommand {
 		MeshDrawCommand() = default;
 		MeshDrawCommand(RefLucy<Mesh> mesh, const glm::mat4& entityTransform)
-			: Mesh(mesh), EntityTransform(entityTransform) {}
+			: Mesh(mesh), EntityTransform(entityTransform) {
+		}
 
 		friend class Renderer;
 	private:

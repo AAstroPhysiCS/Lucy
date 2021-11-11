@@ -8,8 +8,7 @@
 namespace Lucy {
 
 	OpenGLFrameBuffer::OpenGLFrameBuffer(FrameBufferSpecification& specs)
-		: FrameBuffer(specs)
-	{
+		: FrameBuffer(specs) {
 		Renderer::Submit([=]() {
 
 			glCreateFramebuffers(1, &m_Id);
@@ -30,7 +29,7 @@ namespace Lucy {
 				renderBuffer->AttachToFramebuffer();
 				renderBuffer->Unbind();
 			}
-			
+
 			LUCY_ASSERT(CheckStatus());
 			Unbind();
 		});
@@ -41,31 +40,27 @@ namespace Lucy {
 			blittedSpec.MultiSampled = false;
 			blittedSpec.TextureSpecs.push_back(specs.BlittedTextureSpecs);
 			m_Blitted = FrameBuffer::Create(blittedSpec);
+			As(m_Blitted, OpenGLFrameBuffer)->CheckStatus();
 		}
 	}
 
-	void OpenGLFrameBuffer::Bind()
-	{
+	void OpenGLFrameBuffer::Bind() {
 		glBindFramebuffer(GL_FRAMEBUFFER, m_Id);
 	}
 
-	void OpenGLFrameBuffer::Unbind()
-	{
+	void OpenGLFrameBuffer::Unbind() {
 		glBindFramebuffer(GL_FRAMEBUFFER, 0); //binds the default framebuffer (OpenGL only)
 	}
 
-	void OpenGLFrameBuffer::Destroy()
-	{
+	void OpenGLFrameBuffer::Destroy() {
 		glDeleteFramebuffers(1, &m_Id);
 	}
 
-	void OpenGLFrameBuffer::Blit()
-	{
+	void OpenGLFrameBuffer::Blit() {
 		glBlitNamedFramebuffer(m_Id, m_Blitted->GetID(), 0, 0, m_Specs.RenderBuffer->GetWidth(), m_Specs.RenderBuffer->GetHeight(), 0, 0, m_Specs.RenderBuffer->GetWidth(), m_Specs.RenderBuffer->GetHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
 	}
 
-	bool OpenGLFrameBuffer::CheckStatus()
-	{
+	bool OpenGLFrameBuffer::CheckStatus() {
 		return glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
 	}
 }

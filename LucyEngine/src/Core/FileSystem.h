@@ -4,8 +4,8 @@
 #include "Base.h"
 
 namespace Lucy {
-	class FileSystem
-	{
+
+	class FileSystem {
 	public:
 		static std::string GetParentPath(std::string& path);
 

@@ -25,9 +25,9 @@ namespace Lucy {
 		void Destroy();
 
 		inline Scene& GetScene() { return m_Scene; }
-
 	private:
 		EditorLayer() = default;
+		virtual ~EditorLayer() = default;
 
 		RefLucy<Window> m_Window;
 		Scene m_Scene;

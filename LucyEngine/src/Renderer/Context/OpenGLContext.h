@@ -4,8 +4,7 @@
 
 namespace Lucy {
 
-	class OpenGLContext : public RenderContext
-	{
+	class OpenGLContext : public RenderContext {
 	public:
 		OpenGLContext(RenderAPI type);
 		virtual ~OpenGLContext() = default;

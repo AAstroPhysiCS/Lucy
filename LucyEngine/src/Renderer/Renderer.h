@@ -2,6 +2,7 @@
 
 #include "../Core/Base.h"
 #include "../Scene/Scene.h"
+#include "../Scene/Camera.h"
 #include "../Core/Window.h"
 
 #include "Context/RendererAPI.h"
@@ -10,13 +11,12 @@
 #include "DrawCommand.h"
 
 namespace Lucy {
-	
+
 	class RenderPass;
 	class FrameBuffer;
 	class ShaderLibrary;
 
-	class Renderer
-	{
+	class Renderer {
 		using Func = std::function<void()>;
 
 	public:
@@ -25,14 +25,14 @@ namespace Lucy {
 
 		inline static RenderAPI GetCurrentRenderAPI() { return s_RenderContext->GetRenderAPI(); }
 		inline static RefLucy<RenderPass>& GetGeometryPass() { return s_GeometryPass; }
-		inline static ShaderLibrary& GetShaderLibrary(){ return s_ShaderLibrary; }
+		inline static ShaderLibrary& GetShaderLibrary() { return s_ShaderLibrary; }
 
 		inline static auto GetViewportSize() {
 			struct Size { uint32_t Width, Height; };
-			return Size { s_Window->GetWidth(), s_Window->GetHeight() };
+			return Size{ s_Window->GetWidth(), s_Window->GetHeight() };
 		}
 
-		static void BeginScene(const Scene& scene);
+		static void BeginScene(Scene& scene);
 		static void EndScene();
 		static void Submit(const Func&& func);
 		static void SubmitMesh(RefLucy<Mesh>& mesh, const glm::mat4& entityTransform);
@@ -46,7 +46,9 @@ namespace Lucy {
 		static RefLucy<RenderContext> s_RenderContext;
 		static RefLucy<RenderPass> s_GeometryPass;
 		static RefLucy<Window> s_Window;
-		
+
+		static Camera* s_ActiveCamera;
+
 		static std::vector<Func> s_RenderQueue;
 		static std::vector<MeshDrawCommand> s_MeshDrawCommand;
 

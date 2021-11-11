@@ -16,8 +16,7 @@ namespace Lucy {
 		ClearColor ClearColor;
 	};
 
-	class RenderPass
-	{
+	class RenderPass {
 	public:
 		static RefLucy<RenderPass> Create(RenderPassSpecification& specs);
 		static void Begin(RefLucy<RenderPass>& renderPass);

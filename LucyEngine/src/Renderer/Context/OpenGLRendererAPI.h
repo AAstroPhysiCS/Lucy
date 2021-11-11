@@ -4,8 +4,7 @@
 
 namespace Lucy {
 
-	class OpenGLRendererAPI : public RendererAPI
-	{
+	class OpenGLRendererAPI : public RendererAPI {
 	public:
 		OpenGLRendererAPI() = default;
 		virtual ~OpenGLRendererAPI() = default;

@@ -5,17 +5,14 @@
 namespace Lucy {
 
 	RenderContext::RenderContext(RenderAPI type)
-		: m_RenderContextType(type)
-	{
+		: m_RenderContextType(type) {
 	}
 
-	RenderAPI RenderContext::GetRenderAPI()
-	{
+	RenderAPI RenderContext::GetRenderAPI() {
 		return m_RenderContextType;
 	}
 
-	RefLucy<RenderContext> RenderContext::Create(RenderAPI type)
-	{
+	RefLucy<RenderContext> RenderContext::Create(RenderAPI type) {
 		switch (type) {
 			case RenderAPI::OpenGL:
 				return CreateRef<OpenGLContext>(type);

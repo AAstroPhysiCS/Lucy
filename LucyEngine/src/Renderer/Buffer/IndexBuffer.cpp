@@ -4,9 +4,8 @@
 #include "../Renderer.h"
 
 namespace Lucy {
-	
-	RefLucy<IndexBuffer> IndexBuffer::Create(uint32_t size)
-	{
+
+	RefLucy<IndexBuffer> IndexBuffer::Create(uint32_t size) {
 		switch (Renderer::GetCurrentRenderAPI()) {
 			case RenderAPI::OpenGL:
 				return CreateRef<OpenGLIndexBuffer>(size);
@@ -18,8 +17,7 @@ namespace Lucy {
 		}
 	}
 
-	RefLucy<IndexBuffer> IndexBuffer::Create()
-	{
+	RefLucy<IndexBuffer> IndexBuffer::Create() {
 		switch (Renderer::GetCurrentRenderAPI()) {
 			case RenderAPI::OpenGL:
 				return CreateRef<OpenGLIndexBuffer>();
@@ -31,10 +29,12 @@ namespace Lucy {
 		}
 	}
 
-	IndexBuffer::IndexBuffer(uint32_t size)
-		: Buffer<uint32_t>(size)
-	{
-		//m_Data.resize(size);
+	IndexBuffer::IndexBuffer() {
+		m_DataHead = m_Data.data();
+	}
+
+	IndexBuffer::IndexBuffer(uint32_t size) {
+		m_Data.resize(size);
 		m_DataHead = m_Data.data();
 	}
 }

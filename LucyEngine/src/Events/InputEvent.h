@@ -52,7 +52,7 @@ namespace Lucy {
 		inline int32_t GetCodePoint() const { return m_CodePoint; }
 
 		std::function<void(uint32_t)> dispatchFunc;
-	
+
 	private:
 		uint32_t m_CodePoint;
 	};
@@ -67,7 +67,7 @@ namespace Lucy {
 		std::function<void(int32_t, int32_t, int32_t, int32_t)> dispatchFunc;
 
 		inline constexpr bool operator==(KeyCode keyCode) {
-			return m_Key == (uint16_t) keyCode;
+			return m_Key == (uint16_t)keyCode;
 		}
 
 		inline int32_t GetKey() const { return m_Key; }
@@ -83,7 +83,7 @@ namespace Lucy {
 	};
 
 	struct MouseEvent : Event {
-		
+
 		MouseEvent(int32_t button, int32_t action, int32_t mods)
 			: m_Button(button), m_Action(action), m_Mods(mods) {
 			m_Type = EventType::MouseEvent;

@@ -7,8 +7,7 @@
 
 namespace Lucy {
 
-	class RendererAPI
-	{
+	class RendererAPI {
 	public:
 		virtual void SwapBuffers(GLFWwindow* window) = 0;
 		virtual void Clear(uint32_t bitField) = 0;

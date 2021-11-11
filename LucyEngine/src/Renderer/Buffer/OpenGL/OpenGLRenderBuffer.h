@@ -4,8 +4,7 @@
 
 namespace Lucy {
 
-	class OpenGLRenderBuffer : public RenderBuffer
-	{
+	class OpenGLRenderBuffer : public RenderBuffer {
 	public:
 		OpenGLRenderBuffer(RenderBufferSpecification& specs);
 		virtual ~OpenGLRenderBuffer() = default;

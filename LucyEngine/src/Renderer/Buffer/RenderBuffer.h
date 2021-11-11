@@ -12,8 +12,7 @@ namespace Lucy {
 		uint32_t Samples;
 	};
 
-	class RenderBuffer
-	{
+	class RenderBuffer {
 	public:
 		static RefLucy<RenderBuffer> Create(RenderBufferSpecification& specs);
 

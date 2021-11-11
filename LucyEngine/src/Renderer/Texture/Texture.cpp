@@ -4,9 +4,8 @@
 #include "../Renderer.h"
 
 namespace Lucy {
-	
-	RefLucy<Texture2D> Texture2D::Create(TextureSpecification& specs)
-	{
+
+	RefLucy<Texture2D> Texture2D::Create(TextureSpecification& specs) {
 		switch (Renderer::GetCurrentRenderAPI()) {
 			case RenderAPI::OpenGL:
 				return CreateRef<OpenGLTexture2D>(specs);
@@ -17,9 +16,8 @@ namespace Lucy {
 				break;
 		}
 	}
-	
+
 	Texture2D::Texture2D(TextureSpecification& specs)
-		: m_Specs(specs), m_Width(specs.Width), m_Height(specs.Height)
-	{
+		: m_Specs(specs), m_Width(specs.Width), m_Height(specs.Height) {
 	}
 }

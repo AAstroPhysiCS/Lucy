@@ -24,28 +24,27 @@ namespace Lucy {
 		aiProcess_OptimizeMeshes;
 
 	Mesh::Mesh(const std::string& path)
-		: m_Path(path)
-	{
+		: m_Path(path) {
 		ScopedTimer scopedTimer;
 
 		Assimp::Importer importer;
 		const aiScene* scene = importer.ReadFile(path, ASSIMP_FLAGS);
 
-		if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE)
-		{
+		if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) {
 			LUCY_CRITICAL("Mesh could not be imported!");
 			return;
 		}
 
-		uint32_t totalVertexSize = 0, totalIndexSize = 0;
-		LoadData(scene, totalVertexSize, totalIndexSize);
+		uint32_t totalVertexSize = 0;
+		LoadData(scene, totalVertexSize);
 		LoadMaterials(scene);
 		TraverseHierarchy(scene->mRootNode, nullptr);
-		
-		m_IndexBuffer = IndexBuffer::Create(totalIndexSize);
+
+		m_IndexBuffer = IndexBuffer::Create();
 		for (Submesh& submesh : m_Submeshes) {
 			m_IndexBuffer->AddData(submesh.Faces);
 		}
+
 		m_VertexBuffer = VertexBuffer::Create(totalVertexSize * 15);
 		float* dataPtr = m_VertexBuffer->GetData();
 
@@ -81,8 +80,7 @@ namespace Lucy {
 		}
 	}
 
-	Mesh::~Mesh()
-	{
+	Mesh::~Mesh() {
 		m_VertexBuffer->Destroy();
 		m_IndexBuffer->Destroy();
 
@@ -91,8 +89,7 @@ namespace Lucy {
 		}
 	}
 
-	RefLucy<Mesh> Mesh::Create(const std::string& path)
-	{
+	RefLucy<Mesh> Mesh::Create(const std::string& path) {
 		switch (Renderer::GetCurrentRenderAPI()) {
 			case RenderAPI::OpenGL:
 				return CreateRef<Mesh>(path);
@@ -104,8 +101,7 @@ namespace Lucy {
 		}
 	}
 
-	void Mesh::Bind()
-	{
+	void Mesh::Bind() {
 		if (!m_Loaded)
 			LoadBuffers();
 
@@ -115,16 +111,14 @@ namespace Lucy {
 		}
 	}
 
-	void Mesh::Unbind()
-	{
+	void Mesh::Unbind() {
 		if (Renderer::GetCurrentRenderAPI() == RenderAPI::OpenGL) {
-			glBindVertexArray(0);
 			m_IndexBuffer->Unbind();
+			glBindVertexArray(0);
 		}
 	}
 
-	void Mesh::LoadBuffers()
-	{
+	void Mesh::LoadBuffers() {
 		if (Renderer::GetCurrentRenderAPI() == RenderAPI::OpenGL) {
 			glCreateVertexArrays(1, &m_Vao);
 			glBindVertexArray(m_Vao);
@@ -134,15 +128,14 @@ namespace Lucy {
 
 			m_VertexBuffer->Load();
 			m_IndexBuffer->Load();
-			
+
 			glBindVertexArray(0);
 		}
 
 		m_Loaded = true;
 	}
 
-	void Mesh::LoadData(const aiScene* scene, uint32_t& totalVertexSize, uint32_t& totalIndexSize)
-	{
+	void Mesh::LoadData(const aiScene* scene, uint32_t& totalVertexSize) {
 		aiMesh** meshes = scene->mMeshes;
 		uint32_t meshCount = scene->mNumMeshes;
 
@@ -161,26 +154,25 @@ namespace Lucy {
 			baseIndexCount += submesh.IndexCount;
 
 			totalVertexSize += submesh.VertexCount;
-			totalIndexSize += submesh.IndexCount;
 
 			uint32_t sizeVertices = submesh.VertexCount;
 
 			if (mesh->HasPositions()) {
 				aiVector3D* vertices = mesh->mVertices;
 				submesh.Vertices.resize(sizeVertices);
-				memcpy(submesh.Vertices.data(), vertices, sizeVertices);
+				memcpy(submesh.Vertices.data(), vertices, sizeVertices * sizeof(aiVector3D));
 			}
 
 			if (mesh->HasNormals()) {
 				aiVector3D* normals = mesh->mNormals;
 				submesh.Normals.resize(sizeVertices);
-				memcpy(submesh.Normals.data(), normals, sizeVertices);
+				memcpy(submesh.Normals.data(), normals, sizeVertices * sizeof(aiVector3D));
 			}
 
 			if (mesh->HasTextureCoords(0)) {
 				aiVector3D* textureCoords = mesh->mTextureCoords[0];
 				submesh.TextureCoords.resize(sizeVertices);
-				for (uint32_t j = 0; j < sizeVertices / 3; j++) {
+				for (uint32_t j = 0; j < sizeVertices; j++) {
 					submesh.TextureCoords.push_back({ textureCoords[j].x, textureCoords[j].y });
 				}
 			}
@@ -188,11 +180,11 @@ namespace Lucy {
 			if (mesh->HasTangentsAndBitangents()) {
 				aiVector3D* tangents = mesh->mTangents;
 				submesh.Tangents.resize(sizeVertices);
-				memcpy(submesh.Tangents.data(), tangents, sizeVertices);
+				memcpy(submesh.Tangents.data(), tangents, sizeVertices * sizeof(aiVector3D));
 
 				aiVector3D* biTangents = mesh->mBitangents;
 				submesh.BiTangents.resize(sizeVertices);
-				memcpy(submesh.BiTangents.data(), biTangents, sizeVertices);
+				memcpy(submesh.BiTangents.data(), biTangents, sizeVertices * sizeof(aiVector3D));
 			}
 
 			submesh.MaterialIndex = mesh->mMaterialIndex;
@@ -213,8 +205,7 @@ namespace Lucy {
 		}
 	}
 
-	void Mesh::LoadMaterials(const aiScene* scene)
-	{
+	void Mesh::LoadMaterials(const aiScene* scene) {
 		aiMaterial** materials = scene->mMaterials;
 		size_t materialSize = scene->mNumMaterials;
 
@@ -226,8 +217,7 @@ namespace Lucy {
 		}
 	}
 
-	void Mesh::TraverseHierarchy(const aiNode* node, const aiNode* rootNode)
-	{
+	void Mesh::TraverseHierarchy(const aiNode* node, const aiNode* rootNode) {
 		aiMatrix4x4 transform = node->mTransformation;
 		if (rootNode) {
 			transform *= rootNode->mTransformation;
@@ -235,7 +225,7 @@ namespace Lucy {
 
 		for (uint32_t i = 0; i < node->mNumMeshes; i++) {
 			Submesh& submesh = m_Submeshes[node->mMeshes[i]];
-			submesh.Transform = glm::mat4(1.0f);
+			submesh.Transform = *(glm::mat4*)&transform;
 		}
 
 		for (uint32_t i = 0; i < node->mNumChildren; i++) {

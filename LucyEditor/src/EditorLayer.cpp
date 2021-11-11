@@ -15,32 +15,28 @@
 
 namespace Lucy {
 
-	void EditorLayer::Init(RefLucy<Window> window)
-	{
+	void EditorLayer::Init(RefLucy<Window> window) {
 		m_Window = window;
 	}
 
-	void EditorLayer::Begin()
-	{
+	void EditorLayer::Begin() {
 		auto& meshView = m_Scene.View<MeshComponent>();
 
 		for (auto entity : meshView) {
-			Entity e { &m_Scene, entity };
+			Entity e{ &m_Scene, entity };
 			MeshComponent& meshComponent = e.GetComponent<MeshComponent>();
 			if (!meshComponent.IsValid()) continue;
-			
+
 			Renderer::SubmitMesh(meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
 		}
 	}
 
-	void EditorLayer::End()
-	{
+	void EditorLayer::End() {
 		GLenum state = glGetError();
 		if (state != GL_NO_ERROR) Logger::Log(LoggerInfo::LUCY_CRITICAL, state);
 	}
 
-	void EditorLayer::OnRender()
-	{
+	void EditorLayer::OnRender() {
 		Renderer::BeginScene(m_Scene);
 		Renderer::Dispatch();
 		Renderer::EndScene();
@@ -49,8 +45,7 @@ namespace Lucy {
 		Renderer::ClearDrawCommands();
 	}
 
-	void EditorLayer::OnEvent(Event& e)
-	{
+	void EditorLayer::OnEvent(Event& e) {
 		switch (e.GetType()) {
 			case EventType::KeyEvent:
 				break;
@@ -74,8 +69,7 @@ namespace Lucy {
 		});
 	}
 
-	void EditorLayer::Destroy()
-	{
+	void EditorLayer::Destroy() {
 		Renderer::Destroy();
 	}
 }

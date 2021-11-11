@@ -1,21 +1,18 @@
 #include "LayerStack.h"
 
 namespace Lucy {
-	
-	void LayerStack::Push(std::initializer_list<Layer*> list)
-	{
+
+	void LayerStack::Push(std::initializer_list<Layer*> list) {
 		for (Layer* l : list) {
 			m_LayerStack.push_back(l);
 		}
 	}
 
-	void LayerStack::Pop()
-	{
+	void LayerStack::Pop() {
 		m_LayerStack.pop_back();
 	}
 
-	std::vector<Layer*> LayerStack::GetStack() const
-	{
+	std::vector<Layer*> LayerStack::GetStack() const {
 		return m_LayerStack;
 	}
 }

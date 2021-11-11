@@ -4,7 +4,7 @@
 #include "OpenGLRendererAPI.h"
 
 namespace Lucy {
-	
+
 	RefLucy<RendererAPI> RendererAPI::Create() {
 		switch (Renderer::GetCurrentRenderAPI()) {
 			case RenderAPI::OpenGL:

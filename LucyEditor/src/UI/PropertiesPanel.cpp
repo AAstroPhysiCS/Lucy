@@ -106,6 +106,8 @@ namespace Lucy {
 					ImGui::TableSetColumnIndex(1);
 					RenderTransformControl("Scale Control", scale.x, scale.y, scale.z, 1.0f, 0.1f);
 
+					t.CalculateMatrix();
+
 					ImGui::EndTable();
 				}
 			}

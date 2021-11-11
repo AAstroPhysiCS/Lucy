@@ -7,8 +7,7 @@
 
 namespace Lucy {
 
-	class VertexBuffer : public Buffer<float>
-	{
+	class VertexBuffer : public Buffer<float> {
 	public:
 		virtual void Bind() = 0;
 		virtual void Unbind() = 0;
@@ -19,8 +18,8 @@ namespace Lucy {
 		static RefLucy<VertexBuffer> Create(uint32_t size);
 		static RefLucy<VertexBuffer> Create();
 	protected:
-		VertexBuffer() = default;
 		VertexBuffer(uint32_t size);
+		VertexBuffer();
 		virtual ~VertexBuffer() = default;
 
 		std::vector<float> m_Data;

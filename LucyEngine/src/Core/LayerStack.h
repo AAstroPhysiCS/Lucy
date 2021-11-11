@@ -6,8 +6,7 @@
 
 namespace Lucy {
 
-	class LayerStack
-	{
+	class LayerStack {
 	public:
 		LayerStack() = default;
 		~LayerStack() = default;

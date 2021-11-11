@@ -21,8 +21,7 @@ namespace Lucy {
 		RefLucy<RenderBuffer> RenderBuffer;
 	};
 
-	class FrameBuffer
-	{
+	class FrameBuffer {
 	public:
 		~FrameBuffer() = default;
 
@@ -33,11 +32,11 @@ namespace Lucy {
 
 		uint32_t GetID() const { return m_Id; }
 		RefLucy<FrameBuffer>& GetBlitted() { return m_Blitted; }
-		
+
 		static RefLucy<FrameBuffer> Create(FrameBufferSpecification& specs);
 	protected:
 		FrameBuffer(FrameBufferSpecification& specs);
-		
+
 		uint32_t m_Id;
 		FrameBufferSpecification m_Specs;
 		RefLucy<FrameBuffer> m_Blitted;

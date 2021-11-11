@@ -5,8 +5,7 @@
 
 namespace Lucy {
 
-	struct EventDispatcher
-	{
+	struct EventDispatcher {
 		static EventDispatcher& GetInstance() {
 			static EventDispatcher s_Instance;
 			return s_Instance;

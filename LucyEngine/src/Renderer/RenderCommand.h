@@ -7,8 +7,7 @@ namespace Lucy {
 
 	class RenderPass;
 
-	class RenderCommand
-	{
+	class RenderCommand {
 	public:
 		static void Begin(RefLucy<RenderPass> renderPass);
 		static void End(RefLucy<RenderPass> renderPass);

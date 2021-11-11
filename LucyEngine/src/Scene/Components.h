@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "glm/glm.hpp"
+#include "glm/gtx/quaternion.hpp"
 
 #include "UUID.h"
 #include "../Renderer/Mesh.h"
@@ -21,11 +22,17 @@ namespace Lucy {
 		inline glm::vec3& GetRotation() { return m_Rotation; }
 		inline glm::vec3& GetScale() { return m_Scale; }
 
+		void CalculateMatrix() {
+			m_Mat = glm::translate(glm::mat4(1.0f), m_Position)
+				* glm::toMat4(glm::quat(m_Rotation))
+				* glm::scale(glm::mat4(1.0f), m_Scale);
+		}
+
 	private:
 		glm::mat4 m_Mat = glm::mat4();
 		glm::vec3 m_Position = glm::vec3();
 		glm::vec3 m_Rotation = glm::vec3();
-		glm::vec3 m_Scale = glm::vec3();
+		glm::vec3 m_Scale = glm::vec3(1.0f);
 	};
 
 	struct MeshComponent {
@@ -36,7 +43,7 @@ namespace Lucy {
 		MeshComponent(const MeshComponent& other) = default;
 
 		void SetMesh(RefLucy<Mesh>&& mesh) { m_Mesh = std::move(mesh); }
-		
+
 		inline RefLucy<Mesh>& GetMesh() { return m_Mesh; }
 		inline bool IsValid() { return m_Mesh.get() != nullptr && m_Mesh->GetSubmeshes().size() != 0; }
 	private:
@@ -59,9 +66,11 @@ namespace Lucy {
 	struct TagComponent {
 		TagComponent() = default;
 		TagComponent(std::string& tag)
-			: m_Tag(tag) {}
+			: m_Tag(tag) {
+		}
 		TagComponent(const char* tag)
-			: m_Tag(tag) {}
+			: m_Tag(tag) {
+		}
 		TagComponent(const TagComponent& other) = default;
 
 		inline std::string& GetTag() { return m_Tag; }

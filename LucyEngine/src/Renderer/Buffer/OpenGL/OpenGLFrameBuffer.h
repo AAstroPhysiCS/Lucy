@@ -5,8 +5,7 @@
 
 namespace Lucy {
 
-	class OpenGLFrameBuffer : public FrameBuffer
-	{
+	class OpenGLFrameBuffer : public FrameBuffer {
 	public:
 		OpenGLFrameBuffer(FrameBufferSpecification& specs);
 		virtual ~OpenGLFrameBuffer() = default;

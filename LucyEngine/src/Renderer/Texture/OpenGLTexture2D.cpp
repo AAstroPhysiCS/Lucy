@@ -8,11 +8,10 @@
 namespace Lucy {
 
 	OpenGLTexture2D::OpenGLTexture2D(TextureSpecification& specs)
-		: Texture2D(specs)
-	{
+		: Texture2D(specs) {
 		//if you want to create a texture buffer, you can leave the path empty and the stbi_load would fail.
 		uint8_t* data = nullptr;
-		if(specs.Path) {
+		if (specs.Path) {
 			data = stbi_load(specs.Path, &m_Width, &m_Height, &m_Channels, 0);
 
 			if (m_Channels == 1)
@@ -26,7 +25,7 @@ namespace Lucy {
 
 			if (!data) LUCY_CRITICAL(std::string("Failed to load a texture. Texture path: ").append(specs.Path));
 		}
-		
+
 		LUCY_ASSERT(m_Width != 0 && m_Height != 0);
 
 		glCreateTextures(GL_TEXTURE_2D, 1, &m_Id);
@@ -47,18 +46,15 @@ namespace Lucy {
 		Unbind();
 	}
 
-	void OpenGLTexture2D::Bind()
-	{
+	void OpenGLTexture2D::Bind() {
 		glBindTexture(GL_TEXTURE_2D, m_Id);
 	}
 
-	void OpenGLTexture2D::Unbind()
-	{
+	void OpenGLTexture2D::Unbind() {
 		glBindTexture(GL_TEXTURE_2D, 0);
 	}
 
-	void OpenGLTexture2D::Destroy()
-	{
+	void OpenGLTexture2D::Destroy() {
 		glDeleteTextures(1, &m_Id);
 	}
 }

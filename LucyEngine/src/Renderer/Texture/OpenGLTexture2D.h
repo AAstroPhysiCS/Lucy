@@ -4,8 +4,7 @@
 
 namespace Lucy {
 
-	class OpenGLTexture2D : public Texture2D
-	{
+	class OpenGLTexture2D : public Texture2D {
 	public:
 		OpenGLTexture2D(TextureSpecification& specs);
 		virtual ~OpenGLTexture2D() = default;

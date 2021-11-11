@@ -22,8 +22,7 @@ namespace Lucy {
 		Lucy::WindowMode WindowMode = WindowMode::WINDOWED;
 	};
 
-	class Window
-	{
+	class Window {
 	public:
 		virtual ~Window() = default;
 

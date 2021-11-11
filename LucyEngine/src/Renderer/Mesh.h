@@ -31,13 +31,12 @@ namespace Lucy {
 		uint32_t BaseIndexCount = 0;
 	};
 
-	class Mesh
-	{
+	class Mesh {
 	public:
 		Mesh(const std::string& path);
 		Mesh(const Mesh& other) = default;
 		~Mesh();
-		
+
 		static RefLucy<Mesh> Create(const std::string& path);
 
 		inline std::string& GetPath() { return m_Path; }
@@ -48,10 +47,10 @@ namespace Lucy {
 		void Unbind();
 	private:
 		void LoadBuffers();
-		void LoadData(const aiScene* scene, uint32_t& totalSize, uint32_t& totalIndexSize);
+		void LoadData(const aiScene* scene, uint32_t& totalSize);
 		void LoadMaterials(const aiScene* scene);
 		void TraverseHierarchy(const aiNode* node, const aiNode* rootNode);
-		
+
 		RefLucy<VertexBuffer> m_VertexBuffer;
 		RefLucy<IndexBuffer> m_IndexBuffer;
 

@@ -11,16 +11,15 @@ namespace Lucy {
 		char** Argv;
 	};
 
-	class Application
-	{
+	class Application {
 	public:
 		Application(const ApplicationArgs& args);
-		virtual ~Application() { 
+		virtual ~Application() {
 			for (Layer* layers : m_LayerStack.GetStack()) {
 				layers->Destroy();
 			}
 		}
-		
+
 		virtual void Run() = 0;
 	protected:
 		ApplicationArgs m_Args;

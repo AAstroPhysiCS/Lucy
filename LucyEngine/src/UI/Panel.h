@@ -2,8 +2,7 @@
 
 namespace Lucy {
 
-	class Panel
-	{
+	class Panel {
 	public:
 		virtual void Render() = 0;
 	};
