@@ -1,7 +1,5 @@
 #pragma once
 
-#include <stdint.h>
-
 namespace Lucy {
 
 	template <typename T>

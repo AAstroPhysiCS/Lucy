@@ -1,7 +1,5 @@
 #pragma once
 
-#include <vector>
-
 #include "entt/entt.hpp"
 #include "Camera.h"
 

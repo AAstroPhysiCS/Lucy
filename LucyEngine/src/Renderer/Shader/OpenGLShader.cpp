@@ -1,3 +1,5 @@
+#include "lypch.h"
+
 #include "OpenGLShader.h"
 #include "../Renderer.h"
 
@@ -9,7 +11,7 @@ namespace Lucy {
 		: Shader(path, name) {
 		Renderer::Submit([&]() {
 			Load();
-						 });
+		});
 	}
 
 	void OpenGLShader::Load() {

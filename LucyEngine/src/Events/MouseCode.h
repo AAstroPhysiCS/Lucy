@@ -1,7 +1,5 @@
 #pragma once
 
-#include <stdint.h>
-
 namespace Lucy {
 
 	enum class MouseCode : uint8_t {

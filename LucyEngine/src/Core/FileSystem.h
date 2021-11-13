@@ -1,6 +1,5 @@
 #pragma once
 
-#include <filesystem>
 #include "Base.h"
 
 namespace Lucy {

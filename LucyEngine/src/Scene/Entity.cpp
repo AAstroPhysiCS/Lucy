@@ -1,3 +1,5 @@
+#include "lypch.h"
+
 #include "Entity.h"
 
 namespace Lucy {

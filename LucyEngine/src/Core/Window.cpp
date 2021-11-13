@@ -1,3 +1,4 @@
+#include "lypch.h"
 #include "Window.h"
 
 namespace Lucy {

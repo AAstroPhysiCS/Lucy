@@ -1,3 +1,4 @@
+#include "lypch.h"
 #include "VertexBuffer.h"
 
 #include "OpenGL/OpenGLVertexBuffer.h"
@@ -38,4 +39,3 @@ namespace Lucy {
 		m_DataHead = m_Data.data();
 	}
 }
-

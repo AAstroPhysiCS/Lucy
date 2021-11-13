@@ -6,6 +6,9 @@ project "LucyEngine"
     targetdir ("../bin/" .. outputdir .. "/%{prj.name}")
     objdir ("../bin-obj/" .. outputdir .. "/%{prj.name}")
 
+    pchheader "lypch.h"
+    pchsource "lypch.cpp"
+
     files {
         "src/**.h",
         "src/**.hpp",
@@ -20,7 +23,8 @@ project "LucyEngine"
         "vendor/glm",
         "vendor/stb/include",
         "vendor/assimp/include",
-        "vendor/nativefiledialog/include"
+        "vendor/nativefiledialog/include",
+        "src"
     }
 
     links {

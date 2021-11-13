@@ -1,9 +1,6 @@
 #pragma once
 
-#include <stdint.h>
 #include "Event.h"
-
-#include <functional>
 
 namespace Lucy {
 

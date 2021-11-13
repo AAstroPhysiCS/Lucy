@@ -1,3 +1,5 @@
+#include "lypch.h"
+
 #include "Material.h"
 
 #include "../Core/FileSystem.h"

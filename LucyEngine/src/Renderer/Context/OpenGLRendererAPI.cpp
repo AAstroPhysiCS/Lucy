@@ -1,3 +1,5 @@
+#include "lypch.h"
+
 #include "OpenGLRendererAPI.h"
 
 namespace Lucy {

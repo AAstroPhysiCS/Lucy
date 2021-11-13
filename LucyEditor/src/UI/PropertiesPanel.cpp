@@ -1,4 +1,5 @@
 #include "PropertiesPanel.h"
+#include <functional>
 
 #include "Renderer/Renderer.h"
 #include "SceneHierarchyPanel.h"

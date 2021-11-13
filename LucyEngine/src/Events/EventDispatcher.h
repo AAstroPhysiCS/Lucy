@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "../Core/Base.h"
 #include "Event.h"
 

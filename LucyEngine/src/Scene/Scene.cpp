@@ -1,3 +1,5 @@
+#include "lypch.h"
+
 #include "Scene.h"
 #include "Components.h"
 

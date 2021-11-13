@@ -1,11 +1,6 @@
 #pragma once
 
 #include "Core/Base.h"
-#include <vector>
-#include <fstream>
-#include <iostream>
-#include <sstream>
-#include <string>
 
 #include "../nativefiledialog/include/nfd.h"
 

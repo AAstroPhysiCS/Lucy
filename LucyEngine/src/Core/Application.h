@@ -1,6 +1,7 @@
 #pragma once
 
-#include <iostream>
+#include "Base.h"
+
 #include "LayerStack.h"
 #include "Layer.h"
 

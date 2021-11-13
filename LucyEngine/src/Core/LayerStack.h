@@ -1,8 +1,9 @@
 #pragma once
 
-#include "Layer.h"
-
 #include <vector>
+
+#include "Base.h"
+#include "Layer.h"
 
 namespace Lucy {
 

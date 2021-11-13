@@ -1,3 +1,5 @@
+#include "lypch.h"
+
 #include "Camera.h"
 #include "../Renderer/Renderer.h"
 

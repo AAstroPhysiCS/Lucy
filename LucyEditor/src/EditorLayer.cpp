@@ -1,4 +1,3 @@
-#include <iostream>
 #include "EditorLayer.h"
 
 #include "Renderer/Renderer.h"

@@ -1,8 +1,5 @@
 #pragma once
 
-#include <cstdint>
-#include <iostream>
-
 namespace Lucy {
 
 	class UUID {

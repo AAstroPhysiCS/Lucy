@@ -1,7 +1,5 @@
 #pragma once
 
-#include <functional>
-
 #include "UI/Panel.h"
 #include "Scene/Entity.h"
 

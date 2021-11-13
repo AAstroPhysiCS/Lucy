@@ -1,3 +1,5 @@
+#include "lypch.h"
+
 #include "OpenGLRenderBuffer.h"
 #include "OpenGLFrameBuffer.h"
 #include <glad/glad.h>

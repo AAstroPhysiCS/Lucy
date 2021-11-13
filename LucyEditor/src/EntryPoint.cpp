@@ -1,3 +1,4 @@
+#include "lypch.h"
 #include "Lucy.h"
 
 #ifdef LUCY_WINDOWS

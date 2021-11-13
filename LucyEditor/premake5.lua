@@ -19,7 +19,8 @@ project "LucyEditor"
         "../LucyEngine/vendor/ImGui",
         "../LucyEngine/vendor/glm",
         "../LucyEngine/vendor/entt/include",
-        "../LucyEngine/vendor/assimp/include"
+        "../LucyEngine/vendor/assimp/include",
+        "../LucyEngine/src/lypch.h"
     }
 
     links {
@@ -36,7 +37,7 @@ project "LucyEditor"
         }
 
         postbuildcommands {
-            "{COPY} ../LucyEngine/vendor/assimp/assimp-vc142-mt.dll ../bin/" .. outputdir .. "/%{prj.name}",
+            "{COPY} ../LucyEngine/vendor/assimp/assimp-vc143-mt.dll ../bin/" .. outputdir .. "/%{prj.name}",
             "{COPY} ../LucyEngine/vendor/nativefiledialog/nfd.lib ../bin/" .. outputdir .. "/%{prj.name}"
         }
     

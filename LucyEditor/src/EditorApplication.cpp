@@ -1,6 +1,6 @@
-#include <iostream>
-
 #include "EditorApplication.h"
+
+#include <iostream>
 
 #include "EditorLayer.h"
 #include "ImGuiLayer.h"
