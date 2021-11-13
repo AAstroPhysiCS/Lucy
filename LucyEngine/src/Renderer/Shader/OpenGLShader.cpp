@@ -158,6 +158,16 @@ namespace Lucy {
 		}
 	}
 
+	void OpenGLShader::SetInt(const char* name, int32_t* value, uint32_t count) {
+		if (!m_UniformLocations.count(name)) {
+			m_UniformLocations.insert({ name, glGetUniformLocation(m_Program, name) });
+		}
+		auto& it = m_UniformLocations.find(name);
+		if (it != m_UniformLocations.end()) {
+			glUniform1iv(it->second, count, value);
+		}
+	}
+
 	std::string OpenGLShader::LoadVertexData(std::vector<std::string>& lines) {
 		auto& from = std::find(lines.begin(), lines.end(), "//type vertex");
 		auto& to = std::find(lines.begin(), lines.end(), "//type fragment");

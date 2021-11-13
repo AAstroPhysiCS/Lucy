@@ -12,13 +12,13 @@ namespace Lucy {
 	constexpr static uint32_t ASSIMP_FLAGS = aiProcess_CalcTangentSpace |
 		aiProcess_GenSmoothNormals |
 		aiProcess_FixInfacingNormals |
+		aiProcess_FlipUVs |
 		aiProcess_JoinIdenticalVertices |
 		aiProcess_ImproveCacheLocality |
 		aiProcess_LimitBoneWeights |
 		aiProcess_RemoveRedundantMaterials |
 		aiProcess_ValidateDataStructure |
 		aiProcess_Triangulate |
-		aiProcess_GenUVCoords |
 		//aiProcess_PreTransformVertices | (animations won't work, if you enable this)
 		aiProcess_SplitLargeMeshes |
 		aiProcess_OptimizeMeshes;
@@ -37,7 +37,6 @@ namespace Lucy {
 
 		uint32_t totalVertexSize = 0;
 		LoadData(scene, totalVertexSize);
-		LoadMaterials(scene);
 		TraverseHierarchy(scene->mRootNode, nullptr);
 
 		m_IndexBuffer = IndexBuffer::Create();
@@ -142,6 +141,8 @@ namespace Lucy {
 		uint32_t baseVertexCount = 0;
 		uint32_t baseIndexCount = 0;
 
+		m_Materials.resize(scene->mNumMaterials);
+
 		for (uint32_t i = 0; i < meshCount; i++) {
 			aiMesh* mesh = meshes[i];
 			Submesh submesh;
@@ -149,9 +150,12 @@ namespace Lucy {
 			submesh.BaseIndexCount = baseIndexCount;
 			submesh.VertexCount = mesh->mNumVertices;
 			submesh.IndexCount = mesh->mNumFaces * 3;
+			submesh.MaterialIndex = mesh->mMaterialIndex;
 
 			baseVertexCount += submesh.VertexCount;
 			baseIndexCount += submesh.IndexCount;
+
+			LoadMaterials(scene, mesh);
 
 			totalVertexSize += submesh.VertexCount;
 
@@ -171,9 +175,9 @@ namespace Lucy {
 
 			if (mesh->HasTextureCoords(0)) {
 				aiVector3D* textureCoords = mesh->mTextureCoords[0];
-				submesh.TextureCoords.resize(sizeVertices);
+				submesh.TextureCoords.reserve(sizeVertices);
 				for (uint32_t j = 0; j < sizeVertices; j++) {
-					submesh.TextureCoords.push_back({ textureCoords[j].x, textureCoords[j].y });
+					submesh.TextureCoords.emplace_back(textureCoords[j].x, textureCoords[j].y);
 				}
 			}
 
@@ -205,16 +209,8 @@ namespace Lucy {
 		}
 	}
 
-	void Mesh::LoadMaterials(const aiScene* scene) {
-		aiMaterial** materials = scene->mMaterials;
-		size_t materialSize = scene->mNumMaterials;
-
-		m_Materials.reserve(materialSize);
-
-		for (uint32_t i = 0; i < materialSize; i++) {
-			aiMaterial* material = materials[i];
-			m_Materials.emplace_back(Renderer::GetShaderLibrary().GetShader("LucyPBR"), material, m_Path);
-		}
+	void Mesh::LoadMaterials(const aiScene* scene, const aiMesh* mesh) {
+		m_Materials[mesh->mMaterialIndex] = { Renderer::GetShaderLibrary().GetShader("LucyPBR"), scene->mMaterials[mesh->mMaterialIndex], m_Path };
 	}
 
 	void Mesh::TraverseHierarchy(const aiNode* node, const aiNode* rootNode) {

@@ -7,6 +7,10 @@
 
 namespace Lucy {
 
+	uint16_t GetOpenGLType(TextureSpecification& specs) {
+		return specs.Samples != 0 ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
+	}
+
 	OpenGLTexture2D::OpenGLTexture2D(TextureSpecification& specs)
 		: Texture2D(specs) {
 		//if you want to create a texture buffer, you can leave the path empty and the stbi_load would fail.
@@ -26,32 +30,39 @@ namespace Lucy {
 			if (!data) LUCY_CRITICAL(std::string("Failed to load a texture. Texture path: ").append(specs.Path));
 		}
 
+		m_Target = GetOpenGLType(specs);
+
 		LUCY_ASSERT(m_Width != 0 && m_Height != 0);
 
-		glCreateTextures(GL_TEXTURE_2D, 1, &m_Id);
+		glCreateTextures(m_Target, 1, &m_Id);
 		Bind();
 
-		if (specs.Parameter.S != 0)		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, specs.Parameter.S);
-		if (specs.Parameter.T != 0)		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, specs.Parameter.T);
-		if (specs.Parameter.R != 0)		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_R, specs.Parameter.R);
-		if (specs.Parameter.Min != 0)	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, specs.Parameter.Min);
-		if (specs.Parameter.Mag != 0)	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, specs.Parameter.Mag);
+		if (specs.Parameter.S != 0 && m_Target != GL_TEXTURE_2D_MULTISAMPLE)	glTexParameteri(m_Target, GL_TEXTURE_WRAP_S, specs.Parameter.S);
+		if (specs.Parameter.T != 0 && m_Target != GL_TEXTURE_2D_MULTISAMPLE)	glTexParameteri(m_Target, GL_TEXTURE_WRAP_T, specs.Parameter.T);
+		if (specs.Parameter.R != 0 && m_Target != GL_TEXTURE_2D_MULTISAMPLE)	glTexParameteri(m_Target, GL_TEXTURE_WRAP_R, specs.Parameter.R);
+		if (specs.Parameter.Min != 0 && m_Target != GL_TEXTURE_2D_MULTISAMPLE)	glTexParameteri(m_Target, GL_TEXTURE_MIN_FILTER, specs.Parameter.Min);
+		if (specs.Parameter.Mag != 0 && m_Target != GL_TEXTURE_2D_MULTISAMPLE)	glTexParameteri(m_Target, GL_TEXTURE_MAG_FILTER, specs.Parameter.Mag);
 
-		!data ? glTexImage2D(GL_TEXTURE_2D, 0, specs.Format.InternalFormat, m_Width, m_Height, 0, specs.Format.Format, (GLenum)specs.PixelType, 0) :
-			glTexImage2D(GL_TEXTURE_2D, 0, specs.Format.InternalFormat, m_Width, m_Height, 0, specs.Format.Format, (GLenum)specs.PixelType, data);
+		if (specs.Samples == 0) {
+			!data ? glTexImage2D(m_Target, 0, specs.Format.InternalFormat, m_Width, m_Height, 0, specs.Format.Format, (GLenum)specs.PixelType, 0) :
+				glTexImage2D(m_Target, 0, specs.Format.InternalFormat, m_Width, m_Height, 0, specs.Format.Format, (GLenum)specs.PixelType, data);
+		}
+		else {
+			glTexImage2DMultisample(m_Target, specs.Samples, specs.Format.InternalFormat, m_Width, m_Height, true);
+		}
 
-		if (specs.GenerateMipmap) glGenerateMipmap(GL_TEXTURE_2D);
+		if (specs.GenerateMipmap) glGenerateMipmap(m_Target);
 
 		stbi_image_free(data);
 		Unbind();
 	}
 
 	void OpenGLTexture2D::Bind() {
-		glBindTexture(GL_TEXTURE_2D, m_Id);
+		glBindTexture(m_Target, m_Id);
 	}
 
 	void OpenGLTexture2D::Unbind() {
-		glBindTexture(GL_TEXTURE_2D, 0);
+		glBindTexture(m_Target, 0);
 	}
 
 	void OpenGLTexture2D::Destroy() {

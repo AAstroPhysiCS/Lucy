@@ -27,8 +27,15 @@ namespace Lucy {
 		inline static RefLucy<RenderPass>& GetGeometryPass() { return s_GeometryPass; }
 		inline static ShaderLibrary& GetShaderLibrary() { return s_ShaderLibrary; }
 
+		static void SetViewportSize(int32_t width, int32_t height);
+
 		inline static auto GetViewportSize() {
-			struct Size { uint32_t Width, Height; };
+			struct Size { int32_t Width, Height; };
+			return Size{ m_ViewportWidth, m_ViewportHeight };
+		}
+
+		inline static auto GetWindowSize() {
+			struct Size { int32_t Width, Height; };
 			return Size{ s_Window->GetWidth(), s_Window->GetHeight() };
 		}
 
@@ -53,6 +60,8 @@ namespace Lucy {
 		static std::vector<MeshDrawCommand> s_MeshDrawCommand;
 
 		static ShaderLibrary s_ShaderLibrary;
+
+		static int32_t m_ViewportWidth, m_ViewportHeight;
 
 		friend class RenderCommand;
 

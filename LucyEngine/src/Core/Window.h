@@ -16,9 +16,9 @@ namespace Lucy {
 	};
 
 	struct WindowSpecification {
-		uint32_t Width, Height;
-		bool VSync, Resizable, DoubleBuffered;
-		std::string Name;
+		int32_t Width = -1, Height = -1;
+		bool VSync = false, Resizable = false, DoubleBuffered = false;
+		std::string Name = "Window Specification failed!";
 		Lucy::WindowMode WindowMode = WindowMode::WINDOWED;
 	};
 
@@ -29,12 +29,13 @@ namespace Lucy {
 		virtual void PollEvents() = 0;
 		virtual void Init() = 0;
 		virtual void Destroy() = 0;
+		virtual void Update() = 0;
 
 		void SetEventCallback(std::function<void(Event*)>);
 		GLFWwindow* Raw();
 
-		inline uint32_t GetWidth() const { return m_Specs.Width; }
-		inline uint32_t GetHeight() const { return m_Specs.Height; }
+		inline int32_t GetWidth() const { return m_Specs.Width; }
+		inline int32_t GetHeight() const { return m_Specs.Height; }
 
 		static RefLucy<Window> Create(const WindowSpecification& specs);
 	protected:
@@ -49,5 +50,6 @@ namespace Lucy {
 		void PollEvents();
 		void Init();
 		void Destroy();
+		void Update();
 	};
 }

@@ -16,9 +16,6 @@ namespace Lucy {
 	}
 
 	void EditorCamera::UpdateView() {
-		//float radius = 10.0f;
-		//float x = sin(glfwGetTime()) * radius;
-		//float z = cos(glfwGetTime()) * radius;
 		m_ViewMatrix = glm::mat4(1.0f);
 		m_ViewMatrix = glm::lookAt(m_Position, m_Position + m_ForwardDir, m_UpDir);
 	}
@@ -26,6 +23,6 @@ namespace Lucy {
 	void EditorCamera::UpdateProjection() {
 		auto [width, height] = Renderer::GetViewportSize();
 		m_Projection = glm::mat4(1.0f);
-		m_Projection = glm::perspective(glm::radians(m_Fov), (float)width / height, m_NearPlane, m_FarPlane);
+		m_Projection = glm::perspective(glm::radians(m_Fov), (float) width / height, m_NearPlane, m_FarPlane);
 	}
 }

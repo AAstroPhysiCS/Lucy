@@ -32,12 +32,18 @@ namespace Lucy {
 	struct TextureSpecification {
 		const char* Path = nullptr;
 		Lucy::PixelType PixelType = Lucy::PixelType::UnsignedByte;
+		
 		TextureFormat Format;
 		TextureParameter Parameter;
+		
 		int32_t Width = 0, Height = 0; //gets replaced if path is available
-		bool GenerateMipmap;
+		
+		bool GenerateMipmap = false;
+
 		uint32_t AttachmentIndex;
 		int32_t Slot = -1;
+
+		uint32_t Samples = 0;
 	};
 
 	class Texture2D

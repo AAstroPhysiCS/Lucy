@@ -6,15 +6,13 @@
 #include "Renderer/Buffer/OpenGL/OpenGLFrameBuffer.h"
 
 namespace Lucy {
-	
-	ViewportPanel& ViewportPanel::GetInstance()
-	{
+
+	ViewportPanel& ViewportPanel::GetInstance() {
 		static ViewportPanel s_Instance;
 		return s_Instance;
 	}
 
-	void ViewportPanel::Render()
-	{
+	void ViewportPanel::Render() {
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollbar;
 		static bool pOpen = true;
 
@@ -27,7 +25,13 @@ namespace Lucy {
 		auto& texture = blittedFrameBuffer->GetTexture(0);
 
 		ImVec2& size = ImGui::GetWindowSize();
-		ImGui::Image((ImTextureID) texture->GetID(), size, { 0, 1 }, { 1, 0 });
+		ImGui::Image((ImTextureID)texture->GetID(), size, { 0, 1 }, { 1, 0 });
+		
+		auto [w, h] = Renderer::GetViewportSize();
+		if (w != size.x || h != size.y) {
+			Renderer::GetGeometryPass()->GetFrameBuffer()->Resize(size.x, size.y);
+			Renderer::SetViewportSize(size.x, size.y);
+		}
 
 		ImGui::End();
 	}

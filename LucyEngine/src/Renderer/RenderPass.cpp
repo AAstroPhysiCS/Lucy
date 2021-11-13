@@ -23,9 +23,6 @@ namespace Lucy {
 		auto& frameBuffer = renderPass->m_Specs.FrameBuffer;
 		frameBuffer->Bind();
 
-		auto [width, height] = Renderer::GetViewportSize();
-		glViewport(0, 0, width, height);
-
 		RefLucy<Pipeline> pipeline = renderPass->GetPipeline();
 		Rasterization rasterization = pipeline->GetRasterization();
 		glPolygonMode(GL_FRONT_AND_BACK, rasterization.PolygonMode);

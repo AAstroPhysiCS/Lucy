@@ -23,6 +23,7 @@ namespace Lucy {
 		void SetVec2(const char* name, glm::vec2& vec);
 		void SetFloat(const char* name, float value);
 		void SetInt(const char* name, int32_t value);
+		void SetInt(const char* name, int32_t* value, uint32_t count);
 
 	private:
 		std::string LoadVertexData(std::vector<std::string>& lines);

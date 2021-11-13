@@ -17,16 +17,14 @@
 
 namespace Lucy {
 
-	ImGuiLayer::ImGuiLayer()
-	{
+	ImGuiLayer::ImGuiLayer() {
 		m_Panels.push_back(&SceneHierarchyPanel::GetInstance());
 		m_Panels.push_back(&TaskbarPanel::GetInstance());
 		m_Panels.push_back(&ViewportPanel::GetInstance());
 		m_Panels.push_back(&PropertiesPanel::GetInstance());
 	}
 
-	void ImGuiLayer::Init(RefLucy<Window>& window)
-	{
+	void ImGuiLayer::Init(RefLucy<Window>& window) {
 		ImGui::CreateContext();
 
 		ImGuiIO& io = ImGui::GetIO();
@@ -45,8 +43,7 @@ namespace Lucy {
 		ImGui_ImplOpenGL3_Init("#version 460");
 	}
 
-	void ImGuiLayer::Begin()
-	{
+	void ImGuiLayer::Begin() {
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
@@ -75,8 +72,7 @@ namespace Lucy {
 		ImGui::PopStyleVar(3);
 	}
 
-	void ImGuiLayer::End()
-	{
+	void ImGuiLayer::End() {
 		ImGui::End(); //end of dockspace window
 
 		ImGuiIO& io = ImGui::GetIO();
@@ -87,8 +83,7 @@ namespace Lucy {
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-		{
+		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
 			GLFWwindow* backup_current_context = glfwGetCurrentContext();
 			ImGui::UpdatePlatformWindows();
 			ImGui::RenderPlatformWindowsDefault();
@@ -96,15 +91,13 @@ namespace Lucy {
 		}
 	}
 
-	void ImGuiLayer::OnRender()
-	{
+	void ImGuiLayer::OnRender() {
 		for (Panel* panel : m_Panels) {
 			panel->Render();
 		}
 	}
 
-	void ImGuiLayer::OnEvent(Event& e)
-	{
+	void ImGuiLayer::OnEvent(Event& e) {
 		EventDispatcher& dispatcher = EventDispatcher::GetInstance();
 		dispatcher.Dispatch<ScrollEvent>(e, EventType::ScrollEvent, [&](ScrollEvent& e) {
 			ImGuiIO& io = ImGui::GetIO();
@@ -114,7 +107,7 @@ namespace Lucy {
 
 		dispatcher.Dispatch<CursorPosEvent>(e, EventType::CursorPosEvent, [&](CursorPosEvent& e) {
 			ImGuiIO& io = ImGui::GetIO();
-			io.MousePos = { (float) e.GetXPos(), (float) e.GetYPos() };
+			io.MousePos = { (float)e.GetXPos(), (float)e.GetYPos() };
 		});
 
 		dispatcher.Dispatch<KeyEvent>(e, EventType::KeyEvent, [&](KeyEvent& e) {
@@ -138,30 +131,17 @@ namespace Lucy {
 			ImGuiIO& io = ImGui::GetIO();
 			int32_t keyCode = e.GetCodePoint();
 			if (keyCode > 0 && keyCode < 0x100000)
-				io.AddInputCharacter((unsigned short) keyCode);
+				io.AddInputCharacter((unsigned short)keyCode);
 		});
 
 		dispatcher.Dispatch<WindowResizeEvent>(e, EventType::WindowResizeEvent, [&](WindowResizeEvent& e) {
 			ImGuiIO& io = ImGui::GetIO();
-			io.DisplaySize = { (float) e.GetWidth(), (float) e.GetHeight() };
+			io.DisplaySize = { (float)e.GetWidth(), (float)e.GetHeight() };
 			io.DisplayFramebufferScale = { 1.0f, 1.0f };
-
-			switch (Renderer::GetCurrentRenderAPI()) {
-				case RenderAPI::OpenGL:
-					Renderer::GetGeometryPass()->GetFrameBuffer()->Bind();
-					glViewport(0, 0, e.GetWidth(), e.GetHeight());
-					Renderer::GetGeometryPass()->GetFrameBuffer()->Unbind();
-					break;
-				case RenderAPI::Vulkan:
-					LUCY_CRITICAL("Vulkan not supported");
-					LUCY_ASSERT(false);
-					break;
-			}
 		});
 	}
 
-	void ImGuiLayer::Destroy()
-	{
+	void ImGuiLayer::Destroy() {
 		ImGui_ImplOpenGL3_Shutdown();
 		ImGui_ImplGlfw_Shutdown();
 		ImGui::DestroyContext();

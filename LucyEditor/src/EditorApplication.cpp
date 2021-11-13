@@ -14,9 +14,8 @@
 namespace Lucy {
 
 	EditorApplication::EditorApplication(const ApplicationArgs& args)
-		: Application(args)
-	{
-		m_LayerStack.Push({ &EditorLayer::GetInstance(), &ImGuiLayer::GetInstance() });
+		: Application(args) {
+		m_LayerStack.Push({ &ImGuiLayer::GetInstance(), &EditorLayer::GetInstance() });
 
 		m_Running = true;
 
@@ -39,16 +38,14 @@ namespace Lucy {
 		LUCY_ASSERT(NFD_Init() == NFD_OKAY);
 	}
 
-	EditorApplication::~EditorApplication()
-	{
+	EditorApplication::~EditorApplication() {
 		m_Running = false;
 		//layers are being destroyed in the base class
 		m_Window->Destroy();
 		NFD_Quit();
 	}
 
-	void EditorApplication::Run()
-	{
+	void EditorApplication::Run() {
 		while (m_Running && !glfwWindowShouldClose(m_Window->Raw())) {
 			for (Layer* layer : m_LayerStack.GetStack()) {
 				layer->Begin();
@@ -59,8 +56,7 @@ namespace Lucy {
 		}
 	}
 
-	void EditorApplication::OnEvent(Event* e)
-	{
+	void EditorApplication::OnEvent(Event* e) {
 		for (Layer* layer : m_LayerStack.GetStack()) {
 			layer->OnEvent(*e);
 		}

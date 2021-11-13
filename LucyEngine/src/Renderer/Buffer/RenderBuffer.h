@@ -7,9 +7,9 @@ namespace Lucy {
 	class Renderer;
 
 	struct RenderBufferSpecification {
-		uint32_t Width, Height;
-		uint32_t InternalFormat, Attachment;
-		uint32_t Samples;
+		uint32_t Width = 0, Height = 0;
+		uint32_t InternalFormat = 0, Attachment = 0;
+		uint32_t Samples = 0;
 	};
 
 	class RenderBuffer {
@@ -18,6 +18,8 @@ namespace Lucy {
 
 		virtual void Bind() = 0;
 		virtual void Unbind() = 0;
+		virtual void Resize(int32_t width, int32_t height) = 0;
+		virtual void Destroy() = 0;
 
 		inline uint32_t GetID() const { return m_Id; }
 		inline uint32_t GetWidth() const { return m_Specs.Width; }

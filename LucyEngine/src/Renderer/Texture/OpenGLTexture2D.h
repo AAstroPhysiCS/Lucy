@@ -12,6 +12,11 @@ namespace Lucy {
 		void Bind();
 		void Unbind();
 		void Destroy();
+
+		inline uint16_t GetTarget() const { return m_Target; }
+
+	private:
+		uint16_t m_Target;
 	};
 }
 

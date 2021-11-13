@@ -26,6 +26,9 @@ namespace Lucy {
 	std::vector<Func> Renderer::s_RenderQueue;
 	std::vector<MeshDrawCommand> Renderer::s_MeshDrawCommand;
 
+	int32_t Renderer::m_ViewportWidth = 0;
+	int32_t Renderer::m_ViewportHeight = 0;
+
 	ShaderLibrary Renderer::s_ShaderLibrary;
 	Camera* Renderer::s_ActiveCamera = nullptr;
 
@@ -43,6 +46,8 @@ namespace Lucy {
 			Shader::Create("LucyPBR", "assets/shaders/LucyPBR.glsl");
 		}
 
+		uint32_t TargetSamples = 4;
+
 		//------------ Main Framebuffer ------------
 		{
 			RenderBufferSpecification renderBufferSpecs;
@@ -50,11 +55,12 @@ namespace Lucy {
 			renderBufferSpecs.InternalFormat = GL_DEPTH24_STENCIL8;
 			renderBufferSpecs.Width = width;
 			renderBufferSpecs.Height = height;
-			renderBufferSpecs.Samples = 4;
+			renderBufferSpecs.Samples = TargetSamples;
 
 			TextureSpecification textureAntialiased;
 			textureAntialiased.Width = width;
 			textureAntialiased.Height = height;
+			textureAntialiased.Samples = TargetSamples;
 			textureAntialiased.AttachmentIndex = 0;
 			textureAntialiased.Format = { GL_RGBA8, GL_RGBA };
 			textureAntialiased.PixelType = PixelType::UnsignedByte;
@@ -124,13 +130,17 @@ namespace Lucy {
 
 			for (uint32_t i = 0; i < submeshes.size(); i++) {
 				Submesh& submesh = submeshes[i];
-				Material& material = materials[i];
+				Material& material = materials[submesh.MaterialIndex];
 				RefLucy<Shader>& shader = material.GetShader();
 
 				material.Bind();
 				shader->SetMat4("u_ModelMatrix", meshComponent.EntityTransform * submesh.Transform);
 				shader->SetMat4("u_ViewMatrix", s_ActiveCamera->GetViewMatrix());
 				shader->SetMat4("u_ProjMatrix", s_ActiveCamera->GetProjectionMatrix());
+				shader->SetInt("albedoSlot", 1);
+				int32_t textures[32];
+				for (int32_t i = 0; i < 32; i++) textures[i] = i;
+				shader->SetInt("u_Textures", textures, 32);
 				RenderCommand::DrawElementsBaseVertex(submesh.IndexCount, submesh.BaseIndexCount, submesh.BaseVertexCount);
 				material.Unbind();
 			}
@@ -142,6 +152,9 @@ namespace Lucy {
 	}
 
 	void Renderer::BeginScene(Scene& scene) {
+
+		s_Window->Update();
+
 		EditorCamera& camera = scene.GetEditorCamera();
 		camera.UpdateProjection();
 		camera.UpdateView();
@@ -158,6 +171,11 @@ namespace Lucy {
 			func();
 		}
 		s_RenderQueue.clear();
+	}
+
+	void Renderer::SetViewportSize(int32_t width, int32_t height) {
+		m_ViewportWidth = width;
+		m_ViewportHeight = height;
 	}
 
 	void Renderer::ClearDrawCommands() {

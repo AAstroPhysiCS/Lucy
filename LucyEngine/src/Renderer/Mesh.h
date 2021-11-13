@@ -48,7 +48,7 @@ namespace Lucy {
 	private:
 		void LoadBuffers();
 		void LoadData(const aiScene* scene, uint32_t& totalSize);
-		void LoadMaterials(const aiScene* scene);
+		void LoadMaterials(const aiScene* scene, const aiMesh* mesh);
 		void TraverseHierarchy(const aiNode* node, const aiNode* rootNode);
 
 		RefLucy<VertexBuffer> m_VertexBuffer;

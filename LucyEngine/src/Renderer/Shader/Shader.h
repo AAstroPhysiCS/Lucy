@@ -21,6 +21,7 @@ namespace Lucy {
 		virtual void SetVec2(const char* name, glm::vec2& vec) = 0;
 		virtual void SetFloat(const char* name, float value) = 0;
 		virtual void SetInt(const char* name, int32_t value) = 0;
+		virtual void SetInt(const char* name, int32_t* value, uint32_t count) = 0;
 
 		virtual void Bind() = 0;
 		virtual void Unbind() = 0;

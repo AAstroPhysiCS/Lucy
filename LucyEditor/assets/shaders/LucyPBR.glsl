@@ -12,7 +12,11 @@ uniform mat4 u_ModelMatrix;
 uniform mat4 u_ViewMatrix;
 uniform mat4 u_ProjMatrix;
 
+out vec2 textCoords;
+
 void main() {
+	textCoords = a_TextureCoords;
+
 	gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * vec4(a_Pos, 1.0f);
 }
 
@@ -21,6 +25,11 @@ void main() {
 
 layout (location = 0) out vec4 a_Color;
 
+in vec2 textCoords;
+
+uniform int albedoSlot;
+uniform sampler2D u_Textures[32];
+
 void main() {
-	a_Color = vec4(0.5f);
+	a_Color = texture(u_Textures[albedoSlot], textCoords);
 }
