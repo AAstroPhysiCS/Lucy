@@ -21,10 +21,13 @@ namespace Lucy {
 			}
 		}
 
+		inline static PerformanceMetrics& GetPerformanceMetrics() { return s_Metrics; }
+		
 		virtual void Run() = 0;
 	protected:
 		ApplicationArgs m_Args;
 		LayerStack m_LayerStack;
+		static PerformanceMetrics s_Metrics;
 
 		friend extern int main(int argc, char** argv);
 	};

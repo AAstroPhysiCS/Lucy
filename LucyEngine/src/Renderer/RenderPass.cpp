@@ -31,15 +31,19 @@ namespace Lucy {
 		glLineWidth(rasterization.LineWidth);
 		if (rasterization.DisableBackCulling)
 			glDisable(GL_CULL_FACE);
+		if (rasterization.CullingMode != 0) {
+			glEnable(GL_CULL_FACE);
+			glCullFace(rasterization.CullingMode);
+		}
 	}
 
 	void RenderPass::End(RefLucy<RenderPass>& renderPass) {
 		auto& frameBuffer = renderPass->m_Specs.FrameBuffer;
-		frameBuffer->Unbind();
 
 		//reverting the changes back
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		glLineWidth(1.0f);
-		glEnable(GL_CULL_FACE);
+		glDisable(GL_CULL_FACE);
+		frameBuffer->Unbind();
 	}
 }

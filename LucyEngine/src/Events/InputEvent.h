@@ -2,6 +2,8 @@
 
 #include "Event.h"
 #include "KeyCodes.h"
+#include "MouseCode.h"
+#include "GLFW/glfw3.h"
 
 namespace Lucy {
 
@@ -64,7 +66,7 @@ namespace Lucy {
 		std::function<void(int32_t, int32_t, int32_t, int32_t)> dispatchFunc;
 
 		inline constexpr bool operator==(KeyCode keyCode) {
-			return m_Key == (uint16_t)keyCode;
+			return m_Key == (uint16_t)keyCode && m_Action == GLFW_PRESS;
 		}
 
 		inline int32_t GetKey() const { return m_Key; }
@@ -84,6 +86,10 @@ namespace Lucy {
 		MouseEvent(int32_t button, int32_t action, int32_t mods)
 			: m_Button(button), m_Action(action), m_Mods(mods) {
 			m_Type = EventType::MouseEvent;
+		}
+
+		inline constexpr bool operator==(MouseCode mouseCode) {
+			return m_Button == (uint16_t)mouseCode && m_Action == GLFW_PRESS;
 		}
 
 		inline int32_t GetButton() const { return m_Button; }

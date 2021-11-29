@@ -17,8 +17,6 @@ namespace Lucy {
 			if (e.HasComponent<T>())
 				func(e.GetComponent<T>());
 		}
-
-		void RenderTransformControl(const char* id, float& x, float& y, float& z, float defaultValue, float speed);
 	};
 }
 

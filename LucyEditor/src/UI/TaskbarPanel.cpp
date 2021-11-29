@@ -1,4 +1,5 @@
 #include "TaskbarPanel.h"
+#include "PerformancePanel.h"
 
 #include "imgui.h"
 
@@ -14,7 +15,6 @@ namespace Lucy {
 	{
 		if (ImGui::BeginMenuBar()) {
 			if (ImGui::BeginMenu("File")) {
-
 				if (ImGui::MenuItem("New Scene")) {
 					//new scene
 				}
@@ -30,26 +30,30 @@ namespace Lucy {
 				if (ImGui::MenuItem("Save as..")) {
 					//save as
 				}
-
 				ImGui::EndMenu();
 			}
 
 			ImGui::Spacing();
 
 			if (ImGui::BeginMenu("Edit")) {
-
 				if (ImGui::MenuItem("Back", "Ctrl+Z")) {
 				}
 
 				if (ImGui::MenuItem("Forward", "Ctrl+Y")) {
 				}
-
 				ImGui::EndMenu();
 			}
 
+			if (ImGui::BeginMenu("Panel")) {
+				static bool show = false;
+				if (ImGui::MenuItem("Performance", 0, show)) {
+					show = !show;
+					PerformancePanel::GetInstance().SetShow(show);
+				}
+				ImGui::EndMenu();
+			}
 			ImGui::EndMenuBar();
 		}
-
 		ImGui::Spacing();
 	}
 }

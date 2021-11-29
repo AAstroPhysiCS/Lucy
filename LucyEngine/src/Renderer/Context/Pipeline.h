@@ -13,8 +13,9 @@ namespace Lucy {
 
 	struct Rasterization {
 		bool DisableBackCulling = false;
+		uint32_t CullingMode = 0;
 		float LineWidth = 1.0f;
-		uint32_t PolygonMode;
+		uint32_t PolygonMode = 0;
 	};
 
 	struct PipelineSpecification {

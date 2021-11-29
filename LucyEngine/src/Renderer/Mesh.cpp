@@ -24,6 +24,23 @@ namespace Lucy {
 		aiProcess_SplitLargeMeshes |
 		aiProcess_OptimizeMeshes;
 
+	static void IncreaseMeshCount(Mesh* m) {
+		if (MESH_ID_COUNT_X <= 255) {
+			MESH_ID_COUNT_X++;
+		} else {
+			MESH_ID_COUNT_X = 0;
+			if (MESH_ID_COUNT_Y <= 255) {
+				MESH_ID_COUNT_Y++;
+			} else {
+				MESH_ID_COUNT_Y = 0;
+				if (MESH_ID_COUNT_Z <= 255) {
+					MESH_ID_COUNT_Z++;
+				}
+			}
+		}
+		m->m_PixelValue = glm::vec3(MESH_ID_COUNT_X, MESH_ID_COUNT_Y, MESH_ID_COUNT_Z);
+	}
+
 	Mesh::Mesh(const std::string& path)
 		: m_Path(path) {
 		ScopedTimer scopedTimer;
@@ -36,6 +53,8 @@ namespace Lucy {
 			return;
 		}
 
+		m_Name = scene->mRootNode->mName.C_Str();
+
 		uint32_t totalVertexSize = 0;
 		LoadData(scene, totalVertexSize);
 		TraverseHierarchy(scene->mRootNode, nullptr);
@@ -45,8 +64,9 @@ namespace Lucy {
 			m_IndexBuffer->AddData(submesh.Faces);
 		}
 
-		m_VertexBuffer = VertexBuffer::Create(totalVertexSize * 15);
+		m_VertexBuffer = VertexBuffer::Create(totalVertexSize * 17);
 		float* dataPtr = m_VertexBuffer->GetData();
+		IncreaseMeshCount(this);
 
 		uint32_t vertPtr = 0;
 		for (Submesh& submesh : m_Submeshes) {
@@ -55,12 +75,15 @@ namespace Lucy {
 			auto& normals = submesh.Normals;
 			auto& tangents = submesh.Tangents;
 			auto& biTangents = submesh.BiTangents;
-
+			
 			for (uint32_t i = 0; i < submesh.VertexCount; i++) {
 				dataPtr[vertPtr++] = vertices[i].x;
 				dataPtr[vertPtr++] = vertices[i].y;
 				dataPtr[vertPtr++] = vertices[i].z;
-				dataPtr[vertPtr++] = 0.0f; //SubmeshID
+
+				dataPtr[vertPtr++] = MESH_ID_COUNT_X;
+				dataPtr[vertPtr++] = MESH_ID_COUNT_Y;
+				dataPtr[vertPtr++] = MESH_ID_COUNT_Z;
 
 				dataPtr[vertPtr++] = textureCoords[i].x;
 				dataPtr[vertPtr++] = textureCoords[i].y;
@@ -211,7 +234,7 @@ namespace Lucy {
 	}
 
 	void Mesh::LoadMaterials(const aiScene* scene, const aiMesh* mesh) {
-		m_Materials[mesh->mMaterialIndex] = { Renderer::GetShaderLibrary().GetShader("LucyPBR"), scene->mMaterials[mesh->mMaterialIndex], m_Path };
+		m_Materials[mesh->mMaterialIndex] = { Renderer::GetShaderLibrary().GetShader("LucyPBR"), scene->mMaterials[mesh->mMaterialIndex], mesh->mName.data, m_Path };
 	}
 
 	void Mesh::TraverseHierarchy(const aiNode* node, const aiNode* rootNode) {

@@ -13,6 +13,7 @@ namespace Lucy {
 		bool MultiSampled = false;
 		bool DisableReadWriteBuffer = false;
 		bool IsStorage = false;
+		int32_t	ViewportWidth = 0, ViewportHeight = 0;
 		int32_t Level = 0;
 
 		std::vector<TextureSpecification> TextureSpecs;

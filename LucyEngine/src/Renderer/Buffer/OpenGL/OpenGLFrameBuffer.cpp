@@ -12,7 +12,8 @@ namespace Lucy {
 	OpenGLFrameBuffer::OpenGLFrameBuffer(FrameBufferSpecification& specs)
 		: FrameBuffer(specs) {
 		Renderer::Submit([=]() {
-
+			m_Textures.clear();
+			
 			glCreateFramebuffers(1, &m_Id);
 			Bind();
 
@@ -20,7 +21,18 @@ namespace Lucy {
 				auto textureSpec = specs.TextureSpecs[i];
 				RefLucy<OpenGLTexture2D> texture = As(Texture2D::Create(textureSpec), OpenGLTexture2D);
 				texture->Bind();
-				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + textureSpec.AttachmentIndex, texture->GetTarget(), texture->GetID(), 0);
+				if (textureSpec.Format.Format == GL_DEPTH_COMPONENT || textureSpec.Format.InternalFormat == GL_DEPTH_COMPONENT)
+					glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture->GetTarget(), texture->GetID(), 0);
+				else
+					glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + textureSpec.AttachmentIndex, texture->GetTarget(), texture->GetID(), 0);
+
+				if (specs.IsStorage) {
+					if (specs.MultiSampled)
+						glTexStorage2DMultisample(texture->GetTarget(), textureSpec.Samples, textureSpec.Format.InternalFormat, textureSpec.Width, textureSpec.Height, false);
+					else
+						glTexStorage2D(texture->GetTarget(), 1, textureSpec.Format.InternalFormat, textureSpec.Width, textureSpec.Height);
+				}
+
 				texture->Unbind();
 				m_Textures.push_back(texture);
 			}
@@ -33,6 +45,11 @@ namespace Lucy {
 			if (specs.DisableReadWriteBuffer) {
 				glDrawBuffer(GL_NONE);
 				glReadBuffer(GL_NONE);
+			} else {
+				for (uint32_t i = 0; i < m_Specs.TextureSpecs.size(); i++) {
+					if (!specs.TextureSpecs[i].DisableReadWriteBuffer && specs.TextureSpecs[i].Format.Format != GL_DEPTH_COMPONENT)
+						glDrawBuffer(GL_COLOR_ATTACHMENT0 + specs.TextureSpecs[i].AttachmentIndex);
+				}
 			}
 
 			LUCY_ASSERT(CheckStatus());
@@ -42,6 +59,8 @@ namespace Lucy {
 		//we have to blit it if blit texture is defined
 		if (specs.BlittedTextureSpecs.Width != 0 && specs.BlittedTextureSpecs.Height != 0) {
 			FrameBufferSpecification blittedSpec;
+			blittedSpec.ViewportWidth = specs.ViewportWidth;
+			blittedSpec.ViewportHeight = specs.ViewportHeight;
 			blittedSpec.MultiSampled = false;
 			blittedSpec.TextureSpecs.push_back(specs.BlittedTextureSpecs);
 			m_Blitted = FrameBuffer::Create(blittedSpec);
@@ -50,10 +69,9 @@ namespace Lucy {
 	}
 
 	void OpenGLFrameBuffer::Bind() {
+		if (m_Specs.ViewportWidth == 0 || m_Specs.ViewportHeight == 0) LUCY_ASSERT(false);
 		glBindFramebuffer(GL_FRAMEBUFFER, m_Id);
-		
-		auto [w, h] = Renderer::GetViewportSize();
-		glViewport(0, 0, w, h);
+		glViewport(0, 0, m_Specs.ViewportWidth, m_Specs.ViewportHeight);
 	}
 
 	void OpenGLFrameBuffer::Unbind() {
@@ -76,6 +94,10 @@ namespace Lucy {
 
 		Renderer::Submit([=]() {
 			Destroy();
+			m_Textures.clear();
+
+			m_Specs.ViewportWidth = width;
+			m_Specs.ViewportHeight = height;
 
 			glCreateFramebuffers(1, &m_Id);
 			Bind();
@@ -86,7 +108,18 @@ namespace Lucy {
 				textureSpec.Height = height;
 				RefLucy<OpenGLTexture2D> texture = As(Texture2D::Create(textureSpec), OpenGLTexture2D);
 				texture->Bind();
-				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + textureSpec.AttachmentIndex, texture->GetTarget(), texture->GetID(), 0);
+				if (textureSpec.Format.Format == GL_DEPTH_COMPONENT || textureSpec.Format.InternalFormat == GL_DEPTH_COMPONENT)
+					glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture->GetTarget(), texture->GetID(), 0);
+				else
+					glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + textureSpec.AttachmentIndex, texture->GetTarget(), texture->GetID(), 0);
+
+				if (m_Specs.IsStorage) {
+					if (m_Specs.MultiSampled)
+						glTexStorage2DMultisample(texture->GetTarget(), textureSpec.Samples, textureSpec.Format.InternalFormat, textureSpec.Width, textureSpec.Height, false);
+					else
+						glTexStorage2D(texture->GetTarget(), 1, textureSpec.Format.InternalFormat, textureSpec.Width, textureSpec.Height);
+				}
+
 				texture->Unbind();
 				m_Textures.push_back(texture);
 			}
@@ -100,6 +133,11 @@ namespace Lucy {
 			if (m_Specs.DisableReadWriteBuffer) {
 				glDrawBuffer(GL_NONE);
 				glReadBuffer(GL_NONE);
+			} else {
+				for (uint32_t i = 0; i < m_Specs.TextureSpecs.size(); i++) {
+					if (!m_Specs.TextureSpecs[i].DisableReadWriteBuffer && m_Specs.TextureSpecs[i].Format.Format != GL_DEPTH_COMPONENT)
+						glDrawBuffer(GL_COLOR_ATTACHMENT0 + m_Specs.TextureSpecs[i].AttachmentIndex);
+				}
 			}
 
 			LUCY_ASSERT(CheckStatus());

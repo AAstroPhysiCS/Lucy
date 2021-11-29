@@ -1,25 +1,23 @@
-#include "PropertiesPanel.h"
 #include <functional>
+#include "PropertiesPanel.h"
 
-#include "Renderer/Renderer.h"
 #include "SceneHierarchyPanel.h"
 #include "Utils.h"
+#include "UI/UIUtils.h"
 
 #include "imgui.h"
 
 namespace Lucy {
 
-	PropertiesPanel& PropertiesPanel::GetInstance()
-	{
+	PropertiesPanel& PropertiesPanel::GetInstance() {
 		static PropertiesPanel s_Instance;
 		return s_Instance;
 	}
 
-	void PropertiesPanel::Render()
-	{
-		ImGui::Begin("Properties");
+	void PropertiesPanel::Render() {
+		ImGui::Begin("Properties", 0, ImGuiWindowFlags_NoBringToFrontOnFocus);
 
-		auto& entityContext = SceneHierarchyPanel::GetInstance().GetEntityContext();
+		Entity& entityContext = SceneHierarchyPanel::GetInstance().GetEntityContext();
 		if (!entityContext.IsValid()) {
 			ImGui::End();
 			return;
@@ -29,11 +27,12 @@ namespace Lucy {
 		ImGui::Text("Name");
 		ImGui::SameLine();
 
+		TagComponent& tagComponent = entityContext.GetComponent<TagComponent>();
 		char buffer[512];
-		std::string& tag = entityContext.GetComponent<TagComponent>().GetTag();
+		std::string tag = tagComponent.GetTag();
 		std::strncpy(buffer, tag.c_str(), sizeof(buffer));
 		ImGui::InputText("##hidelabel EntityTagLabel", buffer, sizeof(buffer));
-		tag = buffer;
+		tagComponent.SetTag(buffer);
 
 		ImGui::SameLine(0, 20);
 		if (ImGui::Button("Add Component"))
@@ -41,10 +40,12 @@ namespace Lucy {
 
 		if (ImGui::BeginPopup("AddComponentPopup")) {
 			if (ImGui::BeginMenu("Mesh")) {
-				ImGui::EndMenu();
-			}
-
-			if (ImGui::BeginMenu("Script")) {
+				if (ImGui::MenuItem("Mesh Renderer")) {
+					entityContext.AddComponent<MeshComponent>();
+				}
+				if (ImGui::MenuItem("Script")) {
+					//later
+				}
 				ImGui::EndMenu();
 			}
 
@@ -89,7 +90,7 @@ namespace Lucy {
 					ImGui::Text("Translation");
 					ImGui::SameLine();
 					ImGui::TableSetColumnIndex(1);
-					RenderTransformControl("Translation Control", pos.x, pos.y, pos.z, 0.0f, 0.1f);
+					UIUtils::TransformControl("Translation Control", pos.x, pos.y, pos.z, 0.0f, 0.1f);
 
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
@@ -97,7 +98,7 @@ namespace Lucy {
 					ImGui::Text("Rotation");
 					ImGui::SameLine();
 					ImGui::TableSetColumnIndex(1);
-					RenderTransformControl("Rotation Control", rot.x, rot.y, rot.z, 0.0f, 0.1f);
+					UIUtils::TransformControl("Rotation Control", rot.x, rot.y, rot.z, 0.0f, 0.1f);
 
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
@@ -105,7 +106,7 @@ namespace Lucy {
 					ImGui::Text("Scale");
 					ImGui::SameLine();
 					ImGui::TableSetColumnIndex(1);
-					RenderTransformControl("Scale Control", scale.x, scale.y, scale.z, 1.0f, 0.1f);
+					UIUtils::TransformControl("Scale Control", scale.x, scale.y, scale.z, 1.0f, 0.1f);
 
 					t.CalculateMatrix();
 
@@ -114,14 +115,15 @@ namespace Lucy {
 			}
 		});
 
-		DrawComponentPanel<MeshComponent>(entityContext, [](MeshComponent& c) {
-			if(ImGui::CollapsingHeader("Mesh Renderer", ImGuiTreeNodeFlags_DefaultOpen)) {
-				
+		DrawComponentPanel<MeshComponent>(entityContext, [&](MeshComponent& c) {
+			RefLucy<Mesh> mesh = c.GetMesh();
+
+			if (ImGui::CollapsingHeader("Mesh Renderer", ImGuiTreeNodeFlags_DefaultOpen)) {
+
 				char buf[1024];
 				memset(buf, 0, sizeof(buf));
 
-				RefLucy<Mesh> mesh = c.GetMesh();
-				if (mesh.get()) {
+				if (mesh) {
 					std::string& path = mesh->GetPath();
 					std::strncpy(buf, path.c_str(), sizeof(buf));
 				}
@@ -129,17 +131,62 @@ namespace Lucy {
 				ImGui::AlignTextToFramePadding();
 				ImGui::Text("Path");
 				ImGui::SameLine();
-				if (ImGui::InputText("##hideLabel MeshPath", buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue))
+				if (ImGui::InputText("##hideLabel MeshPath", buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
 					c.SetMesh(Mesh::Create(buf));
+					entityContext.GetComponent<TagComponent>().SetTag(c.GetMesh()->GetName());
+				}
 
 				ImGui::SameLine(0, 20);
-				
+
 				if (ImGui::Button("L")) {
 					std::string outPath;
 					Utils::OpenDialog(outPath, Utils::MeshFilterList, 1, "assets/");
-					if (!outPath.empty())
+					if (!outPath.empty()) {
 						c.SetMesh(Mesh::Create(outPath));
+						entityContext.GetComponent<TagComponent>().SetTag(c.GetMesh()->GetName());
+					}
 				}
+			}
+
+			if (mesh) {
+				if (ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_DefaultOpen)) {
+					if (ImGui::BeginTable("##hideLabel MaterialTable", 2, ImGuiTableFlags_BordersH | ImGuiTableFlags_BordersInner | ImGuiTableFlags_Resizable)) {
+						static int32_t selectedMaterial = -1;
+						for (uint32_t i = 0; i < mesh->GetSubmeshes().size(); i++) {
+							ImGui::TableNextRow();
+							
+							ImGui::TableSetColumnIndex(0);
+							UIUtils::TextCenterTable(fmt::format("Element {0}", i).c_str(), 8.0f, -8.0f);
+
+							Submesh& submesh = mesh->GetSubmeshes()[i];
+							Material& m = mesh->GetMaterials()[submesh.MaterialIndex];
+
+							ImGui::TableSetColumnIndex(1);
+							uint32_t textureID = 0;
+							if (m.HasTexture(Material::ALBEDO_TYPE))
+								textureID = m.GetTexture(Material::ALBEDO_TYPE)->GetID();
+
+							ImGui::ImageButton((ImTextureID)textureID, { 64, 64 }, { 0, 0 }, { 1, 1 }, 1.0f);
+							ImGui::SameLine();
+							
+							if (ImGui::BeginCombo(fmt::format("##hideLabel {0}", i).c_str(), m.GetName().c_str())) {
+								for (uint32_t j = 0; j < mesh->GetSubmeshes().size(); j++) {
+									Material& comboMaterial = mesh->GetMaterials()[j];
+									if (ImGui::Selectable(comboMaterial.GetName().c_str())) {
+										selectedMaterial = j;
+										submesh.MaterialIndex = j;
+									}
+									if (selectedMaterial == j)
+										ImGui::SetItemDefaultFocus();
+								}
+								ImGui::EndCombo();
+							}
+						}
+
+						ImGui::EndTable();
+					}
+				}
+				ImGui::Unindent();
 			}
 		});
 
@@ -148,65 +195,5 @@ namespace Lucy {
 		if (demoOpen) ImGui::ShowDemoWindow();
 
 		ImGui::End();
-	}
-
-	void PropertiesPanel::RenderTransformControl(const char* id, float& x, float& y, float& z, float defaultValue, float speed)
-	{
-		ImGui::PushID(id);
-
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0, 4 });
-		ImFont* font = ImGui::GetFont();
-		float lineHeight = font->FontSize + ImGui::GetStyle().FramePadding.y * 2.0f;
-		float buttonWidth = lineHeight + 3.0f;
-
-		ImGui::PushStyleColor(ImGuiCol_Button, { 0.64f, 0.4f, 0.38f, 1.0f });
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.74f, 0.4f, 0.38f, 1.0f });
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 0.64f, 0.4f, 0.38f, 1.0f });
-
-		if (ImGui::Button("X", { buttonWidth, lineHeight }))
-			x = defaultValue;
-		ImGui::PopStyleColor(3);
-
-		ImGui::SameLine();
-
-		ImGui::PushItemWidth(ImGui::CalcItemWidth() / 3 + 17);
-		ImGui::AlignTextToFramePadding();
-		ImGui::DragFloat("##hidelabel X", &x, speed);
-		ImGui::PopItemWidth();
-
-		ImGui::SameLine();
-
-		ImGui::PushStyleColor(ImGuiCol_Button, { 0.46f, 0.59f, 0.5f, 1.0f });
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.46f, 0.69f, 0.5f, 1.0f });
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 0.46f, 0.59f, 0.5f, 1.0f });
-		if (ImGui::Button("Y", { buttonWidth, lineHeight }))
-			y = defaultValue;
-		ImGui::PopStyleColor(3);
-
-		ImGui::SameLine();
-
-		ImGui::PushItemWidth(ImGui::CalcItemWidth() / 3 + 17);
-		ImGui::AlignTextToFramePadding();
-		ImGui::DragFloat("##hidelabel Y", &y, speed);
-		ImGui::PopItemWidth();
-
-		ImGui::SameLine();
-
-		ImGui::PushStyleColor(ImGuiCol_Button, { 0.33f, 0.48f, 0.6f, 1.0f });
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, { 0.33f, 0.48f, 0.7f, 1.0f });
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, { 0.33f, 0.48f, 0.6f, 1.0f });
-		if (ImGui::Button("Z", { buttonWidth, lineHeight }))
-			z = defaultValue;
-		ImGui::PopStyleColor(3);
-
-		ImGui::SameLine();
-
-		ImGui::PushItemWidth(ImGui::CalcItemWidth() / 3 + 17);
-		ImGui::AlignTextToFramePadding();
-		ImGui::DragFloat("##hidelabel Z", &z, speed);
-		ImGui::PopItemWidth();
-
-		ImGui::PopStyleVar();
-		ImGui::PopID();
 	}
 }

@@ -7,7 +7,11 @@
 #include "Renderer/Buffer/FrameBuffer.h"
 #include "Renderer/Buffer/OpenGL/OpenGLFrameBuffer.h"
 
+#include "UI/ViewportPanel.h"
+#include "UI/SceneHierarchyPanel.h"
+
 #include "Events/KeyCodes.h"
+#include "Events/MouseCode.h"
 
 #include "Renderer/RenderCommand.h"
 #include "glad/glad.h"
@@ -18,7 +22,7 @@ namespace Lucy {
 		m_Window = window;
 	}
 
-	void EditorLayer::Begin() {
+	void EditorLayer::Begin(PerformanceMetrics& rendererMetrics) {
 		auto& meshView = m_Scene.View<MeshComponent>();
 
 		for (auto entity : meshView) {
@@ -28,6 +32,8 @@ namespace Lucy {
 
 			Renderer::SubmitMesh(meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
 		}
+		
+		m_Scene.GetEditorCamera().OnEvent(rendererMetrics);
 	}
 
 	void EditorLayer::End() {
@@ -45,25 +51,21 @@ namespace Lucy {
 	}
 
 	void EditorLayer::OnEvent(Event& e) {
-		switch (e.GetType()) {
-			case EventType::KeyEvent:
-				break;
-			case EventType::MouseEvent:
-				break;
-			case EventType::WindowResizeEvent:
-				break;
-			case EventType::ScrollEvent:
-				break;
-			case EventType::CursorPosEvent:
-				break;
-			case EventType::CharCallbackEvent:
-				break;
-		}
-
 		EventDispatcher& dispatcher = EventDispatcher::GetInstance();
 		dispatcher.Dispatch<KeyEvent>(e, EventType::KeyEvent, [&](KeyEvent& e) {
 			if (e == KeyCode::Escape) {
 				glfwSetWindowShouldClose(m_Window->Raw(), GL_TRUE);
+			}
+		});
+
+		dispatcher.Dispatch<MouseEvent>(e, EventType::MouseEvent, [&](MouseEvent& e) {
+			ViewportPanel& viewportPanel = ViewportPanel::GetInstance();
+			if (viewportPanel.IsOverAnyGizmo || !viewportPanel.IsViewportActive) return;
+
+			if (e == MouseCode::Button0) {
+				Entity e = Renderer::OnMousePicking();
+				SceneHierarchyPanel& sceneHierarchyPanel = SceneHierarchyPanel::GetInstance();
+				e.IsValid() ? sceneHierarchyPanel.SetEntityContext(e) : sceneHierarchyPanel.SetEntityContext({});
 			}
 		});
 	}

@@ -9,13 +9,14 @@ namespace Lucy {
 	RenderPass* RenderCommand::s_ActiveRenderPass = nullptr;
 
 	void RenderCommand::Begin(RefLucy<RenderPass> renderPass) {
+		if (s_ActiveRenderPass) LUCY_ASSERT(false);
 		RenderPass::Begin(renderPass);
 		s_ActiveRenderPass = renderPass.get();
 
 		auto& frameBuffer = renderPass->GetFrameBuffer();
 		auto [r, g, b, a] = renderPass->GetClearColor();
 
-		if (frameBuffer->GetBlitted().get())
+		if (frameBuffer->GetBlitted())
 			frameBuffer->Blit();
 		RenderCommand::ClearColor(r, g, b, a);
 		RenderCommand::Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -32,6 +33,18 @@ namespace Lucy {
 
 	void RenderCommand::Clear(uint32_t bitField) {
 		Renderer::s_RendererAPI->Clear(bitField);
+	}
+
+	void RenderCommand::ReadPixels(uint32_t x, uint32_t y, uint32_t width, uint32_t height, float* pixelValueOutput) {
+		Renderer::s_RendererAPI->ReadPixels(x, y, width, height, pixelValueOutput);
+	}
+
+	void RenderCommand::ReadBuffer(RefLucy<FrameBuffer> frameBuffer, uint32_t mode) {
+		Renderer::s_RendererAPI->ReadBuffer(frameBuffer, mode);
+	}
+
+	void RenderCommand::ReadBuffer(uint32_t mode) {
+		Renderer::s_RendererAPI->ReadBuffer(mode);
 	}
 
 	GLenum GetGLMode(Topology topology) {

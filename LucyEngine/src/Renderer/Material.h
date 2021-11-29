@@ -23,13 +23,22 @@ namespace Lucy {
 	class Material {
 	public:
 		Material() = default;
-		Material(RefLucy<Shader> shader, aiMaterial* aiMaterial, std::string& importedFilePath);
+		Material(RefLucy<Shader> shader, aiMaterial* aiMaterial, const char* submeshName, std::string& importedFilePath);
 
 		void Bind();
 		void Unbind();
 
 		inline RefLucy<Shader> GetShader() const { return m_Shader; }
+		inline std::string GetName() const { return m_MaterialData.Name; }
 
+		bool HasTexture(TextureType type);
+		inline RefLucy<Texture2D> GetTexture(TextureType type) const { return m_Textures[type.Index]; }
+
+		inline static const TextureType ALBEDO_TYPE = { aiTextureType_DIFFUSE, "Albedo", 1, 0 };
+		inline static const TextureType NORMALS_TYPE = { aiTextureType_HEIGHT, "Height", 2, 1 };
+		inline static const TextureType METALLIC_TYPE = { aiTextureType_SHININESS, "Metallic", 3, 2 };
+		inline static const TextureType ROUGHNESS_TYPE = { aiTextureType_SPECULAR, "Roughness", 4, 3 };
+		inline static const TextureType AO_TYPE = { aiTextureType_AMBIENT_OCCLUSION, "Ambient Occlusion", 5, 4 };
 	private:
 		void LoadTexture(aiMaterial* aiMaterial, TextureSlot slot, TextureType type, std::string& importedFilePath);
 

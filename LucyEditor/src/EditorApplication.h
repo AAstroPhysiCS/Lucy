@@ -3,6 +3,7 @@
 #include "Core/Base.h"
 #include "Core/Application.h"
 #include "Core/Window.h"
+#include "Core/Metrics.h"
 
 namespace Lucy {
 
@@ -20,7 +21,7 @@ namespace Lucy {
 	};
 
 	//Creates an application with default parameters
-	Application* CreateEditorApplication(const ApplicationArgs& args) {
+	inline Application* CreateEditorApplication(const ApplicationArgs& args) {
 		return new EditorApplication(args);
 	}
 }

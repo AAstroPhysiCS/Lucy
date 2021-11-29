@@ -7,8 +7,12 @@
 namespace Lucy {
 
 	enum class PixelType {
-		Float = 0x1406, 
-		UnsignedByte = 0x1401
+		Byte = 0x1400,
+		UnsignedByte = 0x1401,
+		UnsignedShort565 = 0x8363,
+		Short = 0x1402,
+		Int = 0x1404,
+		Float = 0x1406
 	};
 
 	struct TextureFormat {
@@ -25,6 +29,8 @@ namespace Lucy {
 	struct TextureType {
 		uint32_t Type;
 		std::string Name;
+		uint32_t Slot;
+		uint32_t Index;
 	};
 
 	typedef uint32_t TextureSlot;
@@ -38,6 +44,7 @@ namespace Lucy {
 		
 		int32_t Width = 0, Height = 0; //gets replaced if path is available
 		
+		bool DisableReadWriteBuffer = false;
 		bool GenerateMipmap = false;
 
 		uint32_t AttachmentIndex;

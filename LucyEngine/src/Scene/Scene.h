@@ -16,6 +16,7 @@ namespace Lucy {
 		Entity CreateMesh();
 		Entity CreateEntity();
 		void RemoveEntity(Entity& e);
+		Entity GetEntityByPixelValue(glm::vec3& pixelValue);
 
 		inline EditorCamera& GetEditorCamera() { return m_Camera; }
 

@@ -11,9 +11,13 @@ namespace Lucy {
 		return s_Instance;
 	}
 
+	void SceneHierarchyPanel::SetEntityContext(Entity e) {
+		m_EntityContext = e;
+	}
+
 	void SceneHierarchyPanel::Render()
 	{
-		ImGui::Begin("Scene Hierarchy");
+		ImGui::Begin("Scene Hierarchy", 0, ImGuiWindowFlags_NoBringToFrontOnFocus);
 		
 		auto& scene = EditorLayer::GetInstance().GetScene();
 		auto& view = scene.View<UUIDComponent, TagComponent>();
@@ -47,7 +51,7 @@ namespace Lucy {
 
 			ImGui::EndPopup();
 		}
-		
+
 		ImGui::End();
 	}
 }

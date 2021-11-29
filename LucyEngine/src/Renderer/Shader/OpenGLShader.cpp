@@ -38,7 +38,7 @@ namespace Lucy {
 		glGetShaderiv(vertexId, GL_COMPILE_STATUS, &err);
 
 		if (err != GL_TRUE) {
-			LUCY_CRITICAL("Vertex Shader crashed!");
+			LUCY_CRITICAL(fmt::format("Vertex Shader {0} crashed!", m_Path));
 
 			GLsizei length;
 			GLchar buffer[1024];
@@ -51,7 +51,7 @@ namespace Lucy {
 
 		glGetShaderiv(fragmentId, GL_COMPILE_STATUS, &err);
 		if (err != GL_TRUE) {
-			LUCY_CRITICAL("Fragment Shader crashed!");
+			LUCY_CRITICAL(fmt::format("Fragment Shader {0} crashed!", m_Path));
 
 			GLsizei length;
 			GLchar buffer[1024];

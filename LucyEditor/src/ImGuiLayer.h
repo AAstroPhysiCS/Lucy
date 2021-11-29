@@ -6,6 +6,8 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include "ImGuizmo.h"
+
 #include "GLFW/glfw3.h"
 
 #include "Core/Layer.h"
@@ -23,7 +25,7 @@ namespace Lucy {
 		}
 
 		void Init(RefLucy<Window>& window);
-		void Begin();
+		void Begin(PerformanceMetrics& rendererMetrics);
 		void End();
 		void OnRender();
 		void OnEvent(Event& e);

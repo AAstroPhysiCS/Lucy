@@ -5,6 +5,7 @@
 
 #include "UUID.h"
 #include "../Renderer/Mesh.h"
+#include "../Renderer/Material.h"
 
 namespace Lucy {
 
@@ -22,12 +23,12 @@ namespace Lucy {
 
 		void CalculateMatrix() {
 			m_Mat = glm::translate(glm::mat4(1.0f), m_Position)
-				* glm::toMat4(glm::quat(m_Rotation))
+				* glm::toMat4(glm::quat(glm::radians(m_Rotation)))
 				* glm::scale(glm::mat4(1.0f), m_Scale);
 		}
 
 	private:
-		glm::mat4 m_Mat = glm::mat4();
+		glm::mat4 m_Mat = glm::mat4(1.0f);
 		glm::vec3 m_Position = glm::vec3();
 		glm::vec3 m_Rotation = glm::vec3();
 		glm::vec3 m_Scale = glm::vec3(1.0f);
@@ -55,7 +56,7 @@ namespace Lucy {
 		}
 		UUIDComponent(const UUIDComponent& other) = default;
 
-		inline std::string& GetUUID() { return m_UUID.m_UUIDAsString; }
+		inline std::string GetUUID() { return m_UUID.m_UUIDAsString; }
 
 	private:
 		UUID m_UUID;
@@ -71,7 +72,10 @@ namespace Lucy {
 		}
 		TagComponent(const TagComponent& other) = default;
 
-		inline std::string& GetTag() { return m_Tag; }
+		inline std::string GetTag() { return m_Tag; }
+		inline void SetTag(std::string& tag) { m_Tag = tag; }
+		inline void SetTag(char* tag) { m_Tag = tag; }
+
 	private:
 		std::string m_Tag = "Empty Entity";
 	};

@@ -18,6 +18,9 @@ namespace Lucy {
 		static void DrawElements(uint32_t count, uint32_t indices);
 		static void DrawElementsBaseVertex(uint32_t count, uint32_t indices, int32_t basevertex);
 
+		static void ReadPixels(uint32_t x, uint32_t y, uint32_t width, uint32_t height, float* pixelValueOutput);
+		static void ReadBuffer(RefLucy<FrameBuffer> frameBuffer, uint32_t mode);
+		static void ReadBuffer(uint32_t mode);
 		static void SwapBuffers(GLFWwindow* window);
 
 		friend class Mesh;

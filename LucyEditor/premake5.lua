@@ -20,10 +20,11 @@ project "LucyEditor"
         "../LucyEngine/vendor/glm",
         "../LucyEngine/vendor/entt/include",
         "../LucyEngine/vendor/assimp/include",
-        "../LucyEngine/src/lypch.h"
+        "vendor/ImGuizmo/include"
     }
 
     links {
+        "ImGuizmo",
         "LucyEngine"
     }
 

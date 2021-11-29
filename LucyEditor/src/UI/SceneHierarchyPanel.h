@@ -10,6 +10,7 @@ namespace Lucy {
 	public:
 		static SceneHierarchyPanel& GetInstance();
 
+		void SetEntityContext(Entity e);
 		inline Entity& GetEntityContext() { return m_EntityContext; }
 	private:
 		void Render();

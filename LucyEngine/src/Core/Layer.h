@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Events/Event.h"
+#include "Core/Metrics.h"
 
 namespace Lucy {
 
@@ -9,7 +10,7 @@ namespace Lucy {
 		Layer() = default;
 		~Layer() = default;
 	public:
-		virtual void Begin() = 0;
+		virtual void Begin(PerformanceMetrics& rendererMetrics) = 0;
 		virtual void End() = 0;
 		virtual void OnRender() = 0;
 		virtual void OnEvent(Event& e) = 0;

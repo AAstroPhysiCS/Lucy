@@ -17,7 +17,7 @@ namespace Lucy {
 			return s_Instance;
 		}
 
-		void Begin();
+		void Begin(PerformanceMetrics& rendererMetrics);
 		void End();
 		void Init(RefLucy<Window> window);
 		void OnRender();

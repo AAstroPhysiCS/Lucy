@@ -13,6 +13,8 @@
 
 namespace Lucy {
 
+	PerformanceMetrics EditorApplication::s_Metrics;
+
 	EditorApplication::EditorApplication(const ApplicationArgs& args)
 		: Application(args) {
 		m_LayerStack.Push({ &ImGuiLayer::GetInstance(), &EditorLayer::GetInstance() });
@@ -44,14 +46,17 @@ namespace Lucy {
 		m_Window->Destroy();
 		NFD_Quit();
 	}
-
+	
 	void EditorApplication::Run() {
 		while (m_Running && !glfwWindowShouldClose(m_Window->Raw())) {
+
 			for (Layer* layer : m_LayerStack.GetStack()) {
-				layer->Begin();
+				layer->Begin(s_Metrics);
 				layer->OnRender();
 				layer->End();
 			}
+			
+			s_Metrics.Update();
 			m_Window->PollEvents();
 		}
 	}

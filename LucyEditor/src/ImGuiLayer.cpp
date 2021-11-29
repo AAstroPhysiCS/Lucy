@@ -4,10 +4,12 @@
 #include "UI/TaskbarPanel.h"
 #include "UI/ViewportPanel.h"
 #include "UI/PropertiesPanel.h"
+#include "UI/PerformancePanel.h"
 
 #include "Events/InputEvent.h"
 #include "Events/WindowEvent.h"
 #include "Events/EventDispatcher.h"
+#include "Core/Input.h"
 
 #include "Renderer/Renderer.h"
 #include "Renderer/RenderPass.h"
@@ -22,6 +24,7 @@ namespace Lucy {
 		m_Panels.push_back(&TaskbarPanel::GetInstance());
 		m_Panels.push_back(&ViewportPanel::GetInstance());
 		m_Panels.push_back(&PropertiesPanel::GetInstance());
+		m_Panels.push_back(&PerformancePanel::GetInstance());
 	}
 
 	void ImGuiLayer::Init(RefLucy<Window>& window) {
@@ -43,10 +46,13 @@ namespace Lucy {
 		ImGui_ImplOpenGL3_Init("#version 460");
 	}
 
-	void ImGuiLayer::Begin() {
+	void ImGuiLayer::Begin(PerformanceMetrics& rendererMetrics) {
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
+
+		ImGuizmo::SetOrthographic(false);
+		ImGuizmo::BeginFrame();
 
 		ImGuiIO& io = ImGui::GetIO();
 
@@ -59,7 +65,7 @@ namespace Lucy {
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 
 		ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoScrollbar |
-			ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+			ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
 		ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground;
 
 		static bool pOpen = true;
@@ -73,6 +79,7 @@ namespace Lucy {
 	}
 
 	void ImGuiLayer::End() {
+
 		ImGui::End(); //end of dockspace window
 
 		ImGuiIO& io = ImGui::GetIO();
@@ -107,7 +114,9 @@ namespace Lucy {
 
 		dispatcher.Dispatch<CursorPosEvent>(e, EventType::CursorPosEvent, [&](CursorPosEvent& e) {
 			ImGuiIO& io = ImGui::GetIO();
-			io.MousePos = { (float)e.GetXPos(), (float)e.GetYPos() };
+			//io.MousePos = { (float)e.GetXPos(), (float)e.GetYPos() };
+			Input::MouseX = io.MousePos.x;
+			Input::MouseY = io.MousePos.y;
 		});
 
 		dispatcher.Dispatch<KeyEvent>(e, EventType::KeyEvent, [&](KeyEvent& e) {
@@ -116,8 +125,7 @@ namespace Lucy {
 
 			if (action == GLFW_PRESS) {
 				io.KeysDown[e.GetKey()] = true;
-			}
-			else if (action == GLFW_RELEASE) {
+			} else if (action == GLFW_RELEASE) {
 				io.KeysDown[e.GetKey()] = false;
 			}
 
@@ -139,6 +147,10 @@ namespace Lucy {
 			io.DisplaySize = { (float)e.GetWidth(), (float)e.GetHeight() };
 			io.DisplayFramebufferScale = { 1.0f, 1.0f };
 		});
+
+		for (Panel* panel : m_Panels) {
+			panel->OnEvent(e);
+		}
 	}
 
 	void ImGuiLayer::Destroy() {

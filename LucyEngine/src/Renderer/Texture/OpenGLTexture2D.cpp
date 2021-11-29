@@ -29,11 +29,14 @@ namespace Lucy {
 			specs.Format.InternalFormat = specs.Format.Format;
 
 			if (!data) LUCY_CRITICAL(std::string("Failed to load a texture. Texture path: ").append(specs.Path));
+		} else {
+			m_Width = specs.Width;
+			m_Height = specs.Height;
 		}
 
 		m_Target = GetOpenGLType(specs);
 
-		LUCY_ASSERT(m_Width != 0 && m_Height != 0);
+		if (m_Width == 0 && m_Height == 0) LUCY_ASSERT(false);
 
 		glCreateTextures(m_Target, 1, &m_Id);
 		Bind();
@@ -47,8 +50,7 @@ namespace Lucy {
 		if (specs.Samples == 0) {
 			!data ? glTexImage2D(m_Target, 0, specs.Format.InternalFormat, m_Width, m_Height, 0, specs.Format.Format, (GLenum)specs.PixelType, 0) :
 				glTexImage2D(m_Target, 0, specs.Format.InternalFormat, m_Width, m_Height, 0, specs.Format.Format, (GLenum)specs.PixelType, data);
-		}
-		else {
+		} else {
 			glTexImage2DMultisample(m_Target, specs.Samples, specs.Format.InternalFormat, m_Width, m_Height, true);
 		}
 
