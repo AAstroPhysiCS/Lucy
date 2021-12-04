@@ -11,7 +11,6 @@
 #include "GLFW/glfw3.h"
 
 #include "Core/Layer.h"
-#include "Events/Event.h"
 #include "UI/Panel.h"
 
 namespace Lucy {
@@ -25,7 +24,7 @@ namespace Lucy {
 		}
 
 		void Init(RefLucy<Window>& window);
-		void Begin(PerformanceMetrics& rendererMetrics);
+		void Begin(PerformanceMetrics& performanceMetrics);
 		void End();
 		void OnRender();
 		void OnEvent(Event& e);

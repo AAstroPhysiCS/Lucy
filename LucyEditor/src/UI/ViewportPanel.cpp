@@ -69,11 +69,11 @@ namespace Lucy {
 
 		Entity& e = SceneHierarchyPanel::GetInstance().GetEntityContext();
 		if (e.IsValid()) {
-			Camera* editorCamera = Renderer::GetActiveCamera();
+			EditorCamera& editorCamera = Renderer::GetActiveScene()->GetEditorCamera();
 			TransformComponent& t = e.GetComponent<TransformComponent>();
 			float matrixTranslation[3], matrixRotation[3], matrixScale[3];
 			t.CalculateMatrix();
-			ImGuizmo::Manipulate(glm::value_ptr(editorCamera->GetViewMatrix()), glm::value_ptr(editorCamera->GetProjectionMatrix()),
+			ImGuizmo::Manipulate(glm::value_ptr(editorCamera.GetViewMatrix()), glm::value_ptr(editorCamera.GetProjectionMatrix()),
 								 CurrentGizmoOperation, ImGuizmo::MODE::LOCAL, glm::value_ptr(t.GetMatrix()), nullptr, UseSnap ? &SnapValue : nullptr, nullptr, nullptr);
 			ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(t.GetMatrix()), matrixTranslation, matrixRotation, matrixScale);
 			t.GetPosition().x = matrixTranslation[0]; t.GetPosition().y = matrixTranslation[1]; t.GetPosition().z = matrixTranslation[2];

@@ -1,7 +1,11 @@
 #pragma once
 
+#include <map>
+
 #include "../../Core/Base.h"
 #include "glm/gtc/type_ptr.hpp"
+
+#include "shaderc/shaderc.hpp"
 
 namespace Lucy {
 
@@ -12,28 +16,34 @@ namespace Lucy {
 		static RefLucy<Shader> Create(const std::string& path, const std::string& name);
 
 		inline std::string& GetName() { return m_Name; }
-		inline uint32_t GetProgram() { return m_Program; }
-
-		virtual void SetMat4(const char* name, glm::mat4& mat) = 0;
-		virtual void SetMat3(const char* name, glm::mat3& mat) = 0;
-		virtual void SetVec4(const char* name, glm::vec4& vec) = 0;
-		virtual void SetVec3(const char* name, glm::vec3& vec) = 0;
-		virtual void SetVec2(const char* name, glm::vec2& vec) = 0;
-		virtual void SetFloat(const char* name, float value) = 0;
-		virtual void SetInt(const char* name, int32_t value) = 0;
-		virtual void SetInt(const char* name, int32_t* value, uint32_t count) = 0;
 
 		virtual void Bind() = 0;
 		virtual void Unbind() = 0;
 		virtual void Destroy() = 0;
-	protected:
+	public:
+		Shader() = default;
 		Shader(const std::string& path, const std::string& m_Name);
 
-		virtual void Load() = 0;
+		void Load();
 
 		uint32_t m_Program = 0;
 		std::string m_Path = "";
 		std::string m_Name = "Unnamed";
+	private:
+		struct Extensions {
+			const char* vertexExtension;
+			const char* fragmentExtension;
+		};
+		void Reflect(std::vector<uint32_t>& dataVertex, std::vector<uint32_t>& dataFragment);
+	protected:
+		std::string LoadVertexData(std::vector<std::string>& lines);
+		std::string LoadFragmentData(std::vector<std::string>& lines);
+		const Extensions GetCachedFileExtension();
+
+		void LoadAndRedoCache(shaderc::Compiler& compiler, shaderc::CompileOptions& options, const std::string& cacheFileVert, const std::string& cacheFileFrag);
+		void LoadFromCache(const std::string& cacheFileVert, const std::string& cacheFileFrag);
+	private:
+		virtual void LoadInternal(std::vector<uint32_t>& dataVertex, std::vector<uint32_t>& dataFragment) = 0;
 	};
 
 	enum class ShaderDataSize : uint16_t {
@@ -60,8 +70,8 @@ namespace Lucy {
 
 	class ShaderLibrary {
 	public:
-		RefLucy<Shader>& GetShader(const std::string& name);
-		void PushShader(RefLucy<Shader> shader);
+		RefLucy<Shader> GetShader(const std::string& name);
+		void PushShader(RefLucy<Shader> instance);
 	private:
 		ShaderLibrary() = default;
 

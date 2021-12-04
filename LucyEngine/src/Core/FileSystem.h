@@ -7,6 +7,8 @@ namespace Lucy {
 	class FileSystem {
 	public:
 		static std::string GetParentPath(std::string& path);
+		static std::string GetFileName(std::string& file);
+		static bool FileExists(std::string& file);
 
 	private:
 		FileSystem() = delete;

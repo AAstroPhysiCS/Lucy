@@ -1,5 +1,5 @@
 project "glm"
-    location "glm"
+    location "."
     kind "StaticLib"
     language "C++"
 

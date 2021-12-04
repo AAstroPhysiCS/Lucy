@@ -8,19 +8,21 @@ project "LucyEditor"
 
     files {
         "src/**.h",
+        "src/**.hpp",
         "src/**.cpp"
     }
 
     includedirs {
-        "../LucyEngine/vendor/spdlog/include",
-        "../LucyEngine/src",
-        "../LucyEngine/vendor/GLFW/include",
-        "../LucyEngine/vendor/Glad/include",
-        "../LucyEngine/vendor/ImGui",
-        "../LucyEngine/vendor/glm",
-        "../LucyEngine/vendor/entt/include",
-        "../LucyEngine/vendor/assimp/include",
-        "vendor/ImGuizmo/include"
+        "%{LibraryPath.spdlog}/include",
+        "%{LibraryPath.GLFW}/include",
+        "%{LibraryPath.Glad}/include",
+        "%{LibraryPath.entt}/include",
+        "%{LibraryPath.ImGui}",
+        "%{LibraryPath.glm}",
+        "%{LibraryPath.assimp}/include",
+        "%{LibraryPath.ImGuizmo}/include",
+        "%{LibraryPath.VulkanInclude}",
+        "../LucyEngine/src"
     }
 
     links {
@@ -38,8 +40,8 @@ project "LucyEditor"
         }
 
         postbuildcommands {
-            "{COPY} ../LucyEngine/vendor/assimp/assimp-vc143-mt.dll ../bin/" .. outputdir .. "/%{prj.name}",
-            "{COPY} ../LucyEngine/vendor/nativefiledialog/nfd.lib ../bin/" .. outputdir .. "/%{prj.name}"
+            "{COPY} %{LibraryPath.assimp}/assimp-vc143-mt.dll ../bin/" .. outputdir .. "/%{prj.name}",
+            "{COPY} %{LibraryPath.nativefiledialog}/nfd.lib ../bin/" .. outputdir .. "/%{prj.name}"
         }
     
     filter "configurations:Debug"

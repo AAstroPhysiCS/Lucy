@@ -8,13 +8,17 @@ layout (location = 3) in vec3 a_Normals;
 layout (location = 4) in vec3 a_Tangents;
 layout (location = 5) in vec3 a_BiTangents;
 
-uniform mat4 u_ModelMatrix;
-uniform mat4 u_ViewMatrix;
-uniform mat4 u_ProjMatrix;
-
-out struct LucyRendererOutput {
+struct LucyRendererOutput {
 	vec2 TextCoords;
-} r_Output;
+};
+
+layout(location = 0) out LucyRendererOutput r_Output;
+
+layout(std140, binding = 0) uniform Camera {
+	mat4 u_ViewMatrix;
+	mat4 u_ProjMatrix;
+	mat4 u_ModelMatrix;
+};
 
 void main() {
 	r_Output.TextCoords = a_TextureCoords;
@@ -29,12 +33,21 @@ void main() {
 
 layout (location = 0) out vec4 a_Color;
 
-in struct LucyRendererOutput {
+struct LucyRendererOutput {
 	vec2 TextCoords;
-} r_Output;
+};
 
-uniform int u_AlbedoTextureSlot;
-uniform sampler2D u_Textures[32];
+layout(location = 0) in LucyRendererOutput r_Output;
+
+layout(std140, binding = 1) uniform TextureSlots {
+	int u_AlbedoTextureSlot;
+	int u_NormalTextureSlot;
+	int u_RoughnessTextureSlot;
+	int u_MetallicTextureSlot;
+	int u_AOTextureSlot;
+};
+
+layout (binding = 0) uniform sampler2D u_Textures[32];
 
 void main() {
 	if (u_AlbedoTextureSlot != NULL_TEXTURE_SLOT)

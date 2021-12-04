@@ -5,6 +5,7 @@
 
 #include "Buffer/FrameBuffer.h"
 #include "Buffer/RenderBuffer.h"
+#include "Buffer/UniformBuffer.h"
 #include "Buffer/OpenGL/OpenGLFrameBuffer.h"
 
 #include "Shader/Shader.h"
@@ -40,7 +41,9 @@ namespace Lucy {
 
 	ShaderLibrary Renderer::s_ShaderLibrary;
 	Scene* Renderer::s_ActiveScene = nullptr;
-	Camera* Renderer::s_ActiveCamera = nullptr;
+
+	RefLucy<UniformBuffer> Renderer::cameraUniformBuffer;
+	RefLucy<UniformBuffer> Renderer::textureSlotsUniformBuffer;
 
 	void Renderer::Init(RefLucy<Window> window, RenderAPI renderContext) {
 		s_RenderContext = RenderContext::Create(renderContext);
@@ -52,10 +55,8 @@ namespace Lucy {
 		auto [width, height] = Utils::ReadSizeFromIni("Viewport");
 
 		//------------ Shaders ------------
-		{
-			Shader::Create("LucyPBR", "assets/shaders/LucyPBR.glsl");
-			Shader::Create("LucyID", "assets/shaders/LucyID.glsl");
-		}
+		Shader::Create("LucyPBR", "assets/shaders/LucyPBR.glsl");
+		Shader::Create("LucyID", "assets/shaders/LucyID.glsl");
 
 		uint32_t TargetSamples = 4;
 
@@ -151,15 +152,10 @@ namespace Lucy {
 			s_IDPass = RenderPass::Create(idRenderPassSpecs);
 		}
 
+		cameraUniformBuffer = UniformBuffer::Create(sizeof(glm::mat4) * 3, 0);
+		textureSlotsUniformBuffer = UniformBuffer::Create(20, 1);
+
 		Renderer::Dispatch(); //just for init functions
-
-		int32_t textures[32];
-		for (int32_t i = 0; i < 32; i++) textures[i] = i;
-
-		RefLucy<Shader> pbrShader = s_ShaderLibrary.GetShader("LucyPBR");
-		pbrShader->Bind();
-		pbrShader->SetInt("u_Textures", textures, 32);
-		pbrShader->Unbind();
 	}
 
 	void Renderer::Submit(const Func&& func) {
@@ -182,10 +178,10 @@ namespace Lucy {
 		s_IDPass->GetFrameBuffer()->Bind();
 		glm::vec3 pixelValue;
 		RenderCommand::ReadBuffer(GL_COLOR_ATTACHMENT0);
-		RenderCommand::ReadPixels(s_ViewportMouseX, s_ViewportHeight - s_ViewportMouseY, 1, 1, (float*) &pixelValue);
+		RenderCommand::ReadPixels(s_ViewportMouseX, s_ViewportHeight - s_ViewportMouseY, 1, 1, (float*)&pixelValue);
 
 		//checking if the data that is being read make sense
-		if ((pixelValue.x > 255.0f || pixelValue.x < 0.0f) || 
+		if ((pixelValue.x > 255.0f || pixelValue.x < 0.0f) ||
 			(pixelValue.y > 255.0f || pixelValue.y < 0.0f) ||
 			(pixelValue.z > 255.0f || pixelValue.z < 0.0f))
 			return {};
@@ -196,7 +192,7 @@ namespace Lucy {
 
 		Entity selectedEntity = s_ActiveScene->GetEntityByPixelValue(pixelValue);
 		s_IDPass->GetFrameBuffer()->Unbind();
-		
+
 		return selectedEntity;
 	}
 
@@ -211,12 +207,10 @@ namespace Lucy {
 			for (uint32_t i = 0; i < submeshes.size(); i++) {
 				Submesh& submesh = submeshes[i];
 				Material& material = materials[submesh.MaterialIndex];
-				RefLucy<Shader> shader = material.GetShader();
+				RefLucy<Shader>& shader = material.GetShader();
 
 				material.Bind();
-				shader->SetMat4("u_ModelMatrix", meshComponent.EntityTransform * submesh.Transform);
-				shader->SetMat4("u_ViewMatrix", s_ActiveCamera->GetViewMatrix());
-				shader->SetMat4("u_ProjMatrix", s_ActiveCamera->GetProjectionMatrix());
+				cameraUniformBuffer->SetData((void*)&(meshComponent.EntityTransform * submesh.Transform), sizeof(glm::mat4), sizeof(glm::mat4) * 2);
 				RenderCommand::DrawElementsBaseVertex(submesh.IndexCount, submesh.BaseIndexCount, submesh.BaseVertexCount);
 				material.Unbind();
 			}
@@ -230,8 +224,6 @@ namespace Lucy {
 		RenderCommand::Begin(s_IDPass);
 
 		idShader->Bind();
-		idShader->SetMat4("u_ViewMatrix", s_ActiveCamera->GetViewMatrix());
-		idShader->SetMat4("u_ProjMatrix", s_ActiveCamera->GetProjectionMatrix());
 		for (MeshDrawCommand meshComponent : s_MeshDrawCommand) {
 			RefLucy<Mesh> mesh = meshComponent.Mesh;
 			std::vector<Submesh>& submeshes = mesh->GetSubmeshes();
@@ -239,7 +231,7 @@ namespace Lucy {
 			mesh->Bind();
 			for (uint32_t i = 0; i < submeshes.size(); i++) {
 				Submesh& submesh = submeshes[i];
-				idShader->SetMat4("u_ModelMatrix", meshComponent.EntityTransform * submesh.Transform);
+				cameraUniformBuffer->SetData((void*)&(meshComponent.EntityTransform * submesh.Transform), sizeof(glm::mat4), sizeof(glm::mat4) * 2);
 				RenderCommand::DrawElementsBaseVertex(submesh.IndexCount, submesh.BaseIndexCount, submesh.BaseVertexCount);
 			}
 			mesh->Unbind();
@@ -254,8 +246,10 @@ namespace Lucy {
 		EditorCamera& camera = scene.GetEditorCamera();
 		camera.SetViewportSize(s_ViewportWidth, s_ViewportHeight);
 		camera.Update();
-		s_ActiveCamera = &camera;
 		s_ActiveScene = &scene;
+
+		cameraUniformBuffer->SetData((void*)&camera.GetViewMatrix(), sizeof(glm::mat4), 0);
+		cameraUniformBuffer->SetData((void*)&camera.GetProjectionMatrix(), sizeof(glm::mat4), sizeof(glm::mat4));
 	}
 
 	void Renderer::EndScene() {
@@ -285,7 +279,7 @@ namespace Lucy {
 	}
 
 	void Renderer::Destroy() {
-		for (RefLucy<Shader> shader : s_ShaderLibrary.m_Shaders) {
+		for (RefLucy<Shader>& shader : s_ShaderLibrary.m_Shaders) {
 			shader->Destroy();
 		}
 		glfwTerminate();

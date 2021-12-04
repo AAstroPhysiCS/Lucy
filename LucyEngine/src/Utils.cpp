@@ -62,6 +62,7 @@ namespace Utils {
 			NFD_FreePath((nfdu8char_t*)outPath);
 		}
 	}
+
 }
 
 namespace Maths {

@@ -1,5 +1,5 @@
 project "Glad"
-    location "Glad"
+    location "."
     kind "StaticLib"
     language "C"
 

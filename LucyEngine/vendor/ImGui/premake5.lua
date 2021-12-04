@@ -1,5 +1,5 @@
 project "ImGui"
-    location "ImGui"
+    location "."
     kind "StaticLib"
     language "C++"
 

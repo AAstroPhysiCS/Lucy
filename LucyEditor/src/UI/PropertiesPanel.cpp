@@ -1,7 +1,8 @@
 #include <functional>
-#include "PropertiesPanel.h"
 
+#include "PropertiesPanel.h"
 #include "SceneHierarchyPanel.h"
+
 #include "Utils.h"
 #include "UI/UIUtils.h"
 

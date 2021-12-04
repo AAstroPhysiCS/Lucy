@@ -3,6 +3,7 @@
 
 #include "../Core/Timer.h"
 #include "Renderer.h"
+#include "Shader/Shader.h"
 
 #include "RenderPass.h"
 #include "RenderCommand.h"

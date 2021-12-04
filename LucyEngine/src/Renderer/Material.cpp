@@ -1,12 +1,16 @@
 #include "lypch.h"
 
 #include "Material.h"
+#include "Shader/Shader.h"
 
 #include "../Core/FileSystem.h"
 #include "Texture/Texture.h"
-#include "glm/glm.hpp"
 
+#include "glm/glm.hpp"
 #include "glad/glad.h"
+
+#include "Buffer/UniformBuffer.h"
+#include "Renderer/Renderer.h"
 
 namespace Lucy {
 
@@ -35,27 +39,30 @@ namespace Lucy {
 		for (uint32_t i = 0; i < m_Textures.size(); i++) {
 			uint32_t slot = m_Textures[i]->GetSlot();
 			glBindTextureUnit(slot, m_Textures[i]->GetID());
+		}
 
-			//Kinda bad code
-			if (slot == Material::ALBEDO_TYPE.Slot)
-				m_Shader->SetInt("u_AlbedoTextureSlot", slot);
-			if (slot == Material::NORMALS_TYPE.Slot)
-				m_Shader->SetInt("u_NormalsTextureSlot", slot);
-			if (slot == Material::METALLIC_TYPE.Slot)
-				m_Shader->SetInt("u_MetallicTextureSlot", slot);
-			if (slot == Material::ROUGHNESS_TYPE.Slot)
-				m_Shader->SetInt("u_RoughnessTextureSlot", slot);
-			if (slot == Material::AO_TYPE.Slot)
-				m_Shader->SetInt("u_AOTextureSlot", slot);
+		//Kinda bad/ugly code
+		if (HasTexture(Material::ALBEDO_TYPE)) {
+			int32_t albedoSlot = GetTexture(Material::ALBEDO_TYPE)->GetSlot();
+			Renderer::textureSlotsUniformBuffer->SetData((void*)&albedoSlot, sizeof(int32_t), 0);
+		} else if (HasTexture(Material::NORMALS_TYPE)) {
+			int32_t normalsSlot = GetTexture(Material::NORMALS_TYPE)->GetSlot();
+			Renderer::textureSlotsUniformBuffer->SetData((void*)&normalsSlot, sizeof(int32_t), sizeof(int32_t));
+		} else if (HasTexture(Material::METALLIC_TYPE)) {
+			int32_t metallicSlot = GetTexture(Material::METALLIC_TYPE)->GetSlot();
+			Renderer::textureSlotsUniformBuffer->SetData((void*)&metallicSlot, sizeof(int32_t), sizeof(int32_t) * 2);
+		} else if (HasTexture(Material::ROUGHNESS_TYPE)) {
+			int32_t roughnessSlot = GetTexture(Material::ROUGHNESS_TYPE)->GetSlot();
+			Renderer::textureSlotsUniformBuffer->SetData((void*)&roughnessSlot, sizeof(int32_t), sizeof(int32_t) * 3);
+		} else if (HasTexture(Material::AO_TYPE)) {
+			int32_t aoSlot = GetTexture(Material::AO_TYPE)->GetSlot();
+			Renderer::textureSlotsUniformBuffer->SetData((void*)&aoSlot, sizeof(int32_t), sizeof(int32_t) * 4);
 		}
 	}
 
 	void Material::Unbind() {
-		m_Shader->SetInt("u_AlbedoTextureSlot", -1);
-		m_Shader->SetInt("u_NormalsTextureSlot", -1);
-		m_Shader->SetInt("u_MetallicTextureSlot", -1);
-		m_Shader->SetInt("u_RoughnessTextureSlot", -1);
-		m_Shader->SetInt("u_AOTextureSlot", -1);
+		int32_t clearValue = -1;
+		Renderer::textureSlotsUniformBuffer->SetData((void*)&clearValue, sizeof(int32_t) * 5, 0);
 		m_Shader->Unbind();
 		for (uint32_t i = 0; i < m_Textures.size(); i++) {
 			glBindTextureUnit(m_Textures[i]->GetSlot(), 0);

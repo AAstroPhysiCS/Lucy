@@ -2,12 +2,13 @@
 
 #include "../Core/Base.h"
 #include "Texture/Texture.h"
-#include "Shader/Shader.h"
 
 #include "glm/glm.hpp"
 #include "assimp/scene.h"
 
 namespace Lucy {
+
+	class Shader;
 
 	struct MaterialData {
 		glm::vec3 Diffuse = glm::vec3();
@@ -28,11 +29,12 @@ namespace Lucy {
 		void Bind();
 		void Unbind();
 
-		inline RefLucy<Shader> GetShader() const { return m_Shader; }
+		inline RefLucy<Shader> GetShader() { return m_Shader; }
 		inline std::string GetName() const { return m_MaterialData.Name; }
 
 		bool HasTexture(TextureType type);
 		inline RefLucy<Texture2D> GetTexture(TextureType type) const { return m_Textures[type.Index]; }
+		inline bool HasTexture(TextureType type) const { return m_Textures[type.Index]->GetID() != 0; }
 
 		inline static const TextureType ALBEDO_TYPE = { aiTextureType_DIFFUSE, "Albedo", 1, 0 };
 		inline static const TextureType NORMALS_TYPE = { aiTextureType_HEIGHT, "Height", 2, 1 };

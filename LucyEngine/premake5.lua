@@ -16,14 +16,16 @@ project "LucyEngine"
     }
 
     includedirs {
-        "vendor/spdlog/include",
-        "vendor/GLFW/include",
-        "vendor/Glad/include",
-        "vendor/entt/include",
-        "vendor/glm",
-        "vendor/stb/include",
-        "vendor/assimp/include",
-        "vendor/nativefiledialog/include",
+        "%{LibraryPath.spdlog}/include",
+        "%{LibraryPath.GLFW}/include",
+        "%{LibraryPath.Glad}/include",
+        "%{LibraryPath.entt}/include",
+        "%{LibraryPath.glm}",
+        "%{LibraryPath.stb}/include",
+        "%{LibraryPath.assimp}/include",
+        "%{LibraryPath.nativefiledialog}/include",
+
+        "%{LibraryPath.VulkanInclude}",
         "src"
     }
 
@@ -32,8 +34,8 @@ project "LucyEngine"
         "Glad",
         "ImGui",
         "glm",
-        "vendor/assimp/assimp.lib",
-        "vendor/nativefiledialog/nfd.lib"
+        "%{LibraryPath.assimp}/assimp.lib",
+        "%{LibraryPath.nativefiledialog}/nfd.lib"
     }
 
     filter "platforms:win64"
@@ -52,6 +54,13 @@ project "LucyEngine"
         }
         symbols "On"
 
+        links {
+            "%{LibraryPath.ShaderCDebug}",
+            "%{LibraryPath.SPIRVDebug}",
+            "%{LibraryPath.SPIRVGLSLDebug}",
+            "%{LibraryPath.SPIRVTools}"
+        }
+
     filter "configurations:Release"
         defines {
             "LUCY_RELEASE",
@@ -59,3 +68,9 @@ project "LucyEngine"
         }
         symbols "On"
         optimize "On"
+
+        links {
+            "%{LibraryPath.ShaderCRelease}",
+            "%{LibraryPath.SPIRVRelease}",
+            "%{LibraryPath.SPIRVGLSLRelease}"
+        }

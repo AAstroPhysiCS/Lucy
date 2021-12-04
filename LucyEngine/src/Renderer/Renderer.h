@@ -14,6 +14,7 @@ namespace Lucy {
 
 	class RenderPass;
 	class FrameBuffer;
+	class UniformBuffer;
 	class ShaderLibrary;
 
 	class Renderer {
@@ -41,9 +42,7 @@ namespace Lucy {
 			return Size{ s_Window->GetWidth(), s_Window->GetHeight() };
 		}
 
-		inline static Camera* GetActiveCamera() {
-			return s_ActiveCamera;
-		}
+		inline static Scene* GetActiveScene() { return s_ActiveScene; }
 
 		static void BeginScene(Scene& scene);
 		static void EndScene();
@@ -66,7 +65,6 @@ namespace Lucy {
 		static RefLucy<Window> s_Window;
 
 		static Scene* s_ActiveScene;
-		static Camera* s_ActiveCamera;
 
 		static std::vector<Func> s_RenderQueue;
 		static std::vector<MeshDrawCommand> s_MeshDrawCommand;
@@ -76,8 +74,12 @@ namespace Lucy {
 		static int32_t s_ViewportWidth, s_ViewportHeight;
 		static float s_ViewportMouseX, s_ViewportMouseY;
 
+		static RefLucy<UniformBuffer> cameraUniformBuffer;
+		static RefLucy<UniformBuffer> textureSlotsUniformBuffer;
+
 		friend class RenderCommand;
 		friend class Input;
+		friend class Material;
 
 		Renderer() = delete;
 		~Renderer() = delete;
