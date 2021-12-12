@@ -37,7 +37,7 @@ namespace Lucy {
 		inline bool HasTexture(TextureType type) const { return m_Textures[type.Index]->GetID() != 0; }
 
 		inline static const TextureType ALBEDO_TYPE = { aiTextureType_DIFFUSE, "Albedo", 1, 0 };
-		inline static const TextureType NORMALS_TYPE = { aiTextureType_HEIGHT, "Height", 2, 1 };
+		inline static const TextureType NORMALS_TYPE = { aiTextureType_HEIGHT, "Normals", 2, 1 };
 		inline static const TextureType METALLIC_TYPE = { aiTextureType_SHININESS, "Metallic", 3, 2 };
 		inline static const TextureType ROUGHNESS_TYPE = { aiTextureType_SPECULAR, "Roughness", 4, 3 };
 		inline static const TextureType AO_TYPE = { aiTextureType_AMBIENT_OCCLUSION, "Ambient Occlusion", 5, 4 };

@@ -34,7 +34,7 @@ namespace Lucy {
 			const char* vertexExtension;
 			const char* fragmentExtension;
 		};
-		void Reflect(std::vector<uint32_t>& dataVertex, std::vector<uint32_t>& dataFragment);
+		void Info(std::vector<uint32_t>& dataVertex, std::vector<uint32_t>& dataFragment);
 	protected:
 		std::string LoadVertexData(std::vector<std::string>& lines);
 		std::string LoadFragmentData(std::vector<std::string>& lines);
@@ -71,11 +71,12 @@ namespace Lucy {
 	class ShaderLibrary {
 	public:
 		RefLucy<Shader> GetShader(const std::string& name);
-		void PushShader(RefLucy<Shader> instance);
+		void PushShader(const RefLucy<Shader>& instance);
 	private:
 		ShaderLibrary() = default;
 
 		std::vector<RefLucy<Shader>> m_Shaders;
-		friend class Renderer;
+		friend class RendererAPI;
+		friend class OpenGLRenderer;
 	};
 }

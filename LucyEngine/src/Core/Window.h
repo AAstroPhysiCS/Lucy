@@ -9,6 +9,8 @@
 #include "../Events/InputEvent.h"
 #include "../Events/WindowEvent.h"
 
+#include "Renderer/Context/RenderContext.h"
+
 namespace Lucy {
 
 	enum class WindowMode {
@@ -20,6 +22,7 @@ namespace Lucy {
 		bool VSync = false, Resizable = false, DoubleBuffered = false;
 		std::string Name = "Window Specification failed!";
 		Lucy::WindowMode WindowMode = WindowMode::WINDOWED;
+		RenderArchitecture Architecture;
 	};
 
 	class Window {

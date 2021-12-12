@@ -19,16 +19,15 @@ namespace Lucy {
 	class RenderPass {
 	public:
 		static RefLucy<RenderPass> Create(RenderPassSpecification& specs);
-		static void Begin(RefLucy<RenderPass>& renderPass);
-		static void End(RefLucy<RenderPass>& renderPass);
+		virtual void Begin() = 0;
+		virtual void End() = 0;
 
 		RenderPass(RenderPassSpecification& specs);
 
 		inline RefLucy<FrameBuffer> GetFrameBuffer() { return m_Specs.FrameBuffer; }
 		inline RefLucy<Pipeline> GetPipeline() { return m_Specs.Pipeline; }
 		inline ClearColor GetClearColor() { return m_Specs.ClearColor; }
-
-	private:
+	protected:
 		RenderPassSpecification m_Specs;
 	};
 }

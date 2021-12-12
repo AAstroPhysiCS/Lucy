@@ -2,6 +2,7 @@
 #include "SceneHierarchyPanel.h"
 
 #include "Renderer/Renderer.h"
+#include "Renderer/OpenGLRenderer.h"
 #include "Renderer/RenderPass.h"
 #include "Renderer/Buffer/OpenGL/OpenGLFrameBuffer.h"
 
@@ -48,15 +49,17 @@ namespace Lucy {
 		IsViewportActive = IsViewportHovered && ImGui::IsWindowFocused();
 		IsOverAnyGizmo = IsOverAnyGizmoM();
 
-		auto& blittedFrameBuffer = As(Renderer::GetGeometryPass()->GetFrameBuffer()->GetBlitted(), OpenGLFrameBuffer);
+		//TODO: Bad access? Change it maybe?
+		auto& blittedFrameBuffer = As(As(Renderer::GetCurrentRendererContext(), OpenGLRenderer)->GetGeometryPass()->GetFrameBuffer()->GetBlitted(), OpenGLFrameBuffer);
 		auto& texture = blittedFrameBuffer->GetTexture(0);
 
 		ImVec2& size = ImGui::GetWindowSize();
 		ImGui::Image((ImTextureID)texture->GetID(), size, { 0, 1 }, { 1, 0 });
 
 		auto [w, h] = Renderer::GetViewportSize();
-		if (w != size.x || h != size.y)
+		if (w != size.x || h != size.y) {
 			Renderer::OnFramebufferResize(size.x, size.y);
+		}
 
 		ImVec2& mousePos = ImGui::GetMousePos();
 		ImVec2& offset = ImGui::GetCursorPos();

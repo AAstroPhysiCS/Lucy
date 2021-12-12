@@ -55,6 +55,9 @@ project "LucyEngine"
         symbols "On"
 
         links {
+            "%{LibraryPath.VulkanLib}/vulkan-1.lib",
+            "%{LibraryPath.VulkanLib}/VkLayer_utils.lib",
+
             "%{LibraryPath.ShaderCDebug}",
             "%{LibraryPath.SPIRVDebug}",
             "%{LibraryPath.SPIRVGLSLDebug}",
@@ -70,6 +73,9 @@ project "LucyEngine"
         optimize "On"
 
         links {
+            "%{LibraryPath.VulkanLib}/vulkan-1.lib",
+            "%{LibraryPath.VulkanLib}/VkLayer_utils.lib",
+
             "%{LibraryPath.ShaderCRelease}",
             "%{LibraryPath.SPIRVRelease}",
             "%{LibraryPath.SPIRVGLSLRelease}"

@@ -28,40 +28,45 @@ namespace Lucy {
 		w_Specs.DoubleBuffered = true;
 		w_Specs.Resizable = true;
 		w_Specs.VSync = false;
+		w_Specs.Architecture = RenderArchitecture::Vulkan;
 
 		m_Window = Window::Create(w_Specs);
 		m_Window->Init();
 		m_Window->SetEventCallback(std::bind(&EditorApplication::OnEvent, this, std::placeholders::_1));
 
-		Renderer::Init(m_Window, RenderAPI::OpenGL);
-		EditorLayer::GetInstance().Init(m_Window);
-		ImGuiLayer::GetInstance().Init(m_Window);
+		Renderer::Init(m_Window, w_Specs.Architecture);
+		//EditorLayer::GetInstance().Init(m_Window);
+		//ImGuiLayer::GetInstance().Init(m_Window);
 
 		LUCY_ASSERT(NFD_Init() == NFD_OKAY);
 	}
 
 	EditorApplication::~EditorApplication() {
 		m_Running = false;
+		Renderer::Destroy();
 		//layers are being destroyed in the base class
 		m_Window->Destroy();
 		NFD_Quit();
 	}
-	
+
 	void EditorApplication::Run() {
 		while (m_Running && !glfwWindowShouldClose(m_Window->Raw())) {
 
-			for (Layer* layer : m_LayerStack.GetStack()) {
-				layer->Begin(s_Metrics);
-				layer->OnRender();
-				layer->End();
+			if (false) {
+				for (Layer* layer : m_LayerStack.GetStack()) {
+					layer->Begin(s_Metrics);
+					layer->OnRender();
+					layer->End();
+				}
 			}
-			
+
 			s_Metrics.Update();
 			m_Window->PollEvents();
 		}
 	}
 
 	void EditorApplication::OnEvent(Event* e) {
+		return;
 		for (Layer* layer : m_LayerStack.GetStack()) {
 			layer->OnEvent(*e);
 		}

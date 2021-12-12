@@ -46,7 +46,6 @@ namespace Lucy {
 		Renderer::Dispatch();
 		Renderer::EndScene();
 
-		RenderCommand::SwapBuffers(m_Window->Raw());
 		Renderer::ClearDrawCommands();
 	}
 
@@ -71,6 +70,5 @@ namespace Lucy {
 	}
 
 	void EditorLayer::Destroy() {
-		Renderer::Destroy();
 	}
 }

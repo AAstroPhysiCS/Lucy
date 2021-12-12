@@ -11,6 +11,7 @@ namespace Lucy {
 
 		void Bind();
 		void Unbind();
+		void Destroy();
 		void SetData(void* data, uint32_t size, uint32_t offset);
 	};
 }

@@ -7,11 +7,11 @@
 namespace Lucy {
 
 	RefLucy<UniformBuffer> UniformBuffer::Create(uint32_t size, uint32_t binding) {
-		switch (Renderer::GetCurrentRenderAPI()) {
-			case RenderAPI::OpenGL:
+		switch (Renderer::GetCurrentRenderArchitecture()) {
+			case RenderArchitecture::OpenGL:
 				return CreateRef<OpenGLUniformBuffer>(size, binding);
 				break;
-			case RenderAPI::Vulkan:
+			case RenderArchitecture::Vulkan:
 				LUCY_CRITICAL("Vulkan not supported");
 				LUCY_ASSERT(false);
 				break;

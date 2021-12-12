@@ -20,7 +20,7 @@ namespace Lucy {
 	}
 
 	RefLucy<Shader> Shader::Create(const std::string& name, const std::string& path) {
-		if (Renderer::GetCurrentRenderAPI() == RenderAPI::OpenGL) {
+		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::OpenGL) {
 			auto& instance = CreateRef<OpenGLShader>(path, name);
 			Renderer::GetShaderLibrary().PushShader(instance);
 			return instance;
@@ -36,7 +36,7 @@ namespace Lucy {
 		LUCY_ASSERT(false);
 	}
 
-	void ShaderLibrary::PushShader(RefLucy<Shader> instance) {
+	void ShaderLibrary::PushShader(const RefLucy<Shader>& instance) {
 		m_Shaders.push_back(instance);
 	}
 
@@ -45,9 +45,9 @@ namespace Lucy {
 		shaderc::CompileOptions options;
 		options.SetOptimizationLevel(shaderc_optimization_level::shaderc_optimization_level_performance);
 
-		if (Renderer::GetCurrentRenderAPI() == RenderAPI::OpenGL) {
+		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::OpenGL) {
 			options.SetTargetEnvironment(shaderc_target_env_opengl, shaderc_env_version_opengl_4_5);
-		} else if (Renderer::GetCurrentRenderAPI() == RenderAPI::Vulkan) {
+		} else if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::Vulkan) {
 			options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_2);
 		}
 
@@ -96,7 +96,7 @@ namespace Lucy {
 		}
 
 #ifdef LUCY_DEBUG
-		//Reflect(dataVert, dataFrag);
+		//Info(dataVert, dataFrag);
 #endif
 		LoadInternal(dataVert, dataFrag);
 	}
@@ -128,12 +128,12 @@ namespace Lucy {
 		}
 
 #ifdef LUCY_DEBUG
-		//Reflect(dataVert, dataFrag);
+		//Info(dataVert, dataFrag);
 #endif
 		LoadInternal(dataVert, dataFrag);
 	}
 
-	void Shader::Reflect(std::vector<uint32_t>& dataVertex, std::vector<uint32_t>& dataFragment) {
+	void Shader::Info(std::vector<uint32_t>& dataVertex, std::vector<uint32_t>& dataFragment) {
 		/*
 		//heap allocating it because of the compiler warning/stack size: "function uses X bytes of stack consider moving some data to heap"
 		spirv_cross::Compiler* compilerVertex = new spirv_cross::Compiler(dataVertex);
@@ -216,7 +216,7 @@ namespace Lucy {
 	}
 
 	const Shader::Extensions Shader::GetCachedFileExtension() {
-		if (Renderer::GetCurrentRenderAPI() == RenderAPI::OpenGL) {
+		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::OpenGL) {
 			return Extensions{ ".cached_opengl.vert", ".cached_opengl.frag" };
 		} else {
 			return Extensions{ ".cached_vulkan.frag", ".cached_vulkan.frag" };

@@ -1,23 +1,21 @@
 #include "lypch.h"
 
 #include "RenderContext.h"
-#include "../../Core/Base.h"
 #include "OpenGLContext.h"
+#include "VulkanContext.h"
 
 namespace Lucy {
 
-	RenderContext::RenderContext(RenderAPI type)
-		: m_RenderContextType(type) {
-	}
+	RenderContext::RenderContext(RenderArchitecture type)
+	{}
 
-	RenderAPI RenderContext::GetRenderAPI() {
-		return m_RenderContextType;
-	}
-
-	RefLucy<RenderContext> RenderContext::Create(RenderAPI type) {
+	RefLucy<RenderContext> RenderContext::Create(RenderArchitecture type) {
 		switch (type) {
-			case RenderAPI::OpenGL:
+			case RenderArchitecture::OpenGL:
 				return CreateRef<OpenGLContext>(type);
+				break;
+			case RenderArchitecture::Vulkan:
+				return CreateRef<VulkanContext>(type);
 				break;
 			default:
 				LUCY_CRITICAL("Other API's are not supported!");

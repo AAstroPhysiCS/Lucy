@@ -7,11 +7,11 @@
 namespace Lucy {
 
 	RefLucy<VertexBuffer> VertexBuffer::Create(uint32_t size) {
-		switch (Renderer::GetCurrentRenderAPI()) {
-			case RenderAPI::OpenGL:
+		switch (Renderer::GetCurrentRenderArchitecture()) {
+			case RenderArchitecture::OpenGL:
 				return CreateRef<OpenGLVertexBuffer>(size);
 				break;
-			case RenderAPI::Vulkan:
+			case RenderArchitecture::Vulkan:
 				LUCY_CRITICAL("Vulkan not supported");
 				LUCY_ASSERT(false);
 				break;
@@ -19,11 +19,11 @@ namespace Lucy {
 	}
 
 	RefLucy<VertexBuffer> VertexBuffer::Create() {
-		switch (Renderer::GetCurrentRenderAPI()) {
-			case RenderAPI::OpenGL:
+		switch (Renderer::GetCurrentRenderArchitecture()) {
+			case RenderArchitecture::OpenGL:
 				return CreateRef<OpenGLVertexBuffer>();
 				break;
-			case RenderAPI::Vulkan:
+			case RenderArchitecture::Vulkan:
 				LUCY_CRITICAL("Vulkan not supported");
 				LUCY_ASSERT(false);
 				break;

@@ -8,13 +8,13 @@
 
 namespace Lucy {
 
-	OpenGLContext::OpenGLContext(RenderAPI type)
+	OpenGLContext::OpenGLContext(RenderArchitecture type)
 		: RenderContext(type) {
-		Init();
+		Init(type);
 	}
 
-	void OpenGLContext::Init() {
-		if (m_RenderContextType == RenderAPI::OpenGL && !gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+	void OpenGLContext::Init(RenderArchitecture type) {
+		if (type == RenderArchitecture::OpenGL && !gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
 			Destroy();
 			LUCY_CRITICAL("OpenGL init failed!");
 			LUCY_ASSERT(false);
@@ -27,7 +27,7 @@ namespace Lucy {
 		glEnable(GL_DEBUG_OUTPUT);
 		glDebugMessageCallback([](GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam) {
 			if (type == GL_DEBUG_TYPE_ERROR) LUCY_CRITICAL(fmt::format("OpenGL Error: message = {0}", message));
-			}, 0);
+		}, 0);
 	}
 
 	void OpenGLContext::Destroy() {

@@ -17,7 +17,7 @@ namespace Lucy {
 		Application(const ApplicationArgs& args);
 		virtual ~Application() {
 			for (Layer* layers : m_LayerStack.GetStack()) {
-				layers->Destroy();
+				//layers->Destroy();
 			}
 		}
 

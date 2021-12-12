@@ -108,17 +108,17 @@ namespace Lucy {
 		m_VertexBuffer->Destroy();
 		m_IndexBuffer->Destroy();
 
-		if (Renderer::GetCurrentRenderAPI() == RenderAPI::OpenGL) {
+		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::OpenGL) {
 			glDeleteVertexArrays(1, &m_Vao);
 		}
 	}
 
 	RefLucy<Mesh> Mesh::Create(const std::string& path) {
-		switch (Renderer::GetCurrentRenderAPI()) {
-			case RenderAPI::OpenGL:
+		switch (Renderer::GetCurrentRenderArchitecture()) {
+			case RenderArchitecture::OpenGL:
 				return CreateRef<Mesh>(path);
 				break;
-			case RenderAPI::Vulkan:
+			case RenderArchitecture::Vulkan:
 				LUCY_CRITICAL("Vulkan not supported");
 				LUCY_ASSERT(false);
 				break;
@@ -129,21 +129,21 @@ namespace Lucy {
 		if (!m_Loaded)
 			LoadBuffers();
 
-		if (Renderer::GetCurrentRenderAPI() == RenderAPI::OpenGL) {
+		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::OpenGL) {
 			glBindVertexArray(m_Vao);
 			m_IndexBuffer->Bind();
 		}
 	}
 
 	void Mesh::Unbind() {
-		if (Renderer::GetCurrentRenderAPI() == RenderAPI::OpenGL) {
+		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::OpenGL) {
 			m_IndexBuffer->Unbind();
 			glBindVertexArray(0);
 		}
 	}
 
 	void Mesh::LoadBuffers() {
-		if (Renderer::GetCurrentRenderAPI() == RenderAPI::OpenGL) {
+		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::OpenGL) {
 			glCreateVertexArrays(1, &m_Vao);
 			glBindVertexArray(m_Vao);
 

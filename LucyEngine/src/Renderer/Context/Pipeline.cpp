@@ -1,11 +1,13 @@
 #include "lypch.h"
 #include "OpenGLPipeline.h"
 
+#include "Renderer/Renderer.h"
+
 namespace Lucy {
 
 	RefLucy<Pipeline> Pipeline::Create(PipelineSpecification& specs) {
-		switch (Renderer::GetCurrentRenderAPI()) {
-			case RenderAPI::OpenGL:
+		switch (Renderer::GetCurrentRenderArchitecture()) {
+			case RenderArchitecture::OpenGL:
 				return CreateRef<OpenGLPipeline>(specs);
 				break;
 			default:

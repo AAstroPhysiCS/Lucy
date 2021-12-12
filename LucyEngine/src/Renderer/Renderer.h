@@ -1,48 +1,25 @@
 #pragma once
 
 #include "../Core/Base.h"
-#include "../Scene/Scene.h"
-#include "../Scene/Camera.h"
 #include "../Core/Window.h"
 
-#include "Context/RendererAPI.h"
-#include "Context/RenderContext.h"
+#include "Scene/Scene.h"
+#include "Shader/Shader.h"
+#include "Mesh.h"
 
-#include "DrawCommand.h"
+#include "Context/RenderContext.h"
+#include "Context/RendererAPI.h"
 
 namespace Lucy {
-
-	class RenderPass;
-	class FrameBuffer;
-	class UniformBuffer;
-	class ShaderLibrary;
 
 	class Renderer {
 		using Func = std::function<void()>;
 
 	public:
-		static void Init(RefLucy<Window> window, RenderAPI rendererContext);
+		static void Init(RefLucy<Window> window, RenderArchitecture renderArchitecture);
 		static void Destroy();
 
-		inline static RenderAPI GetCurrentRenderAPI() { return s_RenderContext->GetRenderAPI(); }
-		inline static RefLucy<RenderPass>& GetGeometryPass() { return s_GeometryPass; }
-		inline static RefLucy<RenderPass>& GetIDPass() { return s_IDPass; }
-		inline static ShaderLibrary& GetShaderLibrary() { return s_ShaderLibrary; }
-
-		static void SetViewportSize(int32_t width, int32_t height);
 		static void SetViewportMousePosition(float x, float y);
-
-		inline static auto GetViewportSize() {
-			struct Size { int32_t Width, Height; };
-			return Size{ s_ViewportWidth, s_ViewportHeight };
-		}
-
-		inline static auto GetWindowSize() {
-			struct Size { int32_t Width, Height; };
-			return Size{ s_Window->GetWidth(), s_Window->GetHeight() };
-		}
-
-		inline static Scene* GetActiveScene() { return s_ActiveScene; }
 
 		static void BeginScene(Scene& scene);
 		static void EndScene();
@@ -52,37 +29,31 @@ namespace Lucy {
 		static void OnFramebufferResize(float sizeX, float sizeY);
 		static Entity OnMousePicking();
 
-		static void GeometryPass();
-		static void IDPass();
-
 		static void Dispatch();
 		static void ClearDrawCommands();
+
+		inline static auto GetWindowSize() {
+			struct Size { int32_t Width, Height; };
+			return Size{ s_Window->GetWidth(), s_Window->GetHeight() };
+		}
+
+		inline static auto GetViewportSize() { return s_RendererAPI->GetViewportSize(); }
+		inline static RenderArchitecture GetCurrentRenderArchitecture() { return s_SelectedArchitecture; }
+		inline static ShaderLibrary& GetShaderLibrary() { return s_RendererAPI->GetShaderLibrary(); }
+		inline static Scene* GetActiveScene() { return s_RendererAPI->m_ActiveScene; }
+
+		inline static RefLucy<RendererAPI> GetCurrentRendererContext() { return s_RendererAPI; }
 	private:
-		static RefLucy<RendererAPI> s_RendererAPI;
-		static RefLucy<RenderContext> s_RenderContext;
-		static RefLucy<RenderPass> s_GeometryPass;
-		static RefLucy<RenderPass> s_IDPass;
+		Renderer() = delete;
+
 		static RefLucy<Window> s_Window;
+		static RefLucy<RendererAPI> s_RendererAPI;
 
-		static Scene* s_ActiveScene;
-
-		static std::vector<Func> s_RenderQueue;
-		static std::vector<MeshDrawCommand> s_MeshDrawCommand;
-
-		static ShaderLibrary s_ShaderLibrary;
-
-		static int32_t s_ViewportWidth, s_ViewportHeight;
-		static float s_ViewportMouseX, s_ViewportMouseY;
-
-		static RefLucy<UniformBuffer> cameraUniformBuffer;
-		static RefLucy<UniformBuffer> textureSlotsUniformBuffer;
+		static RenderArchitecture s_SelectedArchitecture;
 
 		friend class RenderCommand;
 		friend class Input;
 		friend class Material;
-
-		Renderer() = delete;
-		~Renderer() = delete;
+		friend class OpenGLRenderer;
 	};
-
 }

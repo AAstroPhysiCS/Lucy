@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../Renderer.h"
 #include "../Shader/Shader.h"
 
 namespace Lucy {

@@ -4,23 +4,21 @@
 
 namespace Lucy {
 
-	enum class RenderAPI {
+	enum class RenderArchitecture {
 		OpenGL,
 		Vulkan
 	};
 
 	class RenderContext {
 	public:
-		virtual void Init() = 0;
 		virtual void Destroy() = 0;
 		virtual void PrintInfo() = 0;
-		RenderAPI GetRenderAPI();
 
-		static RefLucy<RenderContext> Create(RenderAPI type);
-
+		static RefLucy<RenderContext> Create(RenderArchitecture type);
 	protected:
-		RenderContext(RenderAPI type);
-		RenderAPI m_RenderContextType;
+		RenderContext(RenderArchitecture type);
+
+		virtual void Init(RenderArchitecture type) = 0;
 	};
 }
 

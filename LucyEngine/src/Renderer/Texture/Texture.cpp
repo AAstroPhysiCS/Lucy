@@ -8,8 +8,8 @@
 namespace Lucy {
 
 	RefLucy<Texture2D> Texture2D::Create(TextureSpecification& specs) {
-		switch (Renderer::GetCurrentRenderAPI()) {
-			case RenderAPI::OpenGL:
+		switch (Renderer::GetCurrentRenderArchitecture()) {
+			case RenderArchitecture::OpenGL:
 				return CreateRef<OpenGLTexture2D>(specs);
 				break;
 			default:

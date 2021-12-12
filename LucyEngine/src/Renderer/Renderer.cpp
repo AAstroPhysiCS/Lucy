@@ -3,285 +3,66 @@
 #include "Renderer.h"
 #include "Context/RendererAPI.h"
 
-#include "Buffer/FrameBuffer.h"
-#include "Buffer/RenderBuffer.h"
 #include "Buffer/UniformBuffer.h"
-#include "Buffer/OpenGL/OpenGLFrameBuffer.h"
 
 #include "Shader/Shader.h"
-#include "Texture/Texture.h"
-
-#include "RenderPass.h"
-#include "RenderCommand.h"
-
-#include "Core/Input.h"
 #include "Scene/Scene.h"
 #include "Scene/Entity.h"
-#include "../Utils.h"
-
-#include <iostream>
-#include "glad/glad.h"
 
 namespace Lucy {
 
-	RefLucy<RendererAPI> Renderer::s_RendererAPI;
-	RefLucy<RenderContext> Renderer::s_RenderContext;
-	RefLucy<RenderPass> Renderer::s_GeometryPass;
-	RefLucy<RenderPass> Renderer::s_IDPass;
 	RefLucy<Window> Renderer::s_Window;
+	RefLucy<RendererAPI> Renderer::s_RendererAPI;
 
-	std::vector<Func> Renderer::s_RenderQueue;
-	std::vector<MeshDrawCommand> Renderer::s_MeshDrawCommand;
+	RenderArchitecture Renderer::s_SelectedArchitecture;
 
-	int32_t Renderer::s_ViewportWidth = 0;
-	int32_t Renderer::s_ViewportHeight = 0;
-
-	float Renderer::s_ViewportMouseX = 0;
-	float Renderer::s_ViewportMouseY = 0;
-
-	ShaderLibrary Renderer::s_ShaderLibrary;
-	Scene* Renderer::s_ActiveScene = nullptr;
-
-	RefLucy<UniformBuffer> Renderer::cameraUniformBuffer;
-	RefLucy<UniformBuffer> Renderer::textureSlotsUniformBuffer;
-
-	void Renderer::Init(RefLucy<Window> window, RenderAPI renderContext) {
-		s_RenderContext = RenderContext::Create(renderContext);
-		s_RenderContext->PrintInfo();
-
-		s_RendererAPI = RendererAPI::Create();
+	void Renderer::Init(RefLucy<Window> window, RenderArchitecture renderArchitecture) {
 		s_Window = window;
+		s_SelectedArchitecture = renderArchitecture;
 
-		auto [width, height] = Utils::ReadSizeFromIni("Viewport");
-
-		//------------ Shaders ------------
-		Shader::Create("LucyPBR", "assets/shaders/LucyPBR.glsl");
-		Shader::Create("LucyID", "assets/shaders/LucyID.glsl");
-
-		uint32_t TargetSamples = 4;
-
-		//------------ Main Framebuffer ------------
-		{
-			RenderBufferSpecification renderBufferSpecs;
-			renderBufferSpecs.Attachment = GL_DEPTH_STENCIL_ATTACHMENT;
-			renderBufferSpecs.InternalFormat = GL_DEPTH24_STENCIL8;
-			renderBufferSpecs.Width = width;
-			renderBufferSpecs.Height = height;
-			renderBufferSpecs.Samples = TargetSamples;
-
-			TextureSpecification textureAntialiased;
-			textureAntialiased.Width = width;
-			textureAntialiased.Height = height;
-			textureAntialiased.DisableReadWriteBuffer = false;
-			textureAntialiased.Samples = TargetSamples;
-			textureAntialiased.AttachmentIndex = 0;
-			textureAntialiased.Format = { GL_RGBA8, GL_RGBA };
-			textureAntialiased.PixelType = PixelType::UnsignedByte;
-
-			TextureSpecification finalTextureSpec;
-			finalTextureSpec.Width = width;
-			finalTextureSpec.Height = height;
-			finalTextureSpec.GenerateMipmap = true;
-			finalTextureSpec.DisableReadWriteBuffer = false;
-			finalTextureSpec.AttachmentIndex = 0;
-			finalTextureSpec.Parameter.Min = GL_LINEAR;
-			finalTextureSpec.Parameter.Mag = GL_LINEAR;
-			finalTextureSpec.Format = { GL_RGBA8, GL_RGBA };
-			finalTextureSpec.PixelType = PixelType::UnsignedByte;
-
-			FrameBufferSpecification geometryFrameBufferSpecs;
-			geometryFrameBufferSpecs.MultiSampled = true;
-			geometryFrameBufferSpecs.ViewportWidth = width;
-			geometryFrameBufferSpecs.ViewportHeight = height;
-			geometryFrameBufferSpecs.RenderBuffer = RenderBuffer::Create(renderBufferSpecs);
-			geometryFrameBufferSpecs.TextureSpecs.push_back(textureAntialiased);
-			geometryFrameBufferSpecs.BlittedTextureSpecs = finalTextureSpec;
-
-			PipelineSpecification geometryPipelineSpecs;
-			std::vector<ShaderLayoutElement> vertexLayout = {
-					{ "a_Pos", ShaderDataSize::Float3 },
-					{ "a_ID", ShaderDataSize::Float3 },
-					{ "a_TextureCoords", ShaderDataSize::Float2 },
-					{ "a_Normals", ShaderDataSize::Float3 },
-					{ "a_Tangents", ShaderDataSize::Float3 },
-					{ "a_BiTangents", ShaderDataSize::Float3 }
-			};
-
-			geometryPipelineSpecs.VertexShaderLayout = VertexShaderLayout(vertexLayout);
-			geometryPipelineSpecs.Topology = Topology::TRIANGLES;
-			geometryPipelineSpecs.Rasterization = { true, GL_BACK, 1.0f, GL_FILL };
-
-			RenderPassSpecification geometryPassSpecs;
-			geometryPassSpecs.FrameBuffer = FrameBuffer::Create(geometryFrameBufferSpecs);
-			geometryPassSpecs.Pipeline = Pipeline::Create(geometryPipelineSpecs);
-			geometryPassSpecs.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
-			s_GeometryPass = RenderPass::Create(geometryPassSpecs);
-
-			//------------ Mouse Picking ------------
-			TextureSpecification idTextureRGBSpecs;
-			idTextureRGBSpecs.Width = width;
-			idTextureRGBSpecs.Height = height;
-			idTextureRGBSpecs.AttachmentIndex = 0;
-			idTextureRGBSpecs.Parameter.Min = GL_NEAREST;
-			idTextureRGBSpecs.Parameter.Mag = GL_NEAREST;
-			idTextureRGBSpecs.DisableReadWriteBuffer = false;
-			idTextureRGBSpecs.Format = { GL_RGB32F , GL_RGB };
-			idTextureRGBSpecs.PixelType = PixelType::Float;
-
-			TextureSpecification idTextureDepthSpecs;
-			idTextureDepthSpecs.Width = width;
-			idTextureDepthSpecs.Height = height;
-			idTextureDepthSpecs.AttachmentIndex = 1;
-			idTextureDepthSpecs.Parameter.Min = GL_NEAREST;
-			idTextureDepthSpecs.Parameter.Mag = GL_NEAREST;
-			idTextureDepthSpecs.DisableReadWriteBuffer = false;
-			idTextureDepthSpecs.Format = { GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT };
-			idTextureDepthSpecs.PixelType = PixelType::Float;
-
-			FrameBufferSpecification idFrameBufferSpecs;
-			idFrameBufferSpecs.ViewportWidth = width;
-			idFrameBufferSpecs.ViewportHeight = height;
-			idFrameBufferSpecs.TextureSpecs.push_back(idTextureRGBSpecs);
-			idFrameBufferSpecs.TextureSpecs.push_back(idTextureDepthSpecs);
-			idFrameBufferSpecs.IsStorage = true;
-
-			RenderPassSpecification idRenderPassSpecs;
-			idRenderPassSpecs.FrameBuffer = FrameBuffer::Create(idFrameBufferSpecs);
-			idRenderPassSpecs.Pipeline = Pipeline::Create(geometryPipelineSpecs);
-			idRenderPassSpecs.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
-			s_IDPass = RenderPass::Create(idRenderPassSpecs);
-		}
-
-		cameraUniformBuffer = UniformBuffer::Create(sizeof(glm::mat4) * 3, 0);
-		textureSlotsUniformBuffer = UniformBuffer::Create(20, 1);
-
-		Renderer::Dispatch(); //just for init functions
+		s_RendererAPI = RendererAPI::Create(renderArchitecture);
+		s_RendererAPI->Init();
 	}
 
 	void Renderer::Submit(const Func&& func) {
-		s_RenderQueue.push_back(func);
+		s_RendererAPI->Submit(std::move(func));
 	}
 
 	void Renderer::SubmitMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform) {
-		Submit([mesh, entityTransform]() {
-			s_MeshDrawCommand.push_back(MeshDrawCommand(mesh, entityTransform));
-		});
+		s_RendererAPI->SubmitMesh(mesh, entityTransform);
 	}
 
 	void Renderer::OnFramebufferResize(float sizeX, float sizeY) {
-		s_GeometryPass->GetFrameBuffer()->Resize(sizeX, sizeY);
-		s_IDPass->GetFrameBuffer()->Resize(sizeX, sizeY);
-		Renderer::SetViewportSize(sizeX, sizeY);
+		s_RendererAPI->OnFramebufferResize(sizeX, sizeY);
 	}
 
 	Entity Renderer::OnMousePicking() {
-		s_IDPass->GetFrameBuffer()->Bind();
-		glm::vec3 pixelValue;
-		RenderCommand::ReadBuffer(GL_COLOR_ATTACHMENT0);
-		RenderCommand::ReadPixels(s_ViewportMouseX, s_ViewportHeight - s_ViewportMouseY, 1, 1, (float*)&pixelValue);
-
-		//checking if the data that is being read make sense
-		if ((pixelValue.x > 255.0f || pixelValue.x < 0.0f) ||
-			(pixelValue.y > 255.0f || pixelValue.y < 0.0f) ||
-			(pixelValue.z > 255.0f || pixelValue.z < 0.0f))
-			return {};
-
-		//checking if we clicked on the void
-		if (pixelValue.x == 0 && pixelValue.y == 0 && pixelValue.z == 0)
-			return {};
-
-		Entity selectedEntity = s_ActiveScene->GetEntityByPixelValue(pixelValue);
-		s_IDPass->GetFrameBuffer()->Unbind();
-
-		return selectedEntity;
+		return s_RendererAPI->OnMousePicking();
 	}
 
-	void Renderer::GeometryPass() {
-		RenderCommand::Begin(s_GeometryPass);
-		for (MeshDrawCommand meshComponent : s_MeshDrawCommand) {
-			RefLucy<Mesh> mesh = meshComponent.Mesh;
-			std::vector<Material>& materials = mesh->GetMaterials();
-			std::vector<Submesh>& submeshes = mesh->GetSubmeshes();
-
-			mesh->Bind();
-			for (uint32_t i = 0; i < submeshes.size(); i++) {
-				Submesh& submesh = submeshes[i];
-				Material& material = materials[submesh.MaterialIndex];
-				RefLucy<Shader>& shader = material.GetShader();
-
-				material.Bind();
-				cameraUniformBuffer->SetData((void*)&(meshComponent.EntityTransform * submesh.Transform), sizeof(glm::mat4), sizeof(glm::mat4) * 2);
-				RenderCommand::DrawElementsBaseVertex(submesh.IndexCount, submesh.BaseIndexCount, submesh.BaseVertexCount);
-				material.Unbind();
-			}
-			mesh->Unbind();
-		}
-		RenderCommand::End(s_GeometryPass);
+	void Renderer::Dispatch() {
+		s_RendererAPI->Dispatch();
 	}
 
-	void Renderer::IDPass() {
-		RefLucy<Shader> idShader = s_ShaderLibrary.GetShader("LucyID");
-		RenderCommand::Begin(s_IDPass);
-
-		idShader->Bind();
-		for (MeshDrawCommand meshComponent : s_MeshDrawCommand) {
-			RefLucy<Mesh> mesh = meshComponent.Mesh;
-			std::vector<Submesh>& submeshes = mesh->GetSubmeshes();
-
-			mesh->Bind();
-			for (uint32_t i = 0; i < submeshes.size(); i++) {
-				Submesh& submesh = submeshes[i];
-				cameraUniformBuffer->SetData((void*)&(meshComponent.EntityTransform * submesh.Transform), sizeof(glm::mat4), sizeof(glm::mat4) * 2);
-				RenderCommand::DrawElementsBaseVertex(submesh.IndexCount, submesh.BaseIndexCount, submesh.BaseVertexCount);
-			}
-			mesh->Unbind();
-		}
-		idShader->Unbind();
-		RenderCommand::End(s_IDPass);
+	void Renderer::ClearDrawCommands() {
+		s_RendererAPI->ClearCommands();
 	}
 
 	void Renderer::BeginScene(Scene& scene) {
 		s_Window->Update();
-
-		EditorCamera& camera = scene.GetEditorCamera();
-		camera.SetViewportSize(s_ViewportWidth, s_ViewportHeight);
-		camera.Update();
-		s_ActiveScene = &scene;
-
-		cameraUniformBuffer->SetData((void*)&camera.GetViewMatrix(), sizeof(glm::mat4), 0);
-		cameraUniformBuffer->SetData((void*)&camera.GetProjectionMatrix(), sizeof(glm::mat4), sizeof(glm::mat4));
+		s_RendererAPI->BeginScene(scene);
 	}
 
 	void Renderer::EndScene() {
-		GeometryPass();
-		IDPass();
-	}
-
-	void Renderer::Dispatch() {
-		for (Func func : s_RenderQueue) {
-			func();
-		}
-		s_RenderQueue.clear();
-	}
-
-	void Renderer::SetViewportSize(int32_t width, int32_t height) {
-		s_ViewportWidth = width;
-		s_ViewportHeight = height;
-	}
-
-	void Renderer::SetViewportMousePosition(float x, float y) {
-		s_ViewportMouseX = x;
-		s_ViewportMouseY = y;
-	}
-
-	void Renderer::ClearDrawCommands() {
-		s_MeshDrawCommand.clear();
+		s_RendererAPI->EndScene();
+		glfwSwapBuffers(s_Window->Raw());
 	}
 
 	void Renderer::Destroy() {
-		for (RefLucy<Shader>& shader : s_ShaderLibrary.m_Shaders) {
-			shader->Destroy();
-		}
-		glfwTerminate();
+		s_RendererAPI->Destroy();
+	}
+
+	void Renderer::SetViewportMousePosition(float x, float y) {
+		s_RendererAPI->SetViewportMousePosition(x, y);
 	}
 }

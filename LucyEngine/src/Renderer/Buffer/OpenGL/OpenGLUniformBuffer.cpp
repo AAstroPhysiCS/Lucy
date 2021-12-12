@@ -20,6 +20,10 @@ namespace Lucy {
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 	}
 
+	void OpenGLUniformBuffer::Destroy() {
+		glDeleteBuffers(1, &m_Id);
+	}
+
 	void OpenGLUniformBuffer::SetData(void* data, uint32_t size, uint32_t offset) {
 		glNamedBufferSubData(m_Id, offset, size, data);
 	}

@@ -23,6 +23,8 @@ namespace Lucy {
 			LUCY_ASSERT(false);
 		}
 
+		if (m_Specs.Architecture == RenderArchitecture::Vulkan)
+			glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		glfwWindowHint(GLFW_RESIZABLE, m_Specs.Resizable);
 		glfwWindowHint(GLFW_DOUBLEBUFFER, m_Specs.DoubleBuffered);
 		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);

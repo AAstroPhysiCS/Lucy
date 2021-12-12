@@ -7,7 +7,7 @@ namespace Lucy {
 
 		std::string m_UUIDAsString = "0";
 
-		friend class UUIDComponent;
+		friend struct UUIDComponent;
 	public:
 		bool operator==(UUID& other) {
 			return m_UUIDAsString == other.m_UUIDAsString;

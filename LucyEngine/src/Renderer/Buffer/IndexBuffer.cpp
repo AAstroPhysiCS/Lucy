@@ -7,11 +7,11 @@
 namespace Lucy {
 
 	RefLucy<IndexBuffer> IndexBuffer::Create(uint32_t size) {
-		switch (Renderer::GetCurrentRenderAPI()) {
-			case RenderAPI::OpenGL:
+		switch (Renderer::GetCurrentRenderArchitecture()) {
+			case RenderArchitecture::OpenGL:
 				return CreateRef<OpenGLIndexBuffer>(size);
 				break;
-			case RenderAPI::Vulkan:
+			case RenderArchitecture::Vulkan:
 				LUCY_CRITICAL("Vulkan not supported");
 				LUCY_ASSERT(false);
 				break;
@@ -19,11 +19,11 @@ namespace Lucy {
 	}
 
 	RefLucy<IndexBuffer> IndexBuffer::Create() {
-		switch (Renderer::GetCurrentRenderAPI()) {
-			case RenderAPI::OpenGL:
+		switch (Renderer::GetCurrentRenderArchitecture()) {
+			case RenderArchitecture::OpenGL:
 				return CreateRef<OpenGLIndexBuffer>();
 				break;
-			case RenderAPI::Vulkan:
+			case RenderArchitecture::Vulkan:
 				LUCY_CRITICAL("Vulkan not supported");
 				LUCY_ASSERT(false);
 				break;

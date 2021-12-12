@@ -12,6 +12,7 @@ namespace Lucy {
 		}
 
 		friend class Renderer;
+		friend class OpenGLRenderer;
 	private:
 		RefLucy<Mesh> Mesh;
 		glm::mat4 EntityTransform;
