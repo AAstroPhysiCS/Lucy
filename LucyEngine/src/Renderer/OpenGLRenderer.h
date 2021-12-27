@@ -3,7 +3,7 @@
 #include "Context/RendererAPI.h"
 #include "../Core/Window.h"
 
-#include "OpenGLRenderPass.h"
+#include "Context/OpenGLPipeline.h"
 
 namespace Lucy {
 
@@ -25,8 +25,8 @@ namespace Lucy {
 		void Submit(const Func&& func);
 		void SubmitMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform);
 
-		inline RefLucy<OpenGLRenderPass>& GetGeometryPass() { return m_GeometryPass; }
-		inline RefLucy<OpenGLRenderPass>& GetIDPass() { return m_IDPass; }
+		inline RefLucy<OpenGLPipeline>& GetGeometryPipeline() { return m_GeometryPipeline; }
+		inline RefLucy<OpenGLPipeline>& GetIDPipeline() { return m_IDPipeline; }
 		
 		void OnFramebufferResize(float sizeX, float sizeY);
 		Entity OnMousePicking();
@@ -34,8 +34,8 @@ namespace Lucy {
 		void GeometryPass();
 		void IDPass();
 
-		RefLucy<OpenGLRenderPass> m_GeometryPass;
-		RefLucy<OpenGLRenderPass> m_IDPass;
+		RefLucy<OpenGLPipeline> m_GeometryPipeline;
+		RefLucy<OpenGLPipeline> m_IDPipeline;
 
 		friend class Renderer;
 	};

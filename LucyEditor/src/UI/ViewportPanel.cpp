@@ -50,7 +50,7 @@ namespace Lucy {
 		IsOverAnyGizmo = IsOverAnyGizmoM();
 
 		//TODO: Bad access? Change it maybe?
-		auto& blittedFrameBuffer = As(As(Renderer::GetCurrentRendererContext(), OpenGLRenderer)->GetGeometryPass()->GetFrameBuffer()->GetBlitted(), OpenGLFrameBuffer);
+		auto& blittedFrameBuffer = As(As(Renderer::GetCurrentRendererContext(), OpenGLRenderer)->GetGeometryPipeline()->GetFrameBuffer()->GetBlitted(), OpenGLFrameBuffer);
 		auto& texture = blittedFrameBuffer->GetTexture(0);
 
 		ImVec2& size = ImGui::GetWindowSize();

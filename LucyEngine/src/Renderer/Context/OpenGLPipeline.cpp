@@ -32,7 +32,7 @@ namespace Lucy {
 		return stride;
 	}
 
-	void OpenGLPipeline::UploadVertexLayout(RefLucy<OpenGLVertexBuffer>& vertexBuffer) {
+	void OpenGLPipeline::UploadVertexLayout(RefLucy<VertexBuffer>& vertexBuffer) {
 		vertexBuffer->Bind();
 
 		uint32_t stride = CalculateStride();

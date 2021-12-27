@@ -54,6 +54,11 @@ namespace Lucy {
 		friend class RenderCommand;
 		friend class Input;
 		friend class Material;
+		
 		friend class OpenGLRenderer;
+
+		friend class VulkanDevice;
+		friend class VulkanContext;
+		friend class VulkanSwapChain;
 	};
 }

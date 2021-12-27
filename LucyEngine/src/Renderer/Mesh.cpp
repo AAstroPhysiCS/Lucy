@@ -147,8 +147,8 @@ namespace Lucy {
 			glCreateVertexArrays(1, &m_Vao);
 			glBindVertexArray(m_Vao);
 
-			RefLucy<OpenGLPipeline>& pipeline = As(RenderCommand::s_ActiveRenderPass->GetPipeline(), OpenGLPipeline);
-			pipeline->UploadVertexLayout(As(m_VertexBuffer, OpenGLVertexBuffer));
+			RefLucy<OpenGLPipeline>& pipeline = As(RenderCommand::s_ActivePipeline, OpenGLPipeline);
+			pipeline->UploadVertexLayout(m_VertexBuffer);
 
 			m_VertexBuffer->Load();
 			m_IndexBuffer->Load();

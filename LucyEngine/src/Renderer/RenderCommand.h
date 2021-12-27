@@ -1,9 +1,7 @@
 #pragma once
 
 #include "../Core/Base.h"
-#include "GLFW/glfw3.h"
-
-#include "Buffer/FrameBuffer.h"
+#include "Context/Pipeline.h"
 
 namespace Lucy {
 
@@ -13,14 +11,14 @@ namespace Lucy {
 	public:
 		static RefLucy<RenderCommand> Create();
 
-		virtual void Begin(RefLucy<RenderPass> renderPass) = 0;
-		virtual void End(RefLucy<RenderPass> renderPass) = 0;
+		virtual void Begin(RefLucy<Pipeline> pipeline) = 0;
+		virtual void End(RefLucy<Pipeline> pipeline) = 0;
 
 		friend class Mesh;
 	protected:
 		RenderCommand() = default;
 
-		static RenderPass* s_ActiveRenderPass;
+		static RefLucy<Pipeline> s_ActivePipeline;
 	};
 
 }

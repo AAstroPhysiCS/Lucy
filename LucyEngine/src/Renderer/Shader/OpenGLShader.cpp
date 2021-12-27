@@ -10,6 +10,58 @@ namespace Lucy {
 		: Shader(path, name)
 	{}
 
+	void OpenGLShader::Bind() {
+		glUseProgram(m_Program);
+	}
+
+	void OpenGLShader::Unbind() {
+		glUseProgram(0);
+	}
+
+	void OpenGLShader::Destroy() {
+		glDeleteProgram(m_Program);
+	}
+
+	void OpenGLShader::LoadInternal(std::vector<uint32_t>& dataVertex, std::vector<uint32_t>& dataFragment) {
+		m_Program = glCreateProgram();
+
+		uint32_t vertexId = glCreateShader(GL_VERTEX_SHADER);
+		uint32_t fragmentId = glCreateShader(GL_FRAGMENT_SHADER);
+
+		glShaderBinary(1, &vertexId, GL_SHADER_BINARY_FORMAT_SPIR_V, dataVertex.data(), dataVertex.size() * sizeof(uint32_t));
+		glSpecializeShader(vertexId, "main", 0, nullptr, nullptr);
+		glAttachShader(m_Program, vertexId);
+
+		glShaderBinary(1, &fragmentId, GL_SHADER_BINARY_FORMAT_SPIR_V, dataFragment.data(), dataFragment.size() * sizeof(uint32_t));
+		glSpecializeShader(fragmentId, "main", 0, nullptr, nullptr);
+		glAttachShader(m_Program, fragmentId);
+
+		glLinkProgram(m_Program);
+
+		int32_t isLinked;
+		glGetProgramiv(m_Program, GL_LINK_STATUS, &isLinked);
+		if (isLinked == GL_FALSE) {
+			int32_t maxLength;
+			glGetProgramiv(m_Program, GL_INFO_LOG_LENGTH, &maxLength);
+
+			std::vector<char> infoLog(maxLength);
+			glGetProgramInfoLog(m_Program, maxLength, &maxLength, infoLog.data());
+			LUCY_CRITICAL(fmt::format("Shader linking failed ({0}):{1}", m_Path, infoLog.data()));
+
+			glDeleteShader(vertexId);
+			glDeleteShader(fragmentId);
+			glDeleteProgram(m_Program);
+
+			LUCY_ASSERT(false);
+		}
+
+		glDetachShader(m_Program, vertexId);
+		glDetachShader(m_Program, fragmentId);
+
+		glDeleteShader(vertexId);
+		glDeleteShader(fragmentId);
+	}
+
 	void OpenGLShader::SetMat4(const char* name, glm::mat4& mat) {
 		if (!m_UniformLocations.count(name)) {
 			int32_t location = glGetUniformLocation(m_Program, name);
@@ -106,58 +158,4 @@ namespace Lucy {
 			glUniform1iv(it->second, count, value);
 		}
 	}
-
-	void OpenGLShader::Bind() {
-		glUseProgram(m_Program);
-	}
-
-	void OpenGLShader::Unbind() {
-		glUseProgram(0);
-	}
-
-	void OpenGLShader::Destroy() {
-		glDeleteProgram(m_Program);
-	}
-
-	void OpenGLShader::LoadInternal(std::vector<uint32_t>& dataVertex, std::vector<uint32_t>& dataFragment) {
-		m_Program = glCreateProgram();
-
-		uint32_t vertexId = glCreateShader(GL_VERTEX_SHADER);
-		uint32_t fragmentId = glCreateShader(GL_FRAGMENT_SHADER);
-
-		glShaderBinary(1, &vertexId, GL_SHADER_BINARY_FORMAT_SPIR_V, dataVertex.data(), dataVertex.size() * sizeof(uint32_t));
-		glSpecializeShader(vertexId, "main", 0, nullptr, nullptr);
-		glAttachShader(m_Program, vertexId);
-
-		glShaderBinary(1, &fragmentId, GL_SHADER_BINARY_FORMAT_SPIR_V, dataFragment.data(), dataFragment.size() * sizeof(uint32_t));
-		glSpecializeShader(fragmentId, "main", 0, nullptr, nullptr);
-		glAttachShader(m_Program, fragmentId);
-		
-		glLinkProgram(m_Program);
-
-		int32_t isLinked;
-		glGetProgramiv(m_Program, GL_LINK_STATUS, &isLinked);
-		if (isLinked == GL_FALSE) {
-			int32_t maxLength;
-			glGetProgramiv(m_Program, GL_INFO_LOG_LENGTH, &maxLength);
-
-			std::vector<char> infoLog(maxLength);
-			glGetProgramInfoLog(m_Program, maxLength, &maxLength, infoLog.data());
-			LUCY_CRITICAL(fmt::format("Shader linking failed ({0}):{1}", m_Path, infoLog.data()));
-
-			glDeleteShader(vertexId);
-			glDeleteShader(fragmentId);
-			glDeleteProgram(m_Program);
-
-			LUCY_ASSERT(false);
-		}
-
-		glDetachShader(m_Program, vertexId);
-		glDetachShader(m_Program, fragmentId);
-
-		glDeleteShader(vertexId);
-		glDeleteShader(fragmentId);
-	}
 }
-
-

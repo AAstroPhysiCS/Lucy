@@ -1,5 +1,6 @@
 #include "lypch.h"
 #include "OpenGLPipeline.h"
+#include "VulkanPipeline.h"
 
 #include "Renderer/Renderer.h"
 
@@ -9,6 +10,9 @@ namespace Lucy {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
 				return CreateRef<OpenGLPipeline>(specs);
+				break;
+			case RenderArchitecture::Vulkan:
+				return CreateRef<VulkanPipeline>(specs);
 				break;
 			default:
 				LUCY_CRITICAL("Other API's not supported!");

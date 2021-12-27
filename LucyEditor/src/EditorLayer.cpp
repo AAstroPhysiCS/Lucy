@@ -32,13 +32,15 @@ namespace Lucy {
 
 			Renderer::SubmitMesh(meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
 		}
-		
+
 		m_Scene.GetEditorCamera().OnEvent(rendererMetrics);
 	}
 
 	void EditorLayer::End() {
-		GLenum state = glGetError();
-		if (state != GL_NO_ERROR) Logger::Log(LoggerInfo::LUCY_CRITICAL, state);
+		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::OpenGL) {
+			GLenum state = glGetError();
+			if (state != GL_NO_ERROR) Logger::Log(LoggerInfo::LUCY_CRITICAL, state);
+		}
 	}
 
 	void EditorLayer::OnRender() {

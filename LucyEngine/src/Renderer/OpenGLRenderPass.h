@@ -9,7 +9,7 @@ namespace Lucy {
 		OpenGLRenderPass(RenderPassSpecification& specs);
 		virtual ~OpenGLRenderPass() = default;
 
-		void Begin();
-		void End();
+		void Begin(RenderPassBeginInfo& info);
+		void End(RenderPassEndInfo& info);
 	};
 }

@@ -13,6 +13,7 @@ namespace Lucy {
 
 	class Shader {
 	public:
+		///args should only be used when vulkan is being targeted
 		static RefLucy<Shader> Create(const std::string& path, const std::string& name);
 
 		inline std::string& GetName() { return m_Name; }

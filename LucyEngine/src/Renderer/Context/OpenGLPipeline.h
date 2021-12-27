@@ -3,6 +3,8 @@
 #include "Pipeline.h"
 #include "../Buffer/OpenGL/OpenGLVertexBuffer.h"
 
+#include "../RenderPass.h"
+
 namespace Lucy {
 
 	class OpenGLPipeline : public Pipeline {
@@ -12,7 +14,7 @@ namespace Lucy {
 
 		friend class Mesh;
 	private:
-		void UploadVertexLayout(RefLucy<OpenGLVertexBuffer>& vertexBuffer);
+		void UploadVertexLayout(RefLucy<VertexBuffer>& vertexBuffer);
 
 		uint32_t GetTypeFromSize(ShaderDataSize size);
 		uint32_t CalculateStride();

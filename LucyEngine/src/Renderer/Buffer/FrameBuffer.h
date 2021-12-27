@@ -3,6 +3,9 @@
 #include "../Texture/Texture.h"
 #include "../../Core/Base.h"
 
+#include "RenderBuffer.h"
+#include "Renderer/VulkanRenderPass.h"
+
 namespace Lucy {
 
 	class RenderBuffer;
@@ -20,6 +23,13 @@ namespace Lucy {
 		TextureSpecification BlittedTextureSpecs;
 
 		RefLucy<RenderBuffer> RenderBuffer;
+
+		//Vulkan only
+	private:
+		RefLucy<VulkanRenderPass> RenderPass;
+
+		friend class VulkanFrameBuffer;
+		friend class VulkanRenderer;
 	};
 
 	class FrameBuffer {

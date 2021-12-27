@@ -1,7 +1,10 @@
 #pragma once
 
 #include "RenderContext.h"
+
 #include "vulkan/vulkan.h"
+#include "Renderer/Context/VulkanDevice.h"
+#include "Renderer/Context/VulkanSwapChain.h"
 
 namespace Lucy {
 
@@ -25,12 +28,14 @@ namespace Lucy {
 		void SetupMessageCallback();
 		void DestroyMessageCallback();
 
-		const std::vector<const char*> m_ValidationLayers = {
+		std::vector<const char*> m_ValidationLayers = {
 			"VK_LAYER_KHRONOS_validation"
 		};
 
 		VkInstance m_Instance;
 		VkDebugUtilsMessengerEXT m_DebugMessenger{};
+		
+		friend class VulkanRenderer;
+		friend class Renderer;
 	};
 }
-

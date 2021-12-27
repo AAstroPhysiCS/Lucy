@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RenderCommand.h"
+#include "Buffer/FrameBuffer.h"
 
 namespace Lucy {
 
@@ -9,8 +10,8 @@ namespace Lucy {
 		OpenGLRenderCommand() = default;
 		virtual ~OpenGLRenderCommand() = default;
 		
-		void Begin(RefLucy<RenderPass> renderPass);
-		void End(RefLucy<RenderPass> renderPass);
+		void Begin(RefLucy<Pipeline> pipeline);
+		void End(RefLucy<Pipeline> pipeline);
 
 		void ClearColor(float r, float g, float b, float a);
 		void Clear(uint32_t bitField);

@@ -1,5 +1,7 @@
 #pragma once
 
+#define GLFW_INCLUDE_VULKAN
+
 #include "Base.h"
 #include "GLFW/glfw3.h"
 
@@ -10,6 +12,8 @@
 #include "../Events/WindowEvent.h"
 
 #include "Renderer/Context/RenderContext.h"
+
+#include "vulkan/vulkan.h"
 
 namespace Lucy {
 
@@ -31,6 +35,8 @@ namespace Lucy {
 
 		virtual void PollEvents() = 0;
 		virtual void Init() = 0;
+		virtual void InitVulkanSurface(VkInstance instance) = 0;
+		virtual void DestroyVulkanSurface(VkInstance instance) = 0;
 		virtual void Destroy() = 0;
 		virtual void Update() = 0;
 
@@ -43,15 +49,22 @@ namespace Lucy {
 		static RefLucy<Window> Create(const WindowSpecification& specs);
 	protected:
 		WindowSpecification m_Specs;
-		GLFWwindow* m_Window;
+		GLFWwindow* m_Window = nullptr;
 
 		static std::function<void(Event*)> s_EventFunc;
+
+		VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
+
+		friend class VulkanDevice;
+		friend class VulkanSwapChain;
 	};
 
 	class WinWindow : public Window {
 	private:
 		void PollEvents();
 		void Init();
+		void InitVulkanSurface(VkInstance instance);
+		void DestroyVulkanSurface(VkInstance instance);
 		void Destroy();
 		void Update();
 	};

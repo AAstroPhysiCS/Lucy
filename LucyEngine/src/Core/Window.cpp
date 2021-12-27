@@ -23,12 +23,14 @@ namespace Lucy {
 			LUCY_ASSERT(false);
 		}
 
-		if (m_Specs.Architecture == RenderArchitecture::Vulkan)
+		if (m_Specs.Architecture == RenderArchitecture::Vulkan) {
 			glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+		} else {
+			glfwWindowHint(GLFW_DOUBLEBUFFER, m_Specs.DoubleBuffered);
+			glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+			glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+		}
 		glfwWindowHint(GLFW_RESIZABLE, m_Specs.Resizable);
-		glfwWindowHint(GLFW_DOUBLEBUFFER, m_Specs.DoubleBuffered);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 
 		switch (m_Specs.WindowMode) {
 			case WindowMode::FULLSCREEN: {
@@ -46,8 +48,18 @@ namespace Lucy {
 				break;
 		}
 
-		glfwMakeContextCurrent(m_Window);
-		glfwSwapInterval(m_Specs.VSync);
+		if (m_Specs.Architecture == RenderArchitecture::OpenGL) {
+			glfwMakeContextCurrent(m_Window);
+			glfwSwapInterval(m_Specs.VSync);
+		}
+	}
+
+	void WinWindow::InitVulkanSurface(VkInstance instance) {
+		LUCY_VULKAN_ASSERT(glfwCreateWindowSurface(instance, m_Window, nullptr, &m_Surface));
+	}
+
+	void WinWindow::DestroyVulkanSurface(VkInstance instance) {
+		vkDestroySurfaceKHR(instance, m_Surface, nullptr);
 	}
 
 	void Window::SetEventCallback(std::function<void(Event*)> func) {

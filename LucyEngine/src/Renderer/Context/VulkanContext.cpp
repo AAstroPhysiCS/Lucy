@@ -3,6 +3,8 @@
 
 #include "GLFW/glfw3.h"
 
+#include "Renderer/Renderer.h"
+
 namespace Lucy {
 
 	VulkanContext::VulkanContext(RenderArchitecture type)
@@ -11,13 +13,16 @@ namespace Lucy {
 	}
 
 	void VulkanContext::Destroy() {
+		VulkanSwapChain::Get().Destroy();
+		Renderer::s_Window->DestroyVulkanSurface(m_Instance);
+		VulkanDevice::Get().Destroy();
+		
 		DestroyMessageCallback();
 		vkDestroyInstance(m_Instance, nullptr);
 		glfwTerminate();
 	}
 
 	void VulkanContext::PrintInfo() {
-		Logger::Log(LoggerInfo::LUCY_INFO, "Vulkan version 1.2");
 	}
 
 	void VulkanContext::Init(RenderArchitecture type) {
@@ -58,12 +63,17 @@ namespace Lucy {
 		createInfo.enabledExtensionCount = 0;
 		createInfo.ppEnabledExtensionNames = nullptr;
 #endif
-		
+
 		VkResult result = vkCreateInstance(&createInfo, nullptr, &m_Instance);
-		LUCY_ASSERT_VULKAN(result);
+		LUCY_VULKAN_ASSERT(result);
 		LUCY_INFO("Vulkan successfully initialized");
 
 		SetupMessageCallback();
+
+		Renderer::s_Window->InitVulkanSurface(m_Instance);
+
+		VulkanDevice::Get().Create(m_Instance, m_ValidationLayers);
+		VulkanSwapChain::Get().Create();
 	}
 
 	void VulkanContext::CheckValidationSupport() {
@@ -94,16 +104,16 @@ namespace Lucy {
 		createInfo.pfnUserCallback = VulkanMessageCallback::DebugCallback;
 		createInfo.pUserData = nullptr; // Optional
 
-		auto func = (PFN_vkCreateDebugUtilsMessengerEXT) vkGetInstanceProcAddr(m_Instance, "vkCreateDebugUtilsMessengerEXT");
+		auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(m_Instance, "vkCreateDebugUtilsMessengerEXT");
 		if (func) {
-			LUCY_ASSERT_VULKAN(func(m_Instance, &createInfo, nullptr, &m_DebugMessenger));
+			LUCY_VULKAN_ASSERT(func(m_Instance, &createInfo, nullptr, &m_DebugMessenger));
 			return;
 		}
 		LUCY_ASSERT(false);
 	}
 
 	void VulkanContext::DestroyMessageCallback() {
-		auto func = (PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(m_Instance, "vkDestroyDebugUtilsMessengerEXT");
+		auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(m_Instance, "vkDestroyDebugUtilsMessengerEXT");
 		if (func) {
 			func(m_Instance, m_DebugMessenger, nullptr);
 		}

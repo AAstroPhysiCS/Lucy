@@ -9,6 +9,8 @@
 #include "Scene/Scene.h"
 #include "Scene/Entity.h"
 
+#include "Renderer/VulkanRenderer.h"
+
 namespace Lucy {
 
 	RefLucy<Window> Renderer::s_Window;

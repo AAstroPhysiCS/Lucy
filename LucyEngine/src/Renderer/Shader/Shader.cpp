@@ -1,6 +1,7 @@
 #include "lypch.h"
 #include "Shader.h"
 #include "OpenGLShader.h"
+#include "VulkanShader.h"
 
 #include "../Renderer.h"
 #include "Utils.h"
@@ -20,11 +21,15 @@ namespace Lucy {
 	}
 
 	RefLucy<Shader> Shader::Create(const std::string& name, const std::string& path) {
-		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::OpenGL) {
-			auto& instance = CreateRef<OpenGLShader>(path, name);
-			Renderer::GetShaderLibrary().PushShader(instance);
-			return instance;
+		auto currentRenderArchitecture = Renderer::GetCurrentRenderArchitecture();
+		RefLucy<Shader> instance = nullptr;
+		if (currentRenderArchitecture == RenderArchitecture::OpenGL) {
+			instance = CreateRef<OpenGLShader>(path, name);
+		} else if (currentRenderArchitecture == RenderArchitecture::Vulkan) {
+			instance = CreateRef<VulkanShader>(path, name);
 		}
+		Renderer::GetShaderLibrary().PushShader(instance);
+		return instance;
 	}
 
 	RefLucy<Shader> ShaderLibrary::GetShader(const std::string& name) {
@@ -219,7 +224,7 @@ namespace Lucy {
 		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::OpenGL) {
 			return Extensions{ ".cached_opengl.vert", ".cached_opengl.frag" };
 		} else {
-			return Extensions{ ".cached_vulkan.frag", ".cached_vulkan.frag" };
+			return Extensions{ ".cached_vulkan.vert", ".cached_vulkan.frag" };
 		}
 	}
 }

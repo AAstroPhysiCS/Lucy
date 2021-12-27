@@ -7,6 +7,7 @@
 #include "Mesh.h"
 
 #include "OpenGLRenderCommand.h"
+#include "OpenGLRenderPass.h"
 
 #include "glad/glad.h"
 
@@ -83,13 +84,14 @@ namespace Lucy {
 
 			geometryPipelineSpecs.VertexShaderLayout = VertexShaderLayout(vertexLayout);
 			geometryPipelineSpecs.Topology = Topology::TRIANGLES;
-			geometryPipelineSpecs.Rasterization = { true, GL_BACK, 1.0f, GL_FILL };
+			geometryPipelineSpecs.Rasterization = { true, GL_BACK, 1.0f, PolygonMode::FILL };
 
 			RenderPassSpecification geometryPassSpecs;
-			geometryPassSpecs.FrameBuffer = FrameBuffer::Create(geometryFrameBufferSpecs);
-			geometryPassSpecs.Pipeline = Pipeline::Create(geometryPipelineSpecs);
 			geometryPassSpecs.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
-			m_GeometryPass = As(RenderPass::Create(geometryPassSpecs), OpenGLRenderPass);
+			
+			geometryPipelineSpecs.FrameBuffer = FrameBuffer::Create(geometryFrameBufferSpecs);
+			geometryPipelineSpecs.RenderPass = RenderPass::Create(geometryPassSpecs);
+			m_GeometryPipeline = As(Pipeline::Create(geometryPipelineSpecs), OpenGLPipeline);
 
 			//------------ Mouse Picking ------------
 			TextureSpecification idTextureRGBSpecs;
@@ -120,24 +122,25 @@ namespace Lucy {
 			idFrameBufferSpecs.IsStorage = true;
 
 			RenderPassSpecification idRenderPassSpecs;
-			idRenderPassSpecs.FrameBuffer = FrameBuffer::Create(idFrameBufferSpecs);
-			idRenderPassSpecs.Pipeline = Pipeline::Create(geometryPipelineSpecs);
 			idRenderPassSpecs.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
-			m_IDPass = As(RenderPass::Create(idRenderPassSpecs), OpenGLRenderPass);
+			
+			geometryPipelineSpecs.FrameBuffer = FrameBuffer::Create(idFrameBufferSpecs);
+			geometryPipelineSpecs.RenderPass = RenderPass::Create(idRenderPassSpecs);
+			m_IDPipeline = As(Pipeline::Create(geometryPipelineSpecs), OpenGLPipeline);
 		}
 
 		Dispatch(); //just for init functions (if any)
 	}
 
 	void OpenGLRenderer::OnFramebufferResize(float sizeX, float sizeY) {
-		m_GeometryPass->GetFrameBuffer()->Resize(sizeX, sizeY);
-		m_IDPass->GetFrameBuffer()->Resize(sizeX, sizeY);
+		m_GeometryPipeline->GetFrameBuffer()->Resize(sizeX, sizeY);
+		m_IDPipeline->GetFrameBuffer()->Resize(sizeX, sizeY);
 		m_ViewportWidth = sizeX;
 		m_ViewportHeight = sizeY;
 	}
 
 	Entity OpenGLRenderer::OnMousePicking() {
-		m_IDPass->GetFrameBuffer()->Bind();
+		m_IDPipeline->GetFrameBuffer()->Bind();
 		glm::vec3 pixelValue;
 		const auto& renderCommand = As(m_RenderCommand, OpenGLRenderCommand);
 		renderCommand->ReadBuffer(GL_COLOR_ATTACHMENT0);
@@ -154,14 +157,14 @@ namespace Lucy {
 			return {};
 
 		Entity selectedEntity = m_ActiveScene->GetEntityByPixelValue(pixelValue);
-		m_IDPass->GetFrameBuffer()->Unbind();
+		m_IDPipeline->GetFrameBuffer()->Unbind();
 
 		return selectedEntity;
 	}
 
 	void OpenGLRenderer::GeometryPass() {
 		const auto& renderCommand = As(m_RenderCommand, OpenGLRenderCommand);
-		renderCommand->Begin(m_GeometryPass);
+		renderCommand->Begin(m_GeometryPipeline);
 		for (MeshDrawCommand meshComponent : m_MeshDrawCommand) {
 			const RefLucy<Mesh>& mesh = meshComponent.Mesh;
 			std::vector<Material>& materials = mesh->GetMaterials();
@@ -180,13 +183,13 @@ namespace Lucy {
 			}
 			mesh->Unbind();
 		}
-		renderCommand->End(m_GeometryPass);
+		renderCommand->End(m_GeometryPipeline);
 	}
 
 	void OpenGLRenderer::IDPass() {
 		RefLucy<Shader> idShader = m_ShaderLibrary.GetShader("LucyID");
 		const auto& renderCommand = As(m_RenderCommand, OpenGLRenderCommand);
-		renderCommand->Begin(m_IDPass);
+		renderCommand->Begin(m_IDPipeline);
 
 		idShader->Bind();
 		for (MeshDrawCommand meshComponent : m_MeshDrawCommand) {
@@ -202,7 +205,7 @@ namespace Lucy {
 			mesh->Unbind();
 		}
 		idShader->Unbind();
-		renderCommand->End(m_IDPass);
+		renderCommand->End(m_IDPipeline);
 	}
 
 	void OpenGLRenderer::Draw() {

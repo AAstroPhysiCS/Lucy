@@ -1,8 +1,8 @@
 #pragma once
 
 #include "../Core/Base.h"
-#include "Buffer/FrameBuffer.h"
-#include "Context/Pipeline.h"
+
+#include "vulkan/vulkan.h"
 
 namespace Lucy {
 
@@ -11,21 +11,37 @@ namespace Lucy {
 	};
 
 	struct RenderPassSpecification {
-		RefLucy<FrameBuffer> FrameBuffer;
-		RefLucy<Pipeline> Pipeline;
 		ClearColor ClearColor;
+	};
+
+	//Vulkan only
+	struct RenderPassBeginInfo {
+	private:
+		VkCommandBuffer CommandBuffer;
+		VkFramebuffer FrameBuffer;
+
+		friend class VulkanRenderPass;
+		friend class VulkanRenderCommand;
+	};
+
+	//Vulkan only
+	struct RenderPassEndInfo {
+	private:
+		VkCommandBuffer CommandBuffer;
+
+		friend class VulkanRenderPass;
+		friend class VulkanRenderCommand;
 	};
 
 	class RenderPass {
 	public:
 		static RefLucy<RenderPass> Create(RenderPassSpecification& specs);
-		virtual void Begin() = 0;
-		virtual void End() = 0;
 
 		RenderPass(RenderPassSpecification& specs);
-
-		inline RefLucy<FrameBuffer> GetFrameBuffer() { return m_Specs.FrameBuffer; }
-		inline RefLucy<Pipeline> GetPipeline() { return m_Specs.Pipeline; }
+		
+		virtual void Begin(RenderPassBeginInfo& info) = 0;
+		virtual void End(RenderPassEndInfo& info) = 0;
+		
 		inline ClearColor GetClearColor() { return m_Specs.ClearColor; }
 	protected:
 		RenderPassSpecification m_Specs;

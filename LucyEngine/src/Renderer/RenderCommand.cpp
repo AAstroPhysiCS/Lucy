@@ -3,10 +3,11 @@
 
 #include "Renderer/Renderer.h"
 #include "OpenGLRenderCommand.h"
+#include "VulkanRenderCommand.h"
 
 namespace Lucy {
 
-	RenderPass* RenderCommand::s_ActiveRenderPass = nullptr;
+	RefLucy<Pipeline> RenderCommand::s_ActivePipeline = nullptr;
 
 	RefLucy<RenderCommand> RenderCommand::Create() {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
@@ -14,8 +15,7 @@ namespace Lucy {
 				return CreateRef<OpenGLRenderCommand>();
 				break;
 			case RenderArchitecture::Vulkan:
-				LUCY_CRITICAL("Vulkan not supported");
-				LUCY_ASSERT(false);
+				return CreateRef<VulkanRenderCommand>();
 				break;
 		}
 	}

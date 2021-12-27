@@ -11,32 +11,36 @@
 #include "../nativefiledialog/include/nfd.h"
 #include "glad/glad.h"
 
+#define VULKAN_DEBUGGING_PROCESS 0
+
 namespace Lucy {
 
 	PerformanceMetrics EditorApplication::s_Metrics;
 
 	EditorApplication::EditorApplication(const ApplicationArgs& args)
 		: Application(args) {
-		m_LayerStack.Push({ &ImGuiLayer::GetInstance(), &EditorLayer::GetInstance() });
+		m_LayerStack.Push({ /*&ImGuiLayer::GetInstance(),*/ &EditorLayer::GetInstance()});
 
 		m_Running = true;
 
 		WindowSpecification w_Specs;
+		w_Specs.Architecture = RenderArchitecture::Vulkan;
 		w_Specs.Width = 1366;
 		w_Specs.Height = 766;
-		w_Specs.Name = "LucyEditor - Windows x64";
+		w_Specs.Name = fmt::format("LucyEditor - Windows x64 {0}", w_Specs.Architecture == RenderArchitecture::OpenGL ? "OpenGL" : "Vulkan");
 		w_Specs.DoubleBuffered = true;
 		w_Specs.Resizable = true;
 		w_Specs.VSync = false;
-		w_Specs.Architecture = RenderArchitecture::Vulkan;
 
 		m_Window = Window::Create(w_Specs);
 		m_Window->Init();
 		m_Window->SetEventCallback(std::bind(&EditorApplication::OnEvent, this, std::placeholders::_1));
 
 		Renderer::Init(m_Window, w_Specs.Architecture);
-		//EditorLayer::GetInstance().Init(m_Window);
+#if !VULKAN_DEBUGGING_PROCESS
+		EditorLayer::GetInstance().Init(m_Window);
 		//ImGuiLayer::GetInstance().Init(m_Window);
+#endif
 
 		LUCY_ASSERT(NFD_Init() == NFD_OKAY);
 	}
@@ -52,23 +56,23 @@ namespace Lucy {
 	void EditorApplication::Run() {
 		while (m_Running && !glfwWindowShouldClose(m_Window->Raw())) {
 
-			if (false) {
-				for (Layer* layer : m_LayerStack.GetStack()) {
-					layer->Begin(s_Metrics);
-					layer->OnRender();
-					layer->End();
-				}
+#if !VULKAN_DEBUGGING_PROCESS
+			for (Layer* layer : m_LayerStack.GetStack()) {
+				layer->Begin(s_Metrics);
+				layer->OnRender();
+				layer->End();
 			}
-
+#endif
 			s_Metrics.Update();
 			m_Window->PollEvents();
 		}
 	}
 
 	void EditorApplication::OnEvent(Event* e) {
-		return;
+#if !VULKAN_DEBUGGING_PROCESS
 		for (Layer* layer : m_LayerStack.GetStack()) {
 			layer->OnEvent(*e);
 		}
+#endif
 	}
 }
