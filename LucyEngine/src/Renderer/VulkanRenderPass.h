@@ -13,6 +13,7 @@ namespace Lucy {
 
 		void Begin(RenderPassBeginInfo& info);
 		void End(RenderPassEndInfo& info);
+		void Recreate();
 		void Destroy();
 
 		inline VkRenderPass GetVulkanHandle() { return m_RenderPass; }

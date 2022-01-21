@@ -14,7 +14,8 @@ project "ImGui"
     includedirs {
         ".",
         "../GLFW/include",
-        "../glad/include"
+        "../glad/include",
+        "%{LibraryPath.VulkanInclude}"
     }
 
     filter "system:windows"

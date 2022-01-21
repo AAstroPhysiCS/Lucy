@@ -53,6 +53,7 @@ project "LucyEngine"
             "GLFW_INCLUDE_NONE"
         }
         symbols "On"
+        runtime "Debug"
 
         links {
             "%{LibraryPath.VulkanLib}/vulkan-1.lib",
@@ -71,6 +72,7 @@ project "LucyEngine"
         }
         symbols "On"
         optimize "On"
+        runtime "Release"
 
         links {
             "%{LibraryPath.VulkanLib}/vulkan-1.lib",

@@ -9,7 +9,7 @@ namespace Lucy {
 	class VulkanFrameBuffer : public FrameBuffer {
 
 	public:
-		VulkanFrameBuffer(FrameBufferSpecification& specs);
+		VulkanFrameBuffer(FrameBufferSpecification& specs, RefLucy<VulkanRenderPass>& renderPass);
 		virtual ~VulkanFrameBuffer() = default;
 
 		void Bind();
@@ -20,7 +20,10 @@ namespace Lucy {
 
 		inline std::vector<VkFramebuffer>& GetSwapChainFrameBuffers() { return m_SwapChainFrameBuffers; }
 	private:
+		void Create();
+
 		std::vector<VkFramebuffer> m_SwapChainFrameBuffers;
+		RefLucy<VulkanRenderPass> m_RenderPass;
 	};
 }
 

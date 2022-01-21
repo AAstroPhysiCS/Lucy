@@ -10,9 +10,9 @@ namespace Lucy {
 		OpenGLVertexBuffer();
 		virtual ~OpenGLVertexBuffer() = default;
 
-		void Bind();
+		void Bind(const VertexBindInfo& info);
 		void Unbind();
-		void AddData(std::vector<float>& dataToAdd);
+		void AddData(const std::vector<float>& dataToAdd);
 		void Load();
 		void Destroy();
 	};

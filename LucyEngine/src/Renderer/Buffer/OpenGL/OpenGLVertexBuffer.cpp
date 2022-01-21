@@ -13,7 +13,8 @@ namespace Lucy {
 		glCreateBuffers(1, &m_Id);
 	}
 
-	void OpenGLVertexBuffer::Bind() {
+	void OpenGLVertexBuffer::Bind(const VertexBindInfo& info) {
+		//info is vulkan only
 		glBindBuffer(GL_ARRAY_BUFFER, m_Id);
 	}
 
@@ -22,7 +23,7 @@ namespace Lucy {
 	}
 
 	void OpenGLVertexBuffer::Load() {
-		Bind();
+		Bind({});
 		glBufferData(GL_ARRAY_BUFFER, m_Data.size() * sizeof(float), m_Data.data(), GL_STATIC_DRAW);
 		Unbind();
 	}
@@ -31,7 +32,7 @@ namespace Lucy {
 		glDeleteBuffers(1, &m_Id);
 	}
 
-	void OpenGLVertexBuffer::AddData(std::vector<float>& dataToAdd) {
+	void OpenGLVertexBuffer::AddData(const std::vector<float>& dataToAdd) {
 		m_Data.insert(m_Data.end(), dataToAdd.begin(), dataToAdd.end());
 	}
 }

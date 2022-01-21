@@ -5,10 +5,10 @@
 #include "Utils.h"
 
 namespace Lucy {
-	
-	OpenGLShader::OpenGLShader(const std::string& path, const std::string& name) 
-		: Shader(path, name)
-	{}
+
+	OpenGLShader::OpenGLShader(const std::string& path, const std::string& name)
+		: Shader(path, name) {
+	}
 
 	void OpenGLShader::Bind() {
 		glUseProgram(m_Program);

@@ -6,7 +6,6 @@
 #include "Shader/Shader.h"
 
 #include "RenderPass.h"
-#include "RenderCommand.h"
 #include "Context/OpenGLPipeline.h"
 
 namespace Lucy {
@@ -66,7 +65,6 @@ namespace Lucy {
 		}
 
 		m_VertexBuffer = VertexBuffer::Create(totalVertexSize * 17);
-		float* dataPtr = m_VertexBuffer->GetData();
 		IncreaseMeshCount(this);
 
 		uint32_t vertPtr = 0;
@@ -76,30 +74,33 @@ namespace Lucy {
 			auto& normals = submesh.Normals;
 			auto& tangents = submesh.Tangents;
 			auto& biTangents = submesh.BiTangents;
-			
+
 			for (uint32_t i = 0; i < submesh.VertexCount; i++) {
-				dataPtr[vertPtr++] = vertices[i].x;
-				dataPtr[vertPtr++] = vertices[i].y;
-				dataPtr[vertPtr++] = vertices[i].z;
+				std::vector<float> vertex = {
+					vertices[i].x,
+					vertices[i].y,
+					vertices[i].z,
+					
+					(float) MESH_ID_COUNT_X,
+					(float) MESH_ID_COUNT_Y,
+					(float) MESH_ID_COUNT_Z,
+					
+					textureCoords[i].x,
+					textureCoords[i].y,
+					
+					normals[i].x,
+					normals[i].y,
+					normals[i].z,
+					
+					tangents[i].x,
+					tangents[i].y,
+					tangents[i].z,
 
-				dataPtr[vertPtr++] = MESH_ID_COUNT_X;
-				dataPtr[vertPtr++] = MESH_ID_COUNT_Y;
-				dataPtr[vertPtr++] = MESH_ID_COUNT_Z;
-
-				dataPtr[vertPtr++] = textureCoords[i].x;
-				dataPtr[vertPtr++] = textureCoords[i].y;
-
-				dataPtr[vertPtr++] = normals[i].x;
-				dataPtr[vertPtr++] = normals[i].y;
-				dataPtr[vertPtr++] = normals[i].z;
-
-				dataPtr[vertPtr++] = tangents[i].x;
-				dataPtr[vertPtr++] = tangents[i].y;
-				dataPtr[vertPtr++] = tangents[i].z;
-
-				dataPtr[vertPtr++] = biTangents[i].x;
-				dataPtr[vertPtr++] = biTangents[i].y;
-				dataPtr[vertPtr++] = biTangents[i].z;
+					biTangents[i].x,
+					biTangents[i].y,
+					biTangents[i].z
+				};
+				m_VertexBuffer->AddData(vertex);
 			}
 		}
 	}
@@ -131,7 +132,7 @@ namespace Lucy {
 
 		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::OpenGL) {
 			glBindVertexArray(m_Vao);
-			m_IndexBuffer->Bind();
+			m_IndexBuffer->Bind({});
 		}
 	}
 
@@ -147,8 +148,8 @@ namespace Lucy {
 			glCreateVertexArrays(1, &m_Vao);
 			glBindVertexArray(m_Vao);
 
-			RefLucy<OpenGLPipeline>& pipeline = As(RenderCommand::s_ActivePipeline, OpenGLPipeline);
-			pipeline->UploadVertexLayout(m_VertexBuffer);
+			OpenGLPipeline* activePipeline = (OpenGLPipeline*) Pipeline::s_ActivePipeline;
+			activePipeline->UploadVertexLayout(m_VertexBuffer);
 
 			m_VertexBuffer->Load();
 			m_IndexBuffer->Load();

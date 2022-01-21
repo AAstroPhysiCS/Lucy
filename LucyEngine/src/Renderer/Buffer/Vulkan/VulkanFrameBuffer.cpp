@@ -3,12 +3,19 @@
 
 #include "vulkan/vulkan.h"
 
+#include "Renderer/Renderer.h"
 #include "../../Context/VulkanDevice.h"
 
 namespace Lucy {
 
-	VulkanFrameBuffer::VulkanFrameBuffer(FrameBufferSpecification& specs)
-		: FrameBuffer(specs) {
+	VulkanFrameBuffer::VulkanFrameBuffer(FrameBufferSpecification& specs, RefLucy<VulkanRenderPass>& renderPass)
+		: FrameBuffer(specs), m_RenderPass(renderPass) {
+		Renderer::Submit([this]() {
+			Create();
+		});
+	}
+
+	void VulkanFrameBuffer::Create() {
 		auto& swapChainInstance = VulkanSwapChain::Get();
 		size_t size = swapChainInstance.m_SwapChainImageViews.size();
 		m_SwapChainFrameBuffers.resize(size);
@@ -19,7 +26,7 @@ namespace Lucy {
 			VkFramebufferCreateInfo createInfo{};
 			createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 			createInfo.attachmentCount = 1;
-			createInfo.renderPass = m_Specs.RenderPass->GetVulkanHandle();
+			createInfo.renderPass = m_RenderPass->GetVulkanHandle();
 			createInfo.pAttachments = &swapChainInstance.m_SwapChainImageViews[i];
 			createInfo.width = swapChainInstance.GetExtent().width;
 			createInfo.height = swapChainInstance.GetExtent().height;
@@ -49,6 +56,7 @@ namespace Lucy {
 	}
 
 	void VulkanFrameBuffer::Resize(int32_t width, int32_t height) {
-
+		Destroy();
+		Create();
 	}
 }

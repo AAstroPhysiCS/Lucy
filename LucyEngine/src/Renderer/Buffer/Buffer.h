@@ -4,9 +4,6 @@ namespace Lucy {
 
 	template <typename T>
 	class Buffer {
-	public:
-		inline T* GetData() const { return m_DataHead; }
-
 	protected:
 		Buffer() = default;
 		~Buffer() = default;

@@ -19,6 +19,8 @@ namespace Lucy {
 		static VulkanSwapChain& Get();
 
 		void Create();
+		void Recreate();
+		VkResult AcquireNextImage(VkSemaphore currentFrameImageAvailSemaphore, uint32_t& imageIndex);
 		void Destroy();
 
 		inline VkExtent2D& GetExtent() { return m_SelectedSwapExtent; }

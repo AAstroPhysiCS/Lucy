@@ -11,12 +11,12 @@ namespace Lucy {
 	}
 	
 	void OpenGLRenderPass::Begin(RenderPassBeginInfo& info) {
-		//auto& frameBuffer = m_Specs.FrameBuffer;
-		//frameBuffer->Bind();
+		auto& frameBuffer = info.OpenGLFrameBuffer;
+		frameBuffer->Bind();
 	}
 	
 	void OpenGLRenderPass::End(RenderPassEndInfo& info) {
-		//auto& frameBuffer = m_Specs.FrameBuffer;
-		//frameBuffer->Unbind();
+		auto& frameBuffer = info.OpenGLFrameBuffer;
+		frameBuffer->Unbind();
 	}
 }

@@ -8,6 +8,7 @@
 #include "Core/FileSystem.h"
 
 #include "shaderc/shaderc.hpp"
+
 //#include "spirv_cross/spirv_cross.hpp"
 //#include "spirv_cross/spirv_glsl.hpp"
 
@@ -100,9 +101,7 @@ namespace Lucy {
 			ofFrag.close();
 		}
 
-#ifdef LUCY_DEBUG
-		//Info(dataVert, dataFrag);
-#endif
+		Info(dataVert, dataFrag);
 		LoadInternal(dataVert, dataFrag);
 	}
 
@@ -132,9 +131,7 @@ namespace Lucy {
 			isFrag.close();
 		}
 
-#ifdef LUCY_DEBUG
-		//Info(dataVert, dataFrag);
-#endif
+		Info(dataVert, dataFrag);
 		LoadInternal(dataVert, dataFrag);
 	}
 

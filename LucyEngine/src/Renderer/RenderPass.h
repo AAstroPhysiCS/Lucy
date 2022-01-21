@@ -3,34 +3,29 @@
 #include "../Core/Base.h"
 
 #include "vulkan/vulkan.h"
+#include "Buffer/OpenGL/OpenGLFrameBuffer.h"
 
 namespace Lucy {
 
 	struct ClearColor {
-		float r = 0, g = 0, b = 0, a = 0;
+		float r = 0.0f, g = 0.0f, b = 0.0f, a = 0.0f;
 	};
 
 	struct RenderPassSpecification {
 		ClearColor ClearColor;
+		std::vector<VkAttachmentReference> AttachmentReferences;
 	};
-
-	//Vulkan only
+	
 	struct RenderPassBeginInfo {
-	private:
+		RefLucy<OpenGLFrameBuffer> OpenGLFrameBuffer = nullptr;
+		VkFramebuffer VulkanFrameBuffer;
 		VkCommandBuffer CommandBuffer;
-		VkFramebuffer FrameBuffer;
-
-		friend class VulkanRenderPass;
-		friend class VulkanRenderCommand;
 	};
 
-	//Vulkan only
 	struct RenderPassEndInfo {
-	private:
+		RefLucy<OpenGLFrameBuffer> OpenGLFrameBuffer = nullptr;
+		VkFramebuffer FrameBuffer;
 		VkCommandBuffer CommandBuffer;
-
-		friend class VulkanRenderPass;
-		friend class VulkanRenderCommand;
 	};
 
 	class RenderPass {

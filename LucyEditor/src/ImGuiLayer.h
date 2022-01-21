@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Core/Base.h"
-#include "Core/Window.h"
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -13,6 +12,8 @@
 #include "Core/Layer.h"
 #include "UI/Panel.h"
 
+#include "Core/Window.h"
+
 namespace Lucy {
 
 	class ImGuiLayer : public Layer
@@ -23,7 +24,7 @@ namespace Lucy {
 			return s_Instance;
 		}
 
-		void Init(RefLucy<Window>& window);
+		void Init(RefLucy<Window> window);
 		void Begin(PerformanceMetrics& performanceMetrics);
 		void End();
 		void OnRender();

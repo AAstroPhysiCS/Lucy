@@ -2,6 +2,7 @@
 #include "IndexBuffer.h"
 
 #include "OpenGL/OpenGLIndexBuffer.h"
+#include "Vulkan/VulkanIndexBuffer.h"
 #include "../Renderer.h"
 
 namespace Lucy {
@@ -12,8 +13,7 @@ namespace Lucy {
 				return CreateRef<OpenGLIndexBuffer>(size);
 				break;
 			case RenderArchitecture::Vulkan:
-				LUCY_CRITICAL("Vulkan not supported");
-				LUCY_ASSERT(false);
+				return CreateRef<VulkanIndexBuffer>(size);
 				break;
 		}
 	}
@@ -24,8 +24,7 @@ namespace Lucy {
 				return CreateRef<OpenGLIndexBuffer>();
 				break;
 			case RenderArchitecture::Vulkan:
-				LUCY_CRITICAL("Vulkan not supported");
-				LUCY_ASSERT(false);
+				return CreateRef<VulkanIndexBuffer>();
 				break;
 		}
 	}
@@ -34,8 +33,8 @@ namespace Lucy {
 		m_DataHead = m_Data.data();
 	}
 
-	IndexBuffer::IndexBuffer(uint32_t size) {
-		m_Data.resize(size);
+	IndexBuffer::IndexBuffer(uint32_t size)
+		: m_Size(size) {
 		m_DataHead = m_Data.data();
 	}
 }

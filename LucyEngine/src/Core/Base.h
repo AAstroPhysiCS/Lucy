@@ -26,7 +26,7 @@
 								LUCY_DEBUG_BREAK }
 	#elif LUCY_RELEASE
 	#define LUCY_ASSERT(arg)
-	#define LUCY_ASSERT_VULKAN(arg) 
+	#define LUCY_VULKAN_ASSERT(arg) 
 	#endif
 #endif
 

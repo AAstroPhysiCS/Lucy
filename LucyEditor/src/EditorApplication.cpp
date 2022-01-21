@@ -4,14 +4,10 @@
 
 #include "EditorLayer.h"
 #include "ImGuiLayer.h"
-
 #include "Renderer/Renderer.h"
-#include "Renderer/RenderCommand.h"
 
 #include "../nativefiledialog/include/nfd.h"
 #include "glad/glad.h"
-
-#define VULKAN_DEBUGGING_PROCESS 0
 
 namespace Lucy {
 
@@ -37,10 +33,9 @@ namespace Lucy {
 		m_Window->SetEventCallback(std::bind(&EditorApplication::OnEvent, this, std::placeholders::_1));
 
 		Renderer::Init(m_Window, w_Specs.Architecture);
-#if !VULKAN_DEBUGGING_PROCESS
+
 		EditorLayer::GetInstance().Init(m_Window);
 		//ImGuiLayer::GetInstance().Init(m_Window);
-#endif
 
 		LUCY_ASSERT(NFD_Init() == NFD_OKAY);
 	}
@@ -56,23 +51,19 @@ namespace Lucy {
 	void EditorApplication::Run() {
 		while (m_Running && !glfwWindowShouldClose(m_Window->Raw())) {
 
-#if !VULKAN_DEBUGGING_PROCESS
 			for (Layer* layer : m_LayerStack.GetStack()) {
 				layer->Begin(s_Metrics);
 				layer->OnRender();
 				layer->End();
 			}
-#endif
 			s_Metrics.Update();
 			m_Window->PollEvents();
 		}
 	}
 
 	void EditorApplication::OnEvent(Event* e) {
-#if !VULKAN_DEBUGGING_PROCESS
 		for (Layer* layer : m_LayerStack.GetStack()) {
 			layer->OnEvent(*e);
 		}
-#endif
 	}
 }

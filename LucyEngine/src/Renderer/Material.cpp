@@ -41,7 +41,7 @@ namespace Lucy {
 			glBindTextureUnit(slot, m_Textures[i]->GetID());
 		}
 		
-		RefLucy<RendererAPI>& currentContext = Renderer::GetCurrentRendererContext();
+		RefLucy<RendererAPI>& currentContext = Renderer::GetCurrentRenderer();
 
 		//TODO: Kinda bad/ugly code and its slow somehow although i dont do anything wrong here...!
 		if (HasTexture(Material::ALBEDO_TYPE)) {
@@ -64,7 +64,7 @@ namespace Lucy {
 
 	void Material::Unbind() {
 		int32_t clearValue = -1;
-		RefLucy<RendererAPI>& currentContext = Renderer::GetCurrentRendererContext();
+		RefLucy<RendererAPI>& currentContext = Renderer::GetCurrentRenderer();
 		currentContext->m_TextureSlotsUniformBuffer->SetData((void*)&clearValue, sizeof(int32_t) * 5, 0);
 		m_Shader->Unbind();
 		for (uint32_t i = 0; i < m_Textures.size(); i++) {

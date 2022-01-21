@@ -9,12 +9,19 @@ namespace Lucy {
 		VulkanPipeline(PipelineSpecification& specs);
 		virtual ~VulkanPipeline() = default;
 
-		void UploadVertexLayout(RefLucy<VertexBuffer>& vertexBuffer);
 		void Destroy();
+		void Recreate(float sizeX, float sizeY);
+
+		void BeginVirtual();
+		void EndVirtual();
 
 		inline VkPipeline GetVulkanHandle() { return m_Pipeline; }
 	private:
 		void Create();
+
+		VkVertexInputBindingDescription CreateBindingDescriptor();
+		std::vector<VkVertexInputAttributeDescription> CreateAttributeDescriptor(uint32_t binding);
+		VkFormat GetVulkanTypeFromSize(ShaderDataSize size);
 
 		VkPipeline m_Pipeline{};
 		VkPipelineLayout m_PipelineLayout{};

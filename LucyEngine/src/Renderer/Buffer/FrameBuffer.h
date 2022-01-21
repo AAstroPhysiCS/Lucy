@@ -4,11 +4,11 @@
 #include "../../Core/Base.h"
 
 #include "RenderBuffer.h"
-#include "Renderer/VulkanRenderPass.h"
 
 namespace Lucy {
 
 	class RenderBuffer;
+	class RenderPass;
 
 	struct TextureSpecification;
 
@@ -23,13 +23,6 @@ namespace Lucy {
 		TextureSpecification BlittedTextureSpecs;
 
 		RefLucy<RenderBuffer> RenderBuffer;
-
-		//Vulkan only
-	private:
-		RefLucy<VulkanRenderPass> RenderPass;
-
-		friend class VulkanFrameBuffer;
-		friend class VulkanRenderer;
 	};
 
 	class FrameBuffer {
@@ -50,11 +43,11 @@ namespace Lucy {
 			return Size{ m_Specs.TextureSpecs[index].Width, m_Specs.TextureSpecs[index].Height };
 		}
 
-		static RefLucy<FrameBuffer> Create(FrameBufferSpecification& specs);
+		static RefLucy<FrameBuffer> Create(FrameBufferSpecification& specs, RefLucy<RenderPass> renderPass = nullptr);
 	protected:
 		FrameBuffer(FrameBufferSpecification& specs);
 
-		uint32_t m_Id;
+		uint32_t m_Id = 0;
 		FrameBufferSpecification m_Specs;
 		RefLucy<FrameBuffer> m_Blitted;
 	};

@@ -12,8 +12,4 @@ namespace Lucy {
 	void LayerStack::Pop() {
 		m_LayerStack.pop_back();
 	}
-
-	std::vector<Layer*> LayerStack::GetStack() const {
-		return m_LayerStack;
-	}
 }

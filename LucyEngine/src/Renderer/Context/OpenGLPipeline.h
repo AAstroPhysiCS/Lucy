@@ -12,11 +12,11 @@ namespace Lucy {
 		OpenGLPipeline(PipelineSpecification& specs);
 		virtual ~OpenGLPipeline() = default;
 
+		void BeginVirtual();
+		void EndVirtual();
+
 		friend class Mesh;
 	private:
 		void UploadVertexLayout(RefLucy<VertexBuffer>& vertexBuffer);
-
-		uint32_t GetTypeFromSize(ShaderDataSize size);
-		uint32_t CalculateStride();
 	};
 }

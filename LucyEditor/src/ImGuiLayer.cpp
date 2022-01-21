@@ -12,8 +12,11 @@
 #include "Core/Input.h"
 
 #include "Renderer/Renderer.h"
-#include "Renderer/RenderPass.h"
+#include "Renderer/VulkanRenderPass.h"
 #include "glad/glad.h"
+#include "imgui_impl_vulkan.h"
+
+#include "Renderer/Context/VulkanContext.h"
 
 #include <iostream>
 
@@ -27,7 +30,7 @@ namespace Lucy {
 		m_Panels.push_back(&PerformancePanel::GetInstance());
 	}
 
-	void ImGuiLayer::Init(RefLucy<Window>& window) {
+	void ImGuiLayer::Init(RefLucy<Window> window) {
 		ImGui::CreateContext();
 
 		ImGuiIO& io = ImGui::GetIO();
@@ -42,12 +45,73 @@ namespace Lucy {
 		glfwGetWindowSize(window->Raw(), &width, &height);
 		io.DisplaySize = { (float)width, (float)height };
 
-		ImGui_ImplGlfw_InitForOpenGL(window->Raw(), true);
-		ImGui_ImplOpenGL3_Init("#version 460");
+		auto currentArchitecture = Renderer::GetCurrentRenderArchitecture();
+		if (currentArchitecture == RenderArchitecture::OpenGL) {
+			ImGui_ImplGlfw_InitForOpenGL(window->Raw(), true);
+			ImGui_ImplOpenGL3_Init("#version 460");
+		} else if (currentArchitecture == RenderArchitecture::Vulkan) {
+
+			auto& renderContext = Renderer::GetCurrentRenderer()->m_RenderContext;
+
+			ImGui::CreateContext();
+			ImGui_ImplGlfw_InitForVulkan(window->Raw(), true);
+			
+			auto& vulkanContext = As(renderContext, VulkanContext);
+			VulkanDevice device = VulkanDevice::Get();
+			RenderPassSpecification renderPassSpecs;
+			RefLucy<VulkanRenderPass> renderPass = As(RenderPass::Create(renderPassSpecs), VulkanRenderPass);
+
+			//TODO: Change and do it properly
+			//from imgui demo
+			VkDescriptorPoolSize pool_sizes[] =
+			{
+				{ VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+				{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+				{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+				{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+				{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+				{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+				{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+				{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+				{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+			};
+
+			VkDescriptorPoolCreateInfo pool_info = {};
+			pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+			pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+			pool_info.maxSets = 1000;
+			pool_info.poolSizeCount = std::size(pool_sizes);
+			pool_info.pPoolSizes = pool_sizes;
+
+			VkDescriptorPool imguiPool;
+			LUCY_VULKAN_ASSERT(vkCreateDescriptorPool(device.GetLogicalDevice(), &pool_info, nullptr, &imguiPool));
+
+			ImGui_ImplVulkan_InitInfo initInfo{};
+			initInfo.Instance = vulkanContext->GetVulkanInstance();
+			initInfo.PhysicalDevice = device.GetPhysicalDevice();
+			initInfo.Device = device.GetLogicalDevice();
+			initInfo.Queue = device.GetGraphicsQueue();
+			initInfo.DescriptorPool = imguiPool;
+			initInfo.MinImageCount = 3;
+			initInfo.ImageCount = 3;
+			initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+			ImGui_ImplVulkan_Init(&initInfo, renderPass->GetVulkanHandle());
+
+			//ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
+			ImGui_ImplVulkan_DestroyFontUploadObjects();
+		}
 	}
 
 	void ImGuiLayer::Begin(PerformanceMetrics& rendererMetrics) {
-		ImGui_ImplOpenGL3_NewFrame();
+		auto currentArchitecture = Renderer::GetCurrentRenderArchitecture();
+		if (currentArchitecture == RenderArchitecture::OpenGL) {
+			ImGui_ImplOpenGL3_NewFrame();
+		} else if (currentArchitecture == RenderArchitecture::Vulkan) {
+			ImGui_ImplVulkan_NewFrame();
+		}
+
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
 
@@ -66,7 +130,7 @@ namespace Lucy {
 
 		ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoScrollbar |
 			ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-		ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground;
+			ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground;
 
 		static bool pOpen = true;
 
@@ -88,8 +152,13 @@ namespace Lucy {
 		m_Time = time;
 
 		ImGui::Render();
-		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		auto currentArchitecture = Renderer::GetCurrentRenderArchitecture();
 
+		if (currentArchitecture == RenderArchitecture::OpenGL) {
+			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		} else if (currentArchitecture == RenderArchitecture::Vulkan) {
+			//ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+		}
 		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
 			GLFWwindow* backup_current_context = glfwGetCurrentContext();
 			ImGui::UpdatePlatformWindows();
@@ -154,7 +223,12 @@ namespace Lucy {
 	}
 
 	void ImGuiLayer::Destroy() {
-		ImGui_ImplOpenGL3_Shutdown();
+		auto currentArchitecture = Renderer::GetCurrentRenderArchitecture();
+		if (currentArchitecture == RenderArchitecture::OpenGL) {
+			ImGui_ImplOpenGL3_Shutdown();
+		} else if (currentArchitecture == RenderArchitecture::Vulkan) {
+			ImGui_ImplVulkan_Shutdown();
+		}
 		ImGui_ImplGlfw_Shutdown();
 		ImGui::DestroyContext();
 	}

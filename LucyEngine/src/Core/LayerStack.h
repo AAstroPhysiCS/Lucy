@@ -15,7 +15,7 @@ namespace Lucy {
 		void Push(std::initializer_list<Layer*> list);
 		void Pop();
 
-		std::vector<Layer*> GetStack() const;
+		inline std::vector<Layer*>& GetStack() { return m_LayerStack; }
 	private:
 		std::vector<Layer*> m_LayerStack;
 	};

@@ -2,6 +2,8 @@
 #include "VertexBuffer.h"
 
 #include "OpenGL/OpenGLVertexBuffer.h"
+#include "Vulkan/VulkanVertexBuffer.h"
+
 #include "../Renderer.h"
 
 namespace Lucy {
@@ -12,8 +14,7 @@ namespace Lucy {
 				return CreateRef<OpenGLVertexBuffer>(size);
 				break;
 			case RenderArchitecture::Vulkan:
-				LUCY_CRITICAL("Vulkan not supported");
-				LUCY_ASSERT(false);
+				return CreateRef<VulkanVertexBuffer>(size);
 				break;
 		}
 	}
@@ -24,8 +25,7 @@ namespace Lucy {
 				return CreateRef<OpenGLVertexBuffer>();
 				break;
 			case RenderArchitecture::Vulkan:
-				LUCY_CRITICAL("Vulkan not supported");
-				LUCY_ASSERT(false);
+				return CreateRef<VulkanVertexBuffer>();
 				break;
 		}
 	}
@@ -34,8 +34,8 @@ namespace Lucy {
 		m_DataHead = m_Data.data();
 	}
 
-	VertexBuffer::VertexBuffer(uint32_t size) {
-		m_Data.resize(size);
+	VertexBuffer::VertexBuffer(uint32_t size)
+		: m_Size(size) {
 		m_DataHead = m_Data.data();
 	}
 }

@@ -65,6 +65,8 @@ namespace Lucy {
 		}
 
 		friend class OpenGLPipeline;
+		friend class VulkanPipeline;
+		friend class Pipeline;
 	private:
 		std::vector<ShaderLayoutElement> ElementList;
 	};

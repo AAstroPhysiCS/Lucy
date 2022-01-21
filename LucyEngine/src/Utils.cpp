@@ -24,7 +24,7 @@ namespace Utils {
 		std::ifstream f(path);
 
 		if (!f) {
-			LUCY_CRITICAL("Error opening the file! Or it can not be found");
+			LUCY_CRITICAL(fmt::format("Error opening the file! Or it can not be found {0}", path));
 			LUCY_ASSERT(false);
 		}
 

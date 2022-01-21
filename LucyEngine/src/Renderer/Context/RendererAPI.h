@@ -3,7 +3,6 @@
 #include "../../Core/Base.h"
 #include "../DrawCommand.h"
 #include "RenderContext.h"
-#include "Renderer/RenderCommand.h"
 
 #include "Renderer/Buffer/UniformBuffer.h"
 
@@ -21,7 +20,7 @@ namespace Lucy {
 		static RefLucy<RendererAPI> Create(RenderArchitecture architecture);
 		virtual void Init();
 
-		virtual void Draw() = 0;
+		virtual void Execute() = 0;
 		virtual void ClearCommands() = 0;
 		virtual void Destroy() = 0;
 		virtual void Dispatch() = 0;
@@ -53,11 +52,10 @@ namespace Lucy {
 
 		Scene* m_ActiveScene = nullptr;
 
-		std::vector<Func> m_RenderQueue;
-		std::vector<MeshDrawCommand> m_MeshDrawCommand;
+		std::vector<Func> m_RenderFunctions;
+		std::vector<MeshDrawCommand> m_MeshDrawCommands;
 
 		RefLucy<RenderContext> m_RenderContext;
-		RefLucy<RenderCommand> m_RenderCommand;
 
 		RefLucy<UniformBuffer> m_CameraUniformBuffer;
 		RefLucy<UniformBuffer> m_TextureSlotsUniformBuffer;
@@ -67,5 +65,6 @@ namespace Lucy {
 
 		friend class Renderer;
 		friend class Material;
+		friend class ImGuiLayer;
 	};
 }

@@ -19,7 +19,7 @@ LibraryPath["VulkanLib"] = "%{LibraryPath.VulkanSDK}/Lib"
 LibraryPath["ShaderCDebug"] = "%{LibraryPath.VulkanLib}/shaderc_sharedd.lib"
 LibraryPath["SPIRVDebug"] = "%{LibraryPath.VulkanLib}/spirv-cross-cored.lib"
 LibraryPath["SPIRVGLSLDebug"] = "%{LibraryPath.VulkanLib}/spirv-cross-glsld.lib"
-LibraryPath["SPIRVTools"] = "%{LibraryPath.VulkanLib}/spirv-cross-glsld.lib"
+LibraryPath["SPIRVTools"] = "%{LibraryPath.VulkanLib}/SPIRV-Toolsd.lib"
 
 --Release
 LibraryPath["ShaderCRelease"] = "%{LibraryPath.VulkanLib}/shaderc_shared.lib"

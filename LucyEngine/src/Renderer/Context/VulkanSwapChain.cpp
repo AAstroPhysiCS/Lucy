@@ -2,6 +2,7 @@
 #include "VulkanSwapChain.h"
 
 #include "vulkan/vulkan.h"
+#include "VulkanDevice.h"
 #include "Renderer/Renderer.h"
 
 namespace Lucy {
@@ -45,7 +46,7 @@ namespace Lucy {
 		createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 		createInfo.presentMode = m_SelectedPresentMode;
 		createInfo.clipped = VK_TRUE;
-		createInfo.oldSwapchain = VK_NULL_HANDLE; //TODO: Resizing
+		createInfo.oldSwapchain = VK_NULL_HANDLE;
 
 		LUCY_VULKAN_ASSERT(vkCreateSwapchainKHR(logicalDevice, &createInfo, nullptr, &m_SwapChain));
 
@@ -74,8 +75,18 @@ namespace Lucy {
 			createInfo.subresourceRange.baseArrayLayer = 0;
 			createInfo.subresourceRange.layerCount = 1;
 
-			LUCY_VULKAN_ASSERT(vkCreateImageView(logicalDevice, &createInfo, nullptr, &m_SwapChainImageViews[i]))
+			LUCY_VULKAN_ASSERT(vkCreateImageView(logicalDevice, &createInfo, nullptr, &m_SwapChainImageViews[i]));
 		}
+	}
+
+	void VulkanSwapChain::Recreate() {
+		Destroy();
+		Create();
+	}
+
+	VkResult VulkanSwapChain::AcquireNextImage(VkSemaphore currentFrameImageAvailSemaphore, uint32_t& imageIndex) {
+		VkDevice deviceVulkanHandle = VulkanDevice::Get().GetLogicalDevice();
+		return vkAcquireNextImageKHR(deviceVulkanHandle, m_SwapChain, UINT64_MAX, currentFrameImageAvailSemaphore, VK_NULL_HANDLE, &imageIndex);
 	}
 
 	SwapChainCapabilities VulkanSwapChain::GetSwapChainCapabilities(VkPhysicalDevice device) {

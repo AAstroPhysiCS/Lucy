@@ -50,6 +50,7 @@ project "LucyEditor"
             "GLFW_INCLUDE_NONE"
         }
         symbols "On"
+        runtime "Debug"
 
     filter "configurations:Release"
         defines {
@@ -58,3 +59,4 @@ project "LucyEditor"
         }
         symbols "On"
         optimize "On"
+        runtime "Release"

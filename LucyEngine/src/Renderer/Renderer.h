@@ -42,7 +42,7 @@ namespace Lucy {
 		inline static ShaderLibrary& GetShaderLibrary() { return s_RendererAPI->GetShaderLibrary(); }
 		inline static Scene* GetActiveScene() { return s_RendererAPI->m_ActiveScene; }
 
-		inline static RefLucy<RendererAPI> GetCurrentRendererContext() { return s_RendererAPI; }
+		inline static RefLucy<RendererAPI> GetCurrentRenderer() { return s_RendererAPI; }
 	private:
 		Renderer() = delete;
 

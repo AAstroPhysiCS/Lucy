@@ -5,23 +5,37 @@
 #include "../Shader/VulkanShader.h"
 
 #include "../VulkanRenderPass.h"
+#include "Renderer/Buffer/Vulkan/VulkanFrameBuffer.h"
+
+#include "Renderer/Renderer.h"
 
 namespace Lucy {
 
 	VulkanPipeline::VulkanPipeline(PipelineSpecification& specs)
 		: Pipeline(specs) {
-		Create();
+		Renderer::Submit([this]() {
+			Create();
+		});
+	}
+
+	void VulkanPipeline::BeginVirtual() {
+		
+	}
+
+	void VulkanPipeline::EndVirtual() {
+
 	}
 
 	void VulkanPipeline::Create() {
+		auto& bindingDescriptor = CreateBindingDescriptor();
+		auto& attributeDescriptor = CreateAttributeDescriptor(bindingDescriptor.binding);
 
 		VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		//TODO: change this
-		vertexInputInfo.vertexAttributeDescriptionCount = 0;
-		vertexInputInfo.pVertexAttributeDescriptions = nullptr;
-		vertexInputInfo.vertexBindingDescriptionCount = 0;
-		vertexInputInfo.pVertexBindingDescriptions = nullptr;
+		vertexInputInfo.vertexAttributeDescriptionCount = attributeDescriptor.size();
+		vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptor.data();
+		vertexInputInfo.vertexBindingDescriptionCount = 1;
+		vertexInputInfo.pVertexBindingDescriptions = &bindingDescriptor;
 
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo{};
 		inputAssemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -140,21 +154,68 @@ namespace Lucy {
 
 		LUCY_VULKAN_ASSERT(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_Pipeline));
 		LUCY_INFO("Vulkan pipeline created successfully!");
-
-		m_Specs.Shader->Destroy();
 	}
 
-	void VulkanPipeline::UploadVertexLayout(RefLucy<VertexBuffer>& vertexBuffer) {
+	VkFormat VulkanPipeline::GetVulkanTypeFromSize(ShaderDataSize size) {
+		switch (size) {
+			case ShaderDataSize::Int1: return VK_FORMAT_R32_SINT; break;
+			case ShaderDataSize::Float1: return VK_FORMAT_R32_SFLOAT; break;
+			case ShaderDataSize::Int2: return VK_FORMAT_R32G32_SINT; break;
+			case ShaderDataSize::Float2: return VK_FORMAT_R32G32_SFLOAT; break;
+			case ShaderDataSize::Int3: return VK_FORMAT_R32G32B32_SINT; break;
+			case ShaderDataSize::Float3: return VK_FORMAT_R32G32B32_SFLOAT; break;
+			case ShaderDataSize::Int4: return VK_FORMAT_R32G32B32A32_SINT; break;
+			case ShaderDataSize::Float4: return VK_FORMAT_R32G32B32A32_SFLOAT; break;
+			case ShaderDataSize::Mat4:	 LUCY_ASSERT(false); break; //in vulkan, that's kinda hard...
+		}
+	}
 
+	VkVertexInputBindingDescription VulkanPipeline::CreateBindingDescriptor() {
+		VkVertexInputBindingDescription vertexInputBindingDescription{};
+		vertexInputBindingDescription.binding = 0;
+		vertexInputBindingDescription.stride = CalculateStride(m_Specs.VertexShaderLayout) * sizeof(float);
+		vertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		return vertexInputBindingDescription;
+	}
+
+	std::vector<VkVertexInputAttributeDescription> VulkanPipeline::CreateAttributeDescriptor(uint32_t binding) {
+		std::vector<VkVertexInputAttributeDescription> vertexInputAttributeDescriptions;
+
+		uint32_t bufferIndex = 0;
+		uint32_t offset = 0;
+
+		for (auto [name, size] : m_Specs.VertexShaderLayout.ElementList) {
+			VkVertexInputAttributeDescription attributeDescriptor;
+			attributeDescriptor.binding = binding;
+			attributeDescriptor.location = bufferIndex++;
+			attributeDescriptor.format = GetVulkanTypeFromSize(size);
+			attributeDescriptor.offset = offset;
+			offset += GetSizeFromType(size) * sizeof(float);
+
+			vertexInputAttributeDescriptions.push_back(attributeDescriptor);
+		}
+		return vertexInputAttributeDescriptions;
 	}
 
 	void VulkanPipeline::Destroy() {
-		m_Specs.Shader->Destroy(); //weird (without this, it would crash)
 		m_Specs.FrameBuffer->Destroy();
 		As(m_Specs.RenderPass, VulkanRenderPass)->Destroy();
 
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
 		vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);
 		vkDestroyPipeline(device, m_Pipeline, nullptr);
+		m_Specs.Shader->Destroy();
+	}
+
+	void VulkanPipeline::Recreate(float sizeX, float sizeY) {
+		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+		vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);
+		vkDestroyPipeline(device, m_Pipeline, nullptr);
+
+		Renderer::Submit([this, sizeX, sizeY]() {
+			Create();
+			As(m_Specs.FrameBuffer, VulkanFrameBuffer)->Resize(sizeX, sizeY);
+			As(m_Specs.RenderPass, VulkanRenderPass)->Recreate();
+		});
 	}
 }

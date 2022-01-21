@@ -3,13 +3,20 @@
 #include "../../Core/Base.h"
 #include "Buffer.h"
 
+#include "vulkan/vulkan.h"
+
 namespace Lucy {
+
+	//Vulkan only
+	struct VertexBindInfo {
+		VkCommandBuffer CommandBuffer;
+	};
 
 	class VertexBuffer : public Buffer<float> {
 	public:
-		virtual void Bind() = 0;
+		virtual void Bind(const VertexBindInfo& info) = 0;
 		virtual void Unbind() = 0;
-		virtual void AddData(std::vector<float>& dataToAdd) = 0;
+		virtual void AddData(const std::vector<float>& dataToAdd) = 0;
 		virtual void Load() = 0;
 		virtual void Destroy() = 0;
 
@@ -21,6 +28,7 @@ namespace Lucy {
 		virtual ~VertexBuffer() = default;
 
 		std::vector<float> m_Data;
+		uint32_t m_Size;
 	};
 }
 

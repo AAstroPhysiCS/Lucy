@@ -53,8 +53,16 @@ namespace Lucy {
 		inline RefLucy<RenderPass>& GetRenderPass() { return m_Specs.RenderPass; }
 
 		static RefLucy<Pipeline> Create(PipelineSpecification& specs);
+		static void Begin(const RefLucy<Pipeline>& pipeline);
+		static void End(const RefLucy<Pipeline>& pipeline);
+
+		inline static Pipeline* s_ActivePipeline = nullptr;
 	protected:
-		virtual void UploadVertexLayout(RefLucy<VertexBuffer>& vertexBuffer) = 0;
+		virtual void BeginVirtual() = 0;
+		virtual void EndVirtual() = 0;
+		
+		static uint32_t GetSizeFromType(ShaderDataSize size);
+		static uint32_t CalculateStride(VertexShaderLayout vertexLayout);
 
 		PipelineSpecification m_Specs;
 	};

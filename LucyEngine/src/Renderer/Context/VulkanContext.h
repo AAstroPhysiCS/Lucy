@@ -22,6 +22,7 @@ namespace Lucy {
 
 		void Destroy();
 		void PrintInfo();
+		inline VkInstance GetVulkanInstance() { return m_Instance; };
 	private:
 		void Init(RenderArchitecture type);
 		void CheckValidationSupport();

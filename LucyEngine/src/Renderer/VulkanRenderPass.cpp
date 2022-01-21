@@ -3,6 +3,8 @@
 
 #include "vulkan/vulkan.h"
 
+#include "Renderer.h"
+#include "Buffer/Vulkan/VulkanFrameBuffer.h"
 #include "Context/VulkanDevice.h"
 #include "Context/VulkanSwapChain.h"
 
@@ -10,7 +12,9 @@ namespace Lucy {
 
 	VulkanRenderPass::VulkanRenderPass(RenderPassSpecification& specs)
 		: RenderPass(specs) {
-		Create();
+		Renderer::Submit([this]() {
+			Create();
+		});
 	}
 
 	void VulkanRenderPass::Create() {
@@ -25,25 +29,20 @@ namespace Lucy {
 		colorAttachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		colorAttachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		colorAttachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-
 		colorAttachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		colorAttachmentDescription.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-		VkAttachmentReference colorAttachmentRef{};
-		colorAttachmentRef.attachment = 0;
-		colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
 		VkSubpassDescription subpassDescription{};
 		subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpassDescription.colorAttachmentCount = 1;
-		subpassDescription.pColorAttachments = &colorAttachmentRef;
+		subpassDescription.colorAttachmentCount = m_Specs.AttachmentReferences.size();
+		subpassDescription.pColorAttachments = m_Specs.AttachmentReferences.data();
 
 		VkSubpassDependency subpassDependency{};
 		subpassDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
 		subpassDependency.dstSubpass = 0;
 		subpassDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		subpassDependency.srcAccessMask = 0;
 		subpassDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		subpassDependency.srcAccessMask = 0;
 		subpassDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
 		std::vector<VkAttachmentDescription> attachments = { colorAttachmentDescription };
@@ -66,7 +65,7 @@ namespace Lucy {
 		VkRenderPassBeginInfo beginInfo{};
 		beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		beginInfo.renderPass = m_RenderPass;
-		beginInfo.framebuffer = info.FrameBuffer;
+		beginInfo.framebuffer = info.VulkanFrameBuffer;
 		beginInfo.renderArea.offset = { 0, 0 };
 		beginInfo.renderArea.extent = swapChain.GetExtent();
 
@@ -79,6 +78,11 @@ namespace Lucy {
 
 	void VulkanRenderPass::End(RenderPassEndInfo& info) {
 		vkCmdEndRenderPass(info.CommandBuffer);
+	}
+
+	void VulkanRenderPass::Recreate() {
+		Destroy();
+		Create();
 	}
 
 	void VulkanRenderPass::Destroy() {

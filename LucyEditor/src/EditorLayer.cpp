@@ -13,7 +13,6 @@
 #include "Events/KeyCodes.h"
 #include "Events/MouseCode.h"
 
-#include "Renderer/RenderCommand.h"
 #include "glad/glad.h"
 
 namespace Lucy {

@@ -11,8 +11,8 @@ namespace Lucy {
 		window->m_Specs = specs;
 		return window;
 #else
-		LUCY_CRITICAL("Operating system not being supported!")
-			LUCY_ASSERT(false);
+		LUCY_CRITICAL("Operating system not being supported!");
+		LUCY_ASSERT(false);
 #endif
 	}
 
@@ -72,6 +72,11 @@ namespace Lucy {
 
 	void WinWindow::Update() {
 		glfwGetWindowSize(m_Window, &m_Specs.Width, &m_Specs.Height);
+
+		while (m_Specs.Width == 0 || m_Specs.Height == 0) {
+			glfwGetWindowSize(m_Window, &m_Specs.Width, &m_Specs.Height);
+			glfwWaitEvents();
+		}
 	}
 
 	void WinWindow::PollEvents() {
