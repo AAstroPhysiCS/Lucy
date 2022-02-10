@@ -29,9 +29,7 @@ namespace Lucy {
 	}
 
 	void VulkanPipeline::Create() {
-
 		if (!s_DescriptorPool) {
-
 			std::vector<VkDescriptorPoolSize> poolSizes = CreateDescriptorPoolSizes();
 
 			VulkanDescriptorPoolSpecifications poolSpecs{};
@@ -133,7 +131,7 @@ namespace Lucy {
 		dynamicState.dynamicStateCount = 3;
 		dynamicState.pDynamicStates = dynamicStates;
 
-		std::vector<VkDescriptorSetLayout>& layouts = CreateDescriptorSetLayouts();
+		std::vector<VkDescriptorSetLayout>& layouts = CreateDescriptorSets();
 
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -192,7 +190,7 @@ namespace Lucy {
 		return poolSizes;
 	}
 
-	std::vector<VkDescriptorSetLayout>& VulkanPipeline::CreateDescriptorSetLayouts() {
+	std::vector<VkDescriptorSetLayout> VulkanPipeline::CreateDescriptorSets() {
 		std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
 
@@ -215,6 +213,13 @@ namespace Lucy {
 			VkDescriptorSetLayout descriptorSetLayout;
 			LUCY_VK_ASSERT(vkCreateDescriptorSetLayout(device, &descriptorLayoutInfo, nullptr, &descriptorSetLayout));
 			descriptorSetLayouts.push_back(descriptorSetLayout);
+
+			VulkanDescriptorSetSpecifications setSpecs;
+			setSpecs.Layout = descriptorSetLayout;
+			setSpecs.Pool = s_DescriptorPool;
+			
+			VulkanDescriptorSet descriptorSet(setSpecs);
+			m_DescriptorSets.push_back(descriptorSet);
 		}
 		
 		return descriptorSetLayouts;
@@ -250,6 +255,8 @@ namespace Lucy {
 	void VulkanPipeline::Destroy() {
 		m_Specs.FrameBuffer->Destroy();
 		As(m_Specs.RenderPass, VulkanRenderPass)->Destroy();
+		for (VulkanDescriptorSet sets : m_DescriptorSets)
+			sets.Destroy();
 		s_DescriptorPool->Destroy();
 
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();

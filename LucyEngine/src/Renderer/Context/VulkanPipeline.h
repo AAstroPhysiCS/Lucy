@@ -25,11 +25,12 @@ namespace Lucy {
 		VkFormat GetVulkanTypeFromSize(ShaderDataSize size);
 
 		std::vector<VkDescriptorPoolSize>& CreateDescriptorPoolSizes();
-		std::vector<VkDescriptorSetLayout>& CreateDescriptorSetLayouts();
+		std::vector<VkDescriptorSetLayout> CreateDescriptorSets();
 
-		VkPipeline m_Pipeline{};
-		VkPipelineLayout m_PipelineLayout{};
+		VkPipeline m_Pipeline = VK_NULL_HANDLE;
+		VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
 
 		static RefLucy<VulkanDescriptorPool> s_DescriptorPool;
+		std::vector<VulkanDescriptorSet> m_DescriptorSets;
 	};
 }

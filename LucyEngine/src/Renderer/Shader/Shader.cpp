@@ -144,14 +144,14 @@ namespace Lucy {
 		spirv_cross::ShaderResources resourcesVertex = compilerVertex->get_shader_resources();
 		spirv_cross::ShaderResources resourcesFragment = compilerFragment->get_shader_resources();
 
-		auto reflect = [this](spirv_cross::Compiler* compiler, spirv_cross::ShaderResources resource, ShaderStageInfo& stageInfo) {
+		auto reflect = [this](spirv_cross::Compiler* compiler, spirv_cross::ShaderResources resource, ShaderStageInfo& stageInfo, VkShaderStageFlags stageFlag) {
 			stageInfo.UniformCount = resource.uniform_buffers.size();
 			stageInfo.SampledImagesCount = resource.sampled_images.size();
 			stageInfo.PushConstantBufferCount = resource.push_constant_buffers.size();
 			stageInfo.StageInputCount = resource.stage_inputs.size();
 			stageInfo.StageOutputCount = resource.stage_outputs.size();
 
-			LUCY_INFO(fmt::format("------Shader {0}------", m_Path));
+			LUCY_INFO(fmt::format("------{0} Shader {1}------", stageFlag == VK_SHADER_STAGE_VERTEX_BIT ? "Vertex" : "Fragment", m_Path));
 			LUCY_INFO(fmt::format("{0} uniform buffers", stageInfo.UniformCount));
 			LUCY_INFO(fmt::format("{0} sampled images", stageInfo.SampledImagesCount));
 			LUCY_INFO(fmt::format("{0} push constant buffers", stageInfo.PushConstantBufferCount));
@@ -166,9 +166,9 @@ namespace Lucy {
 				int32_t memberCount = bufferType.member_types.size();
 
 				LUCY_INFO(fmt::format("{0}", ub.name));
+				LUCY_INFO(fmt::format("Set = {0}", set));
 				LUCY_INFO(fmt::format("Size = {0}", bufferSize));
 				LUCY_INFO(fmt::format("Binding = {0}", binding));
-				LUCY_INFO(fmt::format("Set = {0}", set));
 				LUCY_INFO(fmt::format("Members = {0}", memberCount));
 
 				ShaderUniformBufferInfo info;
@@ -177,8 +177,8 @@ namespace Lucy {
 				info.BufferSize = bufferSize;
 				info.MemberCount = memberCount;
 				info.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				info.Name = ub.name.c_str();
-				info.StageFlag = VK_SHADER_STAGE_VERTEX_BIT;
+				info.Name = ub.name;
+				info.StageFlag = stageFlag;
 
 				if (!m_DescriptorSetMap.count(set)) {
 					std::vector<ShaderUniformBufferInfo> buffer;
@@ -207,8 +207,8 @@ namespace Lucy {
 				info.BufferSize = 0;
 				info.MemberCount = memberCount;
 				info.Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-				info.Name = ui.name.c_str();
-				info.StageFlag = VK_SHADER_STAGE_VERTEX_BIT;
+				info.Name = ui.name;
+				info.StageFlag = stageFlag;
 
 				if (!m_DescriptorSetMap.count(set)) {
 					std::vector<ShaderUniformBufferInfo> buffer;
@@ -221,8 +221,8 @@ namespace Lucy {
 			}
 		};
 
-		reflect(compilerVertex, resourcesVertex, m_ShaderInfoVertex);
-		reflect(compilerFragment, resourcesFragment, m_ShaderInfoFragment);
+		reflect(compilerVertex, resourcesVertex, m_ShaderInfoVertex, VK_SHADER_STAGE_VERTEX_BIT);
+		reflect(compilerFragment, resourcesFragment, m_ShaderInfoFragment, VK_SHADER_STAGE_FRAGMENT_BIT);
 
 		delete compilerVertex;
 		delete compilerFragment;

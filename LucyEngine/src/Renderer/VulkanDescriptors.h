@@ -26,7 +26,7 @@ namespace Lucy {
 	};
 
 	struct VulkanDescriptorSetSpecifications {
-		std::vector<VkDescriptorSetLayoutBinding> LayoutBindings;
+		VkDescriptorSetLayout Layout;
 		RefLucy<VulkanDescriptorPool> Pool = nullptr;
 	};
 
@@ -34,12 +34,12 @@ namespace Lucy {
 	public:
 		VulkanDescriptorSet(VulkanDescriptorSetSpecifications& specs);
 		~VulkanDescriptorSet() = default;
+
+		void Destroy();
 	private:
 		void Create();
-		void Destroy();
 
 		VkDescriptorSet m_DescriptorSet = VK_NULL_HANDLE;
-		VkDescriptorSetLayout m_Layout = VK_NULL_HANDLE;
 		VulkanDescriptorSetSpecifications m_Specs;
 	};
 }

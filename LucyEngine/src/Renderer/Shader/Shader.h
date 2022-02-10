@@ -12,7 +12,7 @@
 namespace Lucy {
 
 	struct ShaderUniformBufferInfo {
-		const char* Name;
+		std::string Name;
 		uint32_t Set;
 		uint32_t Binding;
 		uint32_t BufferSize;

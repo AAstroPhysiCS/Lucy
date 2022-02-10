@@ -40,15 +40,9 @@ namespace Lucy {
 	void VulkanDescriptorSet::Create() {
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
 
-		VkDescriptorSetLayoutCreateInfo createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		createInfo.bindingCount = m_Specs.LayoutBindings.size();
-		createInfo.pBindings = m_Specs.LayoutBindings.data();
-		LUCY_VK_ASSERT(vkCreateDescriptorSetLayout(device, &createInfo, nullptr, &m_Layout));
-
 		VkDescriptorSetAllocateInfo allocInfo{};
 		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		allocInfo.pSetLayouts = &m_Layout;
+		allocInfo.pSetLayouts = &m_Specs.Layout;
 		allocInfo.descriptorPool = m_Specs.Pool->GetVulkanHandle();
 		allocInfo.descriptorSetCount = 1;
 
@@ -57,6 +51,6 @@ namespace Lucy {
 
 	void VulkanDescriptorSet::Destroy() {
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
-		vkDestroyDescriptorSetLayout(device, m_Layout, nullptr);
+		vkDestroyDescriptorSetLayout(device, m_Specs.Layout, nullptr);
 	}
 }
