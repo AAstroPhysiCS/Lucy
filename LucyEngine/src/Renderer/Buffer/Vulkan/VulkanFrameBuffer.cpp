@@ -32,7 +32,7 @@ namespace Lucy {
 			createInfo.height = swapChainInstance.GetExtent().height;
 			createInfo.layers = 1;
 
-			LUCY_VULKAN_ASSERT(vkCreateFramebuffer(device, &createInfo, nullptr, &m_SwapChainFrameBuffers[i]));
+			LUCY_VK_ASSERT(vkCreateFramebuffer(device, &createInfo, nullptr, &m_SwapChainFrameBuffers[i]));
 		}
 	}
 

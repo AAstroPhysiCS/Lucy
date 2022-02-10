@@ -41,7 +41,7 @@ namespace Lucy {
 			createCommandPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 			createCommandPoolInfo.flags = m_Specs.PoolFlags;
 			createCommandPoolInfo.queueFamilyIndex = device.GetQueueFamilies().GraphicsFamily;
-			LUCY_VULKAN_ASSERT(vkCreateCommandPool(device.GetLogicalDevice(), &createCommandPoolInfo, nullptr, &m_CommandPool));
+			LUCY_VK_ASSERT(vkCreateCommandPool(device.GetLogicalDevice(), &createCommandPoolInfo, nullptr, &m_CommandPool));
 
 			m_CommandBuffers.resize(m_Specs.CommandBufferCount);
 
@@ -51,7 +51,7 @@ namespace Lucy {
 			createAllocInfo.level = m_Specs.Level;
 			createAllocInfo.commandBufferCount = m_Specs.CommandBufferCount;
 
-			LUCY_VULKAN_ASSERT(vkAllocateCommandBuffers(device.GetLogicalDevice(), &createAllocInfo, m_CommandBuffers.data()));
+			LUCY_VK_ASSERT(vkAllocateCommandBuffers(device.GetLogicalDevice(), &createAllocInfo, m_CommandBuffers.data()));
 		});
 
 		vertexBuffer = new VulkanVertexBuffer(8);
@@ -92,7 +92,7 @@ namespace Lucy {
 			beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 			beginInfo.pInheritanceInfo = nullptr;
 			auto commandBuffer = m_CommandBuffers[i];
-			LUCY_VULKAN_ASSERT(vkBeginCommandBuffer(commandBuffer, &beginInfo));
+			LUCY_VK_ASSERT(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 
 			RenderPassBeginInfo info;
 			info.CommandBuffer = commandBuffer;
@@ -132,7 +132,7 @@ namespace Lucy {
 			RenderPassEndInfo info;
 			info.CommandBuffer = commandBuffer;
 			renderPass->End(info);
-			LUCY_VULKAN_ASSERT(vkEndCommandBuffer(commandBuffer));
+			LUCY_VK_ASSERT(vkEndCommandBuffer(commandBuffer));
 		}
 	}
 
@@ -189,6 +189,6 @@ namespace Lucy {
 		createAllocInfo.level = m_Specs.Level;
 		createAllocInfo.commandBufferCount = m_Specs.CommandBufferCount;
 
-		LUCY_VULKAN_ASSERT(vkAllocateCommandBuffers(VulkanDevice::Get().GetLogicalDevice(), &createAllocInfo, m_CommandBuffers.data()));
+		LUCY_VK_ASSERT(vkAllocateCommandBuffers(VulkanDevice::Get().GetLogicalDevice(), &createAllocInfo, m_CommandBuffers.data()));
 	}
 }

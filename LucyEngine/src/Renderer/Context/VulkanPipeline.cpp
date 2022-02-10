@@ -11,6 +11,8 @@
 
 namespace Lucy {
 
+	RefLucy<VulkanDescriptorPool> VulkanPipeline::s_DescriptorPool = nullptr;
+
 	VulkanPipeline::VulkanPipeline(PipelineSpecification& specs)
 		: Pipeline(specs) {
 		Renderer::Submit([this]() {
@@ -19,7 +21,7 @@ namespace Lucy {
 	}
 
 	void VulkanPipeline::BeginVirtual() {
-		
+
 	}
 
 	void VulkanPipeline::EndVirtual() {
@@ -27,8 +29,19 @@ namespace Lucy {
 	}
 
 	void VulkanPipeline::Create() {
-		auto& bindingDescriptor = CreateBindingDescriptor();
-		auto& attributeDescriptor = CreateAttributeDescriptor(bindingDescriptor.binding);
+
+		if (!s_DescriptorPool) {
+
+			std::vector<VkDescriptorPoolSize> poolSizes = CreateDescriptorPoolSizes();
+
+			VulkanDescriptorPoolSpecifications poolSpecs{};
+			poolSpecs.PoolSizesVector = poolSizes;
+			poolSpecs.MaxSet = 100;
+			s_DescriptorPool = CreateRef<VulkanDescriptorPool>(poolSpecs);
+		}
+
+		auto& bindingDescriptor = CreateBindingDescription();
+		auto& attributeDescriptor = CreateAttributeDescription(bindingDescriptor.binding);
 
 		VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -120,16 +133,17 @@ namespace Lucy {
 		dynamicState.dynamicStateCount = 3;
 		dynamicState.pDynamicStates = dynamicStates;
 
+		std::vector<VkDescriptorSetLayout>& layouts = CreateDescriptorSetLayouts();
+
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutInfo.setLayoutCount = 0;
-		pipelineLayoutInfo.pSetLayouts = nullptr;
+		pipelineLayoutInfo.setLayoutCount = layouts.size();
+		pipelineLayoutInfo.pSetLayouts = layouts.data();
 		pipelineLayoutInfo.pushConstantRangeCount = 0;
 		pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
-
-		LUCY_VULKAN_ASSERT(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_PipelineLayout));
+		LUCY_VK_ASSERT(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_PipelineLayout));
 
 		VkGraphicsPipelineCreateInfo pipelineCreateInfo{};
 		pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -147,12 +161,12 @@ namespace Lucy {
 		pipelineCreateInfo.layout = m_PipelineLayout;
 		pipelineCreateInfo.renderPass = As(m_Specs.RenderPass, VulkanRenderPass)->GetVulkanHandle();
 		pipelineCreateInfo.subpass = 0;
-		
+
 		//not that relevant for now
 		pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
 		pipelineCreateInfo.basePipelineIndex = -1;
 
-		LUCY_VULKAN_ASSERT(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_Pipeline));
+		LUCY_VK_ASSERT(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_Pipeline));
 		LUCY_INFO("Vulkan pipeline created successfully!");
 	}
 
@@ -170,7 +184,43 @@ namespace Lucy {
 		}
 	}
 
-	VkVertexInputBindingDescription VulkanPipeline::CreateBindingDescriptor() {
+	//TODO: Understand this... 10 is a temporary number
+	std::vector<VkDescriptorPoolSize>& VulkanPipeline::CreateDescriptorPoolSizes() {
+		std::vector<VkDescriptorPoolSize> poolSizes;
+		poolSizes.push_back({ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10 });
+		poolSizes.push_back({ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10 });
+		return poolSizes;
+	}
+
+	std::vector<VkDescriptorSetLayout>& VulkanPipeline::CreateDescriptorSetLayouts() {
+		std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+
+		for (auto& [set, info] : m_Specs.Shader->GetDescriptorSetMap()) {
+			std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
+			for (auto& ub : info) {
+				VkDescriptorSetLayoutBinding binding{};
+				binding.binding = ub.Binding;
+				binding.descriptorCount = 1;
+				binding.descriptorType = ub.Type;
+				binding.stageFlags = ub.StageFlag;
+				binding.pImmutableSamplers = nullptr;
+				layoutBindings.push_back(binding);
+			}
+			VkDescriptorSetLayoutCreateInfo descriptorLayoutInfo{};
+			descriptorLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			descriptorLayoutInfo.bindingCount = layoutBindings.size();
+			descriptorLayoutInfo.pBindings = layoutBindings.data();
+		
+			VkDescriptorSetLayout descriptorSetLayout;
+			LUCY_VK_ASSERT(vkCreateDescriptorSetLayout(device, &descriptorLayoutInfo, nullptr, &descriptorSetLayout));
+			descriptorSetLayouts.push_back(descriptorSetLayout);
+		}
+		
+		return descriptorSetLayouts;
+	}
+
+	VkVertexInputBindingDescription VulkanPipeline::CreateBindingDescription() {
 		VkVertexInputBindingDescription vertexInputBindingDescription{};
 		vertexInputBindingDescription.binding = 0;
 		vertexInputBindingDescription.stride = CalculateStride(m_Specs.VertexShaderLayout) * sizeof(float);
@@ -178,7 +228,7 @@ namespace Lucy {
 		return vertexInputBindingDescription;
 	}
 
-	std::vector<VkVertexInputAttributeDescription> VulkanPipeline::CreateAttributeDescriptor(uint32_t binding) {
+	std::vector<VkVertexInputAttributeDescription> VulkanPipeline::CreateAttributeDescription(uint32_t binding) {
 		std::vector<VkVertexInputAttributeDescription> vertexInputAttributeDescriptions;
 
 		uint32_t bufferIndex = 0;
@@ -200,6 +250,7 @@ namespace Lucy {
 	void VulkanPipeline::Destroy() {
 		m_Specs.FrameBuffer->Destroy();
 		As(m_Specs.RenderPass, VulkanRenderPass)->Destroy();
+		s_DescriptorPool->Destroy();
 
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
 		vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);

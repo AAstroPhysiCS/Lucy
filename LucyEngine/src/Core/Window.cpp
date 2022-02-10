@@ -55,7 +55,7 @@ namespace Lucy {
 	}
 
 	void WinWindow::InitVulkanSurface(VkInstance instance) {
-		LUCY_VULKAN_ASSERT(glfwCreateWindowSurface(instance, m_Window, nullptr, &m_Surface));
+		LUCY_VK_ASSERT(glfwCreateWindowSurface(instance, m_Window, nullptr, &m_Surface));
 	}
 
 	void WinWindow::DestroyVulkanSurface(VkInstance instance) {

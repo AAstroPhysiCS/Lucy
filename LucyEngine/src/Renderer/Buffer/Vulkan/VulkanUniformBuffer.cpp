@@ -2,6 +2,7 @@
 #include "VulkanUniformBuffer.h"
 
 #include "Renderer/Renderer.h"
+#include "Renderer/VulkanRenderer.h"
 #include "Renderer/Context/VulkanDevice.h"
 #include "Renderer/Buffer/Vulkan/VulkanBufferUtils.h"
 
@@ -9,22 +10,26 @@ namespace Lucy {
 
 	VulkanUniformBuffer::VulkanUniformBuffer(uint32_t size, uint32_t binding) {
 		Renderer::Submit([this, size, binding]() {
-			VkDescriptorSetLayoutBinding bindingInfo{};
-			bindingInfo.binding = binding;
-			bindingInfo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			bindingInfo.descriptorCount = 1;
-			bindingInfo.stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS;
-			bindingInfo.pImmutableSamplers = nullptr; //not relevant since this is only a uniform buffer
 
-			VkDescriptorSetLayoutCreateInfo createInfo{};
-			createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			createInfo.bindingCount = 1;
-			createInfo.pBindings = &bindingInfo;
+			/*
+			//TODO: CHANGE THIS
+			//I need to change this because what if i dont wanna have just one binding and multiple?
+			//Make a parameter in the specification or a new specification all together and put the layout bindings into that.
+			VkDescriptorSetLayoutBinding uniformBinding{};
+			uniformBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			uniformBinding.binding = binding;
+			uniformBinding.stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS;
+			uniformBinding.descriptorCount = 1;
 
-			LUCY_VULKAN_ASSERT(vkCreateDescriptorSetLayout(VulkanDevice::Get().GetLogicalDevice(), &createInfo, nullptr, &m_Layout));
+			VulkanDescriptorSetSpecifications setSpecs;
+			setSpecs.LayoutBindings = { uniformBinding };
+			setSpecs.Pool = s_DescriptorPool;
+			m_DescriptorSet = CreateRef<VulkanDescriptorSet>(setSpecs);
+			*/
 
-			VulkanBufferUtils::CreateVulkanBuffer(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_SHARING_MODE_EXCLUSIVE, 
-												  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, m_Buffer, m_BufferMemory);
+			const uint32_t instanceSize = VulkanRenderer::MAX_FRAMES_IN_FLIGHT;
+			VulkanBufferUtils::CreateVulkanBuffer(size * instanceSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_SHARING_MODE_EXCLUSIVE,
+												  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, m_Buffer, m_BufferMemory);
 		});
 	}
 
@@ -48,7 +53,6 @@ namespace Lucy {
 
 	void VulkanUniformBuffer::Destroy() {
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
-		vkDestroyDescriptorSetLayout(device, m_Layout, nullptr);
 		vkDestroyBuffer(device, m_Buffer, nullptr);
 		vkFreeMemory(device, m_BufferMemory, nullptr);
 	}

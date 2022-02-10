@@ -14,7 +14,7 @@ struct LucyRendererOutput {
 
 layout(location = 0) out LucyRendererOutput r_Output;
 
-layout(std140, binding = 0) uniform Camera {
+layout(set = 0, binding = 0) uniform Camera {
 	mat4 u_ViewMatrix;
 	mat4 u_ProjMatrix;
 	mat4 u_ModelMatrix;
@@ -39,7 +39,7 @@ struct LucyRendererOutput {
 
 layout(location = 0) in LucyRendererOutput r_Output;
 
-layout(std140, binding = 1) uniform TextureSlots {
+layout(set = 0, binding = 1) uniform TextureSlots {
 	int u_AlbedoTextureSlot;
 	int u_NormalTextureSlot;
 	int u_RoughnessTextureSlot;

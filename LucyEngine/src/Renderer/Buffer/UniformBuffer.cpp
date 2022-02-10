@@ -3,6 +3,7 @@
 
 #include "Renderer/Renderer.h"
 #include "OpenGL/OpenGLUniformBuffer.h"
+#include "Vulkan/VulkanUniformBuffer.h"
 
 namespace Lucy {
 
@@ -12,8 +13,7 @@ namespace Lucy {
 				return CreateRef<OpenGLUniformBuffer>(size, binding);
 				break;
 			case RenderArchitecture::Vulkan:
-				LUCY_CRITICAL("Vulkan not supported");
-				LUCY_ASSERT(false);
+				return CreateRef<VulkanUniformBuffer>(size, binding);
 				break;
 		}
 	}

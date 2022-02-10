@@ -8,6 +8,7 @@ namespace Lucy {
 		std::string Name;
 		uint32_t DriverVersion;
 		uint32_t ApiVersion;
+		uint32_t MinUniformBufferAlignment = 0;
 	};
 
 	struct QueueFamilyIndices {
@@ -35,6 +36,7 @@ namespace Lucy {
 		inline QueueFamilyIndices GetQueueFamilies() { return m_QueueFamilyIndices; }
 		inline VkQueue GetGraphicsQueue() { return m_GraphicsQueue; }
 		inline VkQueue GetPresentQueue() { return m_PresentQueue; }
+		inline uint32_t GetMinUniformBufferOffsetAlignment() { return m_DeviceInfo.MinUniformBufferAlignment; }
 	private:
 		void PickDeviceByRanking(std::vector<VkPhysicalDevice>& devices);
 		void CreateLogicalDevice(std::vector<const char*>& enabledValidationLayers);

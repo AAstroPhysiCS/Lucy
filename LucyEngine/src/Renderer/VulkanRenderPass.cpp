@@ -56,7 +56,7 @@ namespace Lucy {
 		createInfo.dependencyCount = 1;
 		createInfo.pDependencies = &subpassDependency;
 
-		LUCY_VULKAN_ASSERT(vkCreateRenderPass(device.GetLogicalDevice(), &createInfo, nullptr, &m_RenderPass));
+		LUCY_VK_ASSERT(vkCreateRenderPass(device.GetLogicalDevice(), &createInfo, nullptr, &m_RenderPass));
 	}
 
 	void VulkanRenderPass::Begin(RenderPassBeginInfo& info) {

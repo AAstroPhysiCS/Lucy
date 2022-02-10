@@ -65,7 +65,7 @@ namespace Lucy {
 #endif
 
 		VkResult result = vkCreateInstance(&createInfo, nullptr, &m_Instance);
-		LUCY_VULKAN_ASSERT(result);
+		LUCY_VK_ASSERT(result);
 		LUCY_INFO("Vulkan successfully initialized");
 
 		SetupMessageCallback();
@@ -106,7 +106,7 @@ namespace Lucy {
 
 		auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(m_Instance, "vkCreateDebugUtilsMessengerEXT");
 		if (func) {
-			LUCY_VULKAN_ASSERT(func(m_Instance, &createInfo, nullptr, &m_DebugMessenger));
+			LUCY_VK_ASSERT(func(m_Instance, &createInfo, nullptr, &m_DebugMessenger));
 			return;
 		}
 		LUCY_ASSERT(false);

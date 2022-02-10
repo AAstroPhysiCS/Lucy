@@ -21,12 +21,12 @@
 								LUCY_CRITICAL("Assert failed!"); \
 								LUCY_DEBUG_BREAK }
 
-	#define LUCY_VULKAN_ASSERT(arg) if(arg != VK_SUCCESS) { \
+	#define LUCY_VK_ASSERT(arg) if(arg != VK_SUCCESS) { \
 								LUCY_CRITICAL("Assert failed!"); \
 								LUCY_DEBUG_BREAK }
 	#elif LUCY_RELEASE
 	#define LUCY_ASSERT(arg)
-	#define LUCY_VULKAN_ASSERT(arg) 
+	#define LUCY_VK_ASSERT(arg) 
 	#endif
 #endif
 

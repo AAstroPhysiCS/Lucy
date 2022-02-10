@@ -48,7 +48,7 @@ namespace Lucy {
 		createInfo.clipped = VK_TRUE;
 		createInfo.oldSwapchain = VK_NULL_HANDLE;
 
-		LUCY_VULKAN_ASSERT(vkCreateSwapchainKHR(logicalDevice, &createInfo, nullptr, &m_SwapChain));
+		LUCY_VK_ASSERT(vkCreateSwapchainKHR(logicalDevice, &createInfo, nullptr, &m_SwapChain));
 
 		uint32_t swapChainImageCount = 0;
 		vkGetSwapchainImagesKHR(logicalDevice, m_SwapChain, &swapChainImageCount, nullptr);
@@ -75,7 +75,7 @@ namespace Lucy {
 			createInfo.subresourceRange.baseArrayLayer = 0;
 			createInfo.subresourceRange.layerCount = 1;
 
-			LUCY_VULKAN_ASSERT(vkCreateImageView(logicalDevice, &createInfo, nullptr, &m_SwapChainImageViews[i]));
+			LUCY_VK_ASSERT(vkCreateImageView(logicalDevice, &createInfo, nullptr, &m_SwapChainImageViews[i]));
 		}
 	}
 
@@ -91,7 +91,7 @@ namespace Lucy {
 
 	SwapChainCapabilities VulkanSwapChain::GetSwapChainCapabilities(VkPhysicalDevice device) {
 		SwapChainCapabilities capabilities;
-		LUCY_VULKAN_ASSERT(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, Renderer::s_Window->m_Surface, &capabilities.surfaceCapabilities));
+		LUCY_VK_ASSERT(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, Renderer::s_Window->m_Surface, &capabilities.surfaceCapabilities));
 
 		uint32_t formatsCount = 0;
 		vkGetPhysicalDeviceSurfaceFormatsKHR(device, Renderer::s_Window->m_Surface, &formatsCount, nullptr);

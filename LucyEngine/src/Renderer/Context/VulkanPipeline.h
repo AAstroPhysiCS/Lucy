@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Pipeline.h"
+#include "Renderer/VulkanDescriptors.h"
 
 namespace Lucy {
 
@@ -19,11 +20,16 @@ namespace Lucy {
 	private:
 		void Create();
 
-		VkVertexInputBindingDescription CreateBindingDescriptor();
-		std::vector<VkVertexInputAttributeDescription> CreateAttributeDescriptor(uint32_t binding);
+		VkVertexInputBindingDescription CreateBindingDescription();
+		std::vector<VkVertexInputAttributeDescription> CreateAttributeDescription(uint32_t binding);
 		VkFormat GetVulkanTypeFromSize(ShaderDataSize size);
+
+		std::vector<VkDescriptorPoolSize>& CreateDescriptorPoolSizes();
+		std::vector<VkDescriptorSetLayout>& CreateDescriptorSetLayouts();
 
 		VkPipeline m_Pipeline{};
 		VkPipelineLayout m_PipelineLayout{};
+
+		static RefLucy<VulkanDescriptorPool> s_DescriptorPool;
 	};
 }

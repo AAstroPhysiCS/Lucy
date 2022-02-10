@@ -50,6 +50,7 @@ namespace Lucy {
 			LUCY_INFO(fmt::format("Device Driver Version: {0}", deviceInfo.DriverVersion));
 			LUCY_INFO(fmt::format("Device API Version: {0}", deviceInfo.ApiVersion));
 			LUCY_INFO("-------------------------------------");
+			deviceInfo.MinUniformBufferAlignment = properties.limits.minUniformBufferOffsetAlignment;
 
 			FindQueueFamilies(device);
 			bool supportsAllGivenExtensions = CheckDeviceExtensionSupport(device);
@@ -103,7 +104,7 @@ namespace Lucy {
 		deviceCreateInfo.ppEnabledLayerNames = 0;
 #endif
 
-		LUCY_VULKAN_ASSERT(vkCreateDevice(m_PhysicalDevice, &deviceCreateInfo, nullptr, &m_LogicalDevice));
+		LUCY_VK_ASSERT(vkCreateDevice(m_PhysicalDevice, &deviceCreateInfo, nullptr, &m_LogicalDevice));
 	}
 
 	void VulkanDevice::FindQueueFamilies(VkPhysicalDevice device) {

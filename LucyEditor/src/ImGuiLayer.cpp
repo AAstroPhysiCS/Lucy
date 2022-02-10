@@ -86,7 +86,7 @@ namespace Lucy {
 			pool_info.pPoolSizes = pool_sizes;
 
 			VkDescriptorPool imguiPool;
-			LUCY_VULKAN_ASSERT(vkCreateDescriptorPool(device.GetLogicalDevice(), &pool_info, nullptr, &imguiPool));
+			LUCY_VK_ASSERT(vkCreateDescriptorPool(device.GetLogicalDevice(), &pool_info, nullptr, &imguiPool));
 
 			ImGui_ImplVulkan_InitInfo initInfo{};
 			initInfo.Instance = vulkanContext->GetVulkanInstance();
