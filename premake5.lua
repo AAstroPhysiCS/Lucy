@@ -1,6 +1,6 @@
 include "Libraries.lua"
 
-workspace "LucyEngine"
+workspace "Lucy"
     architecture "x64"
     startproject "LucyEditor"
 

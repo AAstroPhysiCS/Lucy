@@ -11,6 +11,7 @@
 #include "Buffer/Vulkan/VulkanVertexBuffer.h" //TODO: Delete
 #include "Buffer/Vulkan/VulkanIndexBuffer.h" //TODO: Delete
 #include "Renderer.h" //TODO: Delete
+#include "Renderer/VulkanRenderer.h"
 
 namespace Lucy {
 
@@ -86,6 +87,57 @@ namespace Lucy {
 		auto& framebuffer = As(pipeline->GetFrameBuffer(), VulkanFrameBuffer)->GetSwapChainFrameBuffers();
 		auto& extent = VulkanSwapChain::Get().GetExtent();
 
+		//TODO: Delete (all temporary, test stuff)
+		auto& uniformBuffer = pipeline->GetUniformBuffers()[0];
+
+		struct MVP {
+			glm::mat4 model;
+			glm::mat4 view;
+			glm::mat4 proj;
+		};
+
+		MVP mvp;
+		mvp.model = glm::rotate(glm::mat4(1.0f), 0.5f * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		mvp.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		mvp.proj = glm::perspective(glm::radians(45.0f), (float)extent.width / extent.height, 0.1f, 10.0f);
+		mvp.proj[1][1] *= -1;
+
+		uniformBuffer->SetData((void*)&mvp, sizeof(MVP), 0);
+		uniformBuffer->WriteToSets(VulkanRenderer::CURRENT_FRAME);
+
+		struct Add {
+			glm::vec4 addition;
+		};
+
+		Add add;
+		add.addition.x = 0.5f;
+		add.addition.y = 0.5f;
+
+		auto& uniformBuffer2 = pipeline->GetUniformBuffers()[1];
+		uniformBuffer2->SetData((void*)&add, sizeof(Add), 0);
+		uniformBuffer2->WriteToSets(VulkanRenderer::CURRENT_FRAME);
+
+		Add add2;
+		add2.addition.x = 0.5f;
+		add2.addition.y = 0.5f;
+
+		auto& uniformBuffer3 = pipeline->GetUniformBuffers()[2];
+		uniformBuffer3->SetData((void*)&add2, sizeof(Add), 0);
+		uniformBuffer3->WriteToSets(VulkanRenderer::CURRENT_FRAME);
+
+		Add add3;
+		add3.addition.x = 0.0f;
+		add3.addition.y = 0.5f;
+
+		auto& uniformBuffer4 = pipeline->GetUniformBuffers()[3];
+		uniformBuffer4->SetData((void*)&add3, sizeof(Add), 0);
+		uniformBuffer4->WriteToSets(VulkanRenderer::CURRENT_FRAME);
+
+		std::vector<VkDescriptorSet> allSetsToBind = {
+			uniformBuffer->GetDescriptorSet().GetSetBasedOffCurrentFrame(VulkanRenderer::CURRENT_FRAME),
+			uniformBuffer3->GetDescriptorSet().GetSetBasedOffCurrentFrame(VulkanRenderer::CURRENT_FRAME)
+		};
+
 		for (uint32_t i = 0; i < m_CommandBuffers.size(); i++) {
 			VkCommandBufferBeginInfo beginInfo{};
 			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -116,11 +168,24 @@ namespace Lucy {
 				vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 				vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
+				/*
+				BindSpecification uboBind;
+				uboBind.CommandBuffer = commandBuffer;
+				uboBind.SetIndicesToBind = { 0, 1 };
+				uboBind.Layout = pipeline->GetPipelineLayout();
+				//WTF is going on?
+				uniformBuffer->Bind(uboBind);
+				*/
+				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetPipelineLayout(), 0, allSetsToBind.size(), allSetsToBind.data(), 0, nullptr);
+
 				vertexBuffer->Bind({ commandBuffer });
 				indexBuffer->Bind({ commandBuffer });
+
 				vkCmdDrawIndexed(commandBuffer, 6, 1, 0, 0, 0);
+
 				vertexBuffer->Unbind();
 				indexBuffer->Unbind();
+				uniformBuffer->Unbind();
 			}
 		}
 	}

@@ -12,9 +12,9 @@ namespace Lucy {
 
 	class VulkanRenderer : public RendererAPI {
 	private:
-		inline static uint32_t CURRENT_FRAME = 0;
 		static uint32_t s_ImageIndex;
 	public:
+		inline static uint32_t CURRENT_FRAME = 0;
 		inline static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
 		VulkanRenderer(RenderArchitecture renderArchitecture);

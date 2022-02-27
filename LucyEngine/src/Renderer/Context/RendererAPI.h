@@ -57,8 +57,8 @@ namespace Lucy {
 
 		RefLucy<RenderContext> m_RenderContext;
 
-		RefLucy<UniformBuffer> m_CameraUniformBuffer;
-		RefLucy<UniformBuffer> m_TextureSlotsUniformBuffer;
+		RefLucy<UniformBuffer> m_CameraUniformBuffer; //TODO: DELETE
+		RefLucy<UniformBuffer> m_TextureSlotsUniformBuffer; //TODO: DELETE
 		RenderArchitecture m_Architecture;
 
 		ShaderLibrary m_ShaderLibrary;

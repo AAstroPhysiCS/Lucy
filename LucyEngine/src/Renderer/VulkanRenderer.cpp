@@ -61,8 +61,6 @@ namespace Lucy {
 		m_ImagesInFlight.resize(imageCount, nullptr);
 
 		s_CommandPool = VulkanCommandPool::Create({ VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, VK_COMMAND_BUFFER_LEVEL_PRIMARY, imageCount });
-		
-		m_CameraUniformBuffer = UniformBuffer::Create(sizeof(glm::mat4) * 3, 0);
 	}
 
 	void VulkanRenderer::ClearCommands() {
@@ -84,9 +82,7 @@ namespace Lucy {
 			return;
 		}
 
-		m_CameraUniformBuffer->Bind();
 		s_CommandPool->Execute(m_GeometryPipeline);
-		m_CameraUniformBuffer->Unbind();
 
 		if (m_ImagesInFlight[s_ImageIndex] != nullptr) {
 			vkWaitForFences(deviceVulkanHandle, 1, &m_ImagesInFlight[s_ImageIndex]->GetFence(), VK_TRUE, UINT64_MAX);
@@ -110,7 +106,7 @@ namespace Lucy {
 		submitInfo.signalSemaphoreCount = 1;
 		submitInfo.pSignalSemaphores = renderSignalSemaphores;
 
-		LUCY_VK_ASSERT(vkQueueSubmit(device.GetGraphicsQueue(), 1, &submitInfo, currentFrameFence));
+ 		LUCY_VK_ASSERT(vkQueueSubmit(device.GetGraphicsQueue(), 1, &submitInfo, currentFrameFence));
 		vkWaitForFences(deviceVulkanHandle, 1, &currentFrameFence, VK_TRUE, UINT64_MAX);
 	}
 
@@ -138,8 +134,6 @@ namespace Lucy {
 	void VulkanRenderer::Destroy() {
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
 		vkDeviceWaitIdle(device);
-
-		m_CameraUniformBuffer->Destroy();
 
 		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 			m_ImageIsAvailableSemaphores[i].Destroy();

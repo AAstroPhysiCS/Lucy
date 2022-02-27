@@ -1,12 +1,14 @@
 #pragma once
-
+#include <optional>
 #include "Buffer.h"
 
 namespace Lucy {
 
+	class VulkanDescriptorSet;
+
 	class UniformBuffer : public Buffer<void*> {
 	public:
-		static RefLucy<UniformBuffer> Create(uint32_t size, uint32_t binding);
+		static RefLucy<UniformBuffer> Create(uint32_t size, uint32_t binding, std::optional<VulkanDescriptorSet> descriptorSet);
 		
 		virtual void Bind() = 0;
 		virtual void Unbind() = 0;

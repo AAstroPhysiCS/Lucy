@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Pipeline.h"
-#include "Renderer/VulkanDescriptors.h"
+#include "Renderer/Buffer/Vulkan/VulkanUniformBuffer.h"
 
 namespace Lucy {
 
@@ -17,6 +17,8 @@ namespace Lucy {
 		void EndVirtual();
 
 		inline VkPipeline GetVulkanHandle() { return m_Pipeline; }
+		inline VkPipelineLayout GetPipelineLayout() { return m_PipelineLayout; }
+		inline std::vector<RefLucy<VulkanUniformBuffer>>& GetUniformBuffers() { return m_UniformBuffers; }
 	private:
 		void Create();
 
@@ -24,13 +26,14 @@ namespace Lucy {
 		std::vector<VkVertexInputAttributeDescription> CreateAttributeDescription(uint32_t binding);
 		VkFormat GetVulkanTypeFromSize(ShaderDataSize size);
 
-		std::vector<VkDescriptorPoolSize>& CreateDescriptorPoolSizes();
-		std::vector<VkDescriptorSetLayout> CreateDescriptorSets();
+		std::vector<VkDescriptorPoolSize> CreateDescriptorPoolSizes();
+		void CreateDescriptorSets();
 
 		VkPipeline m_Pipeline = VK_NULL_HANDLE;
 		VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
 
 		static RefLucy<VulkanDescriptorPool> s_DescriptorPool;
-		std::vector<VulkanDescriptorSet> m_DescriptorSets;
+		std::vector<RefLucy<VulkanUniformBuffer>> m_UniformBuffers;
+		std::vector<VkDescriptorSetLayout> m_DescriptorSetLayouts;
 	};
 }

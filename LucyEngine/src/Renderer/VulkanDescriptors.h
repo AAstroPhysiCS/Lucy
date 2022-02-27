@@ -17,7 +17,7 @@ namespace Lucy {
 
 		void Destroy();
 
-		inline VkDescriptorPool GetVulkanHandle() const { return m_DescriptorPool; }
+		inline VkDescriptorPool GetVulkanHandle() const noexcept { return m_DescriptorPool; }
 	private:
 		void Create();
 
@@ -26,7 +26,7 @@ namespace Lucy {
 	};
 
 	struct VulkanDescriptorSetSpecifications {
-		VkDescriptorSetLayout Layout;
+		VkDescriptorSetLayout Layout = VK_NULL_HANDLE;
 		RefLucy<VulkanDescriptorPool> Pool = nullptr;
 	};
 
@@ -35,11 +35,11 @@ namespace Lucy {
 		VulkanDescriptorSet(VulkanDescriptorSetSpecifications& specs);
 		~VulkanDescriptorSet() = default;
 
-		void Destroy();
+		inline VkDescriptorSet GetSetBasedOffCurrentFrame(uint32_t currentFrame) const noexcept { return m_DescriptorSets[currentFrame]; }
 	private:
 		void Create();
 
-		VkDescriptorSet m_DescriptorSet = VK_NULL_HANDLE;
+		std::vector<VkDescriptorSet> m_DescriptorSets;
 		VulkanDescriptorSetSpecifications m_Specs;
 	};
 }

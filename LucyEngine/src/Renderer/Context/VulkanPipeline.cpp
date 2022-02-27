@@ -8,6 +8,8 @@
 #include "Renderer/Buffer/Vulkan/VulkanFrameBuffer.h"
 
 #include "Renderer/Renderer.h"
+#include "Renderer/VulkanDescriptors.h"
+#include "Renderer/Buffer/Vulkan/VulkanUniformBuffer.h"
 
 namespace Lucy {
 
@@ -15,7 +17,7 @@ namespace Lucy {
 
 	VulkanPipeline::VulkanPipeline(PipelineSpecification& specs)
 		: Pipeline(specs) {
-		Renderer::Submit([this]() {
+		Renderer::Submit([&]() {
 			Create();
 		});
 	}
@@ -30,7 +32,7 @@ namespace Lucy {
 
 	void VulkanPipeline::Create() {
 		if (!s_DescriptorPool) {
-			std::vector<VkDescriptorPoolSize> poolSizes = CreateDescriptorPoolSizes();
+			std::vector<VkDescriptorPoolSize>& poolSizes = CreateDescriptorPoolSizes();
 
 			VulkanDescriptorPoolSpecifications poolSpecs{};
 			poolSpecs.PoolSizesVector = poolSizes;
@@ -88,7 +90,7 @@ namespace Lucy {
 		}
 		rasterizationCreateInfo.lineWidth = m_Specs.Rasterization.LineWidth;
 		rasterizationCreateInfo.cullMode = m_Specs.Rasterization.CullingMode;
-		rasterizationCreateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
+		rasterizationCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 		rasterizationCreateInfo.depthBiasEnable = VK_FALSE;
 		rasterizationCreateInfo.depthBiasConstantFactor = 0.0f;
 		rasterizationCreateInfo.depthBiasClamp = 0.0f;
@@ -131,12 +133,12 @@ namespace Lucy {
 		dynamicState.dynamicStateCount = 3;
 		dynamicState.pDynamicStates = dynamicStates;
 
-		std::vector<VkDescriptorSetLayout>& layouts = CreateDescriptorSets();
+		CreateDescriptorSets();
 
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutInfo.setLayoutCount = layouts.size();
-		pipelineLayoutInfo.pSetLayouts = layouts.data();
+		pipelineLayoutInfo.setLayoutCount = m_DescriptorSetLayouts.size();
+		pipelineLayoutInfo.pSetLayouts = m_DescriptorSetLayouts.data();
 		pipelineLayoutInfo.pushConstantRangeCount = 0;
 		pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
@@ -183,19 +185,20 @@ namespace Lucy {
 	}
 
 	//TODO: Understand this... 10 is a temporary number
-	std::vector<VkDescriptorPoolSize>& VulkanPipeline::CreateDescriptorPoolSizes() {
+	std::vector<VkDescriptorPoolSize> VulkanPipeline::CreateDescriptorPoolSizes() {
 		std::vector<VkDescriptorPoolSize> poolSizes;
 		poolSizes.push_back({ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10 });
 		poolSizes.push_back({ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10 });
 		return poolSizes;
 	}
 
-	std::vector<VkDescriptorSetLayout> VulkanPipeline::CreateDescriptorSets() {
-		std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+	void VulkanPipeline::CreateDescriptorSets() {
+		if (m_DescriptorSetLayouts.size() != 0) return; //if the application has been resized
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
 
 		for (auto& [set, info] : m_Specs.Shader->GetDescriptorSetMap()) {
 			std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
+			uint32_t size = 0;
 			for (auto& ub : info) {
 				VkDescriptorSetLayoutBinding binding{};
 				binding.binding = ub.Binding;
@@ -203,26 +206,28 @@ namespace Lucy {
 				binding.descriptorType = ub.Type;
 				binding.stageFlags = ub.StageFlag;
 				binding.pImmutableSamplers = nullptr;
+				size += ub.BufferSize;
 				layoutBindings.push_back(binding);
 			}
 			VkDescriptorSetLayoutCreateInfo descriptorLayoutInfo{};
 			descriptorLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 			descriptorLayoutInfo.bindingCount = layoutBindings.size();
 			descriptorLayoutInfo.pBindings = layoutBindings.data();
-		
+
 			VkDescriptorSetLayout descriptorSetLayout;
 			LUCY_VK_ASSERT(vkCreateDescriptorSetLayout(device, &descriptorLayoutInfo, nullptr, &descriptorSetLayout));
-			descriptorSetLayouts.push_back(descriptorSetLayout);
+			m_DescriptorSetLayouts.push_back(descriptorSetLayout);
 
 			VulkanDescriptorSetSpecifications setSpecs;
 			setSpecs.Layout = descriptorSetLayout;
 			setSpecs.Pool = s_DescriptorPool;
-			
+
 			VulkanDescriptorSet descriptorSet(setSpecs);
-			m_DescriptorSets.push_back(descriptorSet);
+			for (auto& ub : info) {
+				RefLucy<VulkanUniformBuffer> uniformBuffer = As(UniformBuffer::Create(size, ub.Binding, std::optional<VulkanDescriptorSet>(descriptorSet)), VulkanUniformBuffer);
+				m_UniformBuffers.push_back(uniformBuffer);
+			}
 		}
-		
-		return descriptorSetLayouts;
 	}
 
 	VkVertexInputBindingDescription VulkanPipeline::CreateBindingDescription() {
@@ -253,13 +258,17 @@ namespace Lucy {
 	}
 
 	void VulkanPipeline::Destroy() {
+		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+
 		m_Specs.FrameBuffer->Destroy();
 		As(m_Specs.RenderPass, VulkanRenderPass)->Destroy();
-		for (VulkanDescriptorSet sets : m_DescriptorSets)
-			sets.Destroy();
-		s_DescriptorPool->Destroy();
 
-		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+		for (auto& buffer : m_UniformBuffers)
+			buffer->Destroy();
+		for (auto& descriptorSetLayout : m_DescriptorSetLayouts)
+			vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+
+		s_DescriptorPool->Destroy();
 		vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);
 		vkDestroyPipeline(device, m_Pipeline, nullptr);
 		m_Specs.Shader->Destroy();
@@ -267,6 +276,7 @@ namespace Lucy {
 
 	void VulkanPipeline::Recreate(float sizeX, float sizeY) {
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+
 		vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);
 		vkDestroyPipeline(device, m_Pipeline, nullptr);
 
