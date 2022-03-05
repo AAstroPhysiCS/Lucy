@@ -15,7 +15,7 @@ namespace Lucy {
 
 	void ViewportPanel::OnEvent(Event& e) {
 		EventDispatcher& dispatcher = EventDispatcher::GetInstance();
-		dispatcher.Dispatch<KeyEvent>(e, EventType::KeyEvent, [this](KeyEvent& keyEvent) {
+		dispatcher.Dispatch<KeyEvent>(e, EventType::KeyEvent, [this](const KeyEvent& keyEvent) {
 			if (keyEvent == KeyCode::V)
 				UseSnap = !UseSnap;
 
@@ -61,9 +61,9 @@ namespace Lucy {
 			Renderer::OnFramebufferResize(size.x, size.y);
 		}
 
-		ImVec2& mousePos = ImGui::GetMousePos();
-		ImVec2& offset = ImGui::GetCursorPos();
-		ImVec2& windowPos = ImGui::GetWindowPos();
+		const ImVec2& mousePos = ImGui::GetMousePos();
+		const ImVec2& offset = ImGui::GetCursorPos();
+		const ImVec2& windowPos = ImGui::GetWindowPos();
 
 		Renderer::SetViewportMousePosition(mousePos.x - windowPos.x - offset.x,
 										   mousePos.y - windowPos.y);

@@ -7,14 +7,14 @@ namespace Lucy {
 	class VulkanIndexBuffer : public IndexBuffer {
 	public:
 		VulkanIndexBuffer();
-		VulkanIndexBuffer(uint32_t size);
+		explicit VulkanIndexBuffer(uint32_t size);
 		virtual ~VulkanIndexBuffer() = default;
 		
-		void Bind(const IndexBindInfo& info);
-		void Unbind();
-		void AddData(const std::vector<uint32_t>& dataToAdd);
-		void Load();
-		void Destroy();
+		void Bind(const IndexBindInfo& info) override;
+		void Unbind() override;
+		void AddData(const std::vector<uint32_t>& dataToAdd) override;
+		void Load() override;
+		void Destroy() override;
 	private:
 		void Create(uint32_t size = 0);
 

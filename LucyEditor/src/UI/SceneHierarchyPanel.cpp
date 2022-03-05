@@ -20,7 +20,7 @@ namespace Lucy {
 		ImGui::Begin("Scene Hierarchy", 0, ImGuiWindowFlags_NoBringToFrontOnFocus);
 		
 		auto& scene = EditorLayer::GetInstance().GetScene();
-		auto& view = scene.View<UUIDComponent, TagComponent>();
+		const auto& view = scene.View<UUIDComponent, TagComponent>();
 
 		uint32_t id = 0;
 		for (auto entity : view) {

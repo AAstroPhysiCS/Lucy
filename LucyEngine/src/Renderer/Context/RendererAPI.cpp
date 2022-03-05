@@ -15,6 +15,7 @@ namespace Lucy {
 				return CreateRef<VulkanRenderer>(architecture);
 				break;
 		}
+		return nullptr;
 	}
 	
 	RendererAPI::RendererAPI(RenderArchitecture renderArchitecture) {

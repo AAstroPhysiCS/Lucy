@@ -16,6 +16,7 @@ namespace Lucy {
 				return CreateRef<VulkanIndexBuffer>(size);
 				break;
 		}
+		return nullptr;
 	}
 
 	RefLucy<IndexBuffer> IndexBuffer::Create() {
@@ -27,10 +28,12 @@ namespace Lucy {
 				return CreateRef<VulkanIndexBuffer>();
 				break;
 		}
+		return nullptr;
 	}
 
 	IndexBuffer::IndexBuffer() {
 		m_DataHead = m_Data.data();
+		m_Size = 0;
 	}
 
 	IndexBuffer::IndexBuffer(uint32_t size)

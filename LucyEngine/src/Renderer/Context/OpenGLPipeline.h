@@ -9,11 +9,11 @@ namespace Lucy {
 
 	class OpenGLPipeline : public Pipeline {
 	public:
-		OpenGLPipeline(PipelineSpecification& specs);
+		explicit OpenGLPipeline(const PipelineSpecification& specs);
 		virtual ~OpenGLPipeline() = default;
 
-		void BeginVirtual();
-		void EndVirtual();
+		void BeginVirtual() override;
+		void EndVirtual() override;
 
 		friend class Mesh;
 	private:

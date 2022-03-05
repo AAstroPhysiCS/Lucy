@@ -10,8 +10,8 @@ namespace Lucy {
 	class EditorApplication : public Application
 	{
 	public:
-		EditorApplication(const ApplicationArgs& args);
-		~EditorApplication();
+		explicit EditorApplication(const ApplicationArgs& args);
+		virtual ~EditorApplication();
 		
 		void Run();
 		void OnEvent(Event* e);

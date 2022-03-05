@@ -27,8 +27,8 @@ namespace Lucy {
 		float m_Fov;
 		int32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
 	public:
-		void SetPosition(glm::vec3& position) { m_Position = position; }
-		void SetRotation(glm::vec3& rotation) { m_Rotation = rotation; }
+		void SetPosition(const glm::vec3& position) { m_Position = position; }
+		void SetRotation(const glm::vec3& rotation) { m_Rotation = rotation; }
 
 		void SetViewportSize(int32_t viewportWidth, int32_t viewportHeight) { 
 			m_ViewportWidth = viewportWidth; 
@@ -49,18 +49,18 @@ namespace Lucy {
 	public:
 		EditorCamera(int32_t m_ViewportWidth, int32_t m_ViewportHeight, float farPlane = 1000.0f, float nearPlane = 0.1f, float fov = 90.0f);
 		EditorCamera(float farPlane = 1000.0f, float nearPlane = 0.1f, float fov = 90.0f);
-		EditorCamera(glm::vec3& position, float farPlane = 1000.0f, float nearPlane = 0.1f, float fov = 90.0f);
+		explicit EditorCamera(glm::vec3& position, float farPlane = 1000.0f, float nearPlane = 0.1f, float fov = 90.0f);
 		virtual ~EditorCamera() = default;
 
-		void OnEvent(PerformanceMetrics& rendererMetrics);
+		void OnEvent(PerformanceMetrics& rendererMetrics) override;
 		void Update();
 	private:
 
 		float m_CameraSpeed = 0.025f;
 		float m_Sensivity = .3f;
 
-		void UpdateView();
-		void UpdateProjection();
+		void UpdateView() override;
+		void UpdateProjection() override;
 	};
 }
 

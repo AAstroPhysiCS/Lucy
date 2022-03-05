@@ -17,6 +17,7 @@ namespace Lucy {
 				return CreateRef<VulkanVertexBuffer>(size);
 				break;
 		}
+		return nullptr;
 	}
 
 	RefLucy<VertexBuffer> VertexBuffer::Create() {
@@ -28,10 +29,12 @@ namespace Lucy {
 				return CreateRef<VulkanVertexBuffer>();
 				break;
 		}
+		return nullptr;
 	}
 
 	VertexBuffer::VertexBuffer() {
 		m_DataHead = m_Data.data();
+		m_Size = 0;
 	}
 
 	VertexBuffer::VertexBuffer(uint32_t size)

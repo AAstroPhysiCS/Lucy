@@ -14,7 +14,7 @@ namespace Lucy {
 
 	class VulkanCommandPool {
 	public:
-		VulkanCommandPool(CommandPoolSpecs specs);
+		explicit VulkanCommandPool(CommandPoolSpecs specs);
 		~VulkanCommandPool() = default;
 
 		static RefLucy<VulkanCommandPool> Create(CommandPoolSpecs specs);
@@ -28,6 +28,11 @@ namespace Lucy {
 	private:
 		void BeginRecording(RefLucy<VulkanPipeline>& pipeline);
 		void EndRecording(RefLucy<VulkanPipeline>& pipeline);
+		
+		VkCommandBuffer BeginSingleTimeCommand();
+		void EndSingleTimeCommand(VkCommandBuffer commandBuffer);
+
+		void ImGui_UploadFontsToGPU(std::function<bool(VkCommandBuffer)> imguiUploadFunc);
 		void DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size);
 		void Allocate();
 

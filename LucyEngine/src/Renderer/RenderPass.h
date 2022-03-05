@@ -24,15 +24,15 @@ namespace Lucy {
 
 	struct RenderPassEndInfo {
 		RefLucy<OpenGLFrameBuffer> OpenGLFrameBuffer = nullptr;
-		VkFramebuffer FrameBuffer;
+		VkFramebuffer VulkanFrameBuffer;
 		VkCommandBuffer CommandBuffer;
 	};
 
 	class RenderPass {
 	public:
-		static RefLucy<RenderPass> Create(RenderPassSpecification& specs);
+		static RefLucy<RenderPass> Create(const RenderPassSpecification& specs);
 
-		RenderPass(RenderPassSpecification& specs);
+		RenderPass(const RenderPassSpecification& specs);
 		
 		virtual void Begin(RenderPassBeginInfo& info) = 0;
 		virtual void End(RenderPassEndInfo& info) = 0;

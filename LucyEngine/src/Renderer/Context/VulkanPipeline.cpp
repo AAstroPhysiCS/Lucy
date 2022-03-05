@@ -15,7 +15,7 @@ namespace Lucy {
 
 	RefLucy<VulkanDescriptorPool> VulkanPipeline::s_DescriptorPool = nullptr;
 
-	VulkanPipeline::VulkanPipeline(PipelineSpecification& specs)
+	VulkanPipeline::VulkanPipeline(const PipelineSpecification& specs)
 		: Pipeline(specs) {
 		Renderer::Submit([&]() {
 			Create();
@@ -32,7 +32,7 @@ namespace Lucy {
 
 	void VulkanPipeline::Create() {
 		if (!s_DescriptorPool) {
-			std::vector<VkDescriptorPoolSize>& poolSizes = CreateDescriptorPoolSizes();
+			const std::vector<VkDescriptorPoolSize>& poolSizes = CreateDescriptorPoolSizes();
 
 			VulkanDescriptorPoolSpecifications poolSpecs{};
 			poolSpecs.PoolSizesVector = poolSizes;
@@ -40,8 +40,8 @@ namespace Lucy {
 			s_DescriptorPool = CreateRef<VulkanDescriptorPool>(poolSpecs);
 		}
 
-		auto& bindingDescriptor = CreateBindingDescription();
-		auto& attributeDescriptor = CreateAttributeDescription(bindingDescriptor.binding);
+		const auto& bindingDescriptor = CreateBindingDescription();
+		const auto& attributeDescriptor = CreateAttributeDescription(bindingDescriptor.binding);
 
 		VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;

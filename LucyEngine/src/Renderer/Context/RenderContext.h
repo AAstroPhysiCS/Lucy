@@ -17,7 +17,6 @@ namespace Lucy {
 		static RefLucy<RenderContext> Create(RenderArchitecture type);
 	protected:
 		RenderContext(RenderArchitecture type);
-
 		virtual void Init(RenderArchitecture type) = 0;
 	};
 }

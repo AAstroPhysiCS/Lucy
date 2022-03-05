@@ -6,15 +6,15 @@ namespace Lucy {
 
 	class OpenGLVertexBuffer : public VertexBuffer {
 	public:
-		OpenGLVertexBuffer(uint32_t size);
+		explicit OpenGLVertexBuffer(uint32_t size);
 		OpenGLVertexBuffer();
 		virtual ~OpenGLVertexBuffer() = default;
 
-		void Bind(const VertexBindInfo& info);
-		void Unbind();
-		void AddData(const std::vector<float>& dataToAdd);
-		void Load();
-		void Destroy();
+		void Bind(const VertexBindInfo& info) override;
+		void Unbind() override;
+		void AddData(const std::vector<float>& dataToAdd) override;
+		void Load() override;
+		void Destroy() override;
 	};
 }
 

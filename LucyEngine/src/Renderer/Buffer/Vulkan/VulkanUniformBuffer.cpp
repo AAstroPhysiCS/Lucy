@@ -48,7 +48,7 @@ namespace Lucy {
 
 		VkWriteDescriptorSet setWrite{};
 		setWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		setWrite.dstSet = m_DescriptorSet.GetSetBasedOffCurrentFrame(index);
+		setWrite.dstSet = m_DescriptorSet.GetSetBasedOffFrameIndex(index);
 		setWrite.dstBinding = m_Binding;
 		setWrite.dstArrayElement = 0;
 		setWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;

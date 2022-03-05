@@ -9,7 +9,7 @@ namespace Lucy {
 
 		friend struct UUIDComponent;
 	public:
-		bool operator==(UUID& other) {
+		bool operator==(const UUID& other) {
 			return m_UUIDAsString == other.m_UUIDAsString;
 		}
 	};

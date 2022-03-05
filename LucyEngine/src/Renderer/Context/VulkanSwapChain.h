@@ -29,8 +29,8 @@ namespace Lucy {
 		inline uint32_t GetImageCount() { return m_SwapChainImages.size(); }
 	private:
 		SwapChainCapabilities GetSwapChainCapabilities(VkPhysicalDevice device);
-		VkSurfaceFormatKHR ChooseSwapSurfaceFormat(SwapChainCapabilities& capabilities);
-		VkPresentModeKHR ChooseSwapPresentMode(SwapChainCapabilities& capabilities);
+		VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const SwapChainCapabilities& capabilities);
+		VkPresentModeKHR ChooseSwapPresentMode(const SwapChainCapabilities& capabilities);
 		VkExtent2D ChooseSwapExtent(SwapChainCapabilities& capabilities);
 
 		VkSwapchainKHR m_SwapChain;

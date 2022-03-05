@@ -6,7 +6,7 @@
 
 namespace Lucy {
 
-	RefLucy<Pipeline> Pipeline::Create(PipelineSpecification& specs) {
+	RefLucy<Pipeline> Pipeline::Create(const PipelineSpecification& specs) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
 				return CreateRef<OpenGLPipeline>(specs);
@@ -19,9 +19,10 @@ namespace Lucy {
 				LUCY_ASSERT(false);
 				break;
 		}
+		return nullptr;
 	}
 
-	Pipeline::Pipeline(PipelineSpecification& specs)
+	Pipeline::Pipeline(const PipelineSpecification& specs)
 		: m_Specs(specs) {
 	}
 
@@ -45,6 +46,7 @@ namespace Lucy {
 			case ShaderDataSize::Float4: return 4; break;
 			case ShaderDataSize::Mat4:	 return 4 * 4; break;
 		}
+		return 0;
 	}
 
 	uint32_t Pipeline::CalculateStride(VertexShaderLayout vertexLayout) {

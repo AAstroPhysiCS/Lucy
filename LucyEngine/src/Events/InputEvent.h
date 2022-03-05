@@ -43,7 +43,7 @@ namespace Lucy {
 
 	struct CharCallbackEvent : Event {
 
-		CharCallbackEvent(uint32_t codePoint)
+		explicit CharCallbackEvent(uint32_t codePoint)
 			: m_CodePoint(codePoint) {
 			m_Type = EventType::CharCallbackEvent;
 		}
@@ -69,6 +69,10 @@ namespace Lucy {
 			return m_Key == (uint16_t)keyCode && m_Action == GLFW_PRESS;
 		}
 
+		inline constexpr bool operator==(KeyCode keyCode) const {
+			return m_Key == (uint16_t)keyCode && m_Action == GLFW_PRESS;
+		}
+
 		inline int32_t GetKey() const { return m_Key; }
 		inline int32_t GetScanCode() const { return m_ScanCode; }
 		inline int32_t GetAction() const { return m_Action; }
@@ -89,6 +93,10 @@ namespace Lucy {
 		}
 
 		inline constexpr bool operator==(MouseCode mouseCode) {
+			return m_Button == (uint16_t)mouseCode && m_Action == GLFW_PRESS;
+		}
+
+		inline constexpr bool operator==(MouseCode mouseCode) const {
 			return m_Button == (uint16_t)mouseCode && m_Action == GLFW_PRESS;
 		}
 

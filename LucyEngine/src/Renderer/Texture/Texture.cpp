@@ -17,6 +17,7 @@ namespace Lucy {
 				LUCY_ASSERT(false);
 				break;
 		}
+		return nullptr;
 	}
 
 	Texture2D::Texture2D(TextureSpecification& specs)

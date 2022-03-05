@@ -11,7 +11,7 @@ namespace Lucy {
 
 	class ScopedTimer {
 	public:
-		ScopedTimer(TimeUnit unit)
+		explicit ScopedTimer(TimeUnit unit)
 			: m_Begin(std::chrono::steady_clock::now()), m_Unit(unit) {
 		}
 

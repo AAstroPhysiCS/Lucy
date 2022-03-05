@@ -12,7 +12,7 @@ namespace Lucy {
 
 	class VulkanDescriptorPool {
 	public:
-		VulkanDescriptorPool(VulkanDescriptorPoolSpecifications& specs);
+		explicit VulkanDescriptorPool(VulkanDescriptorPoolSpecifications& specs);
 		~VulkanDescriptorPool() = default;
 
 		void Destroy();
@@ -32,10 +32,10 @@ namespace Lucy {
 
 	class VulkanDescriptorSet {
 	public:
-		VulkanDescriptorSet(VulkanDescriptorSetSpecifications& specs);
+		explicit VulkanDescriptorSet(VulkanDescriptorSetSpecifications& specs);
 		~VulkanDescriptorSet() = default;
 
-		inline VkDescriptorSet GetSetBasedOffCurrentFrame(uint32_t currentFrame) const noexcept { return m_DescriptorSets[currentFrame]; }
+		inline VkDescriptorSet GetSetBasedOffFrameIndex(uint32_t currentFrame) const noexcept { return m_DescriptorSets[currentFrame]; }
 	private:
 		void Create();
 

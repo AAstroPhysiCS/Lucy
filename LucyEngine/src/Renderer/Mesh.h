@@ -37,7 +37,7 @@ namespace Lucy {
 
 	class Mesh {
 	public:
-		Mesh(const std::string& path);
+		explicit Mesh(const std::string& path);
 		Mesh(const Mesh& other) = default;
 		~Mesh();
 

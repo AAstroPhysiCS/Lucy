@@ -10,7 +10,7 @@
 
 namespace Lucy {
 
-	VulkanRenderPass::VulkanRenderPass(RenderPassSpecification& specs)
+	VulkanRenderPass::VulkanRenderPass(const RenderPassSpecification& specs)
 		: RenderPass(specs) {
 		Renderer::Submit([this]() {
 			Create();
@@ -18,7 +18,7 @@ namespace Lucy {
 	}
 
 	void VulkanRenderPass::Create() {
-		VulkanDevice& device = VulkanDevice::Get();
+		const VulkanDevice& device = VulkanDevice::Get();
 		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 
 		VkAttachmentDescription colorAttachmentDescription{};
@@ -86,7 +86,7 @@ namespace Lucy {
 	}
 
 	void VulkanRenderPass::Destroy() {
-		VulkanDevice& device = VulkanDevice::Get();
+		const VulkanDevice& device = VulkanDevice::Get();
 		vkDestroyRenderPass(device.GetLogicalDevice(), m_RenderPass, nullptr);
 	}
 }

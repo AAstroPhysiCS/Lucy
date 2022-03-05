@@ -68,7 +68,7 @@ namespace Lucy {
 	}
 
 	void VulkanRenderer::Execute() {
-		auto& device = VulkanDevice::Get();
+		const auto& device = VulkanDevice::Get();
 		VkDevice deviceVulkanHandle = device.GetLogicalDevice();
 
 		VkFence currentFrameFence = m_InFlightFences[CURRENT_FRAME].GetFence();
@@ -122,7 +122,7 @@ namespace Lucy {
 		presentInfo.pImageIndices = &s_ImageIndex;
 		presentInfo.pResults = nullptr;
 
-		auto& device = VulkanDevice::Get();
+		const auto& device = VulkanDevice::Get();
 		VkResult result = vkQueuePresentKHR(device.GetPresentQueue(), &presentInfo);
 
 		if (result == VK_ERROR_OUT_OF_DATE_KHR)
@@ -196,5 +196,17 @@ namespace Lucy {
 
 	Entity VulkanRenderer::OnMousePicking() {
 		return {};
+	}
+
+	void VulkanRenderer::ImGui_UploadFontsTexture(std::function<bool(VkCommandBuffer)> imguiUploadFunc) {
+		s_CommandPool->ImGui_UploadFontsToGPU(imguiUploadFunc);
+	}
+
+	VkCommandBuffer VulkanRenderer::ImGui_BeginRenderDrawDataCommandBuffer() {
+		return s_CommandPool->BeginSingleTimeCommand();
+	}
+
+	void VulkanRenderer::ImGui_EndRenderDrawDataCommandBuffer(VkCommandBuffer commandBuffer) {
+		s_CommandPool->EndSingleTimeCommand(commandBuffer);
 	}
 }

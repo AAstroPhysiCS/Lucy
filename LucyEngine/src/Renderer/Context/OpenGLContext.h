@@ -6,13 +6,13 @@ namespace Lucy {
 
 	class OpenGLContext : public RenderContext {
 	public:
-		OpenGLContext(RenderArchitecture type);
+		explicit OpenGLContext(RenderArchitecture type);
 		virtual ~OpenGLContext() = default;
 
-		void Destroy();
-		void PrintInfo();
+		void Destroy() override;
+		void PrintInfo() override;
 	private:
-		void Init(RenderArchitecture type);
+		void Init(RenderArchitecture type) override;
 	};
 }
 

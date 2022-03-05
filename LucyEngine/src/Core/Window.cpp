@@ -24,6 +24,7 @@ namespace Lucy {
 		}
 
 		if (m_Specs.Architecture == RenderArchitecture::Vulkan) {
+			LUCY_ASSERT(glfwVulkanSupported());
 			glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		} else {
 			glfwWindowHint(GLFW_DOUBLEBUFFER, m_Specs.DoubleBuffered);

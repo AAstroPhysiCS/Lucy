@@ -45,14 +45,14 @@ namespace Lucy {
 
 	class Pipeline {
 	public:
-		Pipeline(PipelineSpecification& specs);
+		Pipeline(const PipelineSpecification& specs);
 
 		inline Topology GetTopology() const { return m_Specs.Topology; }
 		inline Rasterization GetRasterization() const { return m_Specs.Rasterization; }
 		inline RefLucy<FrameBuffer>& GetFrameBuffer() { return m_Specs.FrameBuffer; }
 		inline RefLucy<RenderPass>& GetRenderPass() { return m_Specs.RenderPass; }
 
-		static RefLucy<Pipeline> Create(PipelineSpecification& specs);
+		static RefLucy<Pipeline> Create(const PipelineSpecification& specs);
 		static void Begin(const RefLucy<Pipeline>& pipeline);
 		static void End(const RefLucy<Pipeline>& pipeline);
 

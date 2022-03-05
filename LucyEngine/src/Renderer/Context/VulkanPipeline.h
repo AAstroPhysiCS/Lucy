@@ -7,14 +7,14 @@ namespace Lucy {
 
 	class VulkanPipeline : public Pipeline {
 	public:
-		VulkanPipeline(PipelineSpecification& specs);
+		explicit VulkanPipeline(const PipelineSpecification& specs);
 		virtual ~VulkanPipeline() = default;
 
 		void Destroy();
 		void Recreate(float sizeX, float sizeY);
 
-		void BeginVirtual();
-		void EndVirtual();
+		void BeginVirtual() override;
+		void EndVirtual() override;
 
 		inline VkPipeline GetVulkanHandle() { return m_Pipeline; }
 		inline VkPipelineLayout GetPipelineLayout() { return m_PipelineLayout; }

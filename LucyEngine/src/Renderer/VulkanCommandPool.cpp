@@ -32,11 +32,12 @@ namespace Lucy {
 				LUCY_ASSERT(false);
 				break;
 		}
+		return nullptr;
 	}
 
 	void VulkanCommandPool::Allocate() {
 		Renderer::Submit([this]() {
-			VulkanDevice& device = VulkanDevice::Get();
+			const VulkanDevice& device = VulkanDevice::Get();
 
 			VkCommandPoolCreateInfo createCommandPoolInfo{};
 			createCommandPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -134,8 +135,8 @@ namespace Lucy {
 		uniformBuffer4->WriteToSets(VulkanRenderer::CURRENT_FRAME);
 
 		std::vector<VkDescriptorSet> allSetsToBind = {
-			uniformBuffer->GetDescriptorSet().GetSetBasedOffCurrentFrame(VulkanRenderer::CURRENT_FRAME),
-			uniformBuffer3->GetDescriptorSet().GetSetBasedOffCurrentFrame(VulkanRenderer::CURRENT_FRAME)
+			uniformBuffer->GetDescriptorSet().GetSetBasedOffFrameIndex(VulkanRenderer::CURRENT_FRAME),
+			uniformBuffer3->GetDescriptorSet().GetSetBasedOffFrameIndex(VulkanRenderer::CURRENT_FRAME)
 		};
 
 		for (uint32_t i = 0; i < m_CommandBuffers.size(); i++) {
@@ -201,15 +202,14 @@ namespace Lucy {
 		}
 	}
 
-	// Should not be used in a loop
-	void VulkanCommandPool::DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size) {
+	VkCommandBuffer VulkanCommandPool::BeginSingleTimeCommand() {
 		VkCommandBufferAllocateInfo allocInfo{};
 		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 		allocInfo.commandPool = m_CommandPool;
 		allocInfo.commandBufferCount = 1;
 
-		VulkanDevice& vulkanDevice = VulkanDevice::Get();
+		const VulkanDevice& vulkanDevice = VulkanDevice::Get();
 
 		VkCommandBuffer commandBuffer;
 		vkAllocateCommandBuffers(vulkanDevice.GetLogicalDevice(), &allocInfo, &commandBuffer);
@@ -220,12 +220,12 @@ namespace Lucy {
 
 		vkBeginCommandBuffer(commandBuffer, &beginInfo);
 
-		VkBufferCopy copyRegion{};
-		copyRegion.srcOffset = 0;
-		copyRegion.dstOffset = 0;
-		copyRegion.size = size;
-		vkCmdCopyBuffer(commandBuffer, stagingBuffer, buffer, 1, &copyRegion);
+		return commandBuffer;
+	}
 
+	void VulkanCommandPool::EndSingleTimeCommand(VkCommandBuffer commandBuffer) {
+		const VulkanDevice& vulkanDevice = VulkanDevice::Get();
+		
 		vkEndCommandBuffer(commandBuffer);
 
 		VkSubmitInfo submitInfo{};
@@ -238,6 +238,25 @@ namespace Lucy {
 		vkQueueWaitIdle(graphicsQueue);
 
 		vkFreeCommandBuffers(vulkanDevice.GetLogicalDevice(), m_CommandPool, 1, &commandBuffer);
+	}
+
+	void VulkanCommandPool::ImGui_UploadFontsToGPU(std::function<bool(VkCommandBuffer)> imguiUploadFunc) {
+		VkCommandBuffer commandBuffer = BeginSingleTimeCommand();
+		imguiUploadFunc(commandBuffer);
+		EndSingleTimeCommand(commandBuffer);
+	}
+
+	// Should not be used in a loop
+	void VulkanCommandPool::DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size) {
+		VkCommandBuffer commandBuffer = BeginSingleTimeCommand();
+
+		VkBufferCopy copyRegion{};
+		copyRegion.srcOffset = 0;
+		copyRegion.dstOffset = 0;
+		copyRegion.size = size;
+		vkCmdCopyBuffer(commandBuffer, stagingBuffer, buffer, 1, &copyRegion);
+
+		EndSingleTimeCommand(commandBuffer);
 	}
 
 	void VulkanCommandPool::Execute(RefLucy<VulkanPipeline>& pipeline) {

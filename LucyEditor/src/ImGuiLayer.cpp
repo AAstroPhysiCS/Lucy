@@ -12,6 +12,7 @@
 #include "Core/Input.h"
 
 #include "Renderer/Renderer.h"
+#include "Renderer/VulkanRenderer.h"
 #include "Renderer/VulkanRenderPass.h"
 #include "glad/glad.h"
 #include "imgui_impl_vulkan.h"
@@ -59,11 +60,14 @@ namespace Lucy {
 			auto& vulkanContext = As(renderContext, VulkanContext);
 			VulkanDevice device = VulkanDevice::Get();
 			RenderPassSpecification renderPassSpecs;
-			RefLucy<VulkanRenderPass> renderPass = As(RenderPass::Create(renderPassSpecs), VulkanRenderPass);
+			renderPassSpecs.AttachmentReferences.push_back({ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+			renderPassSpecs.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+			m_RenderPass = As(RenderPass::Create(renderPassSpecs), VulkanRenderPass);
+			Renderer::Dispatch(); //for renderpass only
 
 			//TODO: Change and do it properly
 			//from imgui demo
-			VkDescriptorPoolSize pool_sizes[] =
+			std::vector<VkDescriptorPoolSize> imguiPoolSizes =
 			{
 				{ VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
 				{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
@@ -78,28 +82,25 @@ namespace Lucy {
 				{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
 			};
 
-			VkDescriptorPoolCreateInfo pool_info = {};
-			pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-			pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-			pool_info.maxSets = 1000;
-			pool_info.poolSizeCount = std::size(pool_sizes);
-			pool_info.pPoolSizes = pool_sizes;
-
-			VkDescriptorPool imguiPool;
-			LUCY_VK_ASSERT(vkCreateDescriptorPool(device.GetLogicalDevice(), &pool_info, nullptr, &imguiPool));
+			VulkanDescriptorPoolSpecifications poolSpecs;
+			poolSpecs.MaxSet = 1000;
+			poolSpecs.PoolFlags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+			poolSpecs.PoolSizesVector = imguiPoolSizes;
+			VulkanDescriptorPool pool(poolSpecs);
 
 			ImGui_ImplVulkan_InitInfo initInfo{};
 			initInfo.Instance = vulkanContext->GetVulkanInstance();
 			initInfo.PhysicalDevice = device.GetPhysicalDevice();
 			initInfo.Device = device.GetLogicalDevice();
 			initInfo.Queue = device.GetGraphicsQueue();
-			initInfo.DescriptorPool = imguiPool;
+			initInfo.DescriptorPool = pool.GetVulkanHandle();
 			initInfo.MinImageCount = 3;
 			initInfo.ImageCount = 3;
 			initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-			ImGui_ImplVulkan_Init(&initInfo, renderPass->GetVulkanHandle());
+			ImGui_ImplVulkan_Init(&initInfo, m_RenderPass->GetVulkanHandle());
 
-			//ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
+			VulkanRenderer::ImGui_UploadFontsTexture(ImGui_ImplVulkan_CreateFontsTexture);
+
 			ImGui_ImplVulkan_DestroyFontUploadObjects();
 		}
 	}
@@ -157,8 +158,19 @@ namespace Lucy {
 		if (currentArchitecture == RenderArchitecture::OpenGL) {
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 		} else if (currentArchitecture == RenderArchitecture::Vulkan) {
-			//ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+			VkCommandBuffer commandBuffer = VulkanRenderer::ImGui_BeginRenderDrawDataCommandBuffer();
+			RenderPassBeginInfo beginInfo;
+			beginInfo.CommandBuffer = commandBuffer;
+			beginInfo.VulkanFrameBuffer;
+			m_RenderPass->Begin(beginInfo);
+			ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+			VulkanRenderer::ImGui_EndRenderDrawDataCommandBuffer(commandBuffer);
+			RenderPassEndInfo endInfo; 
+			endInfo.CommandBuffer = commandBuffer;
+			endInfo.VulkanFrameBuffer;
+			m_RenderPass->End(endInfo);
 		}
+
 		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
 			GLFWwindow* backup_current_context = glfwGetCurrentContext();
 			ImGui::UpdatePlatformWindows();
@@ -182,7 +194,7 @@ namespace Lucy {
 		});
 
 		dispatcher.Dispatch<CursorPosEvent>(e, EventType::CursorPosEvent, [&](CursorPosEvent& e) {
-			ImGuiIO& io = ImGui::GetIO();
+			const ImGuiIO& io = ImGui::GetIO();
 			//io.MousePos = { (float)e.GetXPos(), (float)e.GetYPos() };
 			Input::MouseX = io.MousePos.x;
 			Input::MouseY = io.MousePos.y;

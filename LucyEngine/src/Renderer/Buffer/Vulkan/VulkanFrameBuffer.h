@@ -12,11 +12,11 @@ namespace Lucy {
 		VulkanFrameBuffer(FrameBufferSpecification& specs, RefLucy<VulkanRenderPass>& renderPass);
 		virtual ~VulkanFrameBuffer() = default;
 
-		void Bind();
-		void Unbind();
-		void Destroy();
-		void Blit();
-		void Resize(int32_t width, int32_t height);
+		void Bind() override;
+		void Unbind() override;
+		void Destroy() override;
+		void Blit() override;
+		void Resize(int32_t width, int32_t height) override;
 
 		inline std::vector<VkFramebuffer>& GetSwapChainFrameBuffers() { return m_SwapChainFrameBuffers; }
 	private:

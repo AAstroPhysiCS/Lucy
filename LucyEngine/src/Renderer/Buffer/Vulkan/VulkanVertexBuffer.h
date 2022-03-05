@@ -8,15 +8,15 @@ namespace Lucy {
 
 	class VulkanVertexBuffer : public VertexBuffer {
 	public:
-		void Bind(const VertexBindInfo& info);
-		void Unbind();
-		void AddData(const std::vector<float>& dataToAdd);
-		void Load();
-		void Destroy();
-
-		VulkanVertexBuffer(uint32_t size);
+		explicit VulkanVertexBuffer(uint32_t size);
 		VulkanVertexBuffer();
 		virtual ~VulkanVertexBuffer() = default;
+
+		void Bind(const VertexBindInfo& info) override;
+		void Unbind() override;
+		void AddData(const std::vector<float>& dataToAdd) override;
+		void Load() override;
+		void Destroy() override;
 	private:
 		void Create(uint32_t size = 0);
 

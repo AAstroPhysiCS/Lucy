@@ -12,6 +12,9 @@ namespace Lucy {
 		virtual void Render();
 
 	private:
+		PerformancePanel() = default;
+		virtual ~PerformancePanel() = default;
+
 		bool m_Show;
 	};
 }

@@ -4,9 +4,7 @@
 namespace Lucy {
 
 	void LayerStack::Push(std::initializer_list<Layer*> list) {
-		for (Layer* l : list) {
-			m_LayerStack.push_back(l);
-		}
+		std::copy(list.begin(), list.end(), std::back_inserter(m_LayerStack));
 	}
 
 	void LayerStack::Pop() {

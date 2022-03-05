@@ -68,7 +68,7 @@ namespace Lucy {
 			if (location == -1) LUCY_ASSERT(false);
 			m_UniformLocations.insert({ name, location });
 		}
-		auto& it = m_UniformLocations.find(name);
+		auto it = m_UniformLocations.find(name);
 		if (it != m_UniformLocations.end()) {
 			glUniformMatrix4fv(it->second, 1, false, glm::value_ptr(mat));
 		}
@@ -80,7 +80,7 @@ namespace Lucy {
 			if (location == -1) LUCY_ASSERT(false);
 			m_UniformLocations.insert({ name, location });
 		}
-		auto& it = m_UniformLocations.find(name);
+		auto it = m_UniformLocations.find(name);
 		if (it != m_UniformLocations.end()) {
 			glUniformMatrix3fv(it->second, 1, false, glm::value_ptr(mat));
 		}
@@ -92,7 +92,7 @@ namespace Lucy {
 			if (location == -1) LUCY_ASSERT(false);
 			m_UniformLocations.insert({ name, location });
 		}
-		auto& it = m_UniformLocations.find(name);
+		auto it = m_UniformLocations.find(name);
 		if (it != m_UniformLocations.end()) {
 			glUniform4f(it->second, vec.x, vec.y, vec.z, vec.w);
 		}
@@ -104,7 +104,7 @@ namespace Lucy {
 			if (location == -1) LUCY_ASSERT(false);
 			m_UniformLocations.insert({ name, location });
 		}
-		auto& it = m_UniformLocations.find(name);
+		auto it = m_UniformLocations.find(name);
 		if (it != m_UniformLocations.end()) {
 			glUniform3f(it->second, vec.x, vec.y, vec.z);
 		}
@@ -116,7 +116,7 @@ namespace Lucy {
 			if (location == -1) LUCY_ASSERT(false);
 			m_UniformLocations.insert({ name, location });
 		}
-		auto& it = m_UniformLocations.find(name);
+		auto it = m_UniformLocations.find(name);
 		if (it != m_UniformLocations.end()) {
 			glUniform2f(it->second, vec.x, vec.y);
 		}
@@ -128,8 +128,7 @@ namespace Lucy {
 			if (location == -1) LUCY_ASSERT(false);
 			m_UniformLocations.insert({ name, location });
 		}
-		uint32_t loc = m_UniformLocations.find(name)->second;
-		auto& it = m_UniformLocations.find(name);
+		auto it = m_UniformLocations.find(name);
 		if (it != m_UniformLocations.end()) {
 			glUniform1f(it->second, value);
 		}
@@ -141,7 +140,7 @@ namespace Lucy {
 			if (location == -1) LUCY_ASSERT(false);
 			m_UniformLocations.insert({ name, location });
 		}
-		auto& it = m_UniformLocations.find(name);
+		auto it = m_UniformLocations.find(name);
 		if (it != m_UniformLocations.end()) {
 			glUniform1i(it->second, value);
 		}
@@ -153,7 +152,7 @@ namespace Lucy {
 			if (location == -1) LUCY_ASSERT(false);
 			m_UniformLocations.insert({ name, location });
 		}
-		auto& it = m_UniformLocations.find(name);
+		auto it = m_UniformLocations.find(name);
 		if (it != m_UniformLocations.end()) {
 			glUniform1iv(it->second, count, value);
 		}

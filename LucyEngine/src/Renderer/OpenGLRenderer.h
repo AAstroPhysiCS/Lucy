@@ -9,27 +9,27 @@ namespace Lucy {
 
 	class OpenGLRenderer : public RendererAPI {
 	public:
-		OpenGLRenderer(RenderArchitecture renderArchitecture);
+		explicit OpenGLRenderer(RenderArchitecture renderArchitecture);
 		virtual ~OpenGLRenderer() = default;
 
 		void Init() override;
 
-		void ClearCommands();
-		void Execute();
-		void Destroy();
-		void Dispatch();
+		void ClearCommands() override;
+		void Execute() override;
+		void Destroy() override;
+		void Dispatch() override;
 
-		void BeginScene(Scene& scene);
-		void EndScene();
+		void BeginScene(Scene& scene) override;
+		void EndScene() override;
 
-		void Submit(const Func&& func);
-		void SubmitMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform);
+		void Submit(const Func&& func) override;
+		void SubmitMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform) override;
 
 		inline RefLucy<OpenGLPipeline>& GetGeometryPipeline() { return m_GeometryPipeline; }
 		inline RefLucy<OpenGLPipeline>& GetIDPipeline() { return m_IDPipeline; }
 		
-		void OnFramebufferResize(float sizeX, float sizeY);
-		Entity OnMousePicking();
+		void OnFramebufferResize(float sizeX, float sizeY) override;
+		Entity OnMousePicking() override;
 	private:
 		void GeometryPass();
 		void IDPass();

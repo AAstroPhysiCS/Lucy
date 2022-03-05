@@ -10,13 +10,13 @@ namespace Lucy {
 	public:
 		VulkanShader(const std::string& path, const std::string& name);
 
-		void Bind();
-		void Unbind();
-		void Destroy();
+		void Bind() override;
+		void Unbind() override;
+		void Destroy() override;
 
 		inline VkPipelineShaderStageCreateInfo* GetShaderStageInfos() { return m_ShaderStageInfos; }
 	private:
-		void LoadInternal(std::vector<uint32_t>& dataVertex, std::vector<uint32_t>& dataFragment);
+		void LoadInternal(std::vector<uint32_t>& dataVertex, std::vector<uint32_t>& dataFragment) override;
 
 		VkPipelineShaderStageCreateInfo m_ShaderStageInfos[2] = { {}, {} };
 

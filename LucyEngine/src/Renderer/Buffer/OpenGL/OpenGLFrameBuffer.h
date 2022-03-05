@@ -7,14 +7,14 @@ namespace Lucy {
 
 	class OpenGLFrameBuffer : public FrameBuffer {
 	public:
-		OpenGLFrameBuffer(FrameBufferSpecification& specs);
+		explicit OpenGLFrameBuffer(FrameBufferSpecification& specs);
 		virtual ~OpenGLFrameBuffer() = default;
 
-		void Bind();
-		void Unbind();
-		void Destroy();
-		void Blit();
-		void Resize(int32_t width, int32_t height);
+		void Bind() override;
+		void Unbind() override;
+		void Destroy() override;
+		void Blit() override;
+		void Resize(int32_t width, int32_t height) override;
 
 		inline RefLucy<Texture2D>& GetTexture(uint32_t index) { return m_Textures[index]; }
 	private:

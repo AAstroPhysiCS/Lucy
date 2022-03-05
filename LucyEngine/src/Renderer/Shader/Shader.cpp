@@ -59,8 +59,8 @@ namespace Lucy {
 		}
 
 		const auto [vertexFileExtension, fragmentFileExtension] = GetCachedFileExtension();
-		std::string& cacheFileVert = FileSystem::GetParentPath(m_Path) + "/" + FileSystem::GetFileName(m_Path) + vertexFileExtension;
-		std::string& cacheFileFrag = FileSystem::GetParentPath(m_Path) + "/" + FileSystem::GetFileName(m_Path) + fragmentFileExtension;
+		const std::string& cacheFileVert = FileSystem::GetParentPath(m_Path) + "/" + FileSystem::GetFileName(m_Path) + vertexFileExtension;
+		const std::string& cacheFileFrag = FileSystem::GetParentPath(m_Path) + "/" + FileSystem::GetFileName(m_Path) + fragmentFileExtension;
 
 		if (!FileSystem::FileExists(cacheFileVert) || !FileSystem::FileExists(cacheFileFrag))
 			LoadAndRedoCache(compiler, options, cacheFileVert, cacheFileFrag);
@@ -185,7 +185,7 @@ namespace Lucy {
 					buffer.push_back(info);
 					m_DescriptorSetMap.emplace(set, buffer);
 				} else {
-					auto& it = m_DescriptorSetMap.find(set);
+					const auto& it = m_DescriptorSetMap.find(set);
 					it->second.push_back(info);
 				}
 			}
@@ -215,7 +215,7 @@ namespace Lucy {
 					buffer.push_back(info);
 					m_DescriptorSetMap.emplace(set, buffer);
 				} else {
-					auto& it = m_DescriptorSetMap.find(set);
+					const auto& it = m_DescriptorSetMap.find(set);
 					it->second.push_back(info);
 				}
 			}
@@ -229,8 +229,8 @@ namespace Lucy {
 	}
 
 	std::string Shader::LoadVertexData(std::vector<std::string>& lines) {
-		auto& from = std::find(lines.begin(), lines.end(), "//type vertex");
-		auto& to = std::find(lines.begin(), lines.end(), "//type fragment");
+		const auto& from = std::find(lines.begin(), lines.end(), "//type vertex");
+		const auto& to = std::find(lines.begin(), lines.end(), "//type fragment");
 
 		std::string buffer;
 		if (lines.end() != from) {
@@ -243,8 +243,8 @@ namespace Lucy {
 	}
 
 	std::string Shader::LoadFragmentData(std::vector<std::string>& lines) {
-		auto& from = std::find(lines.begin(), lines.end(), "//type fragment");
-		auto& to = lines.end();
+		const auto& from = std::find(lines.begin(), lines.end(), "//type fragment");
+		const auto& to = lines.end();
 
 		std::string buffer;
 		if (lines.end() != from) {

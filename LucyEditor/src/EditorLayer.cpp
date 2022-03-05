@@ -22,7 +22,7 @@ namespace Lucy {
 	}
 
 	void EditorLayer::Begin(PerformanceMetrics& rendererMetrics) {
-		auto& meshView = m_Scene.View<MeshComponent>();
+		const auto& meshView = m_Scene.View<MeshComponent>();
 
 		for (auto entity : meshView) {
 			Entity e{ &m_Scene, entity };
@@ -52,14 +52,14 @@ namespace Lucy {
 
 	void EditorLayer::OnEvent(Event& e) {
 		EventDispatcher& dispatcher = EventDispatcher::GetInstance();
-		dispatcher.Dispatch<KeyEvent>(e, EventType::KeyEvent, [&](KeyEvent& e) {
+		dispatcher.Dispatch<KeyEvent>(e, EventType::KeyEvent, [&](const KeyEvent& e) {
 			if (e == KeyCode::Escape) {
 				glfwSetWindowShouldClose(m_Window->Raw(), GL_TRUE);
 			}
 		});
 
-		dispatcher.Dispatch<MouseEvent>(e, EventType::MouseEvent, [&](MouseEvent& e) {
-			ViewportPanel& viewportPanel = ViewportPanel::GetInstance();
+		dispatcher.Dispatch<MouseEvent>(e, EventType::MouseEvent, [&](const MouseEvent& e) {
+			const ViewportPanel& viewportPanel = ViewportPanel::GetInstance();
 			if (viewportPanel.IsOverAnyGizmo || !viewportPanel.IsViewportActive) return;
 
 			if (e == MouseCode::Button0) {
@@ -71,5 +71,6 @@ namespace Lucy {
 	}
 
 	void EditorLayer::Destroy() {
+
 	}
 }

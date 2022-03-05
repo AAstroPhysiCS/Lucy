@@ -11,10 +11,10 @@ namespace Lucy {
 		VulkanUniformBuffer(uint32_t size, uint32_t binding, VulkanDescriptorSet& descriptorSet);
 		virtual ~VulkanUniformBuffer() = default;
 
-		void Bind();
-		void Unbind();
-		void Destroy();
-		void SetData(void* data, uint32_t size, uint32_t offset);
+		void Bind() override;
+		void Unbind() override;
+		void Destroy() override;
+		void SetData(void* data, uint32_t size, uint32_t offset) override;
 		void WriteToSets(uint32_t index);
 
 		inline VulkanDescriptorSet& GetDescriptorSet() noexcept { return m_DescriptorSet; }

@@ -15,7 +15,7 @@ namespace Lucy {
 
 	EditorApplication::EditorApplication(const ApplicationArgs& args)
 		: Application(args) {
-		m_LayerStack.Push({ /*&ImGuiLayer::GetInstance(),*/ &EditorLayer::GetInstance()});
+		m_LayerStack.Push({ /*&ImGuiLayer::GetInstance(), */&EditorLayer::GetInstance()});
 
 		m_Running = true;
 

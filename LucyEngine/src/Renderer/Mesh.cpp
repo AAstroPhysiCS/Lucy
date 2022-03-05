@@ -67,7 +67,6 @@ namespace Lucy {
 		m_VertexBuffer = VertexBuffer::Create(totalVertexSize * 17);
 		IncreaseMeshCount(this);
 
-		uint32_t vertPtr = 0;
 		for (Submesh& submesh : m_Submeshes) {
 			auto& vertices = submesh.Vertices;
 			auto& textureCoords = submesh.TextureCoords;
@@ -124,6 +123,7 @@ namespace Lucy {
 				LUCY_ASSERT(false);
 				break;
 		}
+		return nullptr;
 	}
 
 	void Mesh::Bind() {
@@ -217,14 +217,12 @@ namespace Lucy {
 				memcpy(submesh.BiTangents.data(), biTangents, sizeVertices * sizeof(aiVector3D));
 			}
 
-			submesh.MaterialIndex = mesh->mMaterialIndex;
-
 			if (mesh->HasFaces()) {
 				submesh.Faces.reserve(submesh.IndexCount);
-				for (uint32_t i = 0; i < mesh->mNumFaces; i++) {
-					aiFace aiFace = mesh->mFaces[i];
-					for (uint32_t j = 0; j < aiFace.mNumIndices; j++) {
-						submesh.Faces.emplace_back(aiFace.mIndices[j]);
+				for (uint32_t j = 0; j < mesh->mNumFaces; j++) {
+					aiFace aiFace = mesh->mFaces[j];
+					for (uint32_t k = 0; k < aiFace.mNumIndices; k++) {
+						submesh.Faces.emplace_back(aiFace.mIndices[k]);
 					}
 				}
 			}

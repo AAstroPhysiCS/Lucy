@@ -39,7 +39,7 @@ namespace Utils {
 	}
 
 	Size ReadSizeFromIni(const char* windowName) {
-		auto& buffer = ReadFile("lucyconfig.ini");
+		auto buffer = ReadFile("lucyconfig.ini");
 
 		std::string windowNameFull = "[Window][";
 		windowNameFull.append(windowName).append("]");
@@ -51,7 +51,8 @@ namespace Utils {
 		std::string& size = buffer[windowNameIndex + 2];
 		std::vector<std::string>& vec = Split(Split(size, "=")[1], ",");
 
-		return Size{ std::atoi(vec[0].c_str()), std::atoi(vec[1].c_str()) };
+		Size sizeObject{ std::atoi(vec[0].c_str()), std::atoi(vec[1].c_str()) };
+		return sizeObject;
 	}
 
 	void OpenDialog(std::string& outString, const DialogFilter filterList[], size_t count, const char* defaultPath) {

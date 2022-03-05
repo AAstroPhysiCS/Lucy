@@ -13,7 +13,7 @@ namespace Lucy {
 	}
 
 	void VulkanSwapChain::Create() {
-		VulkanDevice& device = VulkanDevice::Get();
+		const VulkanDevice& device = VulkanDevice::Get();
 
 		VkPhysicalDevice physicalDevice = device.GetPhysicalDevice();
 		VkDevice logicalDevice = device.GetLogicalDevice();
@@ -110,23 +110,21 @@ namespace Lucy {
 		return capabilities;
 	}
 
-	VkSurfaceFormatKHR VulkanSwapChain::ChooseSwapSurfaceFormat(SwapChainCapabilities& capabilities) {
+	VkSurfaceFormatKHR VulkanSwapChain::ChooseSwapSurfaceFormat(const SwapChainCapabilities& capabilities) {
 		for (const auto& availableFormat : capabilities.formats) {
 			if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
 				return availableFormat;
 			}
 		}
-
 		return capabilities.formats[0];
 	}
 
-	VkPresentModeKHR VulkanSwapChain::ChooseSwapPresentMode(SwapChainCapabilities& capabilities) {
+	VkPresentModeKHR VulkanSwapChain::ChooseSwapPresentMode(const SwapChainCapabilities& capabilities) {
 		for (const auto& availablePresentMode : capabilities.presentModes) {
 			if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
 				return availablePresentMode;
 			}
 		}
-
 		return VK_PRESENT_MODE_FIFO_KHR; //guaranteed to support
 	}
 
@@ -147,7 +145,7 @@ namespace Lucy {
 	}
 
 	void VulkanSwapChain::Destroy() {
-		VulkanDevice& device = VulkanDevice::Get();
+		const VulkanDevice& device = VulkanDevice::Get();
 		for (uint32_t i = 0; i < m_SwapChainImageViews.size(); i++) {
 			vkDestroyImageView(device.GetLogicalDevice(), m_SwapChainImageViews[i], nullptr);
 		}

@@ -6,7 +6,7 @@
 
 namespace Lucy {
 
-	OpenGLPipeline::OpenGLPipeline(PipelineSpecification& specs)
+	OpenGLPipeline::OpenGLPipeline(const PipelineSpecification& specs)
 		: Pipeline(specs) {
 	}
 

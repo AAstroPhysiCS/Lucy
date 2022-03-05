@@ -61,11 +61,11 @@ namespace Lucy {
 
 	class WinWindow : public Window {
 	private:
-		void PollEvents();
-		void Init();
-		void InitVulkanSurface(VkInstance instance);
-		void DestroyVulkanSurface(VkInstance instance);
-		void Destroy();
-		void Update();
+		void PollEvents() override;
+		void Init() override;
+		void InitVulkanSurface(VkInstance instance) override;
+		void DestroyVulkanSurface(VkInstance instance) override;
+		void Destroy() override;
+		void Update() override;
 	};
 }

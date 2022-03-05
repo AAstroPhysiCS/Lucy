@@ -13,8 +13,11 @@ namespace Lucy {
 	};
 
 	class RenderBuffer {
+	protected:
+		RenderBuffer(const RenderBufferSpecification& specs);
+		virtual ~RenderBuffer() = default;
 	public:
-		static RefLucy<RenderBuffer> Create(RenderBufferSpecification& specs);
+		static RefLucy<RenderBuffer> Create(const RenderBufferSpecification& specs);
 
 		virtual void Bind() = 0;
 		virtual void Unbind() = 0;
@@ -25,9 +28,6 @@ namespace Lucy {
 		inline uint32_t GetWidth() const { return m_Specs.Width; }
 		inline uint32_t GetHeight() const { return m_Specs.Height; }
 	protected:
-		RenderBuffer(RenderBufferSpecification& specs);
-		virtual ~RenderBuffer() = default;
-
 		RenderBufferSpecification m_Specs;
 		uint32_t m_Id = 0;
 	};

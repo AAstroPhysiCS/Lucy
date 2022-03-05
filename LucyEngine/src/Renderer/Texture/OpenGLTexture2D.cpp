@@ -8,7 +8,7 @@
 
 namespace Lucy {
 
-	uint16_t GetOpenGLType(TextureSpecification& specs) {
+	uint16_t GetOpenGLType(const TextureSpecification& specs) {
 		return specs.Samples != 0 ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
 	}
 

@@ -18,6 +18,7 @@ namespace Lucy {
 				return CreateRef<VulkanFrameBuffer>(specs, vulkanRenderPass);
 				break;
 		}
+		return nullptr;
 	}
 
 	FrameBuffer::FrameBuffer(FrameBufferSpecification& specs)

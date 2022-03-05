@@ -18,4 +18,18 @@ namespace Lucy {
 	bool FileSystem::FileExists(std::string& file) {
 		return std::filesystem::exists(file);
 	}
+
+	std::string Lucy::FileSystem::GetParentPath(const std::string& path) {
+		std::filesystem::path relPath(path);
+		return relPath.parent_path().string();
+	}
+
+	std::string FileSystem::GetFileName(const std::string& file) {
+		std::filesystem::path relPath(file);
+		return Utils::Split(relPath.filename().string(), ".")[0];
+	}
+
+	bool FileSystem::FileExists(const std::string& file) {
+		return std::filesystem::exists(file);
+	}
 }

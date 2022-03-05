@@ -6,10 +6,10 @@ namespace Lucy {
 
 	class OpenGLRenderPass : public RenderPass {
 	public:
-		OpenGLRenderPass(RenderPassSpecification& specs);
+		explicit OpenGLRenderPass(const RenderPassSpecification& specs);
 		virtual ~OpenGLRenderPass() = default;
 
-		void Begin(RenderPassBeginInfo& info);
-		void End(RenderPassEndInfo& info);
+		void Begin(RenderPassBeginInfo& info) override;
+		void End(RenderPassEndInfo& info) override;
 	};
 }

@@ -16,6 +16,8 @@
 
 namespace Lucy {
 
+	class VulkanRenderPass;
+
 	class ImGuiLayer : public Layer
 	{
 	public:
@@ -35,5 +37,6 @@ namespace Lucy {
 
 		uint32_t m_Time = 0;
 		std::vector<Panel*> m_Panels;
+		RefLucy<VulkanRenderPass> m_RenderPass;
 	};
 }

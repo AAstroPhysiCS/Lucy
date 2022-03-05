@@ -34,7 +34,7 @@ namespace Lucy {
 		vkDestroyDevice(m_LogicalDevice, nullptr);
 	}
 
-	void VulkanDevice::PickDeviceByRanking(std::vector<VkPhysicalDevice>& devices) {
+	void VulkanDevice::PickDeviceByRanking(const std::vector<VkPhysicalDevice>& devices) {
 
 		LUCY_INFO("----------Available Devices----------");
 

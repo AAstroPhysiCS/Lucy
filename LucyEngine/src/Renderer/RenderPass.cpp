@@ -7,11 +7,11 @@
 
 namespace Lucy {
 
-	RenderPass::RenderPass(RenderPassSpecification& specs)
+	RenderPass::RenderPass(const RenderPassSpecification& specs)
 		: m_Specs(specs) {
 	}
 
-	RefLucy<RenderPass> RenderPass::Create(RenderPassSpecification& specs) {
+	RefLucy<RenderPass> RenderPass::Create(const RenderPassSpecification& specs) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
 				return CreateRef<OpenGLRenderPass>(specs);
@@ -24,5 +24,6 @@ namespace Lucy {
 				LUCY_ASSERT(false);
 				break;
 		}
+		return nullptr;
 	}
 }

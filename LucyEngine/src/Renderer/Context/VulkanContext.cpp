@@ -6,7 +6,7 @@
 #include "Renderer/Renderer.h"
 
 namespace Lucy {
-
+	
 	VulkanContext::VulkanContext(RenderArchitecture type)
 		: RenderContext(type) {
 		Init(type);
@@ -40,16 +40,11 @@ namespace Lucy {
 
 		uint32_t glfwExtensionCount = 0;
 		const char** glfwExtensionNames = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
+		std::vector<const char*> extensions(glfwExtensionNames, glfwExtensionNames + glfwExtensionCount);
 #ifdef LUCY_DEBUG
 		CheckValidationSupport();
 		createInfo.enabledLayerCount = m_ValidationLayers.size();
 		createInfo.ppEnabledLayerNames = m_ValidationLayers.data();
-
-		std::vector<const char*> extensions(glfwExtensionNames, glfwExtensionNames + glfwExtensionCount);
-		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-		createInfo.enabledExtensionCount = extensions.size();
-		createInfo.ppEnabledExtensionNames = extensions.data();
 
 		VkDebugUtilsMessengerCreateInfoEXT debugForVkInstanceAndDestroy{};
 		debugForVkInstanceAndDestroy.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -57,18 +52,21 @@ namespace Lucy {
 		debugForVkInstanceAndDestroy.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 		debugForVkInstanceAndDestroy.pfnUserCallback = VulkanMessageCallback::DebugCallback;
 		createInfo.pNext = &debugForVkInstanceAndDestroy;
+
+		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 #else
 		createInfo.enabledLayerCount = 0;
 		createInfo.ppEnabledLayerNames = nullptr;
-		createInfo.enabledExtensionCount = 0;
-		createInfo.ppEnabledExtensionNames = nullptr;
 #endif
+		createInfo.enabledExtensionCount = extensions.size();
+		createInfo.ppEnabledExtensionNames = extensions.data();
 
-		VkResult result = vkCreateInstance(&createInfo, nullptr, &m_Instance);
-		LUCY_VK_ASSERT(result);
+		LUCY_VK_ASSERT(vkCreateInstance(&createInfo, nullptr, &m_Instance));
 		LUCY_INFO("Vulkan successfully initialized");
 
+#ifdef LUCY_DEBUG
 		SetupMessageCallback();
+#endif
 
 		Renderer::s_Window->InitVulkanSurface(m_Instance);
 
@@ -125,9 +123,9 @@ namespace Lucy {
 		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 		void* pUserData) {
 
-		if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+		if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
 			LUCY_WARN(fmt::format("Vulkan validation warning {0}", pCallbackData->pMessage));
-		} else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+		} else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
 			LUCY_CRITICAL(fmt::format("Vulkan validation error {0}", pCallbackData->pMessage));
 		}
 

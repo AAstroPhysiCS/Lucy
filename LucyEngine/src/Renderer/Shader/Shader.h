@@ -88,8 +88,8 @@ namespace Lucy {
 
 	struct VertexShaderLayout {
 		VertexShaderLayout() = default;
-		VertexShaderLayout(std::vector<ShaderLayoutElement>& elementList) {
-			ElementList = elementList;
+		explicit VertexShaderLayout(const std::vector<ShaderLayoutElement>& elementList)
+			: ElementList(elementList) {
 		}
 
 		friend class OpenGLPipeline;

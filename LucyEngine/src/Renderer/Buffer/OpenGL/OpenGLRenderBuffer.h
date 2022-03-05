@@ -6,14 +6,14 @@ namespace Lucy {
 
 	class OpenGLRenderBuffer : public RenderBuffer {
 	public:
-		OpenGLRenderBuffer(RenderBufferSpecification& specs);
+		explicit OpenGLRenderBuffer(const RenderBufferSpecification& specs);
 		virtual ~OpenGLRenderBuffer() = default;
 
-		void Bind();
-		void Unbind();
+		void Bind() override;
+		void Unbind() override;
+		void Resize(int32_t width, int32_t height) override;
+		void Destroy() override;
 		void AttachToFramebuffer();
-		void Resize(int32_t width, int32_t height);
-		void Destroy();
 
 		inline uint32_t GetInternalFormat() const { return m_Specs.InternalFormat; }
 		inline uint32_t GetAttachment() const { return m_Specs.Attachment; }

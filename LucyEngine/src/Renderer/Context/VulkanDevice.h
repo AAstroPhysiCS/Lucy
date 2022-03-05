@@ -31,14 +31,14 @@ namespace Lucy {
 		void Create(VkInstance instance, std::vector<const char*>& enabledValidationLayers);
 		void Destroy();
 
-		inline VkPhysicalDevice GetPhysicalDevice() { return m_PhysicalDevice; }
-		inline VkDevice GetLogicalDevice() { return m_LogicalDevice; }
-		inline QueueFamilyIndices GetQueueFamilies() { return m_QueueFamilyIndices; }
-		inline VkQueue GetGraphicsQueue() { return m_GraphicsQueue; }
-		inline VkQueue GetPresentQueue() { return m_PresentQueue; }
-		inline uint32_t GetMinUniformBufferOffsetAlignment() { return m_DeviceInfo.MinUniformBufferAlignment; }
+		inline VkPhysicalDevice GetPhysicalDevice() const { return m_PhysicalDevice; }
+		inline VkDevice GetLogicalDevice() const { return m_LogicalDevice; }
+		inline QueueFamilyIndices GetQueueFamilies() const { return m_QueueFamilyIndices; }
+		inline VkQueue GetGraphicsQueue() const { return m_GraphicsQueue; }
+		inline VkQueue GetPresentQueue() const { return m_PresentQueue; }
+		inline uint32_t GetMinUniformBufferOffsetAlignment() const { return m_DeviceInfo.MinUniformBufferAlignment; }
 	private:
-		void PickDeviceByRanking(std::vector<VkPhysicalDevice>& devices);
+		void PickDeviceByRanking(const std::vector<VkPhysicalDevice>& devices);
 		void CreateLogicalDevice(std::vector<const char*>& enabledValidationLayers);
 		void FindQueueFamilies(VkPhysicalDevice device);
 		bool CheckDeviceExtensionSupport(VkPhysicalDevice device);

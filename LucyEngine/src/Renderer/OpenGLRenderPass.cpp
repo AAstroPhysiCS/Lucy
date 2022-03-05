@@ -5,16 +5,15 @@
 
 namespace Lucy {
 
-	OpenGLRenderPass::OpenGLRenderPass(RenderPassSpecification& specs) 
-		: RenderPass(specs)
-	{
+	OpenGLRenderPass::OpenGLRenderPass(const RenderPassSpecification& specs)
+		: RenderPass(specs) {
 	}
-	
+
 	void OpenGLRenderPass::Begin(RenderPassBeginInfo& info) {
 		auto& frameBuffer = info.OpenGLFrameBuffer;
 		frameBuffer->Bind();
 	}
-	
+
 	void OpenGLRenderPass::End(RenderPassEndInfo& info) {
 		auto& frameBuffer = info.OpenGLFrameBuffer;
 		frameBuffer->Unbind();

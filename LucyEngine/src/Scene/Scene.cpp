@@ -8,13 +8,13 @@
 namespace Lucy {
 
 	Entity Scene::CreateMesh(std::string& path) {
-		Entity& e = CreateEntity();
+		Entity e = CreateEntity();
 		e.AddComponent<MeshComponent>(path);
 		return e;
 	}
 
 	Entity Scene::CreateMesh() {
-		Entity& e = CreateEntity();
+		Entity e = CreateEntity();
 		e.AddComponent<TagComponent>("Empty Mesh");
 		e.AddComponent<MeshComponent>();
 		return e;
@@ -35,15 +35,16 @@ namespace Lucy {
 		registry.destroy(e.m_Entity);
 	}
 
-	Entity Scene::GetEntityByPixelValue(glm::vec3& pixelValue) {
+	Entity Scene::GetEntityByPixelValue(const glm::vec3& pixelValue) {
 		auto view = registry.view<MeshComponent>();
 		for (auto entity : view) {
 			Entity e{ this, entity };
 			MeshComponent& meshComponent = e.GetComponent<MeshComponent>();
 			const RefLucy<Mesh>& mesh = meshComponent.GetMesh();
-			glm::vec3& meshPixelValue = mesh->GetMeshPixelValue() / 255.0f;
+			const glm::vec3& meshPixelValue = mesh->GetMeshPixelValue() / 255.0f;
 
-			if (glm::round(meshPixelValue * 10e4f) / 10e4f == pixelValue) return e;
+			if (glm::round(meshPixelValue * 10e4f) / 10e4f == pixelValue) 
+				return e;
 		}
 		LUCY_ASSERT(false);
 	}

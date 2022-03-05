@@ -23,12 +23,14 @@ namespace Lucy {
 		m_RenderContext = RenderContext::Create(m_Architecture);
 		m_RenderContext->PrintInfo();
 
-		RendererAPI::Init(); //call for uniform buffers
+		RendererAPI::Init(); //for uniform buffers
 
 		Shader::Create("LucyPBR", "assets/shaders/LucyPBR.glsl");
 		Shader::Create("LucyID", "assets/shaders/LucyID.glsl");
 
 		auto [width, height] = Utils::ReadSizeFromIni("Viewport");
+		m_ViewportWidth = width;
+		m_ViewportHeight = height;
 
 		uint32_t TargetSamples = 4;
 

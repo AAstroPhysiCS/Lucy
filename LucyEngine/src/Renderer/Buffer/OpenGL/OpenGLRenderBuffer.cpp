@@ -6,7 +6,7 @@
 
 namespace Lucy {
 
-	OpenGLRenderBuffer::OpenGLRenderBuffer(RenderBufferSpecification& specs)
+	OpenGLRenderBuffer::OpenGLRenderBuffer(const RenderBufferSpecification& specs)
 		: RenderBuffer(specs) {
 		glCreateRenderbuffers(1, &m_Id);
 		Bind();
