@@ -5,7 +5,7 @@
 #include "Renderer/Renderer.h"
 
 namespace Lucy {
-
+	
 	RefLucy<Pipeline> Pipeline::Create(const PipelineSpecification& specs) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
@@ -28,10 +28,17 @@ namespace Lucy {
 
 	void Pipeline::Begin(const RefLucy<Pipeline>& pipeline) {
 		pipeline->BeginVirtual();
+		s_ActivePipeline = pipeline.get();
 	}
 
 	void Pipeline::End(const RefLucy<Pipeline>& pipeline) {
 		pipeline->EndVirtual();
+		s_ActivePipeline = nullptr;
+	}
+
+	void Pipeline::DestroyUniformBuffers() {
+		for (const auto& uniformBuffer : m_UniformBuffers)
+			uniformBuffer->Destroy();
 	}
 
 	uint32_t Pipeline::GetSizeFromType(ShaderDataSize size) {

@@ -37,7 +37,7 @@ namespace Lucy {
 
 	class Mesh {
 	public:
-		explicit Mesh(const std::string& path);
+		Mesh(const std::string& path);
 		Mesh(const Mesh& other) = default;
 		~Mesh();
 
@@ -49,10 +49,10 @@ namespace Lucy {
 		inline std::string& GetName() { return m_Name; }
 		inline glm::vec3 GetMeshPixelValue() { return m_PixelValue; }
 
-		void Bind();
-		void Unbind();
-	private:
-		void LoadBuffers();
+		virtual void Bind() = 0;
+		virtual void Unbind() = 0;
+	protected:
+		virtual void LoadBuffers() = 0;
 		void LoadData(const aiScene* scene, uint32_t& totalSize);
 		void LoadMaterials(const aiScene* scene, const aiMesh* mesh);
 		void TraverseHierarchy(const aiNode* node, const aiNode* rootNode);
@@ -67,10 +67,9 @@ namespace Lucy {
 
 		glm::vec3 m_PixelValue;
 
-		friend static void IncreaseMeshCount(Mesh* m);
-
 		bool m_Loaded = false;
-		uint32_t m_Vao = -1; //OpenGL only
+	private:
+		friend static void IncreaseMeshCount(Mesh* m);
 	};
 }
 

@@ -1,13 +1,18 @@
 #include "lypch.h"
 
 #include "OpenGLPipeline.h"
+#include "../VulkanDescriptors.h"
 
+#include "Renderer/Renderer.h"
 #include "glad/glad.h"
 
 namespace Lucy {
 
 	OpenGLPipeline::OpenGLPipeline(const PipelineSpecification& specs)
 		: Pipeline(specs) {
+		Renderer::Submit([this] {
+			ParseUniformBuffers();
+		});
 	}
 
 	void OpenGLPipeline::BeginVirtual() {
@@ -18,7 +23,6 @@ namespace Lucy {
 		RenderPassBeginInfo info;
 		info.OpenGLFrameBuffer = As(GetFrameBuffer(), OpenGLFrameBuffer);
 		renderPass->Begin(info);
-		s_ActivePipeline = this;
 
 		Rasterization rasterization = GetRasterization();
 		switch (rasterization.PolygonMode) {
@@ -59,8 +63,20 @@ namespace Lucy {
 		RenderPassEndInfo info;
 		info.OpenGLFrameBuffer = As(GetFrameBuffer(), OpenGLFrameBuffer);
 		renderPass->End(info);
+	}
 
-		s_ActivePipeline = nullptr;
+	//OpenGL does not care about sets etc.
+	void OpenGLPipeline::ParseUniformBuffers() {
+		for (auto& [set, info] : m_Specs.Shader->GetDescriptorSetMap()) {
+			uint32_t setSize = 0;
+			uint32_t setBinding = 0;
+			for (auto& ub : info) {
+				setSize += ub.BufferSize;
+				setBinding = ub.Binding;
+			}
+			auto& ubo = UniformBuffer::Create(setSize, setBinding, {});
+			m_UniformBuffers.push_back(ubo);
+		}
 	}
 
 	void OpenGLPipeline::UploadVertexLayout(RefLucy<VertexBuffer>& vertexBuffer) {

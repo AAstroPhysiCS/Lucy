@@ -9,7 +9,7 @@ namespace Lucy {
 
 	class OpenGLRenderer : public RendererAPI {
 	public:
-		explicit OpenGLRenderer(RenderArchitecture renderArchitecture);
+		OpenGLRenderer(RenderArchitecture renderArchitecture);
 		virtual ~OpenGLRenderer() = default;
 
 		void Init() override;

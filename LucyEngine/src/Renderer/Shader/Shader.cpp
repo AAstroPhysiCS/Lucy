@@ -165,7 +165,7 @@ namespace Lucy {
 				uint32_t binding = compiler->get_decoration(ub.id, spv::DecorationBinding);
 				int32_t memberCount = bufferType.member_types.size();
 
-				LUCY_INFO(fmt::format("{0}", ub.name));
+				LUCY_INFO(fmt::format("Name = '{0}'", ub.name));
 				LUCY_INFO(fmt::format("Set = {0}", set));
 				LUCY_INFO(fmt::format("Size = {0}", bufferSize));
 				LUCY_INFO(fmt::format("Binding = {0}", binding));
@@ -196,7 +196,7 @@ namespace Lucy {
 				uint32_t binding = compiler->get_decoration(ui.id, spv::DecorationBinding);
 				int32_t memberCount = bufferType.member_types.size();
 
-				LUCY_INFO(fmt::format("{0}", ui.name));
+				LUCY_INFO(fmt::format("Name = '{0}'", ui.name));
 				LUCY_INFO(fmt::format("Set = {0}", set));
 				LUCY_INFO(fmt::format("Binding = {0}", binding));
 				LUCY_INFO(fmt::format("Members = {0}", memberCount));

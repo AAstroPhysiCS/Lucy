@@ -23,7 +23,7 @@ namespace Lucy {
 
 	struct WindowCloseEvent : Event {
 
-		explicit WindowCloseEvent(GLFWwindow* window)
+		WindowCloseEvent(GLFWwindow* window)
 			: m_Window(window) {
 			m_Type = EventType::WindowCloseEvent;
 		}

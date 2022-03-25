@@ -43,7 +43,7 @@ namespace Lucy {
 
 	struct CharCallbackEvent : Event {
 
-		explicit CharCallbackEvent(uint32_t codePoint)
+		CharCallbackEvent(uint32_t codePoint)
 			: m_CodePoint(codePoint) {
 			m_Type = EventType::CharCallbackEvent;
 		}

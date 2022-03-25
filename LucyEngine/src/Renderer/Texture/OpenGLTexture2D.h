@@ -6,7 +6,7 @@ namespace Lucy {
 
 	class OpenGLTexture2D : public Texture2D {
 	public:
-		explicit OpenGLTexture2D(TextureSpecification& specs);
+		OpenGLTexture2D(TextureSpecification& specs);
 		virtual ~OpenGLTexture2D() = default;
 
 		void Bind() override;

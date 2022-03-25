@@ -18,7 +18,7 @@ namespace Lucy {
 	class RendererAPI {
 	public:
 		static RefLucy<RendererAPI> Create(RenderArchitecture architecture);
-		virtual void Init();
+		virtual void Init() = 0;
 
 		virtual void Execute() = 0;
 		virtual void ClearCommands() = 0;
@@ -56,9 +56,6 @@ namespace Lucy {
 		std::vector<MeshDrawCommand> m_MeshDrawCommands;
 
 		RefLucy<RenderContext> m_RenderContext;
-
-		RefLucy<UniformBuffer> m_CameraUniformBuffer; //TODO: DELETE
-		RefLucy<UniformBuffer> m_TextureSlotsUniformBuffer; //TODO: DELETE
 		RenderArchitecture m_Architecture;
 
 		ShaderLibrary m_ShaderLibrary;

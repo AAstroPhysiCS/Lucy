@@ -14,8 +14,8 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/VulkanRenderer.h"
 #include "Renderer/VulkanRenderPass.h"
+#include "Renderer/Buffer/Vulkan/VulkanFrameBuffer.h"
 #include "glad/glad.h"
-#include "imgui_impl_vulkan.h"
 
 #include "Renderer/Context/VulkanContext.h"
 
@@ -26,7 +26,7 @@ namespace Lucy {
 	ImGuiLayer::ImGuiLayer() {
 		m_Panels.push_back(&SceneHierarchyPanel::GetInstance());
 		m_Panels.push_back(&TaskbarPanel::GetInstance());
-		m_Panels.push_back(&ViewportPanel::GetInstance());
+		//m_Panels.push_back(&ViewportPanel::GetInstance());
 		m_Panels.push_back(&PropertiesPanel::GetInstance());
 		m_Panels.push_back(&PerformancePanel::GetInstance());
 	}
@@ -51,55 +51,41 @@ namespace Lucy {
 			ImGui_ImplGlfw_InitForOpenGL(window->Raw(), true);
 			ImGui_ImplOpenGL3_Init("#version 460");
 		} else if (currentArchitecture == RenderArchitecture::Vulkan) {
-
 			auto& renderContext = Renderer::GetCurrentRenderer()->m_RenderContext;
 
 			ImGui::CreateContext();
 			ImGui_ImplGlfw_InitForVulkan(window->Raw(), true);
-			
+
 			auto& vulkanContext = As(renderContext, VulkanContext);
 			VulkanDevice device = VulkanDevice::Get();
 			RenderPassSpecification renderPassSpecs;
 			renderPassSpecs.AttachmentReferences.push_back({ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
 			renderPassSpecs.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+			renderPassSpecs.Descriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			renderPassSpecs.Descriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+			renderPassSpecs.Descriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			renderPassSpecs.Descriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+			renderPassSpecs.Descriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			renderPassSpecs.Descriptor.FinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
 			m_RenderPass = As(RenderPass::Create(renderPassSpecs), VulkanRenderPass);
 			Renderer::Dispatch(); //for renderpass only
 
-			//TODO: Change and do it properly
-			//from imgui demo
-			std::vector<VkDescriptorPoolSize> imguiPoolSizes =
-			{
-				{ VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
-				{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-				{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
-				{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
-				{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
-				{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
-				{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
-				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
-				{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
-				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
-				{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
-			};
-
-			VulkanDescriptorPoolSpecifications poolSpecs;
-			poolSpecs.MaxSet = 1000;
-			poolSpecs.PoolFlags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-			poolSpecs.PoolSizesVector = imguiPoolSizes;
-			VulkanDescriptorPool pool(poolSpecs);
+			m_ImGuiPool = CreateRef<VulkanDescriptorPool>(m_PoolSpecs);
 
 			ImGui_ImplVulkan_InitInfo initInfo{};
 			initInfo.Instance = vulkanContext->GetVulkanInstance();
 			initInfo.PhysicalDevice = device.GetPhysicalDevice();
 			initInfo.Device = device.GetLogicalDevice();
 			initInfo.Queue = device.GetGraphicsQueue();
-			initInfo.DescriptorPool = pool.GetVulkanHandle();
+			initInfo.DescriptorPool = m_ImGuiPool->GetVulkanHandle();
 			initInfo.MinImageCount = 3;
 			initInfo.ImageCount = 3;
 			initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+			initInfo.CheckVkResultFn = VulkanMessageCallback::ImGui_DebugCallback;
 			ImGui_ImplVulkan_Init(&initInfo, m_RenderPass->GetVulkanHandle());
 
-			VulkanRenderer::ImGui_UploadFontsTexture(ImGui_ImplVulkan_CreateFontsTexture);
+			VulkanRenderer::RecordSingleTimeCommand(ImGui_ImplVulkan_CreateFontsTexture);
 
 			ImGui_ImplVulkan_DestroyFontUploadObjects();
 		}
@@ -144,7 +130,6 @@ namespace Lucy {
 	}
 
 	void ImGuiLayer::End() {
-
 		ImGui::End(); //end of dockspace window
 
 		ImGuiIO& io = ImGui::GetIO();
@@ -153,29 +138,45 @@ namespace Lucy {
 		m_Time = time;
 
 		ImGui::Render();
-		auto currentArchitecture = Renderer::GetCurrentRenderArchitecture();
-
-		if (currentArchitecture == RenderArchitecture::OpenGL) {
-			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-		} else if (currentArchitecture == RenderArchitecture::Vulkan) {
-			VkCommandBuffer commandBuffer = VulkanRenderer::ImGui_BeginRenderDrawDataCommandBuffer();
-			RenderPassBeginInfo beginInfo;
-			beginInfo.CommandBuffer = commandBuffer;
-			beginInfo.VulkanFrameBuffer;
-			m_RenderPass->Begin(beginInfo);
-			ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
-			VulkanRenderer::ImGui_EndRenderDrawDataCommandBuffer(commandBuffer);
-			RenderPassEndInfo endInfo; 
-			endInfo.CommandBuffer = commandBuffer;
-			endInfo.VulkanFrameBuffer;
-			m_RenderPass->End(endInfo);
-		}
+		UIPass();
 
 		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
 			GLFWwindow* backup_current_context = glfwGetCurrentContext();
 			ImGui::UpdatePlatformWindows();
 			ImGui::RenderPlatformWindowsDefault();
 			glfwMakeContextCurrent(backup_current_context);
+		}
+	}
+
+	void ImGuiLayer::UIPass() {
+		auto currentArchitecture = Renderer::GetCurrentRenderArchitecture();
+
+		if (currentArchitecture == RenderArchitecture::OpenGL) {
+			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		} else if (currentArchitecture == RenderArchitecture::Vulkan) {
+			Renderer::Submit([this]() {
+				for (uint32_t i = 0; i < VulkanRenderer::s_CommandPool->GetCommandBufferSize(); i++) {
+					const auto& targetFrameBuffer = As(VulkanRenderer::m_GeometryPipeline->GetFrameBuffer(), VulkanFrameBuffer)->GetSwapChainFrameBuffers()[i];
+					const auto& commandBuffer = VulkanRenderer::s_CommandPool->GetCommandBuffer(i);
+
+					VkCommandBufferBeginInfo commandBufferBeginInfo{};
+					commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+					LUCY_VK_ASSERT(vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo));
+
+					RenderPassBeginInfo beginInfo;
+					beginInfo.CommandBuffer = commandBuffer;
+					beginInfo.VulkanFrameBuffer = targetFrameBuffer;
+					m_RenderPass->Begin(beginInfo);
+
+					ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+
+					RenderPassEndInfo endInfo;
+					endInfo.CommandBuffer = commandBuffer;
+					endInfo.VulkanFrameBuffer = targetFrameBuffer;
+					m_RenderPass->End(endInfo);
+					LUCY_VK_ASSERT(vkEndCommandBuffer(commandBuffer));
+				}
+			});
 		}
 	}
 
@@ -240,6 +241,8 @@ namespace Lucy {
 			ImGui_ImplOpenGL3_Shutdown();
 		} else if (currentArchitecture == RenderArchitecture::Vulkan) {
 			ImGui_ImplVulkan_Shutdown();
+			m_ImGuiPool->Destroy();
+			m_RenderPass->Destroy();
 		}
 		ImGui_ImplGlfw_Shutdown();
 		ImGui::DestroyContext();

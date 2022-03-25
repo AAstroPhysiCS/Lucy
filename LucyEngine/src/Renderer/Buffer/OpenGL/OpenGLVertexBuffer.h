@@ -6,7 +6,7 @@ namespace Lucy {
 
 	class OpenGLVertexBuffer : public VertexBuffer {
 	public:
-		explicit OpenGLVertexBuffer(uint32_t size);
+		OpenGLVertexBuffer(uint32_t size);
 		OpenGLVertexBuffer();
 		virtual ~OpenGLVertexBuffer() = default;
 

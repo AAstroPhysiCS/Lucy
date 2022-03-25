@@ -6,7 +6,7 @@ namespace Lucy {
 
 	class OpenGLIndexBuffer : public IndexBuffer {
 	public:
-		explicit OpenGLIndexBuffer(uint32_t size);
+		OpenGLIndexBuffer(uint32_t size);
 		OpenGLIndexBuffer();
 		virtual ~OpenGLIndexBuffer() = default;
 

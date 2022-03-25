@@ -24,13 +24,12 @@ namespace Lucy {
 		VkAttachmentDescription colorAttachmentDescription{};
 		colorAttachmentDescription.format = swapChain.GetSurfaceFormat().format;
 		colorAttachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT; //MSAA but we dont use it yet
-
-		colorAttachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		colorAttachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		colorAttachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		colorAttachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-		colorAttachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		colorAttachmentDescription.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		colorAttachmentDescription.loadOp = m_Specs.Descriptor.LoadOp;
+		colorAttachmentDescription.storeOp = m_Specs.Descriptor.StoreOp;
+		colorAttachmentDescription.stencilLoadOp = m_Specs.Descriptor.StencilLoadOp;
+		colorAttachmentDescription.stencilStoreOp = m_Specs.Descriptor.StencilStoreOp;
+		colorAttachmentDescription.initialLayout = m_Specs.Descriptor.InitialLayout;
+		colorAttachmentDescription.finalLayout = m_Specs.Descriptor.FinalLayout;
 
 		VkSubpassDescription subpassDescription{};
 		subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;

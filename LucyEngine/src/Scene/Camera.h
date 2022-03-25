@@ -49,7 +49,7 @@ namespace Lucy {
 	public:
 		EditorCamera(int32_t m_ViewportWidth, int32_t m_ViewportHeight, float farPlane = 1000.0f, float nearPlane = 0.1f, float fov = 90.0f);
 		EditorCamera(float farPlane = 1000.0f, float nearPlane = 0.1f, float fov = 90.0f);
-		explicit EditorCamera(glm::vec3& position, float farPlane = 1000.0f, float nearPlane = 0.1f, float fov = 90.0f);
+		EditorCamera(glm::vec3& position, float farPlane = 1000.0f, float nearPlane = 0.1f, float fov = 90.0f);
 		virtual ~EditorCamera() = default;
 
 		void OnEvent(PerformanceMetrics& rendererMetrics) override;

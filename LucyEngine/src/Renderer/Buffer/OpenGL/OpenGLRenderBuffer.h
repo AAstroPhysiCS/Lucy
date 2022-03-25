@@ -6,7 +6,7 @@ namespace Lucy {
 
 	class OpenGLRenderBuffer : public RenderBuffer {
 	public:
-		explicit OpenGLRenderBuffer(const RenderBufferSpecification& specs);
+		OpenGLRenderBuffer(const RenderBufferSpecification& specs);
 		virtual ~OpenGLRenderBuffer() = default;
 
 		void Bind() override;

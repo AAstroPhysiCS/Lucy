@@ -8,6 +8,9 @@
 #include "RenderPass.h"
 #include "Context/OpenGLPipeline.h"
 
+#include "VulkanMesh.h"
+#include "OpenGLMesh.h"
+
 namespace Lucy {
 
 	constexpr static uint32_t ASSIMP_FLAGS = aiProcess_CalcTangentSpace |
@@ -79,18 +82,18 @@ namespace Lucy {
 					vertices[i].x,
 					vertices[i].y,
 					vertices[i].z,
-					
-					(float) MESH_ID_COUNT_X,
-					(float) MESH_ID_COUNT_Y,
-					(float) MESH_ID_COUNT_Z,
-					
+
+					(float)MESH_ID_COUNT_X,
+					(float)MESH_ID_COUNT_Y,
+					(float)MESH_ID_COUNT_Z,
+
 					textureCoords[i].x,
 					textureCoords[i].y,
-					
+
 					normals[i].x,
 					normals[i].y,
 					normals[i].z,
-					
+
 					tangents[i].x,
 					tangents[i].y,
 					tangents[i].z,
@@ -107,57 +110,18 @@ namespace Lucy {
 	Mesh::~Mesh() {
 		m_VertexBuffer->Destroy();
 		m_IndexBuffer->Destroy();
-
-		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::OpenGL) {
-			glDeleteVertexArrays(1, &m_Vao);
-		}
 	}
 
 	RefLucy<Mesh> Mesh::Create(const std::string& path) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
-				return CreateRef<Mesh>(path);
+				return CreateRef<OpenGLMesh>(path);
 				break;
 			case RenderArchitecture::Vulkan:
-				LUCY_CRITICAL("Vulkan not supported");
-				LUCY_ASSERT(false);
+				return CreateRef<VulkanMesh>(path);
 				break;
 		}
 		return nullptr;
-	}
-
-	void Mesh::Bind() {
-		if (!m_Loaded)
-			LoadBuffers();
-
-		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::OpenGL) {
-			glBindVertexArray(m_Vao);
-			m_IndexBuffer->Bind({});
-		}
-	}
-
-	void Mesh::Unbind() {
-		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::OpenGL) {
-			m_IndexBuffer->Unbind();
-			glBindVertexArray(0);
-		}
-	}
-
-	void Mesh::LoadBuffers() {
-		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::OpenGL) {
-			glCreateVertexArrays(1, &m_Vao);
-			glBindVertexArray(m_Vao);
-
-			OpenGLPipeline* activePipeline = (OpenGLPipeline*) Pipeline::s_ActivePipeline;
-			activePipeline->UploadVertexLayout(m_VertexBuffer);
-
-			m_VertexBuffer->Load();
-			m_IndexBuffer->Load();
-
-			glBindVertexArray(0);
-		}
-
-		m_Loaded = true;
 	}
 
 	void Mesh::LoadData(const aiScene* scene, uint32_t& totalVertexSize) {

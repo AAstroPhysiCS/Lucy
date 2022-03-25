@@ -88,7 +88,7 @@ namespace Lucy {
 
 	struct VertexShaderLayout {
 		VertexShaderLayout() = default;
-		explicit VertexShaderLayout(const std::vector<ShaderLayoutElement>& elementList)
+		VertexShaderLayout(const std::vector<ShaderLayoutElement>& elementList)
 			: ElementList(elementList) {
 		}
 

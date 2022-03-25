@@ -9,14 +9,15 @@ namespace Lucy {
 
 	class OpenGLPipeline : public Pipeline {
 	public:
-		explicit OpenGLPipeline(const PipelineSpecification& specs);
+		OpenGLPipeline(const PipelineSpecification& specs);
 		virtual ~OpenGLPipeline() = default;
 
 		void BeginVirtual() override;
 		void EndVirtual() override;
 
-		friend class Mesh;
+		friend class OpenGLMesh;
 	private:
 		void UploadVertexLayout(RefLucy<VertexBuffer>& vertexBuffer);
+		void ParseUniformBuffers();
 	};
 }

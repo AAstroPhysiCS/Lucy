@@ -45,6 +45,7 @@ namespace Lucy {
 		inline static RefLucy<RendererAPI> GetCurrentRenderer() { return s_RendererAPI; }
 	private:
 		Renderer() = delete;
+		~Renderer() = delete;
 
 		static RefLucy<Window> s_Window;
 		static RefLucy<RendererAPI> s_RendererAPI;

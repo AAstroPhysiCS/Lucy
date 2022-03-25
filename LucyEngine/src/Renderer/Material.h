@@ -8,6 +8,7 @@
 
 namespace Lucy {
 
+	class Pipeline;
 	class Shader;
 
 	struct MaterialData {
@@ -26,8 +27,8 @@ namespace Lucy {
 		Material() = default;
 		Material(RefLucy<Shader> shader, aiMaterial* aiMaterial, const char* submeshName, std::string& importedFilePath);
 
-		void Bind();
-		void Unbind();
+		void Bind(RefLucy<Pipeline> pipeline);
+		void Unbind(RefLucy<Pipeline> pipeline);
 
 		inline RefLucy<Shader> GetShader() { return m_Shader; }
 		inline std::string GetName() const { return m_MaterialData.Name; }

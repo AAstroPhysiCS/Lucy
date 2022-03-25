@@ -2,6 +2,7 @@
 
 #include "Material.h"
 #include "Shader/Shader.h"
+#include "Context/Pipeline.h"
 
 #include "../Core/FileSystem.h"
 #include "Texture/Texture.h"
@@ -34,38 +35,38 @@ namespace Lucy {
 		LoadTexture(aiMaterial, 5, AO_TYPE, importedFilePath);
 	}
 
-	void Material::Bind() {
+	void Material::Bind(RefLucy<Pipeline> pipeline) {
 		m_Shader->Bind();
 		for (uint32_t i = 0; i < m_Textures.size(); i++) {
 			uint32_t slot = m_Textures[i]->GetSlot();
 			glBindTextureUnit(slot, m_Textures[i]->GetID());
 		}
-		
-		RefLucy<RendererAPI>& currentContext = Renderer::GetCurrentRenderer();
 
+		auto& uniformBuffer = pipeline->GetUniformBuffers<UniformBuffer>(0);
+		
 		//TODO: Kinda bad/ugly code and its slow somehow although i dont do anything wrong here...!
 		if (HasTexture(Material::ALBEDO_TYPE)) {
 			int32_t albedoSlot = GetTexture(Material::ALBEDO_TYPE)->GetSlot();
-			currentContext->m_TextureSlotsUniformBuffer->SetData((void*)&albedoSlot, sizeof(int32_t), 0);
+			uniformBuffer->SetData((void*)&albedoSlot, sizeof(int32_t), 0);
 		} else if (HasTexture(Material::NORMALS_TYPE)) {
 			int32_t normalsSlot = GetTexture(Material::NORMALS_TYPE)->GetSlot();
-			currentContext->m_TextureSlotsUniformBuffer->SetData((void*)&normalsSlot, sizeof(int32_t), sizeof(int32_t));
+			uniformBuffer->SetData((void*)&normalsSlot, sizeof(int32_t), sizeof(int32_t));
 		} else if (HasTexture(Material::METALLIC_TYPE)) {
 			int32_t metallicSlot = GetTexture(Material::METALLIC_TYPE)->GetSlot();
-			currentContext->m_TextureSlotsUniformBuffer->SetData((void*)&metallicSlot, sizeof(int32_t), sizeof(int32_t) * 2);
+			uniformBuffer->SetData((void*)&metallicSlot, sizeof(int32_t), sizeof(int32_t) * 2);
 		} else if (HasTexture(Material::ROUGHNESS_TYPE)) {
 			int32_t roughnessSlot = GetTexture(Material::ROUGHNESS_TYPE)->GetSlot();
-			currentContext->m_TextureSlotsUniformBuffer->SetData((void*)&roughnessSlot, sizeof(int32_t), sizeof(int32_t) * 3);
+			uniformBuffer->SetData((void*)&roughnessSlot, sizeof(int32_t), sizeof(int32_t) * 3);
 		} else if (HasTexture(Material::AO_TYPE)) {
 			int32_t aoSlot = GetTexture(Material::AO_TYPE)->GetSlot();
-			currentContext->m_TextureSlotsUniformBuffer->SetData((void*)&aoSlot, sizeof(int32_t), sizeof(int32_t) * 4);
+			uniformBuffer->SetData((void*)&aoSlot, sizeof(int32_t), sizeof(int32_t) * 4);
 		}
 	}
 
-	void Material::Unbind() {
+	void Material::Unbind(RefLucy<Pipeline> pipeline) {
 		int32_t clearValue = -1;
-		RefLucy<RendererAPI>& currentContext = Renderer::GetCurrentRenderer();
-		currentContext->m_TextureSlotsUniformBuffer->SetData((void*)&clearValue, sizeof(int32_t) * 5, 0);
+		auto& uniformBuffer = pipeline->GetUniformBuffers<UniformBuffer>(0);
+		uniformBuffer->SetData((void*)&clearValue, sizeof(int32_t) * 5, 0);
 		m_Shader->Unbind();
 		for (uint32_t i = 0; i < m_Textures.size(); i++) {
 			glBindTextureUnit(m_Textures[i]->GetSlot(), 0);

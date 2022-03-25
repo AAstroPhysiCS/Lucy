@@ -3,6 +3,7 @@
 
 #include "Renderer/Renderer.h"
 #include "Renderer/OpenGLRenderer.h"
+#include "Renderer/VulkanRenderer.h"
 #include "Renderer/RenderPass.h"
 #include "Renderer/Buffer/OpenGL/OpenGLFrameBuffer.h"
 
@@ -49,12 +50,26 @@ namespace Lucy {
 		IsViewportActive = IsViewportHovered && ImGui::IsWindowFocused();
 		IsOverAnyGizmo = IsOverAnyGizmoM();
 
+		uint32_t outputTextureID = 0;
+
 		//TODO: Bad access? Change it maybe?
-		auto& blittedFrameBuffer = As(As(Renderer::GetCurrentRenderer(), OpenGLRenderer)->GetGeometryPipeline()->GetFrameBuffer()->GetBlitted(), OpenGLFrameBuffer);
-		auto& texture = blittedFrameBuffer->GetTexture(0);
+		RefLucy<RendererAPI>& currentRenderer = Renderer::GetCurrentRenderer();
+
+		switch (Renderer::GetCurrentRenderArchitecture()) {
+			case RenderArchitecture::OpenGL: {
+				auto& blittedFrameBuffer = As(As(currentRenderer, OpenGLRenderer)->GetGeometryPipeline()->GetFrameBuffer()->GetBlitted(), OpenGLFrameBuffer);
+				auto& texture = blittedFrameBuffer->GetTexture(0);
+				outputTextureID = texture->GetID();
+				break;
+			}
+			case RenderArchitecture::Vulkan:
+				break;
+			default:
+				LUCY_ASSERT(false);
+		}
 
 		ImVec2& size = ImGui::GetWindowSize();
-		ImGui::Image((ImTextureID)texture->GetID(), size, { 0, 1 }, { 1, 0 });
+		ImGui::Image((ImTextureID)outputTextureID, size, { 0, 1 }, { 1, 0 });
 
 		auto [w, h] = Renderer::GetViewportSize();
 		if (w != size.x || h != size.y) {

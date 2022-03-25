@@ -23,11 +23,49 @@ namespace Lucy {
 	}
 
 	void VulkanPipeline::BeginVirtual() {
-
+		
 	}
 
 	void VulkanPipeline::EndVirtual() {
 
+	}
+
+	void VulkanPipeline::ParseUniformBuffers() {
+		if (m_DescriptorSetLayouts.size() != 0) return; //if the application has been resized
+		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+
+		for (auto& [set, info] : m_Specs.Shader->GetDescriptorSetMap()) {
+			std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
+			uint32_t size = 0;
+			for (auto& ub : info) {
+				VkDescriptorSetLayoutBinding binding{};
+				binding.binding = ub.Binding;
+				binding.descriptorCount = 1;
+				binding.descriptorType = ub.Type;
+				binding.stageFlags = ub.StageFlag;
+				binding.pImmutableSamplers = nullptr;
+				size += ub.BufferSize;
+				layoutBindings.push_back(binding);
+			}
+			VkDescriptorSetLayoutCreateInfo descriptorLayoutInfo{};
+			descriptorLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			descriptorLayoutInfo.bindingCount = layoutBindings.size();
+			descriptorLayoutInfo.pBindings = layoutBindings.data();
+
+			VkDescriptorSetLayout descriptorSetLayout;
+			LUCY_VK_ASSERT(vkCreateDescriptorSetLayout(device, &descriptorLayoutInfo, nullptr, &descriptorSetLayout));
+			m_DescriptorSetLayouts.push_back(descriptorSetLayout);
+
+			VulkanDescriptorSetSpecifications setSpecs;
+			setSpecs.Layout = descriptorSetLayout;
+			setSpecs.Pool = s_DescriptorPool;
+
+			VulkanDescriptorSet descriptorSet(setSpecs);
+			for (auto& ub : info) {
+				RefLucy<VulkanUniformBuffer> uniformBuffer = As(UniformBuffer::Create(size, ub.Binding, std::optional<VulkanDescriptorSet>(descriptorSet)), VulkanUniformBuffer);
+				m_UniformBuffers.push_back(uniformBuffer);
+			}
+		}
 	}
 
 	void VulkanPipeline::Create() {
@@ -133,7 +171,7 @@ namespace Lucy {
 		dynamicState.dynamicStateCount = 3;
 		dynamicState.pDynamicStates = dynamicStates;
 
-		CreateDescriptorSets();
+		ParseUniformBuffers();
 
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -192,44 +230,6 @@ namespace Lucy {
 		return poolSizes;
 	}
 
-	void VulkanPipeline::CreateDescriptorSets() {
-		if (m_DescriptorSetLayouts.size() != 0) return; //if the application has been resized
-		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
-
-		for (auto& [set, info] : m_Specs.Shader->GetDescriptorSetMap()) {
-			std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
-			uint32_t size = 0;
-			for (auto& ub : info) {
-				VkDescriptorSetLayoutBinding binding{};
-				binding.binding = ub.Binding;
-				binding.descriptorCount = 1;
-				binding.descriptorType = ub.Type;
-				binding.stageFlags = ub.StageFlag;
-				binding.pImmutableSamplers = nullptr;
-				size += ub.BufferSize;
-				layoutBindings.push_back(binding);
-			}
-			VkDescriptorSetLayoutCreateInfo descriptorLayoutInfo{};
-			descriptorLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			descriptorLayoutInfo.bindingCount = layoutBindings.size();
-			descriptorLayoutInfo.pBindings = layoutBindings.data();
-
-			VkDescriptorSetLayout descriptorSetLayout;
-			LUCY_VK_ASSERT(vkCreateDescriptorSetLayout(device, &descriptorLayoutInfo, nullptr, &descriptorSetLayout));
-			m_DescriptorSetLayouts.push_back(descriptorSetLayout);
-
-			VulkanDescriptorSetSpecifications setSpecs;
-			setSpecs.Layout = descriptorSetLayout;
-			setSpecs.Pool = s_DescriptorPool;
-
-			VulkanDescriptorSet descriptorSet(setSpecs);
-			for (auto& ub : info) {
-				RefLucy<VulkanUniformBuffer> uniformBuffer = As(UniformBuffer::Create(size, ub.Binding, std::optional<VulkanDescriptorSet>(descriptorSet)), VulkanUniformBuffer);
-				m_UniformBuffers.push_back(uniformBuffer);
-			}
-		}
-	}
-
 	VkVertexInputBindingDescription VulkanPipeline::CreateBindingDescription() {
 		VkVertexInputBindingDescription vertexInputBindingDescription{};
 		vertexInputBindingDescription.binding = 0;
@@ -263,7 +263,7 @@ namespace Lucy {
 		m_Specs.FrameBuffer->Destroy();
 		As(m_Specs.RenderPass, VulkanRenderPass)->Destroy();
 
-		for (auto& buffer : m_UniformBuffers)
+		for (const auto& buffer : m_UniformBuffers)
 			buffer->Destroy();
 		for (auto& descriptorSetLayout : m_DescriptorSetLayouts)
 			vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);

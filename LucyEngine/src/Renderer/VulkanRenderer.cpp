@@ -12,7 +12,8 @@
 namespace Lucy {
 
 	uint32_t VulkanRenderer::s_ImageIndex = 0;
-	RefLucy<VulkanCommandPool> VulkanRenderer::s_CommandPool;
+	RefLucy<VulkanCommandPool> VulkanRenderer::s_CommandPool = nullptr;
+	RefLucy<VulkanPipeline> VulkanRenderer::m_GeometryPipeline = nullptr;
 
 	VulkanRenderer::VulkanRenderer(RenderArchitecture renderArchitecture)
 		: RendererAPI(renderArchitecture) {
@@ -42,8 +43,15 @@ namespace Lucy {
 		geometryPassSpecs.AttachmentReferences = { 
 			{ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL }
 		};
+		geometryPassSpecs.Descriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		geometryPassSpecs.Descriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+		geometryPassSpecs.Descriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		geometryPassSpecs.Descriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+		geometryPassSpecs.Descriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		geometryPassSpecs.Descriptor.FinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 		
 		FrameBufferSpecification geometryFrameBufferSpecs;
+
 		geometryPipelineSpecs.VertexShaderLayout = VertexShaderLayout(vertexLayout);
 		geometryPipelineSpecs.Topology = Topology::TRIANGLES;
 		geometryPipelineSpecs.Rasterization = { true, VK_CULL_MODE_BACK_BIT, 1.0f, PolygonMode::FILL };
@@ -82,7 +90,7 @@ namespace Lucy {
 			return;
 		}
 
-		s_CommandPool->Execute(m_GeometryPipeline);
+		//s_CommandPool->Execute(m_GeometryPipeline);
 
 		if (m_ImagesInFlight[s_ImageIndex] != nullptr) {
 			vkWaitForFences(deviceVulkanHandle, 1, &m_ImagesInFlight[s_ImageIndex]->GetFence(), VK_TRUE, UINT64_MAX);
@@ -168,7 +176,13 @@ namespace Lucy {
 
 	// Should not be used in a loop
 	void VulkanRenderer::DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size) {
-		s_CommandPool->DirectCopyBuffer(stagingBuffer, buffer, size);
+		RecordSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+			VkBufferCopy copyRegion{};
+			copyRegion.srcOffset = 0;
+			copyRegion.dstOffset = 0;
+			copyRegion.size = size;
+			vkCmdCopyBuffer(commandBuffer, stagingBuffer, buffer, 1, &copyRegion);
+		});
 	}
 
 	void VulkanRenderer::Submit(const Func&& func) {
@@ -179,6 +193,12 @@ namespace Lucy {
 		Submit([this, mesh, entityTransform]() {
 			m_MeshDrawCommands.push_back(MeshDrawCommand(mesh, entityTransform));
 		});
+	}
+
+	void VulkanRenderer::RecordSingleTimeCommand(std::function<void(VkCommandBuffer)>&& func) {
+		VkCommandBuffer commandBuffer = s_CommandPool->BeginSingleTimeCommand();
+		func(commandBuffer);
+		s_CommandPool->EndSingleTimeCommand(commandBuffer);
 	}
 
 	void VulkanRenderer::OnFramebufferResize(float sizeX, float sizeY) {
@@ -196,17 +216,5 @@ namespace Lucy {
 
 	Entity VulkanRenderer::OnMousePicking() {
 		return {};
-	}
-
-	void VulkanRenderer::ImGui_UploadFontsTexture(std::function<bool(VkCommandBuffer)> imguiUploadFunc) {
-		s_CommandPool->ImGui_UploadFontsToGPU(imguiUploadFunc);
-	}
-
-	VkCommandBuffer VulkanRenderer::ImGui_BeginRenderDrawDataCommandBuffer() {
-		return s_CommandPool->BeginSingleTimeCommand();
-	}
-
-	void VulkanRenderer::ImGui_EndRenderDrawDataCommandBuffer(VkCommandBuffer commandBuffer) {
-		s_CommandPool->EndSingleTimeCommand(commandBuffer);
 	}
 }

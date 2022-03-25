@@ -19,7 +19,7 @@ namespace Lucy {
 		inline static uint32_t CURRENT_FRAME = 0;
 		inline static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
-		explicit VulkanRenderer(RenderArchitecture renderArchitecture);
+		VulkanRenderer(RenderArchitecture renderArchitecture);
 		virtual ~VulkanRenderer() = default;
 
 		void Init() override;
@@ -36,11 +36,12 @@ namespace Lucy {
 		void DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size);
 		void Submit(const Func&& func) override;
 		void SubmitMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform) override;
+		static void RecordSingleTimeCommand(std::function<void(VkCommandBuffer)>&& func);
 
 		void OnFramebufferResize(float sizeX, float sizeY) override;
 		Entity OnMousePicking() override;
 	private:
-		RefLucy<VulkanPipeline> m_GeometryPipeline;
+		static RefLucy<VulkanPipeline> m_GeometryPipeline;
 
 		std::vector<Semaphore> m_ImageIsAvailableSemaphores;
 		std::vector<Semaphore> m_RenderIsFinishedSemaphores;
@@ -49,10 +50,6 @@ namespace Lucy {
 
 		static RefLucy<VulkanCommandPool> s_CommandPool;
 	private:
-		static void ImGui_UploadFontsTexture(std::function<bool(VkCommandBuffer)> imguiUploadFunc);
-		static VkCommandBuffer ImGui_BeginRenderDrawDataCommandBuffer();
-		static void ImGui_EndRenderDrawDataCommandBuffer(VkCommandBuffer commandBuffer);
-
 		friend class ImGuiLayer;
 	};
 }

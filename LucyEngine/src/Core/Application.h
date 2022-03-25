@@ -15,11 +15,7 @@ namespace Lucy {
 	class Application {
 	public:
 		Application(const ApplicationArgs& args);
-		virtual ~Application() {
-			for (Layer* layer : m_LayerStack.GetStack()) {
-				layer->Destroy();
-			}
-		}
+		virtual ~Application() = default;
 
 		inline static PerformanceMetrics& GetPerformanceMetrics() { return s_Metrics; }
 		

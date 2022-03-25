@@ -22,7 +22,7 @@ namespace Lucy {
 		void Recreate();
 		VkResult AcquireNextImage(VkSemaphore currentFrameImageAvailSemaphore, uint32_t& imageIndex);
 		void Destroy();
-
+			
 		inline VkExtent2D& GetExtent() { return m_SelectedSwapExtent; }
 		inline VkSurfaceFormatKHR& GetSurfaceFormat() { return m_SelectedFormat; }
 		inline VkSwapchainKHR GetVulkanHandle() { return m_SwapChain; }

@@ -8,7 +8,7 @@ namespace Lucy {
 
 	class VulkanVertexBuffer : public VertexBuffer {
 	public:
-		explicit VulkanVertexBuffer(uint32_t size);
+		VulkanVertexBuffer(uint32_t size);
 		VulkanVertexBuffer();
 		virtual ~VulkanVertexBuffer() = default;
 

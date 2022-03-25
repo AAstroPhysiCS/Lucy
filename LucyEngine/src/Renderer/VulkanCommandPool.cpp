@@ -89,7 +89,7 @@ namespace Lucy {
 		auto& extent = VulkanSwapChain::Get().GetExtent();
 
 		//TODO: Delete (all temporary, test stuff)
-		auto& uniformBuffer = pipeline->GetUniformBuffers()[0];
+		auto uniformBuffer = pipeline->GetUniformBuffers<VulkanUniformBuffer>(0);
 
 		struct MVP {
 			glm::mat4 model;
@@ -114,7 +114,7 @@ namespace Lucy {
 		add.addition.x = 0.5f;
 		add.addition.y = 0.5f;
 
-		auto& uniformBuffer2 = pipeline->GetUniformBuffers()[1];
+		auto& uniformBuffer2 = pipeline->GetUniformBuffers<VulkanUniformBuffer>(1);
 		uniformBuffer2->SetData((void*)&add, sizeof(Add), 0);
 		uniformBuffer2->WriteToSets(VulkanRenderer::CURRENT_FRAME);
 
@@ -122,7 +122,7 @@ namespace Lucy {
 		add2.addition.x = 0.5f;
 		add2.addition.y = 0.5f;
 
-		auto& uniformBuffer3 = pipeline->GetUniformBuffers()[2];
+		auto& uniformBuffer3 = pipeline->GetUniformBuffers<VulkanUniformBuffer>(2);
 		uniformBuffer3->SetData((void*)&add2, sizeof(Add), 0);
 		uniformBuffer3->WriteToSets(VulkanRenderer::CURRENT_FRAME);
 
@@ -130,7 +130,7 @@ namespace Lucy {
 		add3.addition.x = 0.0f;
 		add3.addition.y = 0.5f;
 
-		auto& uniformBuffer4 = pipeline->GetUniformBuffers()[3];
+		auto& uniformBuffer4 = pipeline->GetUniformBuffers<VulkanUniformBuffer>(3);
 		uniformBuffer4->SetData((void*)&add3, sizeof(Add), 0);
 		uniformBuffer4->WriteToSets(VulkanRenderer::CURRENT_FRAME);
 
@@ -143,7 +143,6 @@ namespace Lucy {
 			VkCommandBufferBeginInfo beginInfo{};
 			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 			beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-			beginInfo.pInheritanceInfo = nullptr;
 			auto commandBuffer = m_CommandBuffers[i];
 			LUCY_VK_ASSERT(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 
@@ -169,14 +168,6 @@ namespace Lucy {
 				vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 				vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-				/*
-				BindSpecification uboBind;
-				uboBind.CommandBuffer = commandBuffer;
-				uboBind.SetIndicesToBind = { 0, 1 };
-				uboBind.Layout = pipeline->GetPipelineLayout();
-				//WTF is going on?
-				uniformBuffer->Bind(uboBind);
-				*/
 				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetPipelineLayout(), 0, allSetsToBind.size(), allSetsToBind.data(), 0, nullptr);
 
 				vertexBuffer->Bind({ commandBuffer });
@@ -186,7 +177,6 @@ namespace Lucy {
 
 				vertexBuffer->Unbind();
 				indexBuffer->Unbind();
-				uniformBuffer->Unbind();
 			}
 		}
 	}
@@ -238,25 +228,6 @@ namespace Lucy {
 		vkQueueWaitIdle(graphicsQueue);
 
 		vkFreeCommandBuffers(vulkanDevice.GetLogicalDevice(), m_CommandPool, 1, &commandBuffer);
-	}
-
-	void VulkanCommandPool::ImGui_UploadFontsToGPU(std::function<bool(VkCommandBuffer)> imguiUploadFunc) {
-		VkCommandBuffer commandBuffer = BeginSingleTimeCommand();
-		imguiUploadFunc(commandBuffer);
-		EndSingleTimeCommand(commandBuffer);
-	}
-
-	// Should not be used in a loop
-	void VulkanCommandPool::DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size) {
-		VkCommandBuffer commandBuffer = BeginSingleTimeCommand();
-
-		VkBufferCopy copyRegion{};
-		copyRegion.srcOffset = 0;
-		copyRegion.dstOffset = 0;
-		copyRegion.size = size;
-		vkCmdCopyBuffer(commandBuffer, stagingBuffer, buffer, 1, &copyRegion);
-
-		EndSingleTimeCommand(commandBuffer);
 	}
 
 	void VulkanCommandPool::Execute(RefLucy<VulkanPipeline>& pipeline) {

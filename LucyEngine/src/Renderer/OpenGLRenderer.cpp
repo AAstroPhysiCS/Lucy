@@ -7,6 +7,7 @@
 #include "Mesh.h"
 
 #include "OpenGLRenderPass.h"
+#include "Buffer/OpenGL/OpenGLUniformBuffer.h"
 
 #include "glad/glad.h"
 
@@ -23,10 +24,8 @@ namespace Lucy {
 		m_RenderContext = RenderContext::Create(m_Architecture);
 		m_RenderContext->PrintInfo();
 
-		RendererAPI::Init(); //for uniform buffers
-
-		Shader::Create("LucyPBR", "assets/shaders/LucyPBR.glsl");
-		Shader::Create("LucyID", "assets/shaders/LucyID.glsl");
+		auto& pbrShader = Shader::Create("LucyPBR", "assets/shaders/LucyPBR.glsl");
+		auto& idShader = Shader::Create("LucyID", "assets/shaders/LucyID.glsl");
 
 		auto [width, height] = Utils::ReadSizeFromIni("Viewport");
 		m_ViewportWidth = width;
@@ -90,6 +89,7 @@ namespace Lucy {
 			
 			geometryPipelineSpecs.FrameBuffer = FrameBuffer::Create(geometryFrameBufferSpecs);
 			geometryPipelineSpecs.RenderPass = RenderPass::Create(geometryPassSpecs);
+			geometryPipelineSpecs.Shader = pbrShader;
 			m_GeometryPipeline = As(Pipeline::Create(geometryPipelineSpecs), OpenGLPipeline);
 
 			//------------ Mouse Picking ------------
@@ -125,6 +125,7 @@ namespace Lucy {
 			
 			geometryPipelineSpecs.FrameBuffer = FrameBuffer::Create(idFrameBufferSpecs);
 			geometryPipelineSpecs.RenderPass = RenderPass::Create(idRenderPassSpecs);
+			geometryPipelineSpecs.Shader = idShader;
 			m_IDPipeline = As(Pipeline::Create(geometryPipelineSpecs), OpenGLPipeline);
 		}
 
@@ -162,6 +163,7 @@ namespace Lucy {
 
 	void OpenGLRenderer::GeometryPass() {
 		Pipeline::Begin(m_GeometryPipeline);
+		auto& uniformBuffers = m_GeometryPipeline->GetUniformBuffers<OpenGLUniformBuffer>(0);
 		for (MeshDrawCommand meshComponent : m_MeshDrawCommands) {
 			const RefLucy<Mesh>& mesh = meshComponent.Mesh;
 			std::vector<Material>& materials = mesh->GetMaterials();
@@ -173,10 +175,10 @@ namespace Lucy {
 				Material& material = materials[submesh.MaterialIndex];
 				const RefLucy<Shader>& shader = material.GetShader();
 
-				material.Bind();
-				m_CameraUniformBuffer->SetData((void*)&(meshComponent.EntityTransform * submesh.Transform), sizeof(glm::mat4), sizeof(glm::mat4) * 2);
+				material.Bind(m_GeometryPipeline);
+				uniformBuffers->SetData((void*)&(meshComponent.EntityTransform * submesh.Transform), sizeof(glm::mat4), sizeof(glm::mat4) * 2);
 				OpenGLAPICommands::DrawElementsBaseVertex(m_GeometryPipeline->GetTopology(), submesh.IndexCount, submesh.BaseIndexCount, submesh.BaseVertexCount);
-				material.Unbind();
+				material.Unbind(m_GeometryPipeline);
 			}
 			mesh->Unbind();
 		}
@@ -184,8 +186,9 @@ namespace Lucy {
 	}
 
 	void OpenGLRenderer::IDPass() {
-		RefLucy<Shader> idShader = m_ShaderLibrary.GetShader("LucyID");
 		Pipeline::Begin(m_IDPipeline);
+		RefLucy<Shader> idShader = m_ShaderLibrary.GetShader("LucyID");
+		auto& uniformBuffers = m_GeometryPipeline->GetUniformBuffers<OpenGLUniformBuffer>(0);
 
 		idShader->Bind();
 		for (MeshDrawCommand meshComponent : m_MeshDrawCommands) {
@@ -195,7 +198,7 @@ namespace Lucy {
 			mesh->Bind();
 			for (uint32_t i = 0; i < submeshes.size(); i++) {
 				Submesh& submesh = submeshes[i];
-				m_CameraUniformBuffer->SetData((void*)&(meshComponent.EntityTransform * submesh.Transform), sizeof(glm::mat4), sizeof(glm::mat4) * 2);
+				uniformBuffers->SetData((void*)&(meshComponent.EntityTransform * submesh.Transform), sizeof(glm::mat4), sizeof(glm::mat4) * 2);
 				OpenGLAPICommands::DrawElementsBaseVertex(m_IDPipeline->GetTopology(), submesh.IndexCount, submesh.BaseIndexCount, submesh.BaseVertexCount);
 			}
 			mesh->Unbind();
@@ -213,8 +216,10 @@ namespace Lucy {
 		EditorCamera& camera = scene.GetEditorCamera();
 		camera.SetViewportSize(m_ViewportWidth, m_ViewportHeight);
 		camera.Update();
-		m_CameraUniformBuffer->SetData((void*)&camera.GetViewMatrix(), sizeof(glm::mat4), 0);
-		m_CameraUniformBuffer->SetData((void*)&camera.GetProjectionMatrix(), sizeof(glm::mat4), sizeof(glm::mat4));
+
+		auto& uniformBuffers = m_GeometryPipeline->GetUniformBuffers<OpenGLUniformBuffer>(0);
+		uniformBuffers->SetData((void*)&camera.GetViewMatrix(), sizeof(glm::mat4), 0);
+		uniformBuffers->SetData((void*)&camera.GetProjectionMatrix(), sizeof(glm::mat4), sizeof(glm::mat4));
 
 		m_ActiveScene = &scene;
 	}
@@ -245,11 +250,9 @@ namespace Lucy {
 	}
 
 	void OpenGLRenderer::Destroy() {
-		for (RefLucy<Shader>& shader : m_ShaderLibrary.m_Shaders) {
+		for (RefLucy<Shader>& shader : m_ShaderLibrary.m_Shaders)
 			shader->Destroy();
-		}
-		m_CameraUniformBuffer->Destroy();
-		m_TextureSlotsUniformBuffer->Destroy();
+		m_GeometryPipeline->DestroyUniformBuffers();
 		m_RenderContext->Destroy();
 	}
 

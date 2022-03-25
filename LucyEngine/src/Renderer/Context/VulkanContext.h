@@ -13,11 +13,12 @@ namespace Lucy {
 															VkDebugUtilsMessageTypeFlagsEXT messageType,
 															const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 															void* pUserData);
+		static void ImGui_DebugCallback(VkResult result);
 	};
 
 	class VulkanContext : public RenderContext {
 	public:
-		explicit VulkanContext(RenderArchitecture type);
+		VulkanContext(RenderArchitecture type);
 		virtual ~VulkanContext() = default;
 
 		void Destroy() override;
