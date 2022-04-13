@@ -36,8 +36,6 @@ namespace Lucy {
 
 		VkInstance m_Instance;
 		VkDebugUtilsMessengerEXT m_DebugMessenger{};
-		
-		friend class VulkanRenderer;
-		friend class Renderer;
+		VkDebugReportCallbackEXT m_DebugReport{};
 	};
 }

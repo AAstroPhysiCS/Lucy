@@ -3,6 +3,8 @@
 
 #include "vulkan/vulkan.h"
 #include "VulkanDevice.h"
+#include "../RenderQueue.h"
+#include "Renderer/Buffer/Vulkan/VulkanFrameBuffer.h"
 #include "Renderer/Renderer.h"
 
 namespace Lucy {
@@ -12,7 +14,21 @@ namespace Lucy {
 		return s_Instance;
 	}
 
+	void VulkanSwapChain::AfterInitialization() {
+		m_ImageIsAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+		m_RenderIsFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+		m_InFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
+		m_CommandPool = VulkanCommandPool::Create({ VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, VK_COMMAND_BUFFER_LEVEL_PRIMARY, MAX_FRAMES_IN_FLIGHT });
+
+		m_FirstInitialized = true;
+	}
+
 	void VulkanSwapChain::Create() {
+		m_SwapChain = Create(nullptr);
+	}
+
+	VkSwapchainKHR VulkanSwapChain::Create(VkSwapchainKHR oldSwapChain) {
 		const VulkanDevice& device = VulkanDevice::Get();
 
 		VkPhysicalDevice physicalDevice = device.GetPhysicalDevice();
@@ -46,47 +62,176 @@ namespace Lucy {
 		createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 		createInfo.presentMode = m_SelectedPresentMode;
 		createInfo.clipped = VK_TRUE;
-		createInfo.oldSwapchain = VK_NULL_HANDLE;
+		createInfo.oldSwapchain = oldSwapChain;
 
-		LUCY_VK_ASSERT(vkCreateSwapchainKHR(logicalDevice, &createInfo, nullptr, &m_SwapChain));
+		VkSwapchainKHR swapChain;
+		LUCY_VK_ASSERT(vkCreateSwapchainKHR(logicalDevice, &createInfo, nullptr, &swapChain));
+
+		if (oldSwapChain) { //for resize
+			for (uint32_t i = 0; i < m_SwapChainImageViews.size(); i++)
+				m_SwapChainImageViews[i].Destroy();
+			vkDestroySwapchainKHR(device.GetLogicalDevice(), m_OldSwapChain, nullptr);
+		}
 
 		uint32_t swapChainImageCount = 0;
-		vkGetSwapchainImagesKHR(logicalDevice, m_SwapChain, &swapChainImageCount, nullptr);
+		vkGetSwapchainImagesKHR(logicalDevice, swapChain, &swapChainImageCount, nullptr);
 
 		m_SwapChainImages.resize(swapChainImageCount);
-		vkGetSwapchainImagesKHR(logicalDevice, m_SwapChain, &swapChainImageCount, m_SwapChainImages.data());
+		vkGetSwapchainImagesKHR(logicalDevice, swapChain, &swapChainImageCount, m_SwapChainImages.data());
 
-		m_SwapChainImageViews.resize(swapChainImageCount);
-		for (uint32_t i = 0; i < m_SwapChainImageViews.size(); i++) {
-			VkImageViewCreateInfo createInfo{};
-			createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-			createInfo.image = m_SwapChainImages[i];
-			createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-			createInfo.format = m_SelectedFormat.format;
+		m_SwapChainImageViews.reserve(swapChainImageCount);
 
-			createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-			createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-			createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-			createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-			
-			createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			createInfo.subresourceRange.baseMipLevel = 0;
-			createInfo.subresourceRange.levelCount = 1;
-			createInfo.subresourceRange.baseArrayLayer = 0;
-			createInfo.subresourceRange.layerCount = 1;
+		for (uint32_t i = 0; i < swapChainImageCount; i++) {
+			ImageViewSpecification specs;
+			specs.Image = m_SwapChainImages[i];
+			specs.Format = m_SelectedFormat.format;
+			specs.ViewType = VK_IMAGE_VIEW_TYPE_2D;
 
-			LUCY_VK_ASSERT(vkCreateImageView(logicalDevice, &createInfo, nullptr, &m_SwapChainImageViews[i]));
+			m_SwapChainImageViews.emplace_back(specs);
 		}
+
+		if (!m_FirstInitialized)
+			AfterInitialization();
+
+		return swapChain;
 	}
 
 	void VulkanSwapChain::Recreate() {
-		Destroy();
-		Create();
+		const VulkanDevice& device = VulkanDevice::Get();
+		vkDeviceWaitIdle(device.GetLogicalDevice());
+
+		m_OldSwapChain = m_SwapChain;
+		m_SwapChain = Create(m_OldSwapChain);
+
+		m_CommandPool->Recreate();
+	}
+
+	void VulkanSwapChain::BeginFrame() {
+		const auto& device = VulkanDevice::Get();
+		VkDevice deviceVulkanHandle = device.GetLogicalDevice();
+
+		vkWaitForFences(deviceVulkanHandle, 1, &m_InFlightFences[s_CurrentFrameIndex].GetFence(), VK_TRUE, UINT64_MAX);
+		vkResetFences(deviceVulkanHandle, 1, &m_InFlightFences[s_CurrentFrameIndex].GetFence());
+
+		m_LastSwapChainResult = AcquireNextImage(m_ImageIsAvailableSemaphores[s_CurrentFrameIndex].GetSemaphore(), s_ImageIndex);
+		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR) {
+			return;
+		}
+	}
+
+	void VulkanSwapChain::Execute(const RenderCommandQueue& renderCommandQueue) {
+		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR)
+			return;
+
+		auto commandBuffer = m_CommandPool->GetCommandBuffer(s_CurrentFrameIndex);
+
+		VkCommandBufferBeginInfo beginInfo{};
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		LUCY_VK_ASSERT(vkBeginCommandBuffer(commandBuffer, &beginInfo));
+
+		VkViewport viewport;
+		viewport.x = 0;
+		viewport.y = 0;
+		viewport.width = m_SelectedSwapExtent.width;
+		viewport.height = m_SelectedSwapExtent.height;
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+
+		VkRect2D scissor{};
+		scissor.offset = { 0, 0 };
+		scissor.extent = m_SelectedSwapExtent;
+
+		if (viewport.width == 0 || viewport.height == 0) return;
+
+		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+		for (const RenderCommand& renderCommand : renderCommandQueue.GetCommandQueue()) {
+			if (!renderCommand.Pipeline) { //meaning that the function provides a pipeline already
+				renderCommand.Func(commandBuffer);
+			} else {
+				//organizing all "distinct!" sets
+				const std::vector<VulkanDescriptorSet>& allSetsToBind = renderCommand.Pipeline->GetIndividualSetsToBind();
+				std::vector<VkDescriptorSet> descriptorSetsToBind;
+				for (VulkanDescriptorSet descriptorSet : allSetsToBind) {
+					descriptorSetsToBind.push_back(descriptorSet.GetSetBasedOffCurrentFrame(s_CurrentFrameIndex));
+				}
+
+				auto& renderPass = renderCommand.Pipeline->GetRenderPass();
+				auto& framebuffer = As(renderCommand.Pipeline->GetFrameBuffer(), VulkanFrameBuffer)->GetVulkanHandles();
+
+				RenderPassBeginInfo beginInfo;
+				beginInfo.CommandBuffer = commandBuffer;
+				beginInfo.VulkanFrameBuffer = framebuffer[s_ImageIndex];
+				renderPass->Begin(beginInfo);
+
+				vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderCommand.Pipeline->GetVulkanHandle());
+				if (descriptorSetsToBind.size() != 0)
+					vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderCommand.Pipeline->GetPipelineLayout(), 0, descriptorSetsToBind.size(), descriptorSetsToBind.data(), 0, nullptr);
+				
+				renderCommand.Func(commandBuffer);
+
+				RenderPassEndInfo endInfo;
+				endInfo.CommandBuffer = commandBuffer;
+				renderPass->End(endInfo);
+			}
+		}
+
+		LUCY_VK_ASSERT(vkEndCommandBuffer(commandBuffer));
+	}
+
+	void VulkanSwapChain::EndFrame() {
+		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR)
+			return;
+
+		const auto& device = VulkanDevice::Get();
+		VkDevice deviceVulkanHandle = device.GetLogicalDevice();
+
+		VkFence currentFrameFence = m_InFlightFences[s_CurrentFrameIndex].GetFence();
+		VkSemaphore currentFrameImageAvailSemaphore = m_ImageIsAvailableSemaphores[s_CurrentFrameIndex].GetSemaphore();
+		VkSemaphore currentFrameRenderFinishedSemaphore = m_RenderIsFinishedSemaphores[s_CurrentFrameIndex].GetSemaphore();
+
+		VkSubmitInfo submitInfo{};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+		VkPipelineStageFlags imageWaitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+		submitInfo.waitSemaphoreCount = 1;
+		submitInfo.pWaitSemaphores = &currentFrameImageAvailSemaphore;
+		submitInfo.pWaitDstStageMask = imageWaitStages;
+
+		VkCommandBuffer targetedCommandBuffer = m_CommandPool->GetCommandBuffer(s_CurrentFrameIndex);
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &targetedCommandBuffer;
+		submitInfo.signalSemaphoreCount = 1;
+		submitInfo.pSignalSemaphores = &currentFrameRenderFinishedSemaphore;
+
+		LUCY_VK_ASSERT(vkQueueSubmit(device.GetGraphicsQueue(), 1, &submitInfo, currentFrameFence));
+		vkWaitForFences(deviceVulkanHandle, 1, &currentFrameFence, VK_TRUE, UINT64_MAX);
 	}
 
 	VkResult VulkanSwapChain::AcquireNextImage(VkSemaphore currentFrameImageAvailSemaphore, uint32_t& imageIndex) {
 		VkDevice deviceVulkanHandle = VulkanDevice::Get().GetLogicalDevice();
 		return vkAcquireNextImageKHR(deviceVulkanHandle, m_SwapChain, UINT64_MAX, currentFrameImageAvailSemaphore, VK_NULL_HANDLE, &imageIndex);
+	}
+
+	VkResult VulkanSwapChain::Present() {
+		VkPresentInfoKHR presentInfo{};
+		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+		presentInfo.waitSemaphoreCount = 1;
+		presentInfo.pWaitSemaphores = &m_RenderIsFinishedSemaphores[s_CurrentFrameIndex].GetSemaphore();
+
+		presentInfo.swapchainCount = 1;
+		presentInfo.pSwapchains = &m_SwapChain;
+		presentInfo.pImageIndices = &s_ImageIndex;
+		presentInfo.pResults = nullptr;
+
+		const auto& device = VulkanDevice::Get();
+		m_LastSwapChainResult = vkQueuePresentKHR(device.GetPresentQueue(), &presentInfo);
+
+		s_CurrentFrameIndex = (s_CurrentFrameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+
+		return m_LastSwapChainResult;
 	}
 
 	SwapChainCapabilities VulkanSwapChain::GetSwapChainCapabilities(VkPhysicalDevice device) {
@@ -144,11 +289,27 @@ namespace Lucy {
 		}
 	}
 
+	VkCommandBuffer VulkanSwapChain::BeginSingleTimeCommand() {
+		return m_CommandPool->BeginSingleTimeCommand();
+	}
+
+	void VulkanSwapChain::EndSingleTimeCommand(VkCommandBuffer commandBuffer) {
+		m_CommandPool->EndSingleTimeCommand(commandBuffer);
+	}
+
 	void VulkanSwapChain::Destroy() {
 		const VulkanDevice& device = VulkanDevice::Get();
-		for (uint32_t i = 0; i < m_SwapChainImageViews.size(); i++) {
-			vkDestroyImageView(device.GetLogicalDevice(), m_SwapChainImageViews[i], nullptr);
-		}
+		m_CommandPool->Destroy();
+
+		for (uint32_t i = 0; i < m_SwapChainImageViews.size(); i++)
+			m_SwapChainImageViews[i].Destroy();
+
 		vkDestroySwapchainKHR(device.GetLogicalDevice(), m_SwapChain, nullptr);
+
+		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+			m_ImageIsAvailableSemaphores[i].Destroy();
+			m_RenderIsFinishedSemaphores[i].Destroy();
+			m_InFlightFences[i].Destroy();
+		}
 	}
 }

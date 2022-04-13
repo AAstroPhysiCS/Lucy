@@ -1,3 +1,4 @@
+#include "lypch.h"
 #include "ImGuiLayer.h"
 
 #include "UI/SceneHierarchyPanel.h"
@@ -12,21 +13,20 @@
 #include "Core/Input.h"
 
 #include "Renderer/Renderer.h"
-#include "Renderer/VulkanRenderer.h"
+#include "Renderer/VulkanRHI.h"
 #include "Renderer/VulkanRenderPass.h"
+#include "Renderer/ViewportRenderer.h"
 #include "Renderer/Buffer/Vulkan/VulkanFrameBuffer.h"
 #include "glad/glad.h"
 
 #include "Renderer/Context/VulkanContext.h"
-
-#include <iostream>
 
 namespace Lucy {
 
 	ImGuiLayer::ImGuiLayer() {
 		m_Panels.push_back(&SceneHierarchyPanel::GetInstance());
 		m_Panels.push_back(&TaskbarPanel::GetInstance());
-		//m_Panels.push_back(&ViewportPanel::GetInstance());
+		m_Panels.push_back(&ViewportPanel::GetInstance());
 		m_Panels.push_back(&PropertiesPanel::GetInstance());
 		m_Panels.push_back(&PerformancePanel::GetInstance());
 	}
@@ -54,22 +54,11 @@ namespace Lucy {
 			auto& renderContext = Renderer::GetCurrentRenderer()->m_RenderContext;
 
 			ImGui::CreateContext();
+
 			ImGui_ImplGlfw_InitForVulkan(window->Raw(), true);
 
 			auto& vulkanContext = As(renderContext, VulkanContext);
 			VulkanDevice device = VulkanDevice::Get();
-			RenderPassSpecification renderPassSpecs;
-			renderPassSpecs.AttachmentReferences.push_back({ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
-			renderPassSpecs.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
-			renderPassSpecs.Descriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			renderPassSpecs.Descriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-			renderPassSpecs.Descriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			renderPassSpecs.Descriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-			renderPassSpecs.Descriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			renderPassSpecs.Descriptor.FinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-			m_RenderPass = As(RenderPass::Create(renderPassSpecs), VulkanRenderPass);
-			Renderer::Dispatch(); //for renderpass only
 
 			m_ImGuiPool = CreateRef<VulkanDescriptorPool>(m_PoolSpecs);
 
@@ -83,10 +72,11 @@ namespace Lucy {
 			initInfo.ImageCount = 3;
 			initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 			initInfo.CheckVkResultFn = VulkanMessageCallback::ImGui_DebugCallback;
-			ImGui_ImplVulkan_Init(&initInfo, m_RenderPass->GetVulkanHandle());
 
-			VulkanRenderer::RecordSingleTimeCommand(ImGui_ImplVulkan_CreateFontsTexture);
+			//something is wrong with the order of the layers... idk what it is
 
+		+	ImGui_ImplVulkan_Init(&initInfo, As(ViewportRenderer::s_ImGuiPipeline.m_UIRenderPass, VulkanRenderPass)->GetVulkanHandle());
+			VulkanRHI::RecordSingleTimeCommand(ImGui_ImplVulkan_CreateFontsTexture);
 			ImGui_ImplVulkan_DestroyFontUploadObjects();
 		}
 	}
@@ -154,28 +144,8 @@ namespace Lucy {
 		if (currentArchitecture == RenderArchitecture::OpenGL) {
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 		} else if (currentArchitecture == RenderArchitecture::Vulkan) {
-			Renderer::Submit([this]() {
-				for (uint32_t i = 0; i < VulkanRenderer::s_CommandPool->GetCommandBufferSize(); i++) {
-					const auto& targetFrameBuffer = As(VulkanRenderer::m_GeometryPipeline->GetFrameBuffer(), VulkanFrameBuffer)->GetSwapChainFrameBuffers()[i];
-					const auto& commandBuffer = VulkanRenderer::s_CommandPool->GetCommandBuffer(i);
-
-					VkCommandBufferBeginInfo commandBufferBeginInfo{};
-					commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-					LUCY_VK_ASSERT(vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo));
-
-					RenderPassBeginInfo beginInfo;
-					beginInfo.CommandBuffer = commandBuffer;
-					beginInfo.VulkanFrameBuffer = targetFrameBuffer;
-					m_RenderPass->Begin(beginInfo);
-
-					ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
-
-					RenderPassEndInfo endInfo;
-					endInfo.CommandBuffer = commandBuffer;
-					endInfo.VulkanFrameBuffer = targetFrameBuffer;
-					m_RenderPass->End(endInfo);
-					LUCY_VK_ASSERT(vkEndCommandBuffer(commandBuffer));
-				}
+			Renderer::SubmitUIPass([](VkCommandBuffer commandBuffer) {
+				ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
 			});
 		}
 	}
@@ -242,7 +212,6 @@ namespace Lucy {
 		} else if (currentArchitecture == RenderArchitecture::Vulkan) {
 			ImGui_ImplVulkan_Shutdown();
 			m_ImGuiPool->Destroy();
-			m_RenderPass->Destroy();
 		}
 		ImGui_ImplGlfw_Shutdown();
 		ImGui::DestroyContext();

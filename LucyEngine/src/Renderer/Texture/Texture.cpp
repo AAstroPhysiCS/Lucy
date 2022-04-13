@@ -2,6 +2,7 @@
 
 #include "Texture.h"
 #include "OpenGLTexture2D.h"
+#include "VulkanImage.h"
 
 #include "../Renderer.h"
 
@@ -12,10 +13,11 @@ namespace Lucy {
 			case RenderArchitecture::OpenGL:
 				return CreateRef<OpenGLTexture2D>(specs);
 				break;
-			default:
-				LUCY_CRITICAL("Other API's not supported!");
-				LUCY_ASSERT(false);
+			case RenderArchitecture::Vulkan:
+				return CreateRef<VulkanImage2D>(specs);
 				break;
+			default:
+				LUCY_ASSERT(false);
 		}
 		return nullptr;
 	}

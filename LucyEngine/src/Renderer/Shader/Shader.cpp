@@ -30,7 +30,6 @@ namespace Lucy {
 		} else if (currentRenderArchitecture == RenderArchitecture::Vulkan) {
 			instance = CreateRef<VulkanShader>(path, name);
 		}
-		Renderer::GetShaderLibrary().PushShader(instance);
 		return instance;
 	}
 

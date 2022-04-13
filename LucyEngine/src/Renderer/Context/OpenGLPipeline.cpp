@@ -44,7 +44,7 @@ namespace Lucy {
 			glCullFace(rasterization.CullingMode);
 		}
 
-		auto& frameBuffer = GetFrameBuffer();
+		auto& frameBuffer = As(GetFrameBuffer(), OpenGLFrameBuffer);
 		auto [r, g, b, a] = renderPass->GetClearColor();
 
 		if (frameBuffer->GetBlitted())
@@ -63,6 +63,14 @@ namespace Lucy {
 		RenderPassEndInfo info;
 		info.OpenGLFrameBuffer = As(GetFrameBuffer(), OpenGLFrameBuffer);
 		renderPass->End(info);
+	}
+
+	void OpenGLPipeline::Recreate() {
+
+	}
+
+	void OpenGLPipeline::Destroy() {
+
 	}
 
 	//OpenGL does not care about sets etc.

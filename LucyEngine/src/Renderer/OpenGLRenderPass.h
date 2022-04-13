@@ -11,5 +11,7 @@ namespace Lucy {
 
 		void Begin(RenderPassBeginInfo& info) override;
 		void End(RenderPassEndInfo& info) override;
+		void Destroy() override;
+		void Recreate() override;
 	};
 }

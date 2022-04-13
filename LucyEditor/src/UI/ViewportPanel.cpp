@@ -2,8 +2,8 @@
 #include "SceneHierarchyPanel.h"
 
 #include "Renderer/Renderer.h"
-#include "Renderer/OpenGLRenderer.h"
-#include "Renderer/VulkanRenderer.h"
+#include "Renderer/OpenGLRHI.h"
+#include "Renderer/VulkanRHI.h"
 #include "Renderer/RenderPass.h"
 #include "Renderer/Buffer/OpenGL/OpenGLFrameBuffer.h"
 
@@ -53,11 +53,11 @@ namespace Lucy {
 		uint32_t outputTextureID = 0;
 
 		//TODO: Bad access? Change it maybe?
-		RefLucy<RendererAPI>& currentRenderer = Renderer::GetCurrentRenderer();
+		RefLucy<RHI>& currentRenderer = Renderer::GetCurrentRenderer();
 
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL: {
-				auto& blittedFrameBuffer = As(As(currentRenderer, OpenGLRenderer)->GetGeometryPipeline()->GetFrameBuffer()->GetBlitted(), OpenGLFrameBuffer);
+				auto& blittedFrameBuffer = As(As(currentRenderer, OpenGLRHI)->GetGeometryPipeline()->GetFrameBuffer(), OpenGLFrameBuffer)->GetBlitted();
 				auto& texture = blittedFrameBuffer->GetTexture(0);
 				outputTextureID = texture->GetID();
 				break;
@@ -73,7 +73,7 @@ namespace Lucy {
 
 		auto [w, h] = Renderer::GetViewportSize();
 		if (w != size.x || h != size.y) {
-			Renderer::OnFramebufferResize(size.x, size.y);
+			//Renderer::OnFramebufferResize(size.x, size.y);
 		}
 
 		const ImVec2& mousePos = ImGui::GetMousePos();

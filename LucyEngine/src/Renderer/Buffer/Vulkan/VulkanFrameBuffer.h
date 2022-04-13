@@ -15,14 +15,13 @@ namespace Lucy {
 		void Bind() override;
 		void Unbind() override;
 		void Destroy() override;
-		void Blit() override;
-		void Resize(int32_t width, int32_t height) override;
+		void Recreate();
 
-		inline std::vector<VkFramebuffer>& GetSwapChainFrameBuffers() { return m_SwapChainFrameBuffers; }
+		inline std::vector<VkFramebuffer>& GetVulkanHandles() { return m_FrameBufferHandles; }
 	private:
 		void Create();
 
-		std::vector<VkFramebuffer> m_SwapChainFrameBuffers;
+		std::vector<VkFramebuffer> m_FrameBufferHandles;
 		RefLucy<VulkanRenderPass> m_RenderPass;
 	};
 }

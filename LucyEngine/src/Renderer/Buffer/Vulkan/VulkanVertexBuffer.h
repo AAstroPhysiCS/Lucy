@@ -3,6 +3,7 @@
 #include "../VertexBuffer.h"
 
 #include "vulkan/vulkan.h"
+#include "vma/vk_mem_alloc.h"
 
 namespace Lucy {
 
@@ -22,7 +23,7 @@ namespace Lucy {
 
 		VkBuffer m_StagingBufferHandle = VK_NULL_HANDLE;
 		VkBuffer m_BufferHandle = VK_NULL_HANDLE;
-		VkDeviceMemory m_StagingBufferMemory = VK_NULL_HANDLE;
-		VkDeviceMemory m_BufferMemory = VK_NULL_HANDLE;
+		VmaAllocation m_StagingBufferVma = VK_NULL_HANDLE;
+		VmaAllocation m_BufferVma = VK_NULL_HANDLE;
 	};
 }

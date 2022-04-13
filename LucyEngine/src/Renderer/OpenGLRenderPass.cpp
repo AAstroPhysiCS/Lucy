@@ -18,4 +18,8 @@ namespace Lucy {
 		auto& frameBuffer = info.OpenGLFrameBuffer;
 		frameBuffer->Unbind();
 	}
+	void OpenGLRenderPass::Destroy() {
+	}
+	void OpenGLRenderPass::Recreate() {
+	}
 }

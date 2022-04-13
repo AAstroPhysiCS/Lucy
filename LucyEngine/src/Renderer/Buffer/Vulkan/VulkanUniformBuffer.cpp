@@ -2,9 +2,9 @@
 #include "VulkanUniformBuffer.h"
 
 #include "Renderer/Renderer.h"
-#include "Renderer/VulkanRenderer.h"
+#include "Renderer/Context/VulkanSwapChain.h"
 #include "Renderer/Context/VulkanDevice.h"
-#include "Renderer/Buffer/Vulkan/VulkanBufferUtils.h"
+#include "Renderer/VulkanAllocator.h"
 
 #include "glm/glm.hpp"
 
@@ -12,13 +12,14 @@ namespace Lucy {
 
 	VulkanUniformBuffer::VulkanUniformBuffer(uint32_t size, uint32_t binding, VulkanDescriptorSet& descriptorSet)
 		: m_DescriptorSet(descriptorSet), m_Binding(binding) {
-		constexpr uint32_t maxFramesInFlight = VulkanRenderer::MAX_FRAMES_IN_FLIGHT;
+		constexpr uint32_t maxFramesInFlight = VulkanSwapChain::MAX_FRAMES_IN_FLIGHT;
 		m_Buffers.resize(maxFramesInFlight, VK_NULL_HANDLE);
-		m_BufferMemories.resize(maxFramesInFlight, VK_NULL_HANDLE);
+		m_BufferVma.resize(maxFramesInFlight, VK_NULL_HANDLE);
 
+		VulkanAllocator& allocator = VulkanAllocator::Get();
+		
 		for (uint32_t i = 0; i < maxFramesInFlight; i++) {
-			VulkanBufferUtils::CreateVulkanBuffer(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_SHARING_MODE_EXCLUSIVE,
-												  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, m_Buffers[i], m_BufferMemories[i]);
+			allocator.CreateVulkanBufferVMA(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO, m_Buffers[i], m_BufferVma[i]);
 		}
 	}
 
@@ -32,10 +33,12 @@ namespace Lucy {
 
 	void VulkanUniformBuffer::SetData(void* data, uint32_t size, uint32_t offset) {
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+		VulkanAllocator& allocator = VulkanAllocator::Get();
+
 		void* dataLocal;
-		vkMapMemory(device, m_BufferMemories[VulkanRenderer::CURRENT_FRAME], offset, size, 0, &dataLocal);
+		vmaMapMemory(allocator.GetVMAInstance(), m_BufferVma[VulkanSwapChain::GetCurrentFrameIndex()], &dataLocal);
 		memcpy(dataLocal, data, size);
-		vkUnmapMemory(device, m_BufferMemories[VulkanRenderer::CURRENT_FRAME]);
+		vmaUnmapMemory(allocator.GetVMAInstance(), m_BufferVma[VulkanSwapChain::GetCurrentFrameIndex()]);
 	}
 
 	void VulkanUniformBuffer::WriteToSets(uint32_t index) {
@@ -48,7 +51,7 @@ namespace Lucy {
 
 		VkWriteDescriptorSet setWrite{};
 		setWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		setWrite.dstSet = m_DescriptorSet.GetSetBasedOffFrameIndex(index);
+		setWrite.dstSet = m_DescriptorSet.GetSetBasedOffCurrentFrame(index);
 		setWrite.dstBinding = m_Binding;
 		setWrite.dstArrayElement = 0;
 		setWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -61,10 +64,8 @@ namespace Lucy {
 	}
 
 	void VulkanUniformBuffer::Destroy() {
-		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
-		for (uint32_t i = 0; i < VulkanRenderer::MAX_FRAMES_IN_FLIGHT; i++) {
-			vkDestroyBuffer(device, m_Buffers[i], nullptr);
-			vkFreeMemory(device, m_BufferMemories[i], nullptr);
-		}
+		VulkanAllocator& allocator = VulkanAllocator::Get();
+		for (uint32_t i = 0; i < VulkanSwapChain::MAX_FRAMES_IN_FLIGHT; i++)
+			vmaDestroyBuffer(allocator.GetVMAInstance(), m_Buffers[i], m_BufferVma[i]);
 	}
 }

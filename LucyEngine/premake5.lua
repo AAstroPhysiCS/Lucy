@@ -24,8 +24,8 @@ project "LucyEngine"
         "%{LibraryPath.stb}/include",
         "%{LibraryPath.assimp}/include",
         "%{LibraryPath.nativefiledialog}/include",
-
         "%{LibraryPath.VulkanInclude}",
+        "%{LibraryPath.VMA}",
         "src"
     }
 
@@ -34,6 +34,7 @@ project "LucyEngine"
         "Glad",
         "ImGui",
         "glm",
+        
         "%{LibraryPath.assimp}/assimp.lib",
         "%{LibraryPath.nativefiledialog}/nfd.lib"
     }
@@ -58,6 +59,7 @@ project "LucyEngine"
         links {
             "%{LibraryPath.VulkanLib}/vulkan-1.lib",
             "%{LibraryPath.VulkanLib}/VkLayer_utils.lib",
+            "%{LibraryPath.VMADebug}",
 
             "%{LibraryPath.ShaderCDebug}",
             "%{LibraryPath.SPIRVDebug}",
@@ -77,6 +79,7 @@ project "LucyEngine"
         links {
             "%{LibraryPath.VulkanLib}/vulkan-1.lib",
             "%{LibraryPath.VulkanLib}/VkLayer_utils.lib",
+            "%{LibraryPath.VMARelease}",
 
             "%{LibraryPath.ShaderCRelease}",
             "%{LibraryPath.SPIRVRelease}",

@@ -61,10 +61,13 @@ namespace Lucy {
 		static void Begin(const RefLucy<Pipeline>& pipeline);
 		static void End(const RefLucy<Pipeline>& pipeline);
 
+		virtual void Destroy() = 0;
+
 		inline static Pipeline* s_ActivePipeline = nullptr;
 	protected:
 		virtual void BeginVirtual() = 0;
 		virtual void EndVirtual() = 0;
+		virtual void Recreate() = 0;
 		
 		static uint32_t GetSizeFromType(ShaderDataSize size);
 		static uint32_t CalculateStride(VertexShaderLayout vertexLayout);

@@ -101,13 +101,13 @@ namespace Lucy {
 
 	class ShaderLibrary {
 	public:
+		ShaderLibrary() = default;
+		
 		RefLucy<Shader> GetShader(const std::string& name);
 		void PushShader(const RefLucy<Shader>& instance);
 	private:
-		ShaderLibrary() = default;
-
 		std::vector<RefLucy<Shader>> m_Shaders;
-		friend class RendererAPI;
-		friend class OpenGLRenderer;
+		friend class Renderer;
+		friend class OpenGLRHI;
 	};
 }

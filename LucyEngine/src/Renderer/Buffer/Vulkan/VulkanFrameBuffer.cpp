@@ -17,22 +17,23 @@ namespace Lucy {
 
 	void VulkanFrameBuffer::Create() {
 		auto& swapChainInstance = VulkanSwapChain::Get();
-		size_t size = swapChainInstance.m_SwapChainImageViews.size();
-		m_SwapChainFrameBuffers.resize(size);
+		m_FrameBufferHandles.resize(swapChainInstance.GetImageCount());
 
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
 
-		for (uint32_t i = 0; i < size; i++) {
+		for (uint32_t i = 0; i < swapChainInstance.GetImageCount(); i++) {
+			VkImageView imageViewHandle = m_Specs.ImageViews[i].GetVulkanHandle();
+
 			VkFramebufferCreateInfo createInfo{};
 			createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-			createInfo.attachmentCount = 1;
 			createInfo.renderPass = m_RenderPass->GetVulkanHandle();
-			createInfo.pAttachments = &swapChainInstance.m_SwapChainImageViews[i];
-			createInfo.width = swapChainInstance.GetExtent().width;
-			createInfo.height = swapChainInstance.GetExtent().height;
+			createInfo.attachmentCount = 1;
+			createInfo.pAttachments = &imageViewHandle;
+			createInfo.width = m_Specs.Width;
+			createInfo.height = m_Specs.Height;
 			createInfo.layers = 1;
 
-			LUCY_VK_ASSERT(vkCreateFramebuffer(device, &createInfo, nullptr, &m_SwapChainFrameBuffers[i]));
+			LUCY_VK_ASSERT(vkCreateFramebuffer(device, &createInfo, nullptr, &m_FrameBufferHandles[i]));
 		}
 	}
 
@@ -46,16 +47,12 @@ namespace Lucy {
 
 	void VulkanFrameBuffer::Destroy() {
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
-		for (uint32_t i = 0; i < m_SwapChainFrameBuffers.size(); i++) {
-			vkDestroyFramebuffer(device, m_SwapChainFrameBuffers[i], nullptr);
+		for (uint32_t i = 0; i < m_FrameBufferHandles.size(); i++) {
+			vkDestroyFramebuffer(device, m_FrameBufferHandles[i], nullptr);
 		}
 	}
 
-	void VulkanFrameBuffer::Blit() {
-
-	}
-
-	void VulkanFrameBuffer::Resize(int32_t width, int32_t height) {
+	void VulkanFrameBuffer::Recreate() {
 		Destroy();
 		Create();
 	}

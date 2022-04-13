@@ -10,14 +10,15 @@ namespace Lucy {
 		VulkanPipeline(const PipelineSpecification& specs);
 		virtual ~VulkanPipeline() = default;
 
-		void Destroy();
-		void Recreate(float sizeX, float sizeY);
-
 		void BeginVirtual() override;
 		void EndVirtual() override;
+		void Recreate() override;
+
+		void Destroy() override;
 
 		inline VkPipeline GetVulkanHandle() { return m_Pipeline; }
 		inline VkPipelineLayout GetPipelineLayout() { return m_PipelineLayout; }
+		inline std::vector<VulkanDescriptorSet>& GetIndividualSetsToBind() { return m_IndividualSets; }
 	private:
 		void Create();
 
@@ -31,7 +32,8 @@ namespace Lucy {
 		VkPipeline m_Pipeline = VK_NULL_HANDLE;
 		VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
 
-		static RefLucy<VulkanDescriptorPool> s_DescriptorPool;
+		RefLucy<VulkanDescriptorPool> m_DescriptorPool;
 		std::vector<VkDescriptorSetLayout> m_DescriptorSetLayouts;
+		std::vector<VulkanDescriptorSet> m_IndividualSets; //meaning that only distinct sets are being stored (used for binding sets)
 	};
 }

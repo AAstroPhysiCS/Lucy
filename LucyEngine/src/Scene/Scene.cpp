@@ -3,6 +3,9 @@
 #include "Scene.h"
 #include "Components.h"
 
+#include "Renderer/Renderer.h"
+#include "Renderer/Context/Pipeline.h"
+
 #include "Entity.h"
 
 namespace Lucy {
@@ -21,7 +24,7 @@ namespace Lucy {
 	}
 
 	Entity Scene::CreateEntity() {
-		entt::entity entity = registry.create();
+		entt::entity entity = m_Registry.create();
 		Entity e{ this, entity };
 
 		e.AddComponent<UUIDComponent>();
@@ -32,11 +35,11 @@ namespace Lucy {
 
 	void Scene::RemoveEntity(Entity& e) {
 		//TODO: free all resources depending on the entity
-		registry.destroy(e.m_Entity);
+		m_Registry.destroy(e.m_Entity);
 	}
 
 	Entity Scene::GetEntityByPixelValue(const glm::vec3& pixelValue) {
-		auto view = registry.view<MeshComponent>();
+		auto view = m_Registry.view<MeshComponent>();
 		for (auto entity : view) {
 			Entity e{ this, entity };
 			MeshComponent& meshComponent = e.GetComponent<MeshComponent>();

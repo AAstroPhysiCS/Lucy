@@ -21,9 +21,9 @@ namespace Lucy {
 		inline EditorCamera& GetEditorCamera() { return m_Camera; }
 
 		template <typename ... T>
-		inline auto View() { return registry.view<T...>(); }
+		inline auto View() { return m_Registry.view<T...>(); }
 	private:
-		entt::registry registry;
+		entt::registry m_Registry;
 		EditorCamera m_Camera;
 
 		friend class Entity;

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "vulkan/vulkan.h"
+#include "vma/vk_mem_alloc.h"
+
 #include "../UniformBuffer.h"
 #include "../../VulkanDescriptors.h"
 
@@ -23,8 +25,7 @@ namespace Lucy {
 		VulkanDescriptorSet m_DescriptorSet;
 
 		std::vector<VkBuffer> m_Buffers;
-		std::vector<VkDeviceMemory> m_BufferMemories;
+		std::vector<VmaAllocation> m_BufferVma;
 	};
-
 }
 

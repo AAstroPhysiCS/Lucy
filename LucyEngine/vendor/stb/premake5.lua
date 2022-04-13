@@ -20,7 +20,6 @@ project "stb"
         staticruntime "On"
         systemversion "latest"
 
-
         defines {
             LUCY_WINDOWS
         }

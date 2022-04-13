@@ -59,19 +59,19 @@ namespace Lucy {
 		//we have to blit it if blit texture is defined
 		if (specs.BlittedTextureSpecs.Width != 0 && specs.BlittedTextureSpecs.Height != 0) {
 			FrameBufferSpecification blittedSpec;
-			blittedSpec.ViewportWidth = specs.ViewportWidth;
-			blittedSpec.ViewportHeight = specs.ViewportHeight;
+			blittedSpec.Width = specs.Width;
+			blittedSpec.Height = specs.Height;
 			blittedSpec.MultiSampled = false;
 			blittedSpec.TextureSpecs.push_back(specs.BlittedTextureSpecs);
-			m_Blitted = FrameBuffer::Create(blittedSpec);
-			As(m_Blitted, OpenGLFrameBuffer)->CheckStatus();
+			m_Blitted = As(FrameBuffer::Create(blittedSpec), OpenGLFrameBuffer);
+			m_Blitted->CheckStatus();
 		}
 	}
 
 	void OpenGLFrameBuffer::Bind() {
-		if (m_Specs.ViewportWidth == 0 || m_Specs.ViewportHeight == 0) LUCY_ASSERT(false);
+		if (m_Specs.Width == 0 || m_Specs.Height == 0) LUCY_ASSERT(false);
 		glBindFramebuffer(GL_FRAMEBUFFER, m_Id);
-		glViewport(0, 0, m_Specs.ViewportWidth, m_Specs.ViewportHeight);
+		glViewport(0, 0, m_Specs.Width, m_Specs.Height);
 	}
 
 	void OpenGLFrameBuffer::Unbind() {
@@ -96,8 +96,8 @@ namespace Lucy {
 			Destroy();
 			m_Textures.clear();
 
-			m_Specs.ViewportWidth = width;
-			m_Specs.ViewportHeight = height;
+			m_Specs.Width = width;
+			m_Specs.Height = height;
 
 			glCreateFramebuffers(1, &m_Id);
 			Bind();

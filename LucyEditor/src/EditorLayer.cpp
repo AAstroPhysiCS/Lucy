@@ -19,35 +19,21 @@ namespace Lucy {
 
 	void EditorLayer::Init(RefLucy<Window> window) {
 		m_Window = window;
+		m_ViewportRenderer.Init();
 	}
 
 	void EditorLayer::Begin(PerformanceMetrics& rendererMetrics) {
-		const auto& meshView = m_Scene.View<MeshComponent>();
-
-		for (auto entity : meshView) {
-			Entity e{ &m_Scene, entity };
-			MeshComponent& meshComponent = e.GetComponent<MeshComponent>();
-			if (!meshComponent.IsValid()) continue;
-
-			Renderer::SubmitMesh(meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
-		}
-
 		m_Scene.GetEditorCamera().OnEvent(rendererMetrics);
 	}
 
 	void EditorLayer::End() {
-		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::OpenGL) {
-			GLenum state = glGetError();
-			if (state != GL_NO_ERROR) Logger::Log(LoggerInfo::LUCY_CRITICAL, state);
-		}
+		
 	}
 
 	void EditorLayer::OnRender() {
-		Renderer::BeginScene(m_Scene);
-		Renderer::Dispatch();
-		Renderer::EndScene();
-
-		Renderer::ClearDrawCommands();
+		m_ViewportRenderer.Begin(m_Scene);
+		m_ViewportRenderer.Dispatch();
+		m_ViewportRenderer.End();
 	}
 
 	void EditorLayer::OnEvent(Event& e) {
@@ -56,6 +42,10 @@ namespace Lucy {
 			if (e == KeyCode::Escape) {
 				glfwSetWindowShouldClose(m_Window->Raw(), GL_TRUE);
 			}
+		});
+
+		dispatcher.Dispatch<WindowResizeEvent>(e, EventType::WindowResizeEvent, [&](const WindowResizeEvent& e) {
+			m_ViewportRenderer.OnWindowResize();
 		});
 
 		dispatcher.Dispatch<MouseEvent>(e, EventType::MouseEvent, [&](const MouseEvent& e) {
@@ -71,6 +61,6 @@ namespace Lucy {
 	}
 
 	void EditorLayer::Destroy() {
-
+		m_ViewportRenderer.Destroy();
 	}
 }

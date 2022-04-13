@@ -1,10 +1,11 @@
 #include "lypch.h"
-#include "OpenGLRenderer.h"
+#include "OpenGLRHI.h"
 
 #include "Buffer/FrameBuffer.h"
 #include "Buffer/RenderBuffer.h"
 #include "Buffer/UniformBuffer.h"
 #include "Mesh.h"
+#include "Renderer.h"
 
 #include "OpenGLRenderPass.h"
 #include "Buffer/OpenGL/OpenGLUniformBuffer.h"
@@ -15,17 +16,16 @@
 
 namespace Lucy {
 
-	OpenGLRenderer::OpenGLRenderer(RenderArchitecture renderArchitecture)
-		: RendererAPI(renderArchitecture)
-	{
+	OpenGLRHI::OpenGLRHI(RenderArchitecture renderArchitecture)
+		: RHI(renderArchitecture) {
 	}
 
-	void OpenGLRenderer::Init() {
+	void OpenGLRHI::Init() {
 		m_RenderContext = RenderContext::Create(m_Architecture);
 		m_RenderContext->PrintInfo();
 
-		auto& pbrShader = Shader::Create("LucyPBR", "assets/shaders/LucyPBR.glsl");
-		auto& idShader = Shader::Create("LucyID", "assets/shaders/LucyID.glsl");
+		auto& pbrShader = Renderer::GetShaderLibrary().GetShader("LucyPBR");
+		auto& idShader = Renderer::GetShaderLibrary().GetShader("LucyID");
 
 		auto [width, height] = Utils::ReadSizeFromIni("Viewport");
 		m_ViewportWidth = width;
@@ -64,8 +64,8 @@ namespace Lucy {
 
 			FrameBufferSpecification geometryFrameBufferSpecs;
 			geometryFrameBufferSpecs.MultiSampled = true;
-			geometryFrameBufferSpecs.ViewportWidth = width;
-			geometryFrameBufferSpecs.ViewportHeight = height;
+			geometryFrameBufferSpecs.Width = width;
+			geometryFrameBufferSpecs.Height = height;
 			geometryFrameBufferSpecs.RenderBuffer = RenderBuffer::Create(renderBufferSpecs);
 			geometryFrameBufferSpecs.TextureSpecs.push_back(textureAntialiased);
 			geometryFrameBufferSpecs.BlittedTextureSpecs = finalTextureSpec;
@@ -86,7 +86,7 @@ namespace Lucy {
 
 			RenderPassSpecification geometryPassSpecs;
 			geometryPassSpecs.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
-			
+
 			geometryPipelineSpecs.FrameBuffer = FrameBuffer::Create(geometryFrameBufferSpecs);
 			geometryPipelineSpecs.RenderPass = RenderPass::Create(geometryPassSpecs);
 			geometryPipelineSpecs.Shader = pbrShader;
@@ -114,15 +114,15 @@ namespace Lucy {
 			idTextureDepthSpecs.PixelType = PixelType::Float;
 
 			FrameBufferSpecification idFrameBufferSpecs;
-			idFrameBufferSpecs.ViewportWidth = width;
-			idFrameBufferSpecs.ViewportHeight = height;
+			idFrameBufferSpecs.Width = width;
+			idFrameBufferSpecs.Height = height;
 			idFrameBufferSpecs.TextureSpecs.push_back(idTextureRGBSpecs);
 			idFrameBufferSpecs.TextureSpecs.push_back(idTextureDepthSpecs);
 			idFrameBufferSpecs.IsStorage = true;
 
 			RenderPassSpecification idRenderPassSpecs;
 			idRenderPassSpecs.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
-			
+
 			geometryPipelineSpecs.FrameBuffer = FrameBuffer::Create(idFrameBufferSpecs);
 			geometryPipelineSpecs.RenderPass = RenderPass::Create(idRenderPassSpecs);
 			geometryPipelineSpecs.Shader = idShader;
@@ -132,14 +132,17 @@ namespace Lucy {
 		Dispatch(); //just for init functions (if any)
 	}
 
-	void OpenGLRenderer::OnFramebufferResize(float sizeX, float sizeY) {
-		m_GeometryPipeline->GetFrameBuffer()->Resize(sizeX, sizeY);
-		m_IDPipeline->GetFrameBuffer()->Resize(sizeX, sizeY);
-		m_ViewportWidth = sizeX;
-		m_ViewportHeight = sizeY;
+	//void OpenGLRHI::OnFramebufferResize(float sizeX, float sizeY) {
+		//As(m_GeometryPipeline->GetFrameBuffer(), OpenGLFrameBuffer)->Resize(sizeX, sizeY);
+		//As(m_IDPipeline->GetFrameBuffer(), OpenGLFrameBuffer)->Resize(sizeX, sizeY);
+		//m_ViewportWidth = sizeX;
+		//m_ViewportHeight = sizeY;
+	//}
+
+	void OpenGLRHI::OnViewportResize() {
 	}
 
-	Entity OpenGLRenderer::OnMousePicking() {
+	Entity OpenGLRHI::OnMousePicking() {
 		m_IDPipeline->GetFrameBuffer()->Bind();
 		glm::vec3 pixelValue;
 		OpenGLAPICommands::ReadBuffer(GL_COLOR_ATTACHMENT0);
@@ -161,7 +164,7 @@ namespace Lucy {
 		return selectedEntity;
 	}
 
-	void OpenGLRenderer::GeometryPass() {
+	void OpenGLRHI::GeometryPass() {
 		Pipeline::Begin(m_GeometryPipeline);
 		auto& uniformBuffers = m_GeometryPipeline->GetUniformBuffers<OpenGLUniformBuffer>(0);
 		for (MeshDrawCommand meshComponent : m_MeshDrawCommands) {
@@ -185,7 +188,7 @@ namespace Lucy {
 		Pipeline::End(m_GeometryPipeline);
 	}
 
-	void OpenGLRenderer::IDPass() {
+	void OpenGLRHI::IDPass() {
 		Pipeline::Begin(m_IDPipeline);
 		RefLucy<Shader> idShader = m_ShaderLibrary.GetShader("LucyID");
 		auto& uniformBuffers = m_GeometryPipeline->GetUniformBuffers<OpenGLUniformBuffer>(0);
@@ -207,12 +210,7 @@ namespace Lucy {
 		Pipeline::End(m_IDPipeline);
 	}
 
-	void OpenGLRenderer::Execute() {
-		GeometryPass();
-		IDPass();
-	}
-
-	void OpenGLRenderer::BeginScene(Scene& scene) {
+	void OpenGLRHI::BeginScene(Scene& scene) {
 		EditorCamera& camera = scene.GetEditorCamera();
 		camera.SetViewportSize(m_ViewportWidth, m_ViewportHeight);
 		camera.Update();
@@ -224,32 +222,44 @@ namespace Lucy {
 		m_ActiveScene = &scene;
 	}
 
-	void OpenGLRenderer::EndScene() {
-		Execute();
+	PresentResult OpenGLRHI::RenderScene() {
+		GeometryPass();
+		IDPass();
+		return PresentResult::SUCCESS;
 	}
 
-	void OpenGLRenderer::ClearCommands() {
+	void OpenGLRHI::EndScene() {
+		RenderScene();
+		GLenum state = glGetError();
+		if (state != GL_NO_ERROR) Logger::Log(LoggerInfo::LUCY_CRITICAL, state);
+	}
+
+	void OpenGLRHI::ClearCommands() {
 		m_MeshDrawCommands.clear();
 	}
 
-	void OpenGLRenderer::Submit(const Func&& func) {
+	void OpenGLRHI::Submit(const Func&& func) {
 		m_RenderFunctions.push_back(func);
 	}
 
-	void OpenGLRenderer::SubmitMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform) {
-		Submit([this, mesh, entityTransform]() {
-			m_MeshDrawCommands.push_back(MeshDrawCommand(mesh, entityTransform));
+	void OpenGLRHI::SubmitMesh(RefLucy<Pipeline> pipeline, RefLucy<Mesh> mesh, const glm::mat4& entityTransform) {
+		Submit([=]() {
+			m_MeshDrawCommands.push_back(MeshDrawCommand(pipeline, mesh, entityTransform));
 		});
 	}
 
-	void OpenGLRenderer::Dispatch() {
+	void OpenGLRHI::SubmitRenderCommand(const RenderCommand& renderCommand) {
+
+	}
+
+	void OpenGLRHI::Dispatch() {
 		for (Func func : m_RenderFunctions) {
 			func();
 		}
 		m_RenderFunctions.clear();
 	}
 
-	void OpenGLRenderer::Destroy() {
+	void OpenGLRHI::Destroy() {
 		for (RefLucy<Shader>& shader : m_ShaderLibrary.m_Shaders)
 			shader->Destroy();
 		m_GeometryPipeline->DestroyUniformBuffers();

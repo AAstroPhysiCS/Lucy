@@ -2,10 +2,10 @@
 #include "VulkanVertexBuffer.h"
 
 #include "Renderer/Renderer.h"
-#include "Renderer/VulkanRenderer.h"
+#include "Renderer/VulkanRHI.h"
 #include "Renderer/Context/VulkanDevice.h"
 
-#include "VulkanBufferUtils.h"
+#include "Renderer/VulkanAllocator.h"
 
 namespace Lucy {
 
@@ -21,9 +21,9 @@ namespace Lucy {
 	}
 
 	void VulkanVertexBuffer::Create(uint32_t size) {
-		VulkanBufferUtils::CreateVulkanBuffer(size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_SHARING_MODE_EXCLUSIVE,
-					 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
-					 m_StagingBufferHandle, m_StagingBufferMemory);
+		VulkanAllocator& allocator = VulkanAllocator::Get();
+		allocator.CreateVulkanBufferVMA(size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO,
+					 m_StagingBufferHandle, m_StagingBufferVma);
 	}
 
 	void VulkanVertexBuffer::Bind(const VertexBindInfo& info) {
@@ -41,24 +41,22 @@ namespace Lucy {
 
 	void VulkanVertexBuffer::Load() {
 		Renderer::Submit([&]() {
-			VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+			VulkanAllocator& allocator = VulkanAllocator::Get();
 
 			void* data;
-			vkMapMemory(device, m_StagingBufferMemory, 0, m_Data.size() * sizeof(float), 0, &data);
+			vmaMapMemory(allocator.GetVMAInstance(), m_StagingBufferVma, &data);
 			memcpy(data, m_Data.data(), m_Data.size() * sizeof(float));
-			vkUnmapMemory(device, m_StagingBufferMemory);
+			vmaUnmapMemory(allocator.GetVMAInstance(), m_StagingBufferVma);
 
-			VulkanBufferUtils::CreateVulkanBuffer(m_Size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_SHARING_MODE_EXCLUSIVE, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, m_BufferHandle, m_BufferMemory);
-			As(Renderer::GetCurrentRenderer(), VulkanRenderer)->DirectCopyBuffer(m_StagingBufferHandle, m_BufferHandle, m_Data.size() * sizeof(float));
+			allocator.CreateVulkanBufferVMA(m_Size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO, m_BufferHandle, m_BufferVma);
+			As(Renderer::GetCurrentRenderer(), VulkanRHI)->DirectCopyBuffer(m_StagingBufferHandle, m_BufferHandle, m_Data.size() * sizeof(float));
 
-			vkDestroyBuffer(device, m_StagingBufferHandle, nullptr);
-			vkFreeMemory(device, m_StagingBufferMemory, nullptr);
+			vmaDestroyBuffer(allocator.GetVMAInstance(), m_StagingBufferHandle, m_StagingBufferVma);
 		});
 	}
 
 	void VulkanVertexBuffer::Destroy() {
-		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
-		vkDestroyBuffer(device, m_BufferHandle, nullptr);
-		vkFreeMemory(device, m_BufferMemory, nullptr);
+		VulkanAllocator& allocator = VulkanAllocator::Get();
+		vmaDestroyBuffer(allocator.GetVMAInstance(), m_BufferHandle, m_BufferVma);
 	}
 }

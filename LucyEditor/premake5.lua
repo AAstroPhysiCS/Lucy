@@ -22,6 +22,7 @@ project "LucyEditor"
         "%{LibraryPath.assimp}/include",
         "%{LibraryPath.ImGuizmo}/include",
         "%{LibraryPath.VulkanInclude}",
+        "%{LibraryPath.VMA}",
         "../LucyEngine/src"
     }
 

@@ -5,6 +5,8 @@
 #include "Core/Window.h"
 #include "Scene/Scene.h"
 
+#include "Renderer/ViewportRenderer.h"
+
 #include "Events/EventDispatcher.h"
 #include "Events/InputEvent.h"
 
@@ -17,12 +19,12 @@ namespace Lucy {
 			return s_Instance;
 		}
 
-		void Begin(PerformanceMetrics& rendererMetrics);
-		void End();
 		void Init(RefLucy<Window> window);
-		void OnRender();
-		void OnEvent(Event& e);
-		void Destroy();
+		void Begin(PerformanceMetrics& rendererMetrics) override;
+		void End() override;
+		void OnRender() override;
+		void OnEvent(Event& e) override;
+		void Destroy() override;
 
 		inline Scene& GetScene() { return m_Scene; }
 	private:
@@ -31,5 +33,6 @@ namespace Lucy {
 
 		RefLucy<Window> m_Window;
 		Scene m_Scene;
+		ViewportRenderer m_ViewportRenderer;
 	};
 }

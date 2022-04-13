@@ -1,7 +1,5 @@
 #pragma once
 
-#define STB_IMAGE_IMPLEMENTATION
-
 #include "../../Core/Base.h"
 
 namespace Lucy {
@@ -64,7 +62,6 @@ namespace Lucy {
 
 		inline uint32_t GetID() const { return m_Id; }
 		inline int32_t GetSlot() const { return m_Specs.Slot; }
-
 	protected:
 		Texture2D(TextureSpecification& specs);
 

@@ -1,34 +1,35 @@
 #pragma once
 
-#include "Context/RendererAPI.h"
+#include "Context/RHI.h"
 #include "../Core/Window.h"
 
 #include "Context/OpenGLPipeline.h"
 
 namespace Lucy {
 
-	class OpenGLRenderer : public RendererAPI {
+	class OpenGLRHI : public RHI {
 	public:
-		OpenGLRenderer(RenderArchitecture renderArchitecture);
-		virtual ~OpenGLRenderer() = default;
+		OpenGLRHI(RenderArchitecture renderArchitecture);
+		virtual ~OpenGLRHI() = default;
 
 		void Init() override;
 
 		void ClearCommands() override;
-		void Execute() override;
 		void Destroy() override;
 		void Dispatch() override;
 
 		void BeginScene(Scene& scene) override;
+		PresentResult RenderScene() override;
 		void EndScene() override;
 
 		void Submit(const Func&& func) override;
-		void SubmitMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform) override;
+		void SubmitMesh(RefLucy<Pipeline> pipeline, RefLucy<Mesh> mesh, const glm::mat4& entityTransform) override;
+		void SubmitRenderCommand(const RenderCommand& renderCommand);
 
 		inline RefLucy<OpenGLPipeline>& GetGeometryPipeline() { return m_GeometryPipeline; }
 		inline RefLucy<OpenGLPipeline>& GetIDPipeline() { return m_IDPipeline; }
 		
-		void OnFramebufferResize(float sizeX, float sizeY) override;
+		void OnViewportResize() override;
 		Entity OnMousePicking() override;
 	private:
 		void GeometryPass();

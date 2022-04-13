@@ -67,9 +67,8 @@ namespace Lucy {
 #ifdef LUCY_DEBUG
 		SetupMessageCallback();
 #endif
-
+		
 		Renderer::s_Window->InitVulkanSurface(m_Instance);
-
 		VulkanDevice::Get().Create(m_Instance, m_ValidationLayers);
 		VulkanSwapChain::Get().Create();
 	}

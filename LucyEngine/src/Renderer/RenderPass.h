@@ -46,6 +46,8 @@ namespace Lucy {
 
 		virtual void Begin(RenderPassBeginInfo& info) = 0;
 		virtual void End(RenderPassEndInfo& info) = 0;
+		virtual void Recreate() = 0;
+		virtual void Destroy() = 0;
 
 		inline ClearColor GetClearColor() { return m_Specs.ClearColor; }
 	protected:

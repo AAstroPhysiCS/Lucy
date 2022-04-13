@@ -14,6 +14,8 @@ namespace Lucy {
 
 		void BeginVirtual() override;
 		void EndVirtual() override;
+		void Recreate() override;
+		void Destroy() override;
 
 		friend class OpenGLMesh;
 	private:

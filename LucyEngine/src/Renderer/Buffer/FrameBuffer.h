@@ -1,5 +1,4 @@
 #pragma once
-
 #include "../Texture/Texture.h"
 #include "../../Core/Base.h"
 
@@ -9,20 +8,25 @@ namespace Lucy {
 
 	class RenderBuffer;
 	class RenderPass;
+	class VulkanImageView;
 
 	struct TextureSpecification;
 
+	//TODO: More generalization is needed here!
 	struct FrameBufferSpecification {
 		bool MultiSampled = false;
 		bool DisableReadWriteBuffer = false;
 		bool IsStorage = false;
-		int32_t	ViewportWidth = 0, ViewportHeight = 0;
+		int32_t	Width = 0, Height = 0;
 		int32_t Level = 0;
 
 		std::vector<TextureSpecification> TextureSpecs;
 		TextureSpecification BlittedTextureSpecs;
 
 		RefLucy<RenderBuffer> RenderBuffer;
+
+		//Vulkan stuff, should be changed TODO:
+		std::vector<VulkanImageView> ImageViews;
 	};
 
 	class FrameBuffer {
@@ -32,11 +36,8 @@ namespace Lucy {
 		virtual void Bind() = 0;
 		virtual void Unbind() = 0;
 		virtual void Destroy() = 0;
-		virtual void Blit() = 0;
-		virtual void Resize(int32_t width, int32_t height) = 0;
 
 		uint32_t GetID() const { return m_Id; }
-		RefLucy<FrameBuffer>& GetBlitted() { return m_Blitted; }
 
 		inline auto GetSizeFromTexture(uint32_t index) const {
 			struct Size { int32_t Width, Height; };
@@ -49,6 +50,5 @@ namespace Lucy {
 
 		uint32_t m_Id = 0;
 		FrameBufferSpecification m_Specs;
-		RefLucy<FrameBuffer> m_Blitted;
 	};
 }

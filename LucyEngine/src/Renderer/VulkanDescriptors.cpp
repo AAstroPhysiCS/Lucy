@@ -2,7 +2,7 @@
 #include "VulkanDescriptors.h"
 
 #include "Renderer/Renderer.h"
-#include "Renderer/VulkanRenderer.h"
+#include "Context/VulkanSwapChain.h"
 #include "Context/VulkanDevice.h"
 
 namespace Lucy {
@@ -35,7 +35,7 @@ namespace Lucy {
 	}
 
 	void VulkanDescriptorSet::Create() {
-		constexpr uint32_t maxFramesInFlight = VulkanRenderer::MAX_FRAMES_IN_FLIGHT;
+		constexpr uint32_t maxFramesInFlight = VulkanSwapChain::MAX_FRAMES_IN_FLIGHT;
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
 
 		std::vector<VkDescriptorSetLayout> tempVector(maxFramesInFlight, m_Specs.Layout);

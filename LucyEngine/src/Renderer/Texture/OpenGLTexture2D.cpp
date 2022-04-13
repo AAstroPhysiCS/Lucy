@@ -1,10 +1,12 @@
 #include "lypch.h"
 #include "OpenGLTexture2D.h"
 
-#include "stb/stb_image.h"
 #include "../Renderer.h"
 
 #include "glad/glad.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb/stb_image.h"
 
 namespace Lucy {
 
@@ -28,7 +30,7 @@ namespace Lucy {
 
 			specs.Format.InternalFormat = specs.Format.Format;
 
-			if (!data) LUCY_CRITICAL(std::string("Failed to load a texture. Texture path: ").append(specs.Path));
+			if (!data) LUCY_CRITICAL(fmt::format("Failed to load a texture. Texture path: {0}", specs.Path));
 		} else {
 			m_Width = specs.Width;
 			m_Height = specs.Height;

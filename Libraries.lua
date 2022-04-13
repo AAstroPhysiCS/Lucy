@@ -11,6 +11,10 @@ LibraryPath["ImGui"] = "%{wks.location}/LucyEngine/vendor/ImGui"
 LibraryPath["ImGuizmo"] = "%{wks.location}/LucyEditor/vendor/ImGuizmo"
 LibraryPath["glm"] = "%{wks.location}/LucyEngine/vendor/glm"
 
+LibraryPath["VMA"] = "%{wks.location}/LucyEngine/vendor/vma"
+LibraryPath["VMADebug"] = "%{wks.location}/LucyEngine/vendor/vma/vma/Debug/VulkanMemoryAllocatord.lib"
+LibraryPath["VMARelease"] = "%{wks.location}/LucyEngine/vendor/vma/vma/Release/VulkanMemoryAllocator.lib"
+
 LibraryPath["VulkanSDK"] = os.getenv("VULKAN_SDK")
 LibraryPath["VulkanInclude"] = "%{LibraryPath.VulkanSDK}/Include"
 LibraryPath["VulkanLib"] = "%{LibraryPath.VulkanSDK}/Lib"

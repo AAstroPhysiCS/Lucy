@@ -13,8 +13,8 @@ namespace Lucy {
 
 		void Begin(RenderPassBeginInfo& info) override;
 		void End(RenderPassEndInfo& info) override;
-		void Recreate();
-		void Destroy();
+		void Destroy() override;
+		void Recreate() override;
 
 		inline VkRenderPass GetVulkanHandle() { return m_RenderPass; }
 	private:

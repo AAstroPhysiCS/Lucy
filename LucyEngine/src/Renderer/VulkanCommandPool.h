@@ -22,13 +22,9 @@ namespace Lucy {
 		inline VkCommandBuffer GetCommandBuffer(uint32_t index) { return m_CommandBuffers[index]; }
 		inline size_t GetCommandBufferSize() { return m_CommandBuffers.size(); }
 
-		void Execute(RefLucy<VulkanPipeline>& pipeline);
 		void Recreate();
 		void Destroy();
 	private:
-		void BeginRecording(RefLucy<VulkanPipeline>& pipeline);
-		void EndRecording(RefLucy<VulkanPipeline>& pipeline);
-		
 		VkCommandBuffer BeginSingleTimeCommand();
 		void EndSingleTimeCommand(VkCommandBuffer commandBuffer);
 
@@ -38,7 +34,7 @@ namespace Lucy {
 		VkCommandPool m_CommandPool = VK_NULL_HANDLE;
 		std::vector<VkCommandBuffer> m_CommandBuffers;
 
-		friend class VulkanRenderer;
+		friend class VulkanSwapChain;
 	};
 }
 

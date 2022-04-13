@@ -18,6 +18,7 @@ namespace Lucy {
 	}
 
 	void VulkanShader::Destroy() {
+		if (!m_VertexShaderModule || !m_FragmentShaderModule) return;
 		const VulkanDevice& device = VulkanDevice::Get();
 		vkDestroyShaderModule(device.GetLogicalDevice(), m_VertexShaderModule, nullptr);
 		vkDestroyShaderModule(device.GetLogicalDevice(), m_FragmentShaderModule, nullptr);

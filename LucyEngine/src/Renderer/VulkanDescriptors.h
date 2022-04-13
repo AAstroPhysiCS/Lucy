@@ -35,7 +35,7 @@ namespace Lucy {
 		VulkanDescriptorSet(VulkanDescriptorSetSpecifications& specs);
 		~VulkanDescriptorSet() = default;
 
-		inline VkDescriptorSet GetSetBasedOffFrameIndex(uint32_t currentFrame) const noexcept { return m_DescriptorSets[currentFrame]; }
+		inline VkDescriptorSet GetSetBasedOffCurrentFrame(uint32_t currentFrame) const noexcept { return m_DescriptorSets[currentFrame]; }
 	private:
 		void Create();
 

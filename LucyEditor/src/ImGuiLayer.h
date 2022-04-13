@@ -16,6 +16,7 @@
 #include "Core/Window.h"
 
 #include "Renderer/VulkanDescriptors.h"
+#include "Renderer/Context/VulkanPipeline.h"
 
 namespace Lucy {
 
@@ -61,7 +62,5 @@ namespace Lucy {
 
 		VulkanDescriptorPoolSpecifications m_PoolSpecs = { m_ImguiPoolSizes, VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT, 1000 };
 		RefLucy<VulkanDescriptorPool> m_ImGuiPool = nullptr;
-		RefLucy<VulkanRenderPass> m_RenderPass = nullptr;
-		VkCommandBuffer m_CommandBuffer = VK_NULL_HANDLE;
 	};
 }

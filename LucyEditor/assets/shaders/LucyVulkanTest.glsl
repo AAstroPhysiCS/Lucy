@@ -9,6 +9,8 @@ layout(set = 0, binding = 0) uniform Camera {
 	mat4 u_ProjMatrix;
 };
 
+/*
+
 layout(set = 0, binding = 1) uniform Add {
 	vec4 addition;
 };
@@ -21,8 +23,10 @@ layout(set = 1, binding = 1) uniform Add3 {
 	vec4 addition3;
 };
 
+*/
+
 void main() {
-	gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * vec4(a_Pos + addition.xy + addition2.xy + addition3.xy, 0.0, 1.0);
+	gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * vec4(a_Pos, 0.0, 1.0);
 }
 
 //type fragment

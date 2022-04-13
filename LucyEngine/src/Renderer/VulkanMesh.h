@@ -8,7 +8,7 @@ namespace Lucy {
 	public:
 		VulkanMesh(const std::string& path);
 		VulkanMesh(const VulkanMesh& other) = default;
-		virtual ~VulkanMesh();
+		virtual ~VulkanMesh() = default;
 
 		void Bind();
 		void Unbind();
