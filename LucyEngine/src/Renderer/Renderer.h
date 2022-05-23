@@ -7,69 +7,77 @@
 #include "Shader/Shader.h"
 #include "Mesh.h"
 
-#include "Context/RenderContext.h"
+#include "DrawCommand.h"
+
 #include "Context/RHI.h"
+#include "Context/RenderContext.h"
 
 namespace Lucy {
 
-	class RenderCommand;
+	struct ImGuiPipeline;
+
+	struct RendererSpecification {
+		RenderArchitecture Architecture;
+		RefLucy<Window> Window = nullptr;
+	};
 
 	class Renderer {
 	public:
-		static void Init(RefLucy<Window> window, RenderArchitecture renderArchitecture);
+		static void Init(const RendererSpecification& specs);
 		static void Destroy();
 
 		static void SetViewportMousePosition(float x, float y);
 
 		static void BeginScene(Scene& scene);
-		static void EndScene();
-		static PresentResult RenderScene();
+		static void RenderScene();
+		static PresentResult EndScene();
 
-		static void Submit(const Func&& func);
-		static void SubmitUIPass(const std::function<void(VkCommandBuffer commandBuffer)>&& func);
-		static void SubmitMesh(RefLucy<Pipeline> pipeline, RefLucy<Mesh> mesh, const glm::mat4& entityTransform);
-		static void SubmitRenderCommand(const RenderCommand& renderCommand);
+		static void Enqueue(const SubmitFunc&& func);
+		static void EnqueueStaticMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform);
+		static void RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func);
+
+		static void SetUIDrawData(std::function<void(VkCommandBuffer commandBuffer)>&& func);
+		static void RenderUI(const ImGuiPipeline& imguiPipeline);
+
+		static void BindPipeline(RefLucy<Pipeline> pipeline);
+		static void UnbindPipeline();
+		static void BindBuffers(RefLucy<Mesh> mesh);
+		static void BindBuffers(RefLucy<VertexBuffer> vertexBuffer, RefLucy<IndexBuffer> indexBuffer);
+		static void DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex,
+								int32_t vertexOffset, uint32_t firstInstance);
 
 		static void OnViewportResize();
 		static Entity OnMousePicking();
 
 		static void Dispatch();
-		static void ClearDrawCommands();
+		static void ClearQueues();
 
 		inline static void SetViewportSize(int32_t width, int32_t height);
 		inline static void SetViewportMouse(float viewportMouseX, float viewportMouseY);
 
+		inline static RefLucy<Window> GetWindow() { return s_Specs.Window; }
 		inline static auto GetWindowSize() {
 			struct Size { int32_t Width, Height; };
-			return Size{ s_Window->GetWidth(), s_Window->GetHeight() };
+			return Size{ s_Specs.Window->GetWidth(), s_Specs.Window->GetHeight() };
 		}
 
-		inline static auto GetViewportSize() { return s_RendererAPI->GetViewportSize(); }
-		inline static RenderArchitecture GetCurrentRenderArchitecture() { return s_SelectedArchitecture; }
-		inline static ShaderLibrary& GetShaderLibrary() { return s_RendererAPI->GetShaderLibrary(); }
-		inline static Scene* GetActiveScene() { return s_RendererAPI->m_ActiveScene; }
-		inline static RefLucy<RHI> GetCurrentRenderer() { return s_RendererAPI; }
+		inline static auto GetViewportSize() { return s_RHI->GetViewportSize(); }
+		inline static RenderArchitecture GetCurrentRenderArchitecture() { return s_Specs.Architecture; }
+		inline static ShaderLibrary& GetShaderLibrary() { return s_ShaderLibrary; }
+		inline static Scene* GetActiveScene() { return s_RHI->m_ActiveScene; }
+		inline static RefLucy<RHI> GetCurrentRenderer() { return s_RHI; }
 	private:
 		Renderer() = delete;
 		~Renderer() = delete;
 
-		static RefLucy<Window> s_Window;
-		static RefLucy<RHI> s_RendererAPI;
+		static RefLucy<RHI> s_RHI;
+		static RefLucy<Pipeline> s_ActivePipeline;
+		static RendererSpecification s_Specs;
 
-		static RenderArchitecture s_SelectedArchitecture;
-		inline static std::function<void(VkCommandBuffer commandBuffer)> s_UIPassFunc;
+		static ShaderLibrary s_ShaderLibrary;
 
-		friend class RenderCommand;
-		friend class Input;
-		friend class Material;
-		
-		friend class OpenGLRHI;
+		static std::function<void(VkCommandBuffer commandBuffer)> s_UIDrawDataFunc;
 
-		friend class VulkanDevice;
-		friend class VulkanContext;
-		friend class VulkanSwapChain;
-		friend class ViewportRenderer; //for s_UIPassFunc
-
-		friend class ImGuiLayer; //for SubmitUIPass
+		friend class ViewportRenderer; //for s_UIDrawDataFunc
 	};
 }

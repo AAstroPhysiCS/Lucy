@@ -13,18 +13,21 @@ namespace Lucy {
 		virtual ~OpenGLRHI() = default;
 
 		void Init() override;
-
-		void ClearCommands() override;
 		void Destroy() override;
 		void Dispatch() override;
 
 		void BeginScene(Scene& scene) override;
-		PresentResult RenderScene() override;
-		void EndScene() override;
+		void RenderScene() override;
+		PresentResult EndScene() override;
 
-		void Submit(const Func&& func) override;
-		void SubmitMesh(RefLucy<Pipeline> pipeline, RefLucy<Mesh> mesh, const glm::mat4& entityTransform) override;
-		void SubmitRenderCommand(const RenderCommand& renderCommand);
+		void Enqueue(const SubmitFunc&& func) override;
+		void EnqueueStaticMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform) override;
+
+		void RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func);
+
+		void BindPipeline(RefLucy<Pipeline> pipeline);
+		void UnbindPipeline(RefLucy<Pipeline> pipeline);
+		void BindBuffers(RefLucy<VertexBuffer> vertexBuffer, RefLucy<IndexBuffer> indexBuffer);
 
 		inline RefLucy<OpenGLPipeline>& GetGeometryPipeline() { return m_GeometryPipeline; }
 		inline RefLucy<OpenGLPipeline>& GetIDPipeline() { return m_IDPipeline; }
@@ -50,7 +53,7 @@ namespace Lucy {
 		static void DrawElementsBaseVertex(Topology topology, uint32_t count, uint32_t indices, int32_t basevertex);
 
 		static void ReadPixels(uint32_t x, uint32_t y, uint32_t width, uint32_t height, float* pixelValueOutput);
-		static void ReadBuffer(RefLucy<FrameBuffer> frameBuffer, uint32_t mode);
+		static void ReadBuffer(RefLucy<OpenGLFrameBuffer> frameBuffer, uint32_t mode);
 		static void ReadBuffer(uint32_t mode);
 	};
 }

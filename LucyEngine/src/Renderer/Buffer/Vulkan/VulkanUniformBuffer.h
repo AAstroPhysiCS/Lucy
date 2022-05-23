@@ -5,6 +5,7 @@
 
 #include "../UniformBuffer.h"
 #include "../../VulkanDescriptors.h"
+#include "../../Image/VulkanImage.h"
 
 namespace Lucy {
 
@@ -17,7 +18,7 @@ namespace Lucy {
 		void Unbind() override;
 		void Destroy() override;
 		void SetData(void* data, uint32_t size, uint32_t offset) override;
-		void WriteToSets(uint32_t index);
+		void Update(RefLucy<VulkanImage2D> image = nullptr);
 
 		inline VulkanDescriptorSet& GetDescriptorSet() noexcept { return m_DescriptorSet; }
 	private:
@@ -26,6 +27,8 @@ namespace Lucy {
 
 		std::vector<VkBuffer> m_Buffers;
 		std::vector<VmaAllocation> m_BufferVma;
+
+		bool m_Allocated = false;
 	};
 }
 

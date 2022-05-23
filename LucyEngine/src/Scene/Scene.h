@@ -10,7 +10,7 @@ namespace Lucy {
 	class Scene {
 	public:
 		Scene() = default;
-		Scene(const Scene& other) = default;
+		~Scene() = default;
 
 		Entity CreateMesh(std::string& path);
 		Entity CreateMesh();
@@ -19,6 +19,8 @@ namespace Lucy {
 		Entity GetEntityByPixelValue(const glm::vec3& pixelValue);
 
 		inline EditorCamera& GetEditorCamera() { return m_Camera; }
+
+		void Update();
 
 		template <typename ... T>
 		inline auto View() { return m_Registry.view<T...>(); }

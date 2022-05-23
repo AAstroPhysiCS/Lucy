@@ -33,9 +33,6 @@ namespace Lucy {
 		glCreateVertexArrays(1, &m_Vao);
 		glBindVertexArray(m_Vao);
 
-		OpenGLPipeline* activePipeline = (OpenGLPipeline*)Pipeline::s_ActivePipeline;
-		activePipeline->UploadVertexLayout(m_VertexBuffer);
-
 		m_VertexBuffer->Load();
 		m_IndexBuffer->Load();
 

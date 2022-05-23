@@ -6,13 +6,13 @@
 
 namespace Lucy {
 
-	RefLucy<RHI> RHI::Create(RenderArchitecture architecture) {
-		switch (architecture) {
+	RefLucy<RHI> RHI::Create(RenderArchitecture arch) {
+		switch (arch) {
 			case RenderArchitecture::OpenGL:
-				return CreateRef<OpenGLRHI>(architecture);
+				return CreateRef<OpenGLRHI>(arch);
 				break;
 			case RenderArchitecture::Vulkan:
-				return CreateRef<VulkanRHI>(architecture);
+				return CreateRef<VulkanRHI>(arch);
 				break;
 		}
 		return nullptr;
@@ -25,5 +25,10 @@ namespace Lucy {
 	void RHI::SetViewportMousePosition(float x, float y) {
 		m_ViewportMouseX = x;
 		m_ViewportMouseY = y;
+	}
+
+	void RHI::ClearQueues() {
+		m_StaticMeshDrawCommandQueue.clear();
+		s_CommandQueue.Clear();
 	}
 }

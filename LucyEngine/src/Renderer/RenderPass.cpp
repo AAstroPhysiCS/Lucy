@@ -1,6 +1,6 @@
 #include "lypch.h"
-
 #include "RenderPass.h"
+
 #include "OpenGLRenderPass.h"
 #include "VulkanRenderPass.h"
 #include "Renderer.h"
@@ -11,7 +11,7 @@ namespace Lucy {
 		: m_Specs(specs) {
 	}
 
-	RefLucy<RenderPass> RenderPass::Create(const RenderPassSpecification& specs) {
+	RefLucy<RenderPass> Lucy::RenderPass::Create(const RenderPassSpecification& specs) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
 				return CreateRef<OpenGLRenderPass>(specs);

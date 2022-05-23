@@ -11,21 +11,21 @@ namespace Lucy {
 
 	VulkanIndexBuffer::VulkanIndexBuffer(uint32_t size)
 		: IndexBuffer(size) {
-		Renderer::Submit([this, size]() {
+		Renderer::Enqueue([this, size]() {
 			Create(size);
 		});
 	}
 
 	VulkanIndexBuffer::VulkanIndexBuffer()
 		: IndexBuffer() {
-		Renderer::Submit([this]() {
+		Renderer::Enqueue([this]() {
 			Create();
 		});
 	}
 
 	void VulkanIndexBuffer::Create(uint32_t size) {
 		VulkanAllocator& allocator = VulkanAllocator::Get(); 
-		allocator.CreateVulkanBufferVMA(size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO, m_StagingBufferHandle, m_StagingBufferVma);
+		allocator.CreateVulkanBufferVma(size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO, m_StagingBufferHandle, m_StagingBufferVma);
 	}
 
 	void VulkanIndexBuffer::Bind(const IndexBindInfo& info) {
@@ -41,16 +41,16 @@ namespace Lucy {
 	}
 
 	void VulkanIndexBuffer::Load() {
-		Renderer::Submit([&]() {
+		Renderer::Enqueue([&]() {
 			VulkanAllocator& allocator = VulkanAllocator::Get();
-			VmaAllocator vmaAllocatorHandle = allocator.GetVMAInstance();
+			VmaAllocator vmaAllocatorHandle = allocator.GetVmaInstance();
 
 			void* data;
 			vmaMapMemory(vmaAllocatorHandle, m_StagingBufferVma, &data);
 			memcpy(data, m_Data.data(), m_Data.size() * sizeof(float));
 			vmaUnmapMemory(vmaAllocatorHandle, m_StagingBufferVma);
 
-			allocator.CreateVulkanBufferVMA(m_Size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO, m_BufferHandle, m_BufferVma);
+			allocator.CreateVulkanBufferVma(m_Size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO, m_BufferHandle, m_BufferVma);
 			As(Renderer::GetCurrentRenderer(), VulkanRHI)->DirectCopyBuffer(m_StagingBufferHandle, m_BufferHandle, m_Data.size() * sizeof(float));
 
 			vmaDestroyBuffer(vmaAllocatorHandle, m_StagingBufferHandle, m_StagingBufferVma);
@@ -58,7 +58,7 @@ namespace Lucy {
 	}
 
 	void VulkanIndexBuffer::Destroy() {
-		VmaAllocator vmaAllocator = VulkanAllocator::Get().GetVMAInstance();
+		VmaAllocator vmaAllocator = VulkanAllocator::Get().GetVmaInstance();
 		vmaDestroyBuffer(vmaAllocator, m_BufferHandle, m_BufferVma);
 	}
 }

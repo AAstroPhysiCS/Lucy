@@ -3,6 +3,11 @@
 namespace Lucy {
 
 	enum class MouseCode : uint8_t {
+		// From imgui.h
+		ImGuiMouseButton_Left = 0,
+		ImGuiMouseButton_Right = 1,
+		ImGuiMouseButton_Middle = 2,
+		ImGuiMouseButton_COUNT = 5,
 
 		// From glfw3.h
 		Button0 = 0,

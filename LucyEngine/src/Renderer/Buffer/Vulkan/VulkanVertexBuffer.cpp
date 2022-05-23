@@ -11,7 +11,7 @@ namespace Lucy {
 
 	VulkanVertexBuffer::VulkanVertexBuffer(uint32_t size)
 		: VertexBuffer(size) {
-		Renderer::Submit([this, size]() {
+		Renderer::Enqueue([this, size]() {
 			Create(size);
 		});
 	}
@@ -22,8 +22,8 @@ namespace Lucy {
 
 	void VulkanVertexBuffer::Create(uint32_t size) {
 		VulkanAllocator& allocator = VulkanAllocator::Get();
-		allocator.CreateVulkanBufferVMA(size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO,
-					 m_StagingBufferHandle, m_StagingBufferVma);
+		allocator.CreateVulkanBufferVma(size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+										VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO, m_StagingBufferHandle, m_StagingBufferVma);
 	}
 
 	void VulkanVertexBuffer::Bind(const VertexBindInfo& info) {
@@ -40,23 +40,24 @@ namespace Lucy {
 	}
 
 	void VulkanVertexBuffer::Load() {
-		Renderer::Submit([&]() {
+		Renderer::Enqueue([&]() {
 			VulkanAllocator& allocator = VulkanAllocator::Get();
 
 			void* data;
-			vmaMapMemory(allocator.GetVMAInstance(), m_StagingBufferVma, &data);
+			vmaMapMemory(allocator.GetVmaInstance(), m_StagingBufferVma, &data);
 			memcpy(data, m_Data.data(), m_Data.size() * sizeof(float));
-			vmaUnmapMemory(allocator.GetVMAInstance(), m_StagingBufferVma);
+			vmaUnmapMemory(allocator.GetVmaInstance(), m_StagingBufferVma);
 
-			allocator.CreateVulkanBufferVMA(m_Size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO, m_BufferHandle, m_BufferVma);
+			allocator.CreateVulkanBufferVma(m_Size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
+											VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO, m_BufferHandle, m_BufferVma);
 			As(Renderer::GetCurrentRenderer(), VulkanRHI)->DirectCopyBuffer(m_StagingBufferHandle, m_BufferHandle, m_Data.size() * sizeof(float));
 
-			vmaDestroyBuffer(allocator.GetVMAInstance(), m_StagingBufferHandle, m_StagingBufferVma);
+			vmaDestroyBuffer(allocator.GetVmaInstance(), m_StagingBufferHandle, m_StagingBufferVma);
 		});
 	}
 
 	void VulkanVertexBuffer::Destroy() {
 		VulkanAllocator& allocator = VulkanAllocator::Get();
-		vmaDestroyBuffer(allocator.GetVMAInstance(), m_BufferHandle, m_BufferVma);
+		vmaDestroyBuffer(allocator.GetVmaInstance(), m_BufferHandle, m_BufferVma);
 	}
 }

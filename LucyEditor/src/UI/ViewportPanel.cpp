@@ -6,6 +6,11 @@
 #include "Renderer/VulkanRHI.h"
 #include "Renderer/RenderPass.h"
 #include "Renderer/Buffer/OpenGL/OpenGLFrameBuffer.h"
+#include "Renderer/ViewportRenderer.h"
+
+#include "Renderer/Buffer/Vulkan/VulkanFrameBuffer.h"
+
+#include "imgui_impl_vulkan.h"
 
 namespace Lucy {
 
@@ -50,26 +55,27 @@ namespace Lucy {
 		IsViewportActive = IsViewportHovered && ImGui::IsWindowFocused();
 		IsOverAnyGizmo = IsOverAnyGizmoM();
 
-		uint32_t outputTextureID = 0;
+		void* outputTextureID = 0;
 
 		//TODO: Bad access? Change it maybe?
-		RefLucy<RHI>& currentRenderer = Renderer::GetCurrentRenderer();
+		ImVec2& size = ImGui::GetWindowSize();
 
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL: {
-				auto& blittedFrameBuffer = As(As(currentRenderer, OpenGLRHI)->GetGeometryPipeline()->GetFrameBuffer(), OpenGLFrameBuffer)->GetBlitted();
-				auto& texture = blittedFrameBuffer->GetTexture(0);
-				outputTextureID = texture->GetID();
+				auto& blittedFrameBuffer = As(ViewportRenderer::GetGeometryPipeline()->GetFrameBuffer(), OpenGLFrameBuffer)->GetBlitted();
+				outputTextureID = (void*)blittedFrameBuffer->GetTexture(0)->GetID();
+				ImGui::Image(outputTextureID, size, { 0, 1 }, { 1, 0 });
 				break;
 			}
-			case RenderArchitecture::Vulkan:
+			case RenderArchitecture::Vulkan: {
+				VulkanSwapChain& swapChain = VulkanSwapChain::Get();
+				outputTextureID = As(ViewportRenderer::GetGeometryPipeline()->GetFrameBuffer(), VulkanFrameBuffer)->GetImages()[0]->GetID();
+				ImGui::Image(outputTextureID, size);
 				break;
+			}
 			default:
 				LUCY_ASSERT(false);
 		}
-
-		ImVec2& size = ImGui::GetWindowSize();
-		ImGui::Image((ImTextureID)outputTextureID, size, { 0, 1 }, { 1, 0 });
 
 		auto [w, h] = Renderer::GetViewportSize();
 		if (w != size.x || h != size.y) {
@@ -101,7 +107,7 @@ namespace Lucy {
 
 		ImGui::End();
 	}
-	
+
 	bool ViewportPanel::IsOverTranslateGizmo() {
 		return ImGuizmo::IsOver(ImGuizmo::OPERATION::TRANSLATE) && CurrentGizmoOperation == ImGuizmo::OPERATION::TRANSLATE;
 	}
@@ -109,11 +115,11 @@ namespace Lucy {
 	bool ViewportPanel::IsOverRotateGizmo() {
 		return ImGuizmo::IsOver(ImGuizmo::OPERATION::ROTATE) && CurrentGizmoOperation == ImGuizmo::OPERATION::ROTATE;
 	}
-	
+
 	bool ViewportPanel::IsOverScaleGizmo() {
 		return ImGuizmo::IsOver(ImGuizmo::OPERATION::SCALE) && CurrentGizmoOperation == ImGuizmo::OPERATION::SCALE;
 	}
-	
+
 	bool ViewportPanel::IsOverAnyGizmoM() {
 		return IsOverTranslateGizmo() || IsOverRotateGizmo() || IsOverScaleGizmo();
 	}

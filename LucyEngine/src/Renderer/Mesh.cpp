@@ -198,7 +198,7 @@ namespace Lucy {
 	}
 
 	void Mesh::LoadMaterials(const aiScene* scene, const aiMesh* mesh) {
-		m_Materials[mesh->mMaterialIndex] = { Renderer::GetShaderLibrary().GetShader("LucyPBR"), scene->mMaterials[mesh->mMaterialIndex], mesh->mName.data, m_Path };
+		m_Materials[mesh->mMaterialIndex] = Material::Create(Renderer::GetShaderLibrary().GetShader("LucyPBR"), scene->mMaterials[mesh->mMaterialIndex], mesh->mName.data, m_Path);
 	}
 
 	void Mesh::TraverseHierarchy(const aiNode* node, const aiNode* rootNode) {

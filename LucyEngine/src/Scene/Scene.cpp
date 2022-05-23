@@ -51,4 +51,21 @@ namespace Lucy {
 		}
 		LUCY_ASSERT(false);
 	}
+	
+	void Scene::Update() {
+		auto& [sizeX, sizeY] = Renderer::GetViewportSize();
+
+		EditorCamera& camera = GetEditorCamera();
+		camera.SetViewportSize(sizeX, sizeY);
+		//camera.Update();
+
+		const auto& meshView = View<MeshComponent>();
+		for (auto entity : meshView) {
+			Entity e{ this, entity };
+			MeshComponent& meshComponent = e.GetComponent<MeshComponent>();
+			if (!meshComponent.IsValid()) continue;
+
+			Renderer::EnqueueStaticMesh(meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
+		}
+	}
 }

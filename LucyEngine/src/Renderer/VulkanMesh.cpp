@@ -17,20 +17,8 @@ namespace Lucy {
 	}
 	
 	void VulkanMesh::LoadBuffers() {
-		m_VertexBuffer->AddData(
-			{ -0.5f, -0.5f,
-			   0.5f, -0.5f,
-			   0.5f, 0.5f,
-			  -0.5f, 0.5f
-			}
-		);
 		m_VertexBuffer->Load();
-
-		m_IndexBuffer->AddData(
-			{ 0, 1, 2, 2, 3, 0 }
-		);
 		m_IndexBuffer->Load();
-
 		m_Loaded = true;
 	}
 }

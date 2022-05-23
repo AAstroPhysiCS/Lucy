@@ -1,15 +1,20 @@
 #pragma once
 
 #include "../Core/Base.h"
-#include "Texture/Texture.h"
+#include "../Core/FileSystem.h"
 
 #include "glm/glm.hpp"
 #include "assimp/scene.h"
 
+#include "Shader/Shader.h"
+#include "Image/Image.h"
+
+#include "glm/glm.hpp"
+#include "glad/glad.h"
+
 namespace Lucy {
 
 	class Pipeline;
-	class Shader;
 
 	struct MaterialData {
 		glm::vec3 Diffuse = glm::vec3();
@@ -24,30 +29,30 @@ namespace Lucy {
 
 	class Material {
 	public:
-		Material() = default;
+		static RefLucy<Material> Create(RefLucy<Shader> shader, aiMaterial* aiMaterial, const char* submeshName, std::string& importedFilePath);
+
 		Material(RefLucy<Shader> shader, aiMaterial* aiMaterial, const char* submeshName, std::string& importedFilePath);
 
-		void Bind(RefLucy<Pipeline> pipeline);
-		void Unbind(RefLucy<Pipeline> pipeline);
+		virtual void Bind(RefLucy<Pipeline> pipeline) = 0;
+		virtual void Unbind(RefLucy<Pipeline> pipeline) = 0;
 
 		inline RefLucy<Shader> GetShader() { return m_Shader; }
 		inline std::string GetName() const { return m_MaterialData.Name; }
 
-		bool HasTexture(TextureType type);
-		inline RefLucy<Texture2D> GetTexture(TextureType type) const { return m_Textures[type.Index]; }
-		inline bool HasTexture(TextureType type) const { return m_Textures[type.Index]->GetID() != 0; }
+		inline bool HasTexture(TextureType type) const { return !m_Textures.empty() && m_Textures.size() > type.Index && m_Textures[type.Index]->GetID() != 0; }
+		inline RefLucy<Image2D> GetTexture(TextureType type) const { return m_Textures[type.Index]; }
 
 		inline static const TextureType ALBEDO_TYPE = { aiTextureType_DIFFUSE, "Albedo", 1, 0 };
 		inline static const TextureType NORMALS_TYPE = { aiTextureType_HEIGHT, "Normals", 2, 1 };
 		inline static const TextureType METALLIC_TYPE = { aiTextureType_SHININESS, "Metallic", 3, 2 };
 		inline static const TextureType ROUGHNESS_TYPE = { aiTextureType_SPECULAR, "Roughness", 4, 3 };
 		inline static const TextureType AO_TYPE = { aiTextureType_AMBIENT_OCCLUSION, "Ambient Occlusion", 5, 4 };
-	private:
-		void LoadTexture(aiMaterial* aiMaterial, TextureSlot slot, TextureType type, std::string& importedFilePath);
+	protected:
+		virtual void LoadTexture(aiMaterial* aiMaterial, TextureSlot slot, TextureType type, std::string& importedFilePath) = 0;
 
 		MaterialData m_MaterialData;
 		RefLucy<Shader> m_Shader;
-		std::vector<RefLucy<Texture2D>> m_Textures;
+		std::vector<RefLucy<Image2D>> m_Textures;
 	};
 }
 

@@ -4,7 +4,6 @@
 #include <iostream>
 #include <functional>
 
-#include "Application.h"
 #include "Logger.h"
 
 #ifdef LUCY_WINDOWS
@@ -27,7 +26,10 @@
 
 namespace Lucy {
 
-	using Func = std::function<void()>;
+	using SubmitFunc = std::function<void()>;
+
+	template <typename T>
+	using RecordFunc = std::function<void(T)>;
 
 	template<typename T>
 	using RefLucy = std::shared_ptr<T>;

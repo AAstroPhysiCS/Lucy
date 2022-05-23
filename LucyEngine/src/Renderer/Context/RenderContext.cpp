@@ -6,16 +6,13 @@
 
 namespace Lucy {
 
-	RenderContext::RenderContext(RenderArchitecture type)
-	{}
-
-	RefLucy<RenderContext> RenderContext::Create(RenderArchitecture type) {
-		switch (type) {
+	RefLucy<RenderContext> RenderContext::Create(RenderArchitecture arch) {
+		switch (arch) {
 			case RenderArchitecture::OpenGL:
-				return CreateRef<OpenGLContext>(type);
+				return CreateRef<OpenGLContext>();
 				break;
 			case RenderArchitecture::Vulkan:
-				return CreateRef<VulkanContext>(type);
+				return CreateRef<VulkanContext>();
 				break;
 			default:
 				LUCY_CRITICAL("Other API's are not supported!");

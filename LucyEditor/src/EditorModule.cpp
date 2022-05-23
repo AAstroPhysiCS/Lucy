@@ -1,4 +1,4 @@
-#include "EditorLayer.h"
+#include "EditorModule.h"
 
 #include "Renderer/Renderer.h"
 #include "Renderer/RenderPass.h"
@@ -12,31 +12,32 @@
 
 #include "Events/KeyCodes.h"
 #include "Events/MouseCode.h"
+#include "Events/WindowEvent.h"
+#include "Events/InputEvent.h"
 
 #include "glad/glad.h"
 
 namespace Lucy {
 
-	void EditorLayer::Init(RefLucy<Window> window) {
+	void EditorModule::Init(RefLucy<Window> window) {
 		m_Window = window;
 		m_ViewportRenderer.Init();
 	}
 
-	void EditorLayer::Begin(PerformanceMetrics& rendererMetrics) {
+	void EditorModule::Begin(PerformanceMetrics& rendererMetrics) {
 		m_Scene.GetEditorCamera().OnEvent(rendererMetrics);
-	}
-
-	void EditorLayer::End() {
-		
-	}
-
-	void EditorLayer::OnRender() {
 		m_ViewportRenderer.Begin(m_Scene);
+	}
+
+	void EditorModule::OnRender() {
 		m_ViewportRenderer.Dispatch();
+	}
+
+	void EditorModule::End() {
 		m_ViewportRenderer.End();
 	}
 
-	void EditorLayer::OnEvent(Event& e) {
+	void EditorModule::OnEvent(Event& e) {
 		EventDispatcher& dispatcher = EventDispatcher::GetInstance();
 		dispatcher.Dispatch<KeyEvent>(e, EventType::KeyEvent, [&](const KeyEvent& e) {
 			if (e == KeyCode::Escape) {
@@ -48,7 +49,7 @@ namespace Lucy {
 			m_ViewportRenderer.OnWindowResize();
 		});
 
-		dispatcher.Dispatch<MouseEvent>(e, EventType::MouseEvent, [&](const MouseEvent& e) {
+		dispatcher.Dispatch<MouseEvent>(e, EventType::MouseEvent, [](const MouseEvent& e) {
 			const ViewportPanel& viewportPanel = ViewportPanel::GetInstance();
 			if (viewportPanel.IsOverAnyGizmo || !viewportPanel.IsViewportActive) return;
 
@@ -60,7 +61,7 @@ namespace Lucy {
 		});
 	}
 
-	void EditorLayer::Destroy() {
+	void EditorModule::Destroy() {
 		m_ViewportRenderer.Destroy();
 	}
 }

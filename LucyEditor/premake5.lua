@@ -2,6 +2,7 @@ project "LucyEditor"
     location "."
     kind "ConsoleApp"
     language "C++"
+    cppdialect "C++17"
 
     targetdir ("../bin/" .. outputdir .. "/%{prj.name}")
     objdir ("../bin-obj/" .. outputdir .. "/%{prj.name}")
@@ -32,7 +33,6 @@ project "LucyEditor"
     }
 
     filter "platforms:win64"
-        cppdialect "C++17"
         staticruntime "On"
         systemversion "latest"
 

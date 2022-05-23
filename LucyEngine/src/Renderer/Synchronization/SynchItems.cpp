@@ -7,6 +7,7 @@ namespace Lucy {
 	Semaphore::Semaphore() {
 		VkSemaphoreCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+		auto& a = VulkanDevice::Get();
 		LUCY_VK_ASSERT(vkCreateSemaphore(VulkanDevice::Get().GetLogicalDevice(), &createInfo, nullptr, &m_Handle));
 	}
 

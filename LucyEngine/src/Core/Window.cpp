@@ -1,6 +1,11 @@
 #include "lypch.h"
 #include "Window.h"
 
+#include "Renderer/Context/RenderContext.h"
+#include "../Events/EventDispatcher.h"
+#include "../Events/InputEvent.h"
+#include "../Events/WindowEvent.h"
+
 namespace Lucy {
 
 	std::function<void(Event*)> Window::s_EventFunc;
@@ -16,18 +21,18 @@ namespace Lucy {
 #endif
 	}
 
-	void WinWindow::Init() {
+	void WinWindow::Init(RenderArchitecture architecture) {
 
 		if (!glfwInit()) {
 			LUCY_CRITICAL("GLFW init failed!");
 			LUCY_ASSERT(false);
 		}
 
-		if (m_Specs.Architecture == RenderArchitecture::Vulkan) {
+		if (architecture == RenderArchitecture::Vulkan) {
 			LUCY_ASSERT(glfwVulkanSupported());
 			glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		} else {
-			glfwWindowHint(GLFW_DOUBLEBUFFER, m_Specs.DoubleBuffered);
+			glfwWindowHint(GLFW_DOUBLEBUFFER, true);
 			glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 			glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 		}
@@ -49,7 +54,7 @@ namespace Lucy {
 				break;
 		}
 
-		if (m_Specs.Architecture == RenderArchitecture::OpenGL) {
+		if (architecture == RenderArchitecture::OpenGL) {
 			glfwMakeContextCurrent(m_Window);
 			glfwSwapInterval(m_Specs.VSync);
 		}
@@ -85,7 +90,7 @@ namespace Lucy {
 
 		//Adding events
 		glfwSetWindowSizeCallback(m_Window, [](GLFWwindow* window, int32_t width, int32_t height) {
-			WindowResizeEvent evt{ width, height };
+			WindowResizeEvent evt{ window, width, height };
 			s_EventFunc(&evt);
 		});
 
@@ -95,27 +100,27 @@ namespace Lucy {
 		});
 
 		glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int32_t key, int32_t scanCode, int32_t action, int32_t mods) {
-			KeyEvent evt{ key, scanCode, action, mods };
+			KeyEvent evt{ window, key, scanCode, action, mods };
 			s_EventFunc(&evt);
 		});
 
 		glfwSetCharCallback(m_Window, [](GLFWwindow* window, uint32_t codePoint) {
-			CharCallbackEvent evt{ codePoint };
+			CharCallbackEvent evt{ window, codePoint };
 			s_EventFunc(&evt);
 		});
 
 		glfwSetScrollCallback(m_Window, [](GLFWwindow* window, double xOffset, double yOffset) {
-			ScrollEvent evt{ xOffset, yOffset };
+			ScrollEvent evt{ window, xOffset, yOffset };
 			s_EventFunc(&evt);
 		});
 
 		glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xPos, double yPos) {
-			CursorPosEvent evt{ xPos, yPos };
+			CursorPosEvent evt{ window, xPos, yPos };
 			s_EventFunc(&evt);
 		});
 
 		glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int32_t button, int32_t action, int32_t mods) {
-			MouseEvent evt{ button, action, mods };
+			MouseEvent evt{ window, button, action, mods };
 			s_EventFunc(&evt);
 		});
 	}

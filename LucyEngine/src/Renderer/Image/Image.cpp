@@ -1,17 +1,17 @@
 #include "lypch.h"
 
-#include "Texture.h"
-#include "OpenGLTexture2D.h"
+#include "Image.h"
+#include "OpenGLImage.h"
 #include "VulkanImage.h"
 
 #include "../Renderer.h"
 
 namespace Lucy {
 
-	RefLucy<Texture2D> Texture2D::Create(TextureSpecification& specs) {
+	RefLucy<Image2D> Image2D::Create(ImageSpecification& specs) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
-				return CreateRef<OpenGLTexture2D>(specs);
+				return CreateRef<OpenGLImage2D>(specs);
 				break;
 			case RenderArchitecture::Vulkan:
 				return CreateRef<VulkanImage2D>(specs);
@@ -22,7 +22,7 @@ namespace Lucy {
 		return nullptr;
 	}
 
-	Texture2D::Texture2D(TextureSpecification& specs)
+	Image2D::Image2D(ImageSpecification& specs)
 		: m_Specs(specs), m_Width(specs.Width), m_Height(specs.Height) {
 	}
 }

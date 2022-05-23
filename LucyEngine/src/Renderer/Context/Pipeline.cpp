@@ -26,16 +26,6 @@ namespace Lucy {
 		: m_Specs(specs) {
 	}
 
-	void Pipeline::Begin(const RefLucy<Pipeline>& pipeline) {
-		pipeline->BeginVirtual();
-		s_ActivePipeline = pipeline.get();
-	}
-
-	void Pipeline::End(const RefLucy<Pipeline>& pipeline) {
-		pipeline->EndVirtual();
-		s_ActivePipeline = nullptr;
-	}
-
 	void Pipeline::DestroyUniformBuffers() {
 		for (const auto& uniformBuffer : m_UniformBuffers)
 			uniformBuffer->Destroy();

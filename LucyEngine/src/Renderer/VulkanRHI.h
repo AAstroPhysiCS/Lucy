@@ -4,32 +4,33 @@
 #include "Context/VulkanContext.h"
 
 #include "Synchronization/SynchItems.h"
-
 #include "VulkanRenderPass.h"
 
 namespace Lucy {
 
-	struct ImDrawData;
-
 	class VulkanRHI : public RHI {
 	public:
-		VulkanRHI(RenderArchitecture renderArchitecture);
+		VulkanRHI(RenderArchitecture arch);
 		virtual ~VulkanRHI() = default;
 
 		void Init() override;
-
 		void Dispatch() override;
-		void ClearCommands() override;
 		void Destroy() override;
 
 		void BeginScene(Scene& scene) override;
-		PresentResult RenderScene() override;
-		void EndScene() override;
+		void RenderScene() override;
+		PresentResult EndScene() override;
 
 		void DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size);
-		void Submit(const Func&& func) override;
-		void SubmitMesh(RefLucy<Pipeline> pipeline, RefLucy<Mesh> mesh, const glm::mat4& entityTransform) override;
-		void SubmitRenderCommand(const RenderCommand& renderCommand) override;
+		void Enqueue(const SubmitFunc&& func) override;
+		void EnqueueStaticMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform) override;
+		
+		//Parameter "func" are the individual passes, works in parallel
+		void RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func) override;
+
+		void BindPipeline(RefLucy<Pipeline> pipeline) override;
+		void UnbindPipeline(RefLucy<Pipeline> pipeline) override;
+		void BindBuffers(RefLucy<VertexBuffer> vertexBuffer, RefLucy<IndexBuffer> indexBuffer) override;
 
 		static void RecordSingleTimeCommand(std::function<void(VkCommandBuffer)>&& func);
 		

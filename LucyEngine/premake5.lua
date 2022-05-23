@@ -2,6 +2,7 @@ project "LucyEngine"
     location "."
     kind "StaticLib"
     language "C++"
+    cppdialect "C++17"
 
     targetdir ("../bin/" .. outputdir .. "/%{prj.name}")
     objdir ("../bin-obj/" .. outputdir .. "/%{prj.name}")
@@ -40,7 +41,6 @@ project "LucyEngine"
     }
 
     filter "platforms:win64"
-        cppdialect "C++17"
         staticruntime "On"
         systemversion "latest"
 

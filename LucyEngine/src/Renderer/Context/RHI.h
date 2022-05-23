@@ -3,7 +3,7 @@
 #include "../../Core/Base.h"
 #include "../DrawCommand.h"
 #include "RenderContext.h"
-#include "../RenderQueue.h"
+#include "../CommandQueue.h"
 
 #include "Scene/Entity.h"
 #include "../Shader/Shader.h"
@@ -40,30 +40,33 @@ namespace Lucy {
 		ERROR_VALIDATION_FAILED_EXT = -1000011001,
 	};
 
-	enum class RenderArchitecture;
+	struct RendererSpecification;
 
 	class RHI {
 	public:
-		static RefLucy<RHI> Create(RenderArchitecture architecture);
-		virtual void Init() = 0;
+		static RefLucy<RHI> Create(RenderArchitecture arch);
 
-		virtual void ClearCommands() = 0;
+		virtual void Init() = 0;
 		virtual void Destroy() = 0;
 		virtual void Dispatch() = 0;
-		virtual void Submit(const Func&& func) = 0;
-		virtual void SubmitMesh(RefLucy<Pipeline> pipeline, RefLucy<Mesh> mesh, const glm::mat4& entityTransform) = 0;
-		virtual void SubmitRenderCommand(const RenderCommand& renderCommand) = 0;
+		void ClearQueues();
+
+		virtual void Enqueue(const SubmitFunc&& func) = 0;
+		virtual void EnqueueStaticMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform) = 0;
+		virtual void RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func) = 0;
 
 		virtual void BeginScene(Scene& scene) = 0;
-		virtual PresentResult RenderScene() = 0;
-		virtual void EndScene() = 0;
+		virtual void RenderScene() = 0;
+		virtual PresentResult EndScene() = 0;
+
+		virtual void BindPipeline(RefLucy<Pipeline> pipeline) = 0;
+		virtual void UnbindPipeline(RefLucy<Pipeline> pipeline) = 0;
+		virtual void BindBuffers(RefLucy<VertexBuffer> vertexBuffer, RefLucy<IndexBuffer> indexBuffer) = 0;
 
 		virtual void OnViewportResize() = 0;
 		void SetViewportMousePosition(float x, float y);
 
 		virtual Entity OnMousePicking() = 0;
-
-		inline RenderArchitecture GetCurrentRenderArchitecture() { return m_Architecture; }
 
 		inline void SetViewportSize(int32_t width, int32_t height) const {
 			m_ViewportWidth = width;
@@ -79,10 +82,8 @@ namespace Lucy {
 			struct Size { int32_t Width, Height; };
 			return Size{ m_ViewportWidth, m_ViewportHeight };
 		}
-
-		inline ShaderLibrary& GetShaderLibrary() { return m_ShaderLibrary; }
 	protected:
-		RHI(RenderArchitecture renderArchitecture);
+		RHI(RenderArchitecture arch);
 		~RHI() = default;
 
 		mutable int32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
@@ -90,18 +91,15 @@ namespace Lucy {
 
 		Scene* m_ActiveScene = nullptr;
 
-		std::vector<Func> m_RenderFunctions;
-		std::vector<MeshDrawCommand> m_MeshDrawCommands;
-		RenderCommandQueue m_RenderCommandQueue;
+		std::vector<SubmitFunc> m_RenderFunctionQueue;
+		std::vector<MeshDrawCommand> m_StaticMeshDrawCommandQueue;
+		inline static CommandQueue s_CommandQueue;
 
 		RefLucy<RenderContext> m_RenderContext;
 		RenderArchitecture m_Architecture;
 
-		ShaderLibrary m_ShaderLibrary;
-
 		friend class Renderer;
-		friend class Material;
-		friend class ImGuiLayer; //for m_RenderContext
+		friend class ImGuiOverlay; //for m_RenderContext
 		friend class VulkanAllocator; //for m_RenderContext
 	};
 }

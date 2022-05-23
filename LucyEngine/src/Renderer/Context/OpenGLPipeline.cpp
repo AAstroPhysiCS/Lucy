@@ -3,22 +3,22 @@
 #include "OpenGLPipeline.h"
 #include "../VulkanDescriptors.h"
 
+#include "Renderer/OpenGLRenderPass.h"
 #include "Renderer/Renderer.h"
+
 #include "glad/glad.h"
 
 namespace Lucy {
 
 	OpenGLPipeline::OpenGLPipeline(const PipelineSpecification& specs)
 		: Pipeline(specs) {
-		Renderer::Submit([this] {
+		Renderer::Enqueue([this] {
 			ParseUniformBuffers();
 		});
 	}
 
-	void OpenGLPipeline::BeginVirtual() {
-		if (s_ActivePipeline) LUCY_ASSERT(false);
-
-		auto& renderPass = GetRenderPass();
+	void OpenGLPipeline::Bind(PipelineBindInfo bindInfo) {
+		auto& renderPass = As(GetRenderPass(), OpenGLRenderPass);
 
 		RenderPassBeginInfo info;
 		info.OpenGLFrameBuffer = As(GetFrameBuffer(), OpenGLFrameBuffer);
@@ -53,20 +53,14 @@ namespace Lucy {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
 
-	void OpenGLPipeline::EndVirtual() {
+	void OpenGLPipeline::Unbind() {
 		auto& renderPass = GetRenderPass();
 
 		//reverting the changes back
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		glLineWidth(1.0f);
 		glDisable(GL_CULL_FACE);
-		RenderPassEndInfo info;
-		info.OpenGLFrameBuffer = As(GetFrameBuffer(), OpenGLFrameBuffer);
-		renderPass->End(info);
-	}
-
-	void OpenGLPipeline::Recreate() {
-
+		renderPass->End();
 	}
 
 	void OpenGLPipeline::Destroy() {

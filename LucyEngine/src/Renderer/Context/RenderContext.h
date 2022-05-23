@@ -10,14 +10,16 @@ namespace Lucy {
 	};
 
 	class RenderContext {
+	protected:
+		RenderContext() = default;
+		~RenderContext() = default;
+
+		virtual void Init() = 0;
 	public:
 		virtual void Destroy() = 0;
 		virtual void PrintInfo() = 0;
 
-		static RefLucy<RenderContext> Create(RenderArchitecture type);
-	protected:
-		RenderContext(RenderArchitecture type);
-		virtual void Init(RenderArchitecture type) = 0;
+		static RefLucy<RenderContext> Create(RenderArchitecture arch);
 	};
 }
 

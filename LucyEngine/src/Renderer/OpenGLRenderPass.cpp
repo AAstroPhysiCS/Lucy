@@ -1,6 +1,8 @@
 #include "lypch.h"
 #include "OpenGLRenderPass.h"
 
+#include "Buffer/OpenGL/OpenGLFrameBuffer.h"
+
 #include "glad/glad.h"
 
 namespace Lucy {
@@ -10,16 +12,19 @@ namespace Lucy {
 	}
 
 	void OpenGLRenderPass::Begin(RenderPassBeginInfo& info) {
-		auto& frameBuffer = info.OpenGLFrameBuffer;
-		frameBuffer->Bind();
+		m_BoundedFrameBuffer = info.OpenGLFrameBuffer;
+		m_BoundedFrameBuffer->Bind();
 	}
 
-	void OpenGLRenderPass::End(RenderPassEndInfo& info) {
-		auto& frameBuffer = info.OpenGLFrameBuffer;
-		frameBuffer->Unbind();
+	void OpenGLRenderPass::End() {
+		m_BoundedFrameBuffer->Unbind();
 	}
+
 	void OpenGLRenderPass::Destroy() {
+	
 	}
+	
 	void OpenGLRenderPass::Recreate() {
+	
 	}
 }

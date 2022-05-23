@@ -17,7 +17,7 @@ namespace Lucy {
 
 	Shader::Shader(const std::string& path, const std::string& name)
 		: m_Path(path), m_Name(name) {
-		Renderer::Submit([=]() {
+		Renderer::Enqueue([=]() {
 			Load();
 		});
 	}

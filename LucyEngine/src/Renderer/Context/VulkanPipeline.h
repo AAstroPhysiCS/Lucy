@@ -10,15 +10,14 @@ namespace Lucy {
 		VulkanPipeline(const PipelineSpecification& specs);
 		virtual ~VulkanPipeline() = default;
 
-		void BeginVirtual() override;
-		void EndVirtual() override;
-		void Recreate() override;
-
+		void Bind(PipelineBindInfo bindInfo) override;
+		void Unbind() override;
 		void Destroy() override;
+		void Recreate();
 
-		inline VkPipeline GetVulkanHandle() { return m_Pipeline; }
-		inline VkPipelineLayout GetPipelineLayout() { return m_PipelineLayout; }
-		inline std::vector<VulkanDescriptorSet>& GetIndividualSetsToBind() { return m_IndividualSets; }
+		inline VkPipeline GetVulkanHandle() { return m_PipelineHandle; }
+		inline VkPipelineLayout GetPipelineLayout() { return m_PipelineLayoutHandle; }
+		inline std::vector<VulkanDescriptorSet> GetIndividualSetsToBind() { return m_IndividualSets; }
 	private:
 		void Create();
 
@@ -29,8 +28,8 @@ namespace Lucy {
 		std::vector<VkDescriptorPoolSize> CreateDescriptorPoolSizes();
 		void ParseUniformBuffers();
 
-		VkPipeline m_Pipeline = VK_NULL_HANDLE;
-		VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
+		VkPipeline m_PipelineHandle = VK_NULL_HANDLE;
+		VkPipelineLayout m_PipelineLayoutHandle = VK_NULL_HANDLE;
 
 		RefLucy<VulkanDescriptorPool> m_DescriptorPool;
 		std::vector<VkDescriptorSetLayout> m_DescriptorSetLayouts;

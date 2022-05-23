@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/Layer.h"
+#include "Core/Module.h"
 #include "Core/Base.h"
 #include "Core/Window.h"
 #include "Scene/Scene.h"
@@ -12,14 +12,14 @@
 
 namespace Lucy {
 
-	class EditorLayer : public Layer {
+	class EditorModule : public Module {
 	public:
-		static EditorLayer& GetInstance() {
-			static EditorLayer s_Instance;
+		static EditorModule& GetInstance() {
+			static EditorModule s_Instance;
 			return s_Instance;
 		}
 
-		void Init(RefLucy<Window> window);
+		void Init(RefLucy<Window> window) override;
 		void Begin(PerformanceMetrics& rendererMetrics) override;
 		void End() override;
 		void OnRender() override;
@@ -28,10 +28,9 @@ namespace Lucy {
 
 		inline Scene& GetScene() { return m_Scene; }
 	private:
-		EditorLayer() = default;
-		virtual ~EditorLayer() = default;
+		EditorModule() = default;
+		virtual ~EditorModule() = default;
 
-		RefLucy<Window> m_Window;
 		Scene m_Scene;
 		ViewportRenderer m_ViewportRenderer;
 	};

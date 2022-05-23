@@ -18,9 +18,6 @@ namespace Lucy {
 
 	OpenGLRHI::OpenGLRHI(RenderArchitecture renderArchitecture)
 		: RHI(renderArchitecture) {
-	}
-
-	void OpenGLRHI::Init() {
 		m_RenderContext = RenderContext::Create(m_Architecture);
 		m_RenderContext->PrintInfo();
 
@@ -33,6 +30,7 @@ namespace Lucy {
 
 		uint32_t TargetSamples = 4;
 
+		/*
 		//------------ Main Framebuffer ------------
 		{
 			RenderBufferSpecification renderBufferSpecs;
@@ -42,32 +40,30 @@ namespace Lucy {
 			renderBufferSpecs.Height = height;
 			renderBufferSpecs.Samples = TargetSamples;
 
-			TextureSpecification textureAntialiased;
+			ImageSpecification textureAntialiased;
 			textureAntialiased.Width = width;
 			textureAntialiased.Height = height;
-			textureAntialiased.DisableReadWriteBuffer = false;
 			textureAntialiased.Samples = TargetSamples;
 			textureAntialiased.AttachmentIndex = 0;
 			textureAntialiased.Format = { GL_RGBA8, GL_RGBA };
 			textureAntialiased.PixelType = PixelType::UnsignedByte;
 
-			TextureSpecification finalTextureSpec;
+			ImageSpecification finalTextureSpec;
 			finalTextureSpec.Width = width;
 			finalTextureSpec.Height = height;
 			finalTextureSpec.GenerateMipmap = true;
-			finalTextureSpec.DisableReadWriteBuffer = false;
 			finalTextureSpec.AttachmentIndex = 0;
 			finalTextureSpec.Parameter.Min = GL_LINEAR;
 			finalTextureSpec.Parameter.Mag = GL_LINEAR;
 			finalTextureSpec.Format = { GL_RGBA8, GL_RGBA };
 			finalTextureSpec.PixelType = PixelType::UnsignedByte;
 
-			FrameBufferSpecification geometryFrameBufferSpecs;
-			geometryFrameBufferSpecs.MultiSampled = true;
-			geometryFrameBufferSpecs.Width = width;
-			geometryFrameBufferSpecs.Height = height;
+			OpenGLFrameBufferSpecification geometryFrameBufferSpecs;
+			geometryFrameBufferSpecs.ContentInfo.MultiSampled = true;
+			geometryFrameBufferSpecs.ContentInfo.Width = width;
+			geometryFrameBufferSpecs.ContentInfo.Height = height;
 			geometryFrameBufferSpecs.RenderBuffer = RenderBuffer::Create(renderBufferSpecs);
-			geometryFrameBufferSpecs.TextureSpecs.push_back(textureAntialiased);
+			geometryFrameBufferSpecs.ContentInfo.TextureSpecs.push_back(textureAntialiased);
 			geometryFrameBufferSpecs.BlittedTextureSpecs = finalTextureSpec;
 
 			PipelineSpecification geometryPipelineSpecs;
@@ -84,7 +80,7 @@ namespace Lucy {
 			geometryPipelineSpecs.Topology = Topology::TRIANGLES;
 			geometryPipelineSpecs.Rasterization = { true, GL_BACK, 1.0f, PolygonMode::FILL };
 
-			RenderPassSpecification geometryPassSpecs;
+			OpenGLRenderPassSpecification geometryPassSpecs;
 			geometryPassSpecs.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 			geometryPipelineSpecs.FrameBuffer = FrameBuffer::Create(geometryFrameBufferSpecs);
@@ -93,43 +89,42 @@ namespace Lucy {
 			m_GeometryPipeline = As(Pipeline::Create(geometryPipelineSpecs), OpenGLPipeline);
 
 			//------------ Mouse Picking ------------
-			TextureSpecification idTextureRGBSpecs;
+			ImageSpecification idTextureRGBSpecs;
 			idTextureRGBSpecs.Width = width;
 			idTextureRGBSpecs.Height = height;
 			idTextureRGBSpecs.AttachmentIndex = 0;
 			idTextureRGBSpecs.Parameter.Min = GL_NEAREST;
 			idTextureRGBSpecs.Parameter.Mag = GL_NEAREST;
-			idTextureRGBSpecs.DisableReadWriteBuffer = false;
 			idTextureRGBSpecs.Format = { GL_RGB32F , GL_RGB };
 			idTextureRGBSpecs.PixelType = PixelType::Float;
 
-			TextureSpecification idTextureDepthSpecs;
+			ImageSpecification idTextureDepthSpecs;
 			idTextureDepthSpecs.Width = width;
 			idTextureDepthSpecs.Height = height;
 			idTextureDepthSpecs.AttachmentIndex = 1;
 			idTextureDepthSpecs.Parameter.Min = GL_NEAREST;
 			idTextureDepthSpecs.Parameter.Mag = GL_NEAREST;
-			idTextureDepthSpecs.DisableReadWriteBuffer = false;
 			idTextureDepthSpecs.Format = { GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT };
 			idTextureDepthSpecs.PixelType = PixelType::Float;
 
-			FrameBufferSpecification idFrameBufferSpecs;
-			idFrameBufferSpecs.Width = width;
-			idFrameBufferSpecs.Height = height;
-			idFrameBufferSpecs.TextureSpecs.push_back(idTextureRGBSpecs);
-			idFrameBufferSpecs.TextureSpecs.push_back(idTextureDepthSpecs);
+			OpenGLFrameBufferSpecification idFrameBufferSpecs;
+			idFrameBufferSpecs.ContentInfo.Width = width;
+			idFrameBufferSpecs.ContentInfo.Height = height;
+			idFrameBufferSpecs.ContentInfo.TextureSpecs.push_back(idTextureRGBSpecs);
+			idFrameBufferSpecs.ContentInfo.TextureSpecs.push_back(idTextureDepthSpecs);
 			idFrameBufferSpecs.IsStorage = true;
 
-			RenderPassSpecification idRenderPassSpecs;
+			OpenGLRenderPassSpecification idRenderPassSpecs;
 			idRenderPassSpecs.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 			geometryPipelineSpecs.FrameBuffer = FrameBuffer::Create(idFrameBufferSpecs);
-			geometryPipelineSpecs.RenderPass = RenderPass::Create(idRenderPassSpecs);
+			geometryPipelineSpecs.RenderPass = RenderPass::Create<OpenGLRenderPassSpecification>(idRenderPassSpecs);
 			geometryPipelineSpecs.Shader = idShader;
 			m_IDPipeline = As(Pipeline::Create(geometryPipelineSpecs), OpenGLPipeline);
 		}
 
 		Dispatch(); //just for init functions (if any)
+		*/
 	}
 
 	//void OpenGLRHI::OnFramebufferResize(float sizeX, float sizeY) {
@@ -139,7 +134,12 @@ namespace Lucy {
 		//m_ViewportHeight = sizeY;
 	//}
 
+	void OpenGLRHI::Init() {
+		s_CommandQueue.Init();
+	}
+
 	void OpenGLRHI::OnViewportResize() {
+
 	}
 
 	Entity OpenGLRHI::OnMousePicking() {
@@ -165,36 +165,36 @@ namespace Lucy {
 	}
 
 	void OpenGLRHI::GeometryPass() {
-		Pipeline::Begin(m_GeometryPipeline);
+		m_GeometryPipeline->Bind({});
 		auto& uniformBuffers = m_GeometryPipeline->GetUniformBuffers<OpenGLUniformBuffer>(0);
-		for (MeshDrawCommand meshComponent : m_MeshDrawCommands) {
+		for (MeshDrawCommand meshComponent : m_StaticMeshDrawCommandQueue) {
 			const RefLucy<Mesh>& mesh = meshComponent.Mesh;
-			std::vector<Material>& materials = mesh->GetMaterials();
+			const std::vector<RefLucy<Material>>& materials = mesh->GetMaterials();
 			std::vector<Submesh>& submeshes = mesh->GetSubmeshes();
 
 			mesh->Bind();
 			for (uint32_t i = 0; i < submeshes.size(); i++) {
 				Submesh& submesh = submeshes[i];
-				Material& material = materials[submesh.MaterialIndex];
-				const RefLucy<Shader>& shader = material.GetShader();
+				const RefLucy<Material> material = materials[submesh.MaterialIndex];
+				const RefLucy<Shader>& shader = material->GetShader();
 
-				material.Bind(m_GeometryPipeline);
+				material->Bind(m_GeometryPipeline);
 				uniformBuffers->SetData((void*)&(meshComponent.EntityTransform * submesh.Transform), sizeof(glm::mat4), sizeof(glm::mat4) * 2);
 				OpenGLAPICommands::DrawElementsBaseVertex(m_GeometryPipeline->GetTopology(), submesh.IndexCount, submesh.BaseIndexCount, submesh.BaseVertexCount);
-				material.Unbind(m_GeometryPipeline);
+				material->Unbind(m_GeometryPipeline);
 			}
 			mesh->Unbind();
 		}
-		Pipeline::End(m_GeometryPipeline);
+		m_GeometryPipeline->Unbind();
 	}
 
 	void OpenGLRHI::IDPass() {
-		Pipeline::Begin(m_IDPipeline);
-		RefLucy<Shader> idShader = m_ShaderLibrary.GetShader("LucyID");
+		m_GeometryPipeline->Bind({});
+		RefLucy<Shader> idShader = m_GeometryPipeline->GetShader();
 		auto& uniformBuffers = m_GeometryPipeline->GetUniformBuffers<OpenGLUniformBuffer>(0);
 
 		idShader->Bind();
-		for (MeshDrawCommand meshComponent : m_MeshDrawCommands) {
+		for (MeshDrawCommand meshComponent : m_StaticMeshDrawCommandQueue) {
 			const RefLucy<Mesh>& mesh = meshComponent.Mesh;
 			std::vector<Submesh>& submeshes = mesh->GetSubmeshes();
 
@@ -207,7 +207,7 @@ namespace Lucy {
 			mesh->Unbind();
 		}
 		idShader->Unbind();
-		Pipeline::End(m_IDPipeline);
+		m_GeometryPipeline->Unbind();
 	}
 
 	void OpenGLRHI::BeginScene(Scene& scene) {
@@ -222,46 +222,55 @@ namespace Lucy {
 		m_ActiveScene = &scene;
 	}
 
-	PresentResult OpenGLRHI::RenderScene() {
+	void OpenGLRHI::RenderScene() {
 		GeometryPass();
 		IDPass();
+	}
+
+	PresentResult OpenGLRHI::EndScene() {
+		GLenum state = glGetError();
+		if (state != GL_NO_ERROR) {
+			Logger::Log(LoggerInfo::LUCY_CRITICAL, state);
+			return PresentResult::ERROR_VALIDATION_FAILED_EXT;
+		}
 		return PresentResult::SUCCESS;
 	}
 
-	void OpenGLRHI::EndScene() {
-		RenderScene();
-		GLenum state = glGetError();
-		if (state != GL_NO_ERROR) Logger::Log(LoggerInfo::LUCY_CRITICAL, state);
+	void OpenGLRHI::Enqueue(const SubmitFunc&& func) {
+		m_RenderFunctionQueue.push_back(func);
 	}
 
-	void OpenGLRHI::ClearCommands() {
-		m_MeshDrawCommands.clear();
-	}
-
-	void OpenGLRHI::Submit(const Func&& func) {
-		m_RenderFunctions.push_back(func);
-	}
-
-	void OpenGLRHI::SubmitMesh(RefLucy<Pipeline> pipeline, RefLucy<Mesh> mesh, const glm::mat4& entityTransform) {
-		Submit([=]() {
-			m_MeshDrawCommands.push_back(MeshDrawCommand(pipeline, mesh, entityTransform));
+	void OpenGLRHI::EnqueueStaticMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform) {
+		Enqueue([=]() {
+			m_StaticMeshDrawCommandQueue.push_back(MeshDrawCommand(mesh, entityTransform));
 		});
 	}
 
-	void OpenGLRHI::SubmitRenderCommand(const RenderCommand& renderCommand) {
+	void OpenGLRHI::RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func) {
 
+	}
+
+	void OpenGLRHI::BindPipeline(RefLucy<Pipeline> pipeline) {
+		pipeline->Bind({});
+	}
+
+	void OpenGLRHI::UnbindPipeline(RefLucy<Pipeline> pipeline) {
+		pipeline->Unbind();
+	}
+
+	void OpenGLRHI::BindBuffers(RefLucy<VertexBuffer> vertexBuffer, RefLucy<IndexBuffer> indexBuffer) {
+		vertexBuffer->Bind({});
+		indexBuffer->Bind({});
 	}
 
 	void OpenGLRHI::Dispatch() {
-		for (Func func : m_RenderFunctions) {
+		for (SubmitFunc func : m_RenderFunctionQueue) {
 			func();
 		}
-		m_RenderFunctions.clear();
+		m_RenderFunctionQueue.clear();
 	}
 
 	void OpenGLRHI::Destroy() {
-		for (RefLucy<Shader>& shader : m_ShaderLibrary.m_Shaders)
-			shader->Destroy();
 		m_GeometryPipeline->DestroyUniformBuffers();
 		m_RenderContext->Destroy();
 	}
@@ -296,7 +305,7 @@ namespace Lucy {
 		glReadPixels(x, y, width, height, GL_RGB, GL_FLOAT, pixelValueOutput);
 	}
 
-	void OpenGLAPICommands::ReadBuffer(RefLucy<FrameBuffer> frameBuffer, uint32_t mode) {
+	void OpenGLAPICommands::ReadBuffer(RefLucy<OpenGLFrameBuffer> frameBuffer, uint32_t mode) {
 		glNamedFramebufferReadBuffer(frameBuffer->GetID(), mode);
 	}
 

@@ -1,9 +1,9 @@
+#include "lypch.h"
 #include "EditorApplication.h"
 
-#include <iostream>
+#include "Core/Window.h"
 
-#include "EditorLayer.h"
-#include "ImGuiLayer.h"
+#include "EditorModule.h"
 #include "Renderer/Renderer.h"
 
 #include "../nativefiledialog/include/nfd.h"
@@ -13,38 +13,38 @@ namespace Lucy {
 
 	PerformanceMetrics EditorApplication::s_Metrics;
 
-	EditorApplication::EditorApplication(const ApplicationArgs& args)
-		: Application(args) {
-		m_LayerStack.Push({ &ImGuiLayer::GetInstance(), &EditorLayer::GetInstance()});
+	Application* CreateEditorApplication(const ApplicationArgs& args, ApplicationSpecification& specs) {
+		return new EditorApplication(args, specs);
+	}
 
+	EditorApplication::EditorApplication(const ApplicationArgs& args, ApplicationSpecification& specs)
+		: Application(args, specs) {
+		m_ModuleStack.Push({ &EditorModule::GetInstance() });
 		m_Running = true;
 
-		WindowSpecification w_Specs;
-		w_Specs.Architecture = RenderArchitecture::Vulkan;
-		w_Specs.Width = 1366;
-		w_Specs.Height = 766;
-		w_Specs.Name = fmt::format("LucyEditor - Windows x64 {0}", w_Specs.Architecture == RenderArchitecture::OpenGL ? "OpenGL" : "Vulkan");
-		w_Specs.DoubleBuffered = true;
-		w_Specs.Resizable = true;
-		w_Specs.VSync = false;
+		RendererSpecification rendererSpecs;
+		rendererSpecs.Architecture = RenderArchitecture::Vulkan;
 
-		m_Window = Window::Create(w_Specs);
-		m_Window->Init();
-		m_Window->SetEventCallback(std::bind(&EditorApplication::OnEvent, this, std::placeholders::_1));
+		specs.WindowSpecification.Name = fmt::format("{0} - Windows x64 {1}", specs.WindowSpecification.Name, 
+													 rendererSpecs.Architecture == RenderArchitecture::OpenGL ? "OpenGL" : "Vulkan");
 
-		Renderer::Init(m_Window, w_Specs.Architecture);
+		m_Window = Window::Create(specs.WindowSpecification);
+		m_Window->Init(rendererSpecs.Architecture);
+		m_Window->SetEventCallback(LUCY_BIND_FUNC(&EditorApplication::OnEvent));
+		
+		rendererSpecs.Window = m_Window;
 
-		EditorLayer::GetInstance().Init(m_Window);
-		ImGuiLayer::GetInstance().Init(m_Window);
+		Renderer::Init(rendererSpecs);
+		EditorModule::GetInstance().Init(m_Window);
 
 		LUCY_ASSERT(NFD_Init() == NFD_OKAY);
 	}
 
 	EditorApplication::~EditorApplication() {
-		for (Layer* layer : m_LayerStack.GetStack()) {
+		m_Running = false;
+		for (Module* layer : m_ModuleStack.GetStack()) {
 			layer->Destroy();
 		}
-		m_Running = false;
 		Renderer::Destroy();
 		m_Window->Destroy();
 		NFD_Quit();
@@ -53,7 +53,7 @@ namespace Lucy {
 	void EditorApplication::Run() {
 		while (m_Running && !glfwWindowShouldClose(m_Window->Raw())) {
 
-			for (Layer* layer : m_LayerStack.GetStack()) {
+			for (Module* layer : m_ModuleStack.GetStack()) {
 				layer->Begin(s_Metrics);
 				layer->OnRender();
 				layer->End();
@@ -64,7 +64,7 @@ namespace Lucy {
 	}
 
 	void EditorApplication::OnEvent(Event* e) {
-		for (Layer* layer : m_LayerStack.GetStack()) {
+		for (Module* layer : m_ModuleStack.GetStack()) {
 			layer->OnEvent(*e);
 		}
 	}

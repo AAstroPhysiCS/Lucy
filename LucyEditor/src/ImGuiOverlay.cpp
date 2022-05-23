@@ -23,7 +23,7 @@
 
 namespace Lucy {
 
-	ImGuiLayer::ImGuiLayer() {
+	ImGuiOverlay::ImGuiOverlay() {
 		m_Panels.push_back(&SceneHierarchyPanel::GetInstance());
 		m_Panels.push_back(&TaskbarPanel::GetInstance());
 		m_Panels.push_back(&ViewportPanel::GetInstance());
@@ -31,7 +31,7 @@ namespace Lucy {
 		m_Panels.push_back(&PerformancePanel::GetInstance());
 	}
 
-	void ImGuiLayer::Init(RefLucy<Window> window) {
+	void ImGuiOverlay::Init(RefLucy<Window> window) {
 		ImGui::CreateContext();
 
 		ImGuiIO& io = ImGui::GetIO();
@@ -51,37 +51,37 @@ namespace Lucy {
 			ImGui_ImplGlfw_InitForOpenGL(window->Raw(), true);
 			ImGui_ImplOpenGL3_Init("#version 460");
 		} else if (currentArchitecture == RenderArchitecture::Vulkan) {
-			auto& renderContext = Renderer::GetCurrentRenderer()->m_RenderContext;
-
-			ImGui::CreateContext();
-
 			ImGui_ImplGlfw_InitForVulkan(window->Raw(), true);
+			Renderer::Enqueue([&]() mutable {
+				auto& vulkanContext = As(Renderer::GetCurrentRenderer()->m_RenderContext, VulkanContext);
+				VulkanDevice device = VulkanDevice::Get();
 
-			auto& vulkanContext = As(renderContext, VulkanContext);
-			VulkanDevice device = VulkanDevice::Get();
+				m_ImGuiPool = CreateRef<VulkanDescriptorPool>(m_PoolSpecs);
 
-			m_ImGuiPool = CreateRef<VulkanDescriptorPool>(m_PoolSpecs);
+				ImGui_ImplVulkan_InitInfo initInfo{};
+				initInfo.Instance = vulkanContext->GetVulkanInstance();
+				initInfo.PhysicalDevice = device.GetPhysicalDevice();
+				initInfo.Device = device.GetLogicalDevice();
+				initInfo.Queue = device.GetGraphicsQueue();
+				initInfo.DescriptorPool = m_ImGuiPool->GetVulkanHandle();
+				initInfo.MinImageCount = 3;
+				initInfo.ImageCount = 3;
+				initInfo.ImageCount = 3;
+				initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+				initInfo.CheckVkResultFn = VulkanMessageCallback::ImGui_DebugCallback;
 
-			ImGui_ImplVulkan_InitInfo initInfo{};
-			initInfo.Instance = vulkanContext->GetVulkanInstance();
-			initInfo.PhysicalDevice = device.GetPhysicalDevice();
-			initInfo.Device = device.GetLogicalDevice();
-			initInfo.Queue = device.GetGraphicsQueue();
-			initInfo.DescriptorPool = m_ImGuiPool->GetVulkanHandle();
-			initInfo.MinImageCount = 3;
-			initInfo.ImageCount = 3;
-			initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-			initInfo.CheckVkResultFn = VulkanMessageCallback::ImGui_DebugCallback;
-
-			//something is wrong with the order of the layers... idk what it is
-
-		+	ImGui_ImplVulkan_Init(&initInfo, As(ViewportRenderer::s_ImGuiPipeline.m_UIRenderPass, VulkanRenderPass)->GetVulkanHandle());
-			VulkanRHI::RecordSingleTimeCommand(ImGui_ImplVulkan_CreateFontsTexture);
-			ImGui_ImplVulkan_DestroyFontUploadObjects();
+				ImGui_ImplVulkan_Init(&initInfo, As(ViewportRenderer::GetImGuiPipeline().UIRenderPass, VulkanRenderPass)->GetVulkanHandle());
+				VulkanRHI::RecordSingleTimeCommand(ImGui_ImplVulkan_CreateFontsTexture);
+				ImGui_ImplVulkan_DestroyFontUploadObjects();
+			});
 		}
 	}
 
-	void ImGuiLayer::Begin(PerformanceMetrics& rendererMetrics) {
+	void ImGuiOverlay::Begin(PerformanceMetrics& rendererMetrics) {
+		//waits for the renderer thread, to initialize imgui context
+		if (!IsInitiated()) 
+			return;
+
 		auto currentArchitecture = Renderer::GetCurrentRenderArchitecture();
 		if (currentArchitecture == RenderArchitecture::OpenGL) {
 			ImGui_ImplOpenGL3_NewFrame();
@@ -96,11 +96,12 @@ namespace Lucy {
 		ImGuizmo::BeginFrame();
 
 		ImGuiIO& io = ImGui::GetIO();
-
+		
 		ImGuiViewport* viewport = ImGui::GetMainViewport();
-		ImGui::SetNextWindowPos(viewport->Pos);
-		ImGui::SetNextWindowSize(viewport->Size);
-		ImGui::SetNextWindowViewport(viewport->ID);
+		//ImGui::SetNextWindowPos(viewport->Pos);
+		//ImGui::SetNextWindowSize(viewport->Size);
+		//ImGui::SetNextWindowViewport(viewport->ID);
+
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
@@ -119,7 +120,10 @@ namespace Lucy {
 		ImGui::PopStyleVar(3);
 	}
 
-	void ImGuiLayer::End() {
+	void ImGuiOverlay::End() {
+		if (!IsInitiated()) 
+			return;
+
 		ImGui::End(); //end of dockspace window
 
 		ImGuiIO& io = ImGui::GetIO();
@@ -138,60 +142,51 @@ namespace Lucy {
 		}
 	}
 
-	void ImGuiLayer::UIPass() {
+	void ImGuiOverlay::UIPass() {
 		auto currentArchitecture = Renderer::GetCurrentRenderArchitecture();
 
 		if (currentArchitecture == RenderArchitecture::OpenGL) {
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 		} else if (currentArchitecture == RenderArchitecture::Vulkan) {
-			Renderer::SubmitUIPass([](VkCommandBuffer commandBuffer) {
+			Renderer::SetUIDrawData([](VkCommandBuffer commandBuffer) {
 				ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
 			});
 		}
 	}
 
-	void ImGuiLayer::OnRender() {
+	void ImGuiOverlay::OnRender() {
+		if (!IsInitiated())
+			return;
+
 		for (Panel* panel : m_Panels) {
 			panel->Render();
 		}
 	}
 
-	void ImGuiLayer::OnEvent(Event& e) {
+	void ImGuiOverlay::OnEvent(Event& e) {
 		EventDispatcher& dispatcher = EventDispatcher::GetInstance();
 		dispatcher.Dispatch<ScrollEvent>(e, EventType::ScrollEvent, [&](ScrollEvent& e) {
 			ImGuiIO& io = ImGui::GetIO();
-			io.MouseWheelH += e.GetXOffset();
-			io.MouseWheel += e.GetYOffset();
+			io.AddMouseWheelEvent(e.GetXOffset(), e.GetYOffset());
 		});
 
 		dispatcher.Dispatch<CursorPosEvent>(e, EventType::CursorPosEvent, [&](CursorPosEvent& e) {
-			const ImGuiIO& io = ImGui::GetIO();
-			//io.MousePos = { (float)e.GetXPos(), (float)e.GetYPos() };
-			Input::MouseX = io.MousePos.x;
-			Input::MouseY = io.MousePos.y;
+			ImGuiIO& io = ImGui::GetIO();
+			Input::MouseX = e.GetXPos();
+			Input::MouseY = e.GetYPos();
+			ImGui_ImplGlfw_CursorPosCallback(e.GetWindowHandle(), Input::MouseX, Input::MouseY);
+		});
+		
+		dispatcher.Dispatch<MouseEvent>(e, EventType::MouseEvent, [&](MouseEvent& e) {
+			ImGui_ImplGlfw_MouseButtonCallback(e.GetWindowHandle(), e.GetButton(), e.GetAction(), e.GetMods());
 		});
 
 		dispatcher.Dispatch<KeyEvent>(e, EventType::KeyEvent, [&](KeyEvent& e) {
-			ImGuiIO& io = ImGui::GetIO();
-			int32_t action = e.GetAction();
-
-			if (action == GLFW_PRESS) {
-				io.KeysDown[e.GetKey()] = true;
-			} else if (action == GLFW_RELEASE) {
-				io.KeysDown[e.GetKey()] = false;
-			}
-
-			io.KeyCtrl = io.KeysDown[GLFW_KEY_LEFT_CONTROL] || io.KeysDown[GLFW_KEY_RIGHT_CONTROL];
-			io.KeyShift = io.KeysDown[GLFW_KEY_LEFT_SHIFT] || io.KeysDown[GLFW_KEY_RIGHT_SHIFT];
-			io.KeyAlt = io.KeysDown[GLFW_KEY_LEFT_ALT] || io.KeysDown[GLFW_KEY_RIGHT_ALT];
-			io.KeySuper = io.KeysDown[GLFW_KEY_LEFT_SUPER] || io.KeysDown[GLFW_KEY_RIGHT_SUPER];
+			ImGui_ImplGlfw_KeyCallback(e.GetWindowHandle(), e.GetKey(), e.GetScanCode(), e.GetAction(), e.GetMods());
 		});
 
 		dispatcher.Dispatch<CharCallbackEvent>(e, EventType::CharCallbackEvent, [&](CharCallbackEvent& e) {
-			ImGuiIO& io = ImGui::GetIO();
-			int32_t keyCode = e.GetCodePoint();
-			if (keyCode > 0 && keyCode < 0x100000)
-				io.AddInputCharacter((unsigned short)keyCode);
+			ImGui_ImplGlfw_CharCallback(e.GetWindowHandle(), e.GetCodePoint());
 		});
 
 		dispatcher.Dispatch<WindowResizeEvent>(e, EventType::WindowResizeEvent, [&](WindowResizeEvent& e) {
@@ -205,7 +200,7 @@ namespace Lucy {
 		}
 	}
 
-	void ImGuiLayer::Destroy() {
+	void ImGuiOverlay::Destroy() {
 		auto currentArchitecture = Renderer::GetCurrentRenderArchitecture();
 		if (currentArchitecture == RenderArchitecture::OpenGL) {
 			ImGui_ImplOpenGL3_Shutdown();

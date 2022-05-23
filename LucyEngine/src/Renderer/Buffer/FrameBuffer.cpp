@@ -7,21 +7,23 @@
 
 namespace Lucy {
 
-	RefLucy<FrameBuffer> FrameBuffer::Create(FrameBufferSpecification& specs, RefLucy<RenderPass> renderPass) {
+	FrameBuffer::FrameBuffer(FrameBufferSpecification& specs)
+		: m_Specs(specs) {
+	}
+
+	RefLucy<FrameBuffer> FrameBuffer::Create(FrameBufferSpecification& specs) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
 				return CreateRef<OpenGLFrameBuffer>(specs);
 				break;
 			case RenderArchitecture::Vulkan:
-				LUCY_ASSERT(renderPass);
-				auto& vulkanRenderPass = As(renderPass, VulkanRenderPass);
-				return CreateRef<VulkanFrameBuffer>(specs, vulkanRenderPass);
+				return CreateRef<VulkanFrameBuffer>(specs);
+				break;
+			default:
+				LUCY_CRITICAL("Other API's are not supported!");
+				LUCY_ASSERT(false);
 				break;
 		}
 		return nullptr;
-	}
-
-	FrameBuffer::FrameBuffer(FrameBufferSpecification& specs)
-		: m_Specs(specs) {
 	}
 }

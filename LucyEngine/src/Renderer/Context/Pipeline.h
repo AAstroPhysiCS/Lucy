@@ -42,33 +42,32 @@ namespace Lucy {
 		RefLucy<Shader> Shader;
 	};
 
+	struct PipelineBindInfo {
+		VkCommandBuffer CommandBuffer = VK_NULL_HANDLE;
+		VkPipelineBindPoint PipelineBindPoint;
+	};
+
 	class OpenGLVertexBuffer;
 
 	class Pipeline {
 	public:
 		Pipeline(const PipelineSpecification& specs);
+		static RefLucy<Pipeline> Create(const PipelineSpecification& specs);
 
 		inline Topology GetTopology() const { return m_Specs.Topology; }
 		inline Rasterization GetRasterization() const { return m_Specs.Rasterization; }
 		inline RefLucy<FrameBuffer>& GetFrameBuffer() { return m_Specs.FrameBuffer; }
 		inline RefLucy<RenderPass>& GetRenderPass() { return m_Specs.RenderPass; }
+		inline RefLucy<Shader>& GetShader() { return m_Specs.Shader; }
 
 		template <class T>
 		inline RefLucy<T> GetUniformBuffers(const uint32_t index) { return As(m_UniformBuffers[index], T); }
 		void DestroyUniformBuffers();
 
-		static RefLucy<Pipeline> Create(const PipelineSpecification& specs);
-		static void Begin(const RefLucy<Pipeline>& pipeline);
-		static void End(const RefLucy<Pipeline>& pipeline);
-
+		virtual void Bind(PipelineBindInfo bindInfo) = 0;
+		virtual void Unbind() = 0;
 		virtual void Destroy() = 0;
-
-		inline static Pipeline* s_ActivePipeline = nullptr;
 	protected:
-		virtual void BeginVirtual() = 0;
-		virtual void EndVirtual() = 0;
-		virtual void Recreate() = 0;
-		
 		static uint32_t GetSizeFromType(ShaderDataSize size);
 		static uint32_t CalculateStride(VertexShaderLayout vertexLayout);
 

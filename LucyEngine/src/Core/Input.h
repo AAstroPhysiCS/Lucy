@@ -21,10 +21,10 @@ namespace Lucy {
 		}
 	private:
 		Input() = delete;
-
+		~Input() = delete;
 		static float MouseX, MouseY;
 
-		friend class ImGuiLayer;
+		friend class ImGuiOverlay; //to fetch the newest MouseX and MouseY
 	};
 }
 

@@ -7,7 +7,8 @@
 #include "assimp/scene.h"
 #include "assimp/postprocess.h"
 
-#include "Material.h"
+#include "OpenGLMaterial.h"
+#include "VulkanMaterial.h"
 
 #include "glm/glm.hpp"
 
@@ -45,9 +46,12 @@ namespace Lucy {
 
 		inline std::string& GetPath() { return m_Path; }
 		inline std::vector<Submesh>& GetSubmeshes() { return m_Submeshes; }
-		inline std::vector<Material>& GetMaterials() { return m_Materials; }
+		inline std::vector<RefLucy<Material>>& GetMaterials() { return m_Materials; }
 		inline std::string& GetName() { return m_Name; }
 		inline glm::vec3 GetMeshPixelValue() { return m_PixelValue; }
+
+		inline RefLucy<VertexBuffer> GetVertexBuffer() { return m_VertexBuffer; }
+		inline RefLucy<IndexBuffer> GetIndexBuffer() { return m_IndexBuffer; }
 
 		virtual void Bind() = 0;
 		virtual void Unbind() = 0;
@@ -61,7 +65,7 @@ namespace Lucy {
 		RefLucy<IndexBuffer> m_IndexBuffer;
 
 		std::vector<Submesh> m_Submeshes;
-		std::vector<Material> m_Materials;
+		std::vector<RefLucy<Material>> m_Materials;
 		std::string m_Path;
 		std::string m_Name;
 

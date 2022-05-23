@@ -4,14 +4,15 @@
 #include "Context/Pipeline.h"
 #include "Buffer/FrameBuffer.h"
 #include "RenderPass.h"
+#include "CommandQueue.h"
 
 namespace Lucy {
 	
 	struct ImGuiPipeline {
-		RefLucy<RenderPass> m_UIRenderPass = nullptr;
-		RefLucy<FrameBuffer> m_UIFramebuffer = nullptr;
+		RefLucy<RenderPass> UIRenderPass = nullptr;
+		RefLucy<FrameBuffer> UIFramebuffer = nullptr;
 	};
-	
+
 	class ViewportRenderer {
 	public:
 		ViewportRenderer() = default;
@@ -23,6 +24,9 @@ namespace Lucy {
 		void End();
 		void Destroy();
 
+		static RefLucy<Pipeline> GetGeometryPipeline() { return s_GeometryPipeline; }
+		static ImGuiPipeline GetImGuiPipeline() { return s_ImGuiPipeline; }
+
 		void OnWindowResize();
 	private:
 		void UIPass();
@@ -31,9 +35,9 @@ namespace Lucy {
 
 		inline static RefLucy<Pipeline> s_GeometryPipeline = nullptr;
 		inline static ImGuiPipeline s_ImGuiPipeline;
-		inline static Scene* s_ActiveScene = nullptr;
 
-		friend class ImGuiLayer; //for ImGuiPipeline
+		friend class VulkanRHI;
+		friend class OpenGLRHI;
 	};
 }
 

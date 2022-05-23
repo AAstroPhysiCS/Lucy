@@ -160,20 +160,21 @@ namespace Lucy {
 							UIUtils::TextCenterTable(fmt::format("Element {0}", i).c_str(), 8.0f, -8.0f);
 
 							Submesh& submesh = mesh->GetSubmeshes()[i];
-							Material& m = mesh->GetMaterials()[submesh.MaterialIndex];
+							RefLucy<Material> m = mesh->GetMaterials()[submesh.MaterialIndex];
 
 							ImGui::TableSetColumnIndex(1);
-							uint32_t textureID = 0;
-							if (m.HasTexture(Material::ALBEDO_TYPE))
-								textureID = m.GetTexture(Material::ALBEDO_TYPE)->GetID();
+							void* textureID = 0;
+
+							if (m->HasTexture(Material::ALBEDO_TYPE))
+								textureID = m->GetTexture(Material::ALBEDO_TYPE)->GetID();
 
 							ImGui::ImageButton((ImTextureID)textureID, { 64, 64 }, { 0, 0 }, { 1, 1 }, 1.0f);
 							ImGui::SameLine();
 							
-							if (ImGui::BeginCombo(fmt::format("##hideLabel {0}", i).c_str(), m.GetName().c_str())) {
+							if (ImGui::BeginCombo(fmt::format("##hideLabel {0}", i).c_str(), m->GetName().c_str())) {
 								for (uint32_t j = 0; j < mesh->GetSubmeshes().size(); j++) {
-									Material& comboMaterial = mesh->GetMaterials()[j];
-									if (ImGui::Selectable(comboMaterial.GetName().c_str())) {
+									RefLucy<Material> comboMaterial = mesh->GetMaterials()[j];
+									if (ImGui::Selectable(comboMaterial->GetName().c_str())) {
 										selectedMaterial = j;
 										submesh.MaterialIndex = j;
 									}

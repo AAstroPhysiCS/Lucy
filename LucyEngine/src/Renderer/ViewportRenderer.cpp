@@ -11,22 +11,24 @@
 #include "Buffer/Vulkan/VulkanVertexBuffer.h" //TODO: Delete
 #include "Buffer/Vulkan/VulkanIndexBuffer.h" //TODO: Delete
 #include "Buffer/Vulkan/VulkanUniformBuffer.h" //TODO: Delete
+#include "Image/Image.h" //TODO: Delete
 
 #include "Synchronization/SynchItems.h"
 
 namespace Lucy {
 
-	VulkanVertexBuffer* vertexBuffer = nullptr; //TODO: Delete
-	VulkanIndexBuffer* indexBuffer = nullptr; //TODO: Delete
+	RefLucy<VertexBuffer> vertexBuffer = nullptr; //TODO: Delete
+	RefLucy<IndexBuffer> indexBuffer = nullptr; //TODO: Delete
 
 	void ViewportRenderer::Init() {
 		auto& vulkanTestShader = Renderer::GetShaderLibrary().GetShader("LucyVulkanTest");
+		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
+		RenderArchitecture rhi = Renderer::GetCurrentRenderArchitecture();
 
-		PipelineSpecification geometryPipelineSpecs;
 		std::vector<ShaderLayoutElement> vertexLayout = {
 				{ "a_Pos", ShaderDataSize::Float2 },
+				{ "a_TextureCoords", ShaderDataSize::Float2 },
 				//{ "a_ID", ShaderDataSize::Float3 },
-				//{ "a_TextureCoords", ShaderDataSize::Float2 },
 				//{ "a_Normals", ShaderDataSize::Float3 },
 				//{ "a_Tangents", ShaderDataSize::Float3 },
 				//{ "a_BiTangents", ShaderDataSize::Float3 }
@@ -34,59 +36,104 @@ namespace Lucy {
 
 		RenderPassSpecification geometryPassSpecs;
 		geometryPassSpecs.ClearColor = { 0.0f, 0.0f, 0.5f, 1.0f };
-		geometryPassSpecs.AttachmentReferences = {
-			{ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL }
-		};
-		geometryPassSpecs.Descriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		geometryPassSpecs.Descriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-		geometryPassSpecs.Descriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		geometryPassSpecs.Descriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-		geometryPassSpecs.Descriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		geometryPassSpecs.Descriptor.FinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-		
+		ImageSpecification geometryTextureSpecification;
+		geometryTextureSpecification.Width = swapChain.GetExtent().width;
+		geometryTextureSpecification.Height = swapChain.GetExtent().height;
+		geometryTextureSpecification.Format = VK_FORMAT_B8G8R8A8_UNORM;
+		geometryTextureSpecification.ImageType = ImageType::Type2D;
+		geometryTextureSpecification.Parameter.Mag = VK_FILTER_LINEAR;
+		geometryTextureSpecification.Parameter.Min = VK_FILTER_LINEAR;
+		geometryTextureSpecification.Parameter.U = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		geometryTextureSpecification.Parameter.V = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		geometryTextureSpecification.Parameter.W = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
 		FrameBufferSpecification geometryFrameBufferSpecs;
-		geometryFrameBufferSpecs.ImageViews = swapChain.GetImageViews();
 		geometryFrameBufferSpecs.Width = swapChain.GetExtent().width;
 		geometryFrameBufferSpecs.Height = swapChain.GetExtent().height;
 
+		PipelineSpecification geometryPipelineSpecs;
 		geometryPipelineSpecs.VertexShaderLayout = VertexShaderLayout(vertexLayout);
 		geometryPipelineSpecs.Topology = Topology::TRIANGLES;
 		geometryPipelineSpecs.Rasterization = { true, VK_CULL_MODE_BACK_BIT, 1.0f, PolygonMode::FILL };
 		geometryPipelineSpecs.Shader = vulkanTestShader;
-		geometryPipelineSpecs.RenderPass = RenderPass::Create(geometryPassSpecs);
-		geometryPipelineSpecs.FrameBuffer = FrameBuffer::Create(geometryFrameBufferSpecs, geometryPipelineSpecs.RenderPass);
+
+		if (rhi == RenderArchitecture::Vulkan) {
+			RefLucy<VulkanRHIRenderPassDesc> vulkanRenderPassDesc = CreateRef<VulkanRHIRenderPassDesc>();
+			vulkanRenderPassDesc->AttachmentReferences.push_back({ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+			vulkanRenderPassDesc->Descriptor.Format = VK_FORMAT_B8G8R8A8_UNORM;
+			vulkanRenderPassDesc->Descriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			vulkanRenderPassDesc->Descriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+			vulkanRenderPassDesc->Descriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			vulkanRenderPassDesc->Descriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			vulkanRenderPassDesc->Descriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			vulkanRenderPassDesc->Descriptor.FinalLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR;
+
+			geometryPassSpecs.InternalInfo = vulkanRenderPassDesc;
+
+			RefLucy<VulkanRHIImageDesc> vulkanTextureDesc = CreateRef<VulkanRHIImageDesc>();
+			vulkanTextureDesc->GenerateSampler = true;
+			vulkanTextureDesc->ImGuiUsage = true;
+
+			geometryTextureSpecification.InternalInfo = vulkanTextureDesc;
+
+			RefLucy<VulkanRHIFrameBufferDesc> vulkanFrameBufferDesc = CreateRef<VulkanRHIFrameBufferDesc>();
+			vulkanFrameBufferDesc->ImageBuffers.reserve(swapChain.GetImageCount());
+			for (uint32_t i = 0; i < swapChain.GetImageCount(); i++)
+				vulkanFrameBufferDesc->ImageBuffers.emplace_back(As(Image2D::Create(geometryTextureSpecification), VulkanImage2D));
+			vulkanFrameBufferDesc->RenderPass = RenderPass::Create(geometryPassSpecs);
+
+			geometryFrameBufferSpecs.InternalInfo = vulkanFrameBufferDesc;
+
+			geometryPipelineSpecs.RenderPass = vulkanFrameBufferDesc->RenderPass;
+		}
+
+		geometryPipelineSpecs.FrameBuffer = FrameBuffer::Create(geometryFrameBufferSpecs);
 		s_GeometryPipeline = Pipeline::Create(geometryPipelineSpecs);
 
 		/*
-		----ImGui (does not need a separate pipeline)----
+		----ImGui (for Vulkan; does not need a separate pipeline)----
 		*/
-		RenderPassSpecification uiRenderPassSpecs;
-		uiRenderPassSpecs.AttachmentReferences.push_back({ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
-		uiRenderPassSpecs.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
-		uiRenderPassSpecs.Descriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		uiRenderPassSpecs.Descriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-		uiRenderPassSpecs.Descriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		uiRenderPassSpecs.Descriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-		uiRenderPassSpecs.Descriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		uiRenderPassSpecs.Descriptor.FinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-		s_ImGuiPipeline.m_UIRenderPass = RenderPass::Create(uiRenderPassSpecs);
-		s_ImGuiPipeline.m_UIFramebuffer = FrameBuffer::Create(geometryFrameBufferSpecs, s_ImGuiPipeline.m_UIRenderPass);
+		if (rhi == RenderArchitecture::Vulkan) {
+			RenderPassSpecification uiRenderPassSpecs;
+			uiRenderPassSpecs.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
 
-		Renderer::Dispatch(); //initialization
+			RefLucy<VulkanRHIRenderPassDesc> vulkanRenderPassDesc = CreateRef<VulkanRHIRenderPassDesc>();
+			vulkanRenderPassDesc->AttachmentReferences.push_back({ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+			vulkanRenderPassDesc->Descriptor.Format = swapChain.GetSurfaceFormat().format;
+			vulkanRenderPassDesc->Descriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			vulkanRenderPassDesc->Descriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+			vulkanRenderPassDesc->Descriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			vulkanRenderPassDesc->Descriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			vulkanRenderPassDesc->Descriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			vulkanRenderPassDesc->Descriptor.FinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-		vertexBuffer = new VulkanVertexBuffer(8);
-		indexBuffer = new VulkanIndexBuffer(6);
+			uiRenderPassSpecs.InternalInfo = vulkanRenderPassDesc;
+			s_ImGuiPipeline.UIRenderPass = RenderPass::Create(uiRenderPassSpecs);
+
+			FrameBufferSpecification uiFrameBufferSpecs;
+			uiFrameBufferSpecs.Width = swapChain.GetExtent().width;
+			uiFrameBufferSpecs.Height = swapChain.GetExtent().height;
+
+			RefLucy<VulkanRHIFrameBufferDesc> vulkanFrameBufferDesc = CreateRef<VulkanRHIFrameBufferDesc>();
+			vulkanFrameBufferDesc->ImageViews = swapChain.GetImageViews();
+			vulkanFrameBufferDesc->RenderPass = s_ImGuiPipeline.UIRenderPass;
+
+			uiFrameBufferSpecs.InternalInfo = vulkanFrameBufferDesc;
+
+			s_ImGuiPipeline.UIFramebuffer = FrameBuffer::Create(uiFrameBufferSpecs);
+		}
+
+		vertexBuffer = VertexBuffer::Create(16);
+		indexBuffer = IndexBuffer::Create(6);
 		vertexBuffer->AddData(
-			{ -0.5f, -0.5f,
-			   0.5f, -0.5f,
-			   0.5f, 0.5f,
-			  -0.5f, 0.5f
+			{ -0.5f, -0.5f, 1.0f, 0.0f,
+			   0.5f, -0.5f, 0.0f, 0.0f,
+			   0.5f, 0.5f, 0.0f, 1.0f,
+			  -0.5f, 0.5f, 1.0f, 1.0f
 			}
 		);
-
 		vertexBuffer->Load();
 
 		indexBuffer->AddData(
@@ -96,113 +143,44 @@ namespace Lucy {
 	}
 
 	void ViewportRenderer::Begin(Scene& scene) {
-		const auto& meshView = scene.View<MeshComponent>();
-
-		for (auto entity : meshView) {
-			Entity e{ &scene, entity };
-			MeshComponent& meshComponent = e.GetComponent<MeshComponent>();
-			if (!meshComponent.IsValid()) continue;
-
-			Renderer::SubmitMesh(s_GeometryPipeline, meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
-		}
-
-		s_ActiveScene = &scene;
+		Renderer::BeginScene(scene);
+		Renderer::Dispatch(); //dispatch all the functions that should happen on the main render thread (before the passes)
 	}
 
 	void ViewportRenderer::Dispatch() {
-		Renderer::BeginScene(*s_ActiveScene);
-		Renderer::Dispatch(); //dispatch all the functions that should happen on the main render thread
-
-		//do passes
-		GeometryPass();
-		UIPass();
 		IDPass();
+		GeometryPass();
 
-		PresentResult result = Renderer::RenderScene(); //render the actual scene (TODO: do multithreading)
-		if (result == PresentResult::ERROR_OUT_OF_DATE_KHR || result == PresentResult::SUBOPTIMAL_KHR)
-			OnWindowResize();
-		Renderer::EndScene();
+		Renderer::RenderScene();
+		UIPass(); //UIPass is after rendering the scene and it does not depend on the RenderCommandQueue
 	}
 
 	void ViewportRenderer::End() {
-		Renderer::ClearDrawCommands();
+		PresentResult result = Renderer::EndScene();
+		if (result == PresentResult::ERROR_OUT_OF_DATE_KHR || result == PresentResult::SUBOPTIMAL_KHR)
+			OnWindowResize();
+		Renderer::ClearQueues();
 	}
 
 	void ViewportRenderer::OnWindowResize() {
-		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-		swapChain.Recreate();
 		Renderer::OnViewportResize();
-		As(s_GeometryPipeline, VulkanPipeline)->Recreate();
-		Renderer::Submit([]() {
-			As(s_ImGuiPipeline.m_UIFramebuffer, VulkanFrameBuffer)->Recreate();
-			s_ImGuiPipeline.m_UIRenderPass->Recreate();
-		});
-		//auto& extent = swapChain.GetExtent();
-		//Renderer::SetViewportSize(extent.width, extent.height);
 	}
 
 	void ViewportRenderer::Destroy() {
 		vertexBuffer->Destroy(); //TODO: Delete
 		indexBuffer->Destroy(); //TODO: Delete
 
-		delete vertexBuffer;
-		delete indexBuffer;
-
 		s_GeometryPipeline->Destroy();
-		s_ImGuiPipeline.m_UIFramebuffer->Destroy();
-		s_ImGuiPipeline.m_UIRenderPass->Destroy();
+		s_ImGuiPipeline.UIFramebuffer->Destroy();
+		s_ImGuiPipeline.UIRenderPass->Destroy();
 	}
 
 	void ViewportRenderer::UIPass() {
-		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-		RenderCommand uiPipelineCommand = RenderCommand::BeginNew();
-		uiPipelineCommand.Pipeline = nullptr; //imgui provides a pipeline
-		uiPipelineCommand.Func = [this, swapChain](VkCommandBuffer commandBuffer) {
-			const auto& targetFrameBuffer = As(s_ImGuiPipeline.m_UIFramebuffer, VulkanFrameBuffer)->GetVulkanHandles()[swapChain.GetCurrentImageIndex()];
-
-			RenderPassBeginInfo beginInfo;
-			beginInfo.CommandBuffer = commandBuffer;
-			beginInfo.VulkanFrameBuffer = targetFrameBuffer;
-			s_ImGuiPipeline.m_UIRenderPass->Begin(beginInfo);
-
-			Renderer::s_UIPassFunc(commandBuffer);
-
-			RenderPassEndInfo endInfo;
-			endInfo.CommandBuffer = commandBuffer;
-			endInfo.VulkanFrameBuffer = targetFrameBuffer;
-			s_ImGuiPipeline.m_UIRenderPass->End(endInfo);
-		};
-		RenderCommand::End();
-		Renderer::SubmitRenderCommand(uiPipelineCommand);
+		Renderer::RenderUI(s_ImGuiPipeline);
 	}
 
 	void ViewportRenderer::GeometryPass() {
-
-		/*
-		//TODO: Change this and add submeshes
-		for (MeshDrawCommand& meshDrawCommand : m_MeshDrawCommands) {
-			geometryPipelineCommand.Pipeline = As(meshDrawCommand.Pipeline, VulkanPipeline);
-			geometryPipelineCommand.Func = [meshDrawCommand](VkCommandBuffer commandBuffer) {
-				vkCmdDrawIndexed(commandBuffer, 6, 1, 0, 0, 0);
-			};
-		}
-		*/
-
-		//TODO: DELETE
-		RenderCommand geometryPipelineCommand = RenderCommand::BeginNew();
-		geometryPipelineCommand.Pipeline = As(ViewportRenderer::s_GeometryPipeline, VulkanPipeline);
-		geometryPipelineCommand.Func = [this](VkCommandBuffer commandBuffer) {
-			vertexBuffer->Bind({ commandBuffer });
-			indexBuffer->Bind({ commandBuffer });
-
-			vkCmdDrawIndexed(commandBuffer, 6, 1, 0, 0, 0);
-
-			vertexBuffer->Unbind();
-			indexBuffer->Unbind();
-		};
-		RenderCommand::End();
-
-		auto& uniformBuffer = geometryPipelineCommand.Pipeline->GetUniformBuffers<VulkanUniformBuffer>(0);
+		auto& uniformBuffer = s_GeometryPipeline->GetUniformBuffers<VulkanUniformBuffer>(0);
 
 		struct MVP {
 			glm::mat4 model;
@@ -219,9 +197,34 @@ namespace Lucy {
 		mvp.proj[1][1] *= -1;
 
 		uniformBuffer->SetData((void*)&mvp, sizeof(MVP), 0);
-		uniformBuffer->WriteToSets(VulkanSwapChain::GetCurrentFrameIndex());
+		uniformBuffer->Update();
 
-		Renderer::SubmitRenderCommand(geometryPipelineCommand);
+		//TODO: this function should work in parallel, meaning it should be multithreaded...
+		Renderer::RecordToCommandQueue([](MeshDrawCommand drawCommand) {
+			Renderer::BindPipeline(s_GeometryPipeline);
+			Renderer::BindBuffers(vertexBuffer, indexBuffer);
+			Renderer::DrawIndexed(6, 1, 0, 0, 0);
+			Renderer::UnbindPipeline();
+			/*
+			const RefLucy<Mesh>& mesh = drawCommand.Mesh;
+			const glm::mat4& entityTransform = drawCommand.EntityTransform;
+
+			auto& uniformBuffers = s_GeometryPipeline->GetUniformBuffers<VulkanUniformBuffer>(1);
+			const std::vector<RefLucy<Material>>& materials = mesh->GetMaterials();
+			std::vector<Submesh>& submeshes = mesh->GetSubmeshes();
+
+			for (uint32_t i = 0; i < submeshes.size(); i++) {
+				Submesh& submesh = submeshes[i];
+				const RefLucy<Material> material = materials[submesh.MaterialIndex];
+				const glm::mat4& entityTransform = submesh.Transform;
+
+				material->Bind(s_GeometryPipeline);
+				uniformBuffers->SetData((void*)&(entityTransform * submesh.Transform), sizeof(glm::mat4), sizeof(glm::mat4) * 2);
+				Renderer::DrawIndexed(submesh.IndexCount, 0, 0, submesh.BaseIndexCount, submesh.BaseVertexCount);
+				material->Unbind(s_GeometryPipeline);
+			}
+			*/
+		});
 	}
 
 	void ViewportRenderer::IDPass() {

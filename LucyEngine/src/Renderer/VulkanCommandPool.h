@@ -12,6 +12,11 @@ namespace Lucy {
 		uint32_t CommandBufferCount = 0;
 	};
 
+	//abstract commandbuffer
+	class VulkanCommandBuffer {
+
+	};
+
 	class VulkanCommandPool {
 	public:
 		VulkanCommandPool(CommandPoolSpecs specs);
@@ -34,7 +39,7 @@ namespace Lucy {
 		VkCommandPool m_CommandPool = VK_NULL_HANDLE;
 		std::vector<VkCommandBuffer> m_CommandBuffers;
 
-		friend class VulkanSwapChain;
+		friend class CommandQueue; //for singletime commands
 	};
 }
 

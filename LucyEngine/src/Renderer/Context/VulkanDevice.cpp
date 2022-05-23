@@ -58,6 +58,7 @@ namespace Lucy {
 			if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
 				&& features.multiViewport
 				&& features.geometryShader
+				&& features.samplerAnisotropy
 				&& m_QueueFamilyIndices.IsComplete()
 				&& supportsAllGivenExtensions) {
 				m_DeviceInfo = deviceInfo;
@@ -86,12 +87,13 @@ namespace Lucy {
 		}
 
 		VkPhysicalDeviceFeatures features{};
+		features.samplerAnisotropy = VK_TRUE;
 
 		VkDeviceCreateInfo deviceCreateInfo{};
 		deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 		deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
 		deviceCreateInfo.queueCreateInfoCount = queueCreateInfos.size();
-		deviceCreateInfo.pEnabledFeatures = &features; //TODO: Come back later
+		deviceCreateInfo.pEnabledFeatures = &features;
 
 		deviceCreateInfo.ppEnabledExtensionNames = m_DeviceExtensions.data();
 		deviceCreateInfo.enabledExtensionCount = m_DeviceExtensions.size();
@@ -117,7 +119,7 @@ namespace Lucy {
 		uint32_t i = 0;
 		for (const auto& queueFamily : queueFamilies) {
 			VkBool32 presentSupport = false;
-			vkGetPhysicalDeviceSurfaceSupportKHR(device, i, Renderer::s_Window->m_Surface, &presentSupport);
+			vkGetPhysicalDeviceSurfaceSupportKHR(device, i, Renderer::GetWindow()->GetVulkanSurface(), &presentSupport);
 
 			if (presentSupport) {
 				m_QueueFamilyIndices.PresentFamilyHasValue = true;

@@ -35,7 +35,8 @@ namespace Lucy {
 	}
 
 	void VulkanDescriptorSet::Create() {
-		constexpr uint32_t maxFramesInFlight = VulkanSwapChain::MAX_FRAMES_IN_FLIGHT;
+		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
+		const uint32_t maxFramesInFlight = swapChain.GetMaxFramesInFlight();
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
 
 		std::vector<VkDescriptorSetLayout> tempVector(maxFramesInFlight, m_Specs.Layout);

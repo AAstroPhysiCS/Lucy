@@ -23,10 +23,10 @@ namespace Lucy {
 	class VulkanRenderPass;
 	class VulkanDescriptorPool;
 
-	class ImGuiLayer : public Layer {
+	class ImGuiOverlay {
 	public:
-		static ImGuiLayer& GetInstance() {
-			static ImGuiLayer s_Instance;
+		static ImGuiOverlay& GetInstance() {
+			static ImGuiOverlay s_Instance;
 			return s_Instance;
 		}
 
@@ -37,15 +37,13 @@ namespace Lucy {
 		void OnEvent(Event& e);
 		void Destroy();
 	private:
-		ImGuiLayer();
-		~ImGuiLayer() = default;
+		ImGuiOverlay();
+		~ImGuiOverlay() = default;
 
 		void UIPass();
+		inline bool IsInitiated() { return ImGui::GetIO().BackendRendererUserData; }
 
-		uint32_t m_Time = 0;
-		std::vector<Panel*> m_Panels;
-
-		std::vector<VkDescriptorPoolSize> m_ImguiPoolSizes =
+		std::vector<VkDescriptorPoolSize> m_ImGuiPoolSizes =
 		{
 			{ VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
 			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
@@ -60,7 +58,10 @@ namespace Lucy {
 			{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
 		};
 
-		VulkanDescriptorPoolSpecifications m_PoolSpecs = { m_ImguiPoolSizes, VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT, 1000 };
+		VulkanDescriptorPoolSpecifications m_PoolSpecs = { m_ImGuiPoolSizes, VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT, 1000 };
 		RefLucy<VulkanDescriptorPool> m_ImGuiPool = nullptr;
+
+		uint32_t m_Time = 0;
+		std::vector<Panel*> m_Panels;
 	};
 }

@@ -2,6 +2,7 @@
 
 #include "Pipeline.h"
 #include "../Buffer/OpenGL/OpenGLVertexBuffer.h"
+#include "../Buffer/OpenGL/OpenGLFrameBuffer.h"
 
 #include "../RenderPass.h"
 
@@ -12,14 +13,11 @@ namespace Lucy {
 		OpenGLPipeline(const PipelineSpecification& specs);
 		virtual ~OpenGLPipeline() = default;
 
-		void BeginVirtual() override;
-		void EndVirtual() override;
-		void Recreate() override;
+		void Bind(PipelineBindInfo bindInfo) override;
+		void Unbind();
 		void Destroy() override;
-
-		friend class OpenGLMesh;
-	private:
 		void UploadVertexLayout(RefLucy<VertexBuffer>& vertexBuffer);
+	private:
 		void ParseUniformBuffers();
 	};
 }

@@ -8,7 +8,9 @@ namespace Lucy {
 
 	VulkanCommandPool::VulkanCommandPool(CommandPoolSpecs specs)
 		: m_Specs(specs) {
-		Allocate();
+		Renderer::Enqueue([this]() {
+			Allocate();
+		});
 	}
 
 	RefLucy<VulkanCommandPool> VulkanCommandPool::Create(CommandPoolSpecs specs) {
@@ -22,25 +24,23 @@ namespace Lucy {
 	}
 
 	void VulkanCommandPool::Allocate() {
-		Renderer::Submit([this]() {
-			const VulkanDevice& device = VulkanDevice::Get();
+		const VulkanDevice& device = VulkanDevice::Get();
 
-			VkCommandPoolCreateInfo createCommandPoolInfo{};
-			createCommandPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-			createCommandPoolInfo.flags = m_Specs.PoolFlags;
-			createCommandPoolInfo.queueFamilyIndex = device.GetQueueFamilies().GraphicsFamily;
-			LUCY_VK_ASSERT(vkCreateCommandPool(device.GetLogicalDevice(), &createCommandPoolInfo, nullptr, &m_CommandPool));
+		VkCommandPoolCreateInfo createCommandPoolInfo{};
+		createCommandPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		createCommandPoolInfo.flags = m_Specs.PoolFlags;
+		createCommandPoolInfo.queueFamilyIndex = device.GetQueueFamilies().GraphicsFamily;
+		LUCY_VK_ASSERT(vkCreateCommandPool(device.GetLogicalDevice(), &createCommandPoolInfo, nullptr, &m_CommandPool));
 
-			m_CommandBuffers.resize(m_Specs.CommandBufferCount);
+		m_CommandBuffers.resize(m_Specs.CommandBufferCount);
 
-			VkCommandBufferAllocateInfo createAllocInfo{};
-			createAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-			createAllocInfo.commandPool = m_CommandPool;
-			createAllocInfo.level = m_Specs.Level;
-			createAllocInfo.commandBufferCount = m_Specs.CommandBufferCount;
+		VkCommandBufferAllocateInfo createAllocInfo{};
+		createAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		createAllocInfo.commandPool = m_CommandPool;
+		createAllocInfo.level = m_Specs.Level;
+		createAllocInfo.commandBufferCount = m_Specs.CommandBufferCount;
 
-			LUCY_VK_ASSERT(vkAllocateCommandBuffers(device.GetLogicalDevice(), &createAllocInfo, m_CommandBuffers.data()));
-		});
+		LUCY_VK_ASSERT(vkAllocateCommandBuffers(device.GetLogicalDevice(), &createAllocInfo, m_CommandBuffers.data()));
 	}
 
 	void VulkanCommandPool::Destroy() {

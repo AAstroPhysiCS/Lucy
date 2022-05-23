@@ -2,8 +2,6 @@
 #include "VulkanAllocator.h"
 
 #include "Renderer/Context/VulkanDevice.h"
-#include "Renderer/Context/VulkanContext.h"
-#include "Renderer/Renderer.h"
 
 #define VMA_IMPLEMENTATION
 
@@ -14,15 +12,14 @@ namespace Lucy {
 		return s_Instance;
 	}
 
-	void VulkanAllocator::Init() {
-		auto& context = As(Renderer::GetCurrentRenderer()->m_RenderContext, VulkanContext);
+	void VulkanAllocator::Init(VkInstance instance) {
 		VulkanDevice& device = VulkanDevice::Get();
 
 		VmaAllocatorCreateInfo createInfo{};
 		createInfo.vulkanApiVersion = VK_API_VERSION_1_2;
 		createInfo.physicalDevice = device.GetPhysicalDevice();
 		createInfo.device = device.GetLogicalDevice();
-		createInfo.instance = context->GetVulkanInstance();
+		createInfo.instance = instance;
 
 		LUCY_VK_ASSERT(vmaCreateAllocator(&createInfo, &m_Allocator));
 	}
@@ -68,9 +65,10 @@ namespace Lucy {
 
 		LUCY_ASSERT(false);
 		LUCY_INFO("Cant find a suitable memory type or property");
+		return 0;
 	}
 
-	void VulkanAllocator::CreateVulkanBufferVMA(uint32_t size, VkBufferUsageFlags usage, VmaMemoryUsage vmaMemoryUsage, VkBuffer& bufferHandle, VmaAllocation& vmaAllocation) {
+	void VulkanAllocator::CreateVulkanBufferVma(uint32_t size, VkBufferUsageFlags usage, VmaMemoryUsage vmaMemoryUsage, VkBuffer& bufferHandle, VmaAllocation& vmaAllocation) {
 		VkBufferCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 		createInfo.size = size;
@@ -80,6 +78,29 @@ namespace Lucy {
 		vmaCreateInfo.usage = vmaMemoryUsage;
 		vmaCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
 
-		vmaCreateBuffer(m_Allocator, &createInfo, &vmaCreateInfo, &bufferHandle, &vmaAllocation, nullptr);
+		LUCY_VK_ASSERT(vmaCreateBuffer(m_Allocator, &createInfo, &vmaCreateInfo, &bufferHandle, &vmaAllocation, nullptr));
+	}
+
+	void VulkanAllocator::CreateVulkanImageVma(uint32_t width, uint32_t height, VkFormat format, VkImageLayout currentLayout, VkImageUsageFlags usage, VkImageType imageType,
+											   VmaMemoryUsage memUsage, VkImage& imageHandle, VmaAllocation& allocationHandle) {
+		VkImageCreateInfo imageCreateInfo{};
+		imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		imageCreateInfo.imageType = imageType;
+		imageCreateInfo.extent.width = width;
+		imageCreateInfo.extent.height = height;
+		imageCreateInfo.extent.depth = 1;
+		imageCreateInfo.mipLevels = 1; //TODO: no mipmapping yet
+		imageCreateInfo.arrayLayers = 1;
+		imageCreateInfo.format = format;
+		imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageCreateInfo.initialLayout = currentLayout;
+		imageCreateInfo.usage = usage;
+		imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT; //no multisampling
+
+		VmaAllocationCreateInfo allocationCreateInfo{};
+		allocationCreateInfo.usage = memUsage;
+
+		LUCY_VK_ASSERT(vmaCreateImage(m_Allocator, &imageCreateInfo, &allocationCreateInfo, &imageHandle, &allocationHandle, nullptr));
 	}
 }

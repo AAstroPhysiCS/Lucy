@@ -15,17 +15,33 @@ namespace Lucy {
 
 	VulkanPipeline::VulkanPipeline(const PipelineSpecification& specs)
 		: Pipeline(specs) {
-		Renderer::Submit([&]() {
+		Renderer::Enqueue([&]() {
 			Create();
 		});
 	}
 
-	void VulkanPipeline::BeginVirtual() {
-		
+	void VulkanPipeline::Bind(PipelineBindInfo bindInfo) {
+		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
+
+		vkCmdBindPipeline(bindInfo.CommandBuffer, bindInfo.PipelineBindPoint, m_PipelineHandle);
+
+		//organizing all "distinct!" sets
+		std::vector<VkDescriptorSet> descriptorSetsToBind;
+		for (VulkanDescriptorSet descriptorSet : m_IndividualSets) {
+			descriptorSetsToBind.push_back(descriptorSet.GetSetBasedOffCurrentFrame(swapChain.GetCurrentFrameIndex()));
+		}
+
+		if (descriptorSetsToBind.size() != 0)
+			vkCmdBindDescriptorSets(bindInfo.CommandBuffer, bindInfo.PipelineBindPoint, m_PipelineLayoutHandle, 0, descriptorSetsToBind.size(), descriptorSetsToBind.data(), 0, nullptr);
+
+		RenderPassBeginInfo renderPassBeginInfo;
+		renderPassBeginInfo.CommandBuffer = bindInfo.CommandBuffer;
+		renderPassBeginInfo.VulkanFrameBuffer = As(m_Specs.FrameBuffer, VulkanFrameBuffer)->GetVulkanHandles()[swapChain.GetCurrentImageIndex()];
+		m_Specs.RenderPass->Begin(renderPassBeginInfo);
 	}
 
-	void VulkanPipeline::EndVirtual() {
-
+	void VulkanPipeline::Unbind() {
+		m_Specs.RenderPass->End();
 	}
 
 	void VulkanPipeline::Create() {
@@ -120,7 +136,6 @@ namespace Lucy {
 		colorBlending.attachmentCount = 1;
 		colorBlending.pAttachments = &colorBlendAttachment;
 
-		//we dont need to recreate the swapchain by doing this
 		VkDynamicState dynamicStates[] = {
 			VK_DYNAMIC_STATE_VIEWPORT,
 			VK_DYNAMIC_STATE_LINE_WIDTH,
@@ -141,7 +156,7 @@ namespace Lucy {
 		pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
-		LUCY_VK_ASSERT(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_PipelineLayout));
+		LUCY_VK_ASSERT(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_PipelineLayoutHandle));
 
 		VkGraphicsPipelineCreateInfo pipelineCreateInfo{};
 		pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -156,7 +171,7 @@ namespace Lucy {
 		pipelineCreateInfo.pDepthStencilState = nullptr; //TODO
 		pipelineCreateInfo.pColorBlendState = &colorBlending;
 		pipelineCreateInfo.pDynamicState = &dynamicState;
-		pipelineCreateInfo.layout = m_PipelineLayout;
+		pipelineCreateInfo.layout = m_PipelineLayoutHandle;
 		pipelineCreateInfo.renderPass = As(m_Specs.RenderPass, VulkanRenderPass)->GetVulkanHandle();
 		pipelineCreateInfo.subpass = 0;
 
@@ -164,7 +179,7 @@ namespace Lucy {
 		pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
 		pipelineCreateInfo.basePipelineIndex = -1;
 
-		LUCY_VK_ASSERT(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_Pipeline));
+		LUCY_VK_ASSERT(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_PipelineHandle));
 		LUCY_INFO("Vulkan pipeline created successfully!");
 	}
 
@@ -175,6 +190,7 @@ namespace Lucy {
 		for (auto& [set, info] : m_Specs.Shader->GetDescriptorSetMap()) {
 			std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
 			uint32_t size = 0;
+
 			for (auto& ub : info) {
 				VkDescriptorSetLayoutBinding binding{};
 				binding.binding = ub.Binding;
@@ -185,6 +201,7 @@ namespace Lucy {
 				size += ub.BufferSize;
 				layoutBindings.push_back(binding);
 			}
+
 			VkDescriptorSetLayoutCreateInfo descriptorLayoutInfo{};
 			descriptorLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 			descriptorLayoutInfo.bindingCount = layoutBindings.size();
@@ -268,20 +285,18 @@ namespace Lucy {
 			vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
 		m_DescriptorPool->Destroy();
-		vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);
-		vkDestroyPipeline(device, m_Pipeline, nullptr);
+		vkDestroyPipelineLayout(device, m_PipelineLayoutHandle, nullptr);
+		vkDestroyPipeline(device, m_PipelineHandle, nullptr);
 		//m_Specs.Shader->Destroy(); Shader destroying happens in Renderer::Destroy
 	}
 
 	void VulkanPipeline::Recreate() {
-		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
-
 		//I dont need these uncommented lines, since we are dynamically setting the viewport
 		//vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);
 		//vkDestroyPipeline(device, m_Pipeline, nullptr);
 
-		Renderer::Submit([this]() {
-			//Create();
+		//Create();
+		Renderer::Enqueue([&]() {
 			As(m_Specs.FrameBuffer, VulkanFrameBuffer)->Recreate();
 			As(m_Specs.RenderPass, VulkanRenderPass)->Recreate();
 		});

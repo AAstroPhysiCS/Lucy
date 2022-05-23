@@ -12,7 +12,7 @@ namespace Lucy {
 		virtual ~VulkanRenderPass() = default;
 
 		void Begin(RenderPassBeginInfo& info) override;
-		void End(RenderPassEndInfo& info) override;
+		void End() override;
 		void Destroy() override;
 		void Recreate() override;
 
@@ -21,5 +21,7 @@ namespace Lucy {
 		void Create();
 
 		VkRenderPass m_RenderPass = VK_NULL_HANDLE;
+		//just a helper member variable, to save the commandbuffer that was given in begininfo
+		VkCommandBuffer m_BoundedCommandBuffer = VK_NULL_HANDLE;
 	};
 }

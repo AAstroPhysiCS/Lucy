@@ -4,18 +4,15 @@
 
 #include "Base.h"
 #include "GLFW/glfw3.h"
-
-#include "../Renderer/Buffer/Buffer.h"
-
-#include "../Events/EventDispatcher.h"
-#include "../Events/InputEvent.h"
-#include "../Events/WindowEvent.h"
-
-#include "Renderer/Context/RenderContext.h"
-
 #include "vulkan/vulkan.h"
 
+#include "Events/Event.h"
+
 namespace Lucy {
+
+#define LUCY_BIND_FUNC(func) std::bind(func, this, std::placeholders::_1)
+
+	enum class RenderArchitecture;
 
 	enum class WindowMode {
 		FULLSCREEN, WINDOWED
@@ -23,10 +20,9 @@ namespace Lucy {
 
 	struct WindowSpecification {
 		int32_t Width = -1, Height = -1;
-		bool VSync = false, Resizable = false, DoubleBuffered = false;
+		bool VSync = false, Resizable = false;
 		std::string Name = "Window Specification failed!";
 		Lucy::WindowMode WindowMode = WindowMode::WINDOWED;
-		RenderArchitecture Architecture;
 	};
 
 	class Window {
@@ -34,7 +30,7 @@ namespace Lucy {
 		virtual ~Window() = default;
 
 		virtual void PollEvents() = 0;
-		virtual void Init() = 0;
+		virtual void Init(RenderArchitecture architecture) = 0;
 		virtual void InitVulkanSurface(VkInstance instance) = 0;
 		virtual void DestroyVulkanSurface(VkInstance instance) = 0;
 		virtual void Destroy() = 0;
@@ -45,6 +41,7 @@ namespace Lucy {
 
 		inline int32_t GetWidth() const { return m_Specs.Width; }
 		inline int32_t GetHeight() const { return m_Specs.Height; }
+		VkSurfaceKHR GetVulkanSurface() const { return m_Surface; }
 
 		static RefLucy<Window> Create(const WindowSpecification& specs);
 	protected:
@@ -54,15 +51,12 @@ namespace Lucy {
 		static std::function<void(Event*)> s_EventFunc;
 
 		VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
-
-		friend class VulkanDevice;
-		friend class VulkanSwapChain;
 	};
 
 	class WinWindow : public Window {
 	private:
 		void PollEvents() override;
-		void Init() override;
+		void Init(RenderArchitecture architecture) override;
 		void InitVulkanSurface(VkInstance instance) override;
 		void DestroyVulkanSurface(VkInstance instance) override;
 		void Destroy() override;

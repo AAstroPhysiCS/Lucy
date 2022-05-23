@@ -2,30 +2,31 @@
 #include "VulkanContext.h"
 
 #include "GLFW/glfw3.h"
-
 #include "Renderer/Renderer.h"
+#include "Renderer/VulkanAllocator.h"
 
 namespace Lucy {
 	
-	VulkanContext::VulkanContext(RenderArchitecture type)
-		: RenderContext(type) {
-		Init(type);
+	VulkanContext::VulkanContext()
+		: RenderContext() {
+		Init();
 	}
 
 	void VulkanContext::Destroy() {
 		VulkanSwapChain::Get().Destroy();
-		Renderer::s_Window->DestroyVulkanSurface(m_Instance);
 		VulkanDevice::Get().Destroy();
-		
+		Renderer::GetWindow()->DestroyVulkanSurface(m_Instance);
+
 		DestroyMessageCallback();
 		vkDestroyInstance(m_Instance, nullptr);
 		glfwTerminate();
 	}
 
 	void VulkanContext::PrintInfo() {
+		//TODO:
 	}
 
-	void VulkanContext::Init(RenderArchitecture type) {
+	void VulkanContext::Init() {
 		VkApplicationInfo appInfo{};
 		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 		appInfo.pApplicationName = "LucyEngine x64 Vulkan";
@@ -68,9 +69,10 @@ namespace Lucy {
 		SetupMessageCallback();
 #endif
 		
-		Renderer::s_Window->InitVulkanSurface(m_Instance);
+		Renderer::GetWindow()->InitVulkanSurface(m_Instance);
 		VulkanDevice::Get().Create(m_Instance, m_ValidationLayers);
 		VulkanSwapChain::Get().Create();
+		VulkanAllocator::Get().Init(m_Instance);
 	}
 
 	void VulkanContext::CheckValidationSupport() {
@@ -132,6 +134,7 @@ namespace Lucy {
 	}
 
 	void VulkanMessageCallback::ImGui_DebugCallback(VkResult result) {
-		if (result != VK_SUCCESS) LUCY_CRITICAL(fmt::format("Vulkan ImGui error {0}", result));
+		if (result != VK_SUCCESS) 
+			LUCY_CRITICAL(fmt::format("Vulkan ImGui error {0}", result));
 	}
 }
