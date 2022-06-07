@@ -13,7 +13,7 @@ namespace Lucy {
 		void Bind(PipelineBindInfo bindInfo) override;
 		void Unbind() override;
 		void Destroy() override;
-		void Recreate();
+		void Recreate(uint32_t width, uint32_t height);
 
 		inline VkPipeline GetVulkanHandle() { return m_PipelineHandle; }
 		inline VkPipelineLayout GetPipelineLayout() { return m_PipelineLayoutHandle; }

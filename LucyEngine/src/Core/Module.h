@@ -2,15 +2,15 @@
 
 #include "../Events/Event.h"
 #include "Core/Metrics.h"
+#include "Window.h"
 
 namespace Lucy {
 
 	class Module {
 	protected:
-		Module() = default;
+		Module(RefLucy<Window> window);
 		~Module() = default;
 	public:
-		virtual void Init(RefLucy<Window> window) = 0;
 		virtual void Begin(PerformanceMetrics& rendererMetrics) = 0;
 		virtual void End() = 0;
 		virtual void OnRender() = 0;
@@ -19,6 +19,4 @@ namespace Lucy {
 	protected:
 		RefLucy<Window> m_Window;
 	};
-
-	extern Module* CreateEditorModule()
 }

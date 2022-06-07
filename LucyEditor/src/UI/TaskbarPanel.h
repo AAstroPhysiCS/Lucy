@@ -4,12 +4,14 @@
 
 namespace Lucy {
 
-	class TaskbarPanel : public Panel
-	{
+	class TaskbarPanel : public Panel {
 	public:
+		static TaskbarPanel& GetInstance();
+	private:
 		void Render();
 
-		static TaskbarPanel& GetInstance();
+		TaskbarPanel() = default;
+		virtual ~TaskbarPanel() = default;
 	};
 }
 

@@ -29,9 +29,9 @@ namespace Lucy {
 
 		void OnWindowResize();
 	private:
-		void UIPass();
 		void GeometryPass();
 		void IDPass();
+		void UIPass();
 
 		inline static RefLucy<Pipeline> s_GeometryPipeline = nullptr;
 		inline static ImGuiPipeline s_ImGuiPipeline;

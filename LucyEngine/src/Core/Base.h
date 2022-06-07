@@ -28,20 +28,20 @@ namespace Lucy {
 
 	using SubmitFunc = std::function<void()>;
 
-	template <typename T>
-	using RecordFunc = std::function<void(T)>;
+	template <typename ... T>
+	using RecordFunc = std::function<void(T...)>;
 
 	template<typename T>
 	using RefLucy = std::shared_ptr<T>;
-	template<typename T, typename ... Args>
-	inline RefLucy<T> CreateRef(Args&& ... args) {
+	template<typename T, typename...Args>
+	inline RefLucy<T> CreateRef(Args&&...args) {
 		return std::make_shared<T>(std::forward<Args>(args)...);
 	}
 
 	template<typename T>
 	using ScopeLucy = std::unique_ptr<T>;
-	template<typename T, typename ... Args>
-	inline ScopeLucy<T> CreateScope(Args&& ... args) {
+	template<typename T, typename...Args>
+	inline ScopeLucy<T> CreateScope(Args&&...args) {
 		return std::make_unique<T>(std::forward<Args>(args)...);
 	}
 }

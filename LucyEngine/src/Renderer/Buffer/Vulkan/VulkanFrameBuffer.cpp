@@ -22,9 +22,8 @@ namespace Lucy {
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
 
 		RefLucy<VulkanRHIFrameBufferDesc> frameBufferDesc = As(m_Specs.InternalInfo, VulkanRHIFrameBufferDesc);
-		//if its the first initialization (the object is null
-		//this would make problems when we resized the window, since the lifetime of that object is short
-		if (frameBufferDesc) { 
+		//this would make problems when we resized the window, since the lifetime of this object is short
+		if (frameBufferDesc) {
 			m_RenderPass = As(frameBufferDesc->RenderPass, VulkanRenderPass);
 			m_Images = frameBufferDesc->ImageBuffers;
 			m_ImageViews = frameBufferDesc->ImageViews;
@@ -51,28 +50,28 @@ namespace Lucy {
 		}
 	}
 
-	void VulkanFrameBuffer::Bind() {
-
-	}
-
-	void VulkanFrameBuffer::Unbind() {
-
-	}
-
 	void VulkanFrameBuffer::Destroy() {
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
 		for (uint32_t i = 0; i < m_FrameBufferHandles.size(); i++) {
 			vkDestroyFramebuffer(device, m_FrameBufferHandles[i], nullptr);
 			if (!m_Images.empty())
 				m_Images[i]->Destroy();
+			//no ownership for imageview is taken, the owner is the swapchain
+			//so it should also get destroyed in the swapchain
 		}
 		m_Specs.InternalInfo = nullptr;
 	}
 
-	void VulkanFrameBuffer::Recreate() {
+	void VulkanFrameBuffer::Recreate(uint32_t width, uint32_t height, RefLucy<void> internalInfo) {
+		m_Specs.Width = width;
+		m_Specs.Height = height;
+		
 		Destroy();
+		if (internalInfo)
+			m_Specs.InternalInfo = internalInfo;
+
 		for (uint32_t i = 0; i < m_Images.size(); i++) {
-			m_Images[i]->Recreate();
+			m_Images[i]->Recreate(width, height);
 		}
 		Create();
 	}

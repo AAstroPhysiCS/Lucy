@@ -19,8 +19,8 @@ namespace Lucy {
 			glCreateFramebuffers(1, &m_Id);
 			Bind();
 
-			for (uint32_t i = 0; i < specs.TextureSpecs.size(); i++) {
-				auto textureSpec = specs.TextureSpecs[i];
+			for (uint32_t i = 0; i < frameBufferDesc->TextureSpecs.size(); i++) {
+				auto textureSpec = frameBufferDesc->TextureSpecs[i];
 				RefLucy<OpenGLRHIImageDesc> imageDesc = As(textureSpec.InternalInfo, OpenGLRHIImageDesc);
 				RefLucy<OpenGLImage2D> texture = As(Image2D::Create(textureSpec), OpenGLImage2D);
 				texture->Bind();
@@ -49,9 +49,9 @@ namespace Lucy {
 				glDrawBuffer(GL_NONE);
 				glReadBuffer(GL_NONE);
 			} else {
-				for (uint32_t i = 0; i < m_Specs.TextureSpecs.size(); i++) {
-					RefLucy<OpenGLRHIImageDesc> imageDesc = As(m_Specs.TextureSpecs[i].InternalInfo, OpenGLRHIImageDesc);
-					if (!imageDesc->DisableReadWriteBuffer && specs.TextureSpecs[i].Format != GL_DEPTH_COMPONENT)
+				for (uint32_t i = 0; i < frameBufferDesc->TextureSpecs.size(); i++) {
+					RefLucy<OpenGLRHIImageDesc> imageDesc = As(frameBufferDesc->TextureSpecs[i].InternalInfo, OpenGLRHIImageDesc);
+					if (!imageDesc->DisableReadWriteBuffer && frameBufferDesc->TextureSpecs[i].Format != GL_DEPTH_COMPONENT)
 						glDrawBuffer(GL_COLOR_ATTACHMENT0 + imageDesc->AttachmentIndex);
 				}
 			}
@@ -66,7 +66,7 @@ namespace Lucy {
 			blittedSpec.Width = specs.Width;
 			blittedSpec.Height = specs.Height;
 			blittedSpec.MultiSampled = false;
-			blittedSpec.TextureSpecs.push_back(frameBufferDesc->BlittedTextureSpecs);
+			frameBufferDesc->TextureSpecs.push_back(frameBufferDesc->BlittedTextureSpecs);
 			m_Blitted = As(FrameBuffer::Create(blittedSpec), OpenGLFrameBuffer);
 			m_Blitted->CheckStatus();
 		}
@@ -109,8 +109,8 @@ namespace Lucy {
 			glCreateFramebuffers(1, &m_Id);
 			Bind();
 
-			for (uint32_t i = 0; i < m_Specs.TextureSpecs.size(); i++) {
-				auto& textureSpec = m_Specs.TextureSpecs[i];
+			for (uint32_t i = 0; i < frameBufferDesc->TextureSpecs.size(); i++) {
+				auto& textureSpec = frameBufferDesc->TextureSpecs[i];
 				textureSpec.Width = width;
 				textureSpec.Height = height;
 				RefLucy<OpenGLRHIImageDesc> imageDesc = As(textureSpec.InternalInfo, OpenGLRHIImageDesc);
@@ -142,9 +142,9 @@ namespace Lucy {
 				glDrawBuffer(GL_NONE);
 				glReadBuffer(GL_NONE);
 			} else {
-				for (uint32_t i = 0; i < m_Specs.TextureSpecs.size(); i++) {
-					RefLucy<OpenGLRHIImageDesc> imageDesc = As(m_Specs.TextureSpecs[i].InternalInfo, OpenGLRHIImageDesc);
-					if (!imageDesc->DisableReadWriteBuffer && m_Specs.TextureSpecs[i].Format != GL_DEPTH_COMPONENT)
+				for (uint32_t i = 0; i < frameBufferDesc->TextureSpecs.size(); i++) {
+					RefLucy<OpenGLRHIImageDesc> imageDesc = As(frameBufferDesc->TextureSpecs[i].InternalInfo, OpenGLRHIImageDesc);
+					if (!imageDesc->DisableReadWriteBuffer && frameBufferDesc->TextureSpecs[i].Format != GL_DEPTH_COMPONENT)
 						glDrawBuffer(GL_COLOR_ATTACHMENT0 + imageDesc->AttachmentIndex);
 				}
 			}

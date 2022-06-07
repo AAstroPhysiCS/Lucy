@@ -31,23 +31,46 @@ namespace Lucy {
 		colorAttachmentDescription.stencilStoreOp = renderPassDesc->Descriptor.StencilStoreOp;
 		colorAttachmentDescription.initialLayout = renderPassDesc->Descriptor.InitialLayout;
 		colorAttachmentDescription.finalLayout = renderPassDesc->Descriptor.FinalLayout;
+		
+		VkAttachmentDescription depthAttachmentDescription{};
+		depthAttachmentDescription.format = VK_FORMAT_D32_SFLOAT;
+		depthAttachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
+		depthAttachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		depthAttachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		depthAttachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		depthAttachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		depthAttachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		depthAttachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+		VkAttachmentReference depthAttachmentReference{};
+		depthAttachmentReference.attachment = 1;
+		depthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 		VkSubpassDescription subpassDescription{};
 		subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		subpassDescription.colorAttachmentCount = renderPassDesc->AttachmentReferences.size();
 		subpassDescription.pColorAttachments = renderPassDesc->AttachmentReferences.data();
+		//subpassDescription.pDepthStencilAttachment = &depthAttachmentReference;
 
-		VkSubpassDependency vkDependency;
-		vkDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-		vkDependency.dstSubpass = 0;
-		vkDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		vkDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		vkDependency.srcAccessMask = 0;
-		vkDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
-		vkDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+		VkSubpassDependency subpassColorDependency;
+		subpassColorDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+		subpassColorDependency.dstSubpass = 0;
+		subpassColorDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		subpassColorDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		subpassColorDependency.srcAccessMask = 0;
+		subpassColorDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+		subpassColorDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+		VkSubpassDependency subpassDepthDependency;
+		subpassDepthDependency.srcSubpass = 0;
+		subpassDepthDependency.dstSubpass = VK_SUBPASS_EXTERNAL;
+		subpassDepthDependency.srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+		subpassDepthDependency.srcAccessMask = 0;
+		subpassDepthDependency.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+		subpassDepthDependency.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
 		std::vector<VkAttachmentDescription> attachments = { colorAttachmentDescription };
-		std::vector<VkSubpassDependency> dependencies = { vkDependency };
+		std::vector<VkSubpassDependency> dependencies = { subpassColorDependency };
 
 		VkRenderPassCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -69,7 +92,7 @@ namespace Lucy {
 		beginInfo.renderPass = m_RenderPass;
 		beginInfo.framebuffer = info.VulkanFrameBuffer;
 		beginInfo.renderArea.offset = { 0, 0 };
-		beginInfo.renderArea.extent = swapChain.GetExtent();
+		beginInfo.renderArea.extent = { info.Width, info.Height };
 
 		VkClearValue clearColor = { {{m_Specs.ClearColor.r, m_Specs.ClearColor.g, m_Specs.ClearColor.b, m_Specs.ClearColor.a}} };
 		beginInfo.clearValueCount = 1;
@@ -77,6 +100,27 @@ namespace Lucy {
 
 		m_BoundedCommandBuffer = info.CommandBuffer;
 		vkCmdBeginRenderPass(m_BoundedCommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+		if (!info.EnforceViewport)
+			return;
+
+		VkViewport viewport;
+		viewport.x = 0;
+		viewport.y = 0;
+		viewport.width = info.Width;
+		viewport.height = info.Height;
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+
+		if (viewport.width == 0 || viewport.height == 0)
+			LUCY_ASSERT(false);
+
+		VkRect2D scissor{};
+		scissor.offset = { 0, 0 };
+		scissor.extent = { info.Width, info.Height };
+
+		vkCmdSetViewport(m_BoundedCommandBuffer, 0, 1, &viewport);
+		vkCmdSetScissor(m_BoundedCommandBuffer, 0, 1, &scissor);
 	}
 
 	void VulkanRenderPass::End() {
@@ -84,10 +128,8 @@ namespace Lucy {
 	}
 
 	void VulkanRenderPass::Recreate() {
-		Renderer::Enqueue([&]() {
-			Destroy();
-			Create();
-		});
+		Destroy();
+		Create();
 	}
 
 	void VulkanRenderPass::Destroy() {

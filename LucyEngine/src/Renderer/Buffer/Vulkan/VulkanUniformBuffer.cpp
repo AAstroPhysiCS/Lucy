@@ -78,7 +78,7 @@ namespace Lucy {
 			setWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			setWrite.pBufferInfo = &bufferInfo;
 
-			vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr); //reason is that bufferInfo and imageInfo is stack allocated
+			vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr); //reason for duplicate code is that bufferInfo and imageInfo is stack allocated
 		}
 	}
 

@@ -22,11 +22,6 @@ namespace Lucy {
 		m_Architecture = renderArchitecture;
 	}
 
-	void RHI::SetViewportMousePosition(float x, float y) {
-		m_ViewportMouseX = x;
-		m_ViewportMouseY = y;
-	}
-
 	void RHI::ClearQueues() {
 		m_StaticMeshDrawCommandQueue.clear();
 		s_CommandQueue.Clear();

@@ -50,7 +50,7 @@ namespace Lucy {
 		void Bind() override;
 		void Unbind() override;
 		void Destroy() override;
-		void Recreate();
+		void Recreate(uint32_t width, uint32_t height);
 
 		inline VulkanImageView& GetImageView() { return m_ImageView; }
 		inline VkImage GetVulkanHandle() const { return m_Image; }

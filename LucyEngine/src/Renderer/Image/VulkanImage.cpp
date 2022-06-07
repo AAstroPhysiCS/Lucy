@@ -179,7 +179,10 @@ namespace Lucy {
 		m_Image = VK_NULL_HANDLE;
 	}
 
-	void VulkanImage2D::Recreate() {
+	void VulkanImage2D::Recreate(uint32_t width, uint32_t height) {
+		m_Specs.Width = width;
+		m_Specs.Height = height;
+
 		Destroy();
 		m_CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		Create();

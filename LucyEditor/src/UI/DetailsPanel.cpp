@@ -1,7 +1,7 @@
 #include <functional>
 
-#include "PropertiesPanel.h"
-#include "SceneHierarchyPanel.h"
+#include "DetailsPanel.h"
+#include "SceneExplorerPanel.h"
 
 #include "Utils.h"
 #include "UI/UIUtils.h"
@@ -10,15 +10,15 @@
 
 namespace Lucy {
 
-	PropertiesPanel& PropertiesPanel::GetInstance() {
-		static PropertiesPanel s_Instance;
+	DetailsPanel& DetailsPanel::GetInstance() {
+		static DetailsPanel s_Instance;
 		return s_Instance;
 	}
 
-	void PropertiesPanel::Render() {
-		ImGui::Begin("Properties", 0, ImGuiWindowFlags_NoBringToFrontOnFocus);
+	void DetailsPanel::Render() {
+		ImGui::Begin("Details", 0, ImGuiWindowFlags_NoBringToFrontOnFocus);
 
-		Entity& entityContext = SceneHierarchyPanel::GetInstance().GetEntityContext();
+		Entity& entityContext = SceneExplorerPanel::GetInstance().GetEntityContext();
 		if (!entityContext.IsValid()) {
 			ImGui::End();
 			return;

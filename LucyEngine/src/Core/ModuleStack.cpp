@@ -3,8 +3,9 @@
 
 namespace Lucy {
 
-	void ModuleStack::Push(std::initializer_list<Module*> list) {
-		std::copy(list.begin(), list.end(), std::back_inserter(m_ModuleStack));
+	void ModuleStack::Push(RefLucy<Module> m) {
+		m_ModuleStack.push_back(m);
+		//std::copy(list.begin(), list.end(), std::back_inserter(m_ModuleStack));
 	}
 
 	void ModuleStack::Pop() {

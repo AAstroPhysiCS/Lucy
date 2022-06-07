@@ -81,7 +81,7 @@ namespace Lucy {
 		int32_t m_Channels = 0;
 		int32_t m_Width;
 		int32_t m_Height;
-		ImageID m_ID;
+		ImageID m_ID = 0;
 	};
 }
 

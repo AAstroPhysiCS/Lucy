@@ -143,7 +143,7 @@ namespace Lucy {
 	}
 
 	Entity OpenGLRHI::OnMousePicking() {
-		m_IDPipeline->GetFrameBuffer()->Bind();
+		As(m_IDPipeline->GetFrameBuffer(), OpenGLFrameBuffer)->Bind();
 		glm::vec3 pixelValue;
 		OpenGLAPICommands::ReadBuffer(GL_COLOR_ATTACHMENT0);
 		OpenGLAPICommands::ReadPixels(m_ViewportMouseX, m_ViewportHeight - m_ViewportMouseY, 1, 1, (float*)&pixelValue);
@@ -159,7 +159,7 @@ namespace Lucy {
 			return {};
 
 		Entity selectedEntity = m_ActiveScene->GetEntityByPixelValue(pixelValue);
-		m_IDPipeline->GetFrameBuffer()->Unbind();
+		As(m_IDPipeline->GetFrameBuffer(), OpenGLFrameBuffer)->Unbind();
 
 		return selectedEntity;
 	}
@@ -244,6 +244,10 @@ namespace Lucy {
 		Enqueue([=]() {
 			m_StaticMeshDrawCommandQueue.push_back(MeshDrawCommand(mesh, entityTransform));
 		});
+	}
+
+	void OpenGLRHI::RecordToCommandQueue(RecordFunc<>&& func) {
+
 	}
 
 	void OpenGLRHI::RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func) {

@@ -9,7 +9,7 @@
 #include "Renderer/CommandQueue.h"
 
 namespace Lucy {
-	
+
 	VulkanSwapChain::VulkanSwapChain() {
 		m_WaitSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 		m_SignalSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
@@ -72,7 +72,7 @@ namespace Lucy {
 		m_SwapChainImages.resize(swapChainImageCount);
 		vkGetSwapchainImagesKHR(logicalDevice, swapChain, &swapChainImageCount, m_SwapChainImages.data());
 
-		if (oldSwapChain) {
+		if (oldSwapChain) { //if resized
 			for (uint32_t i = 0; i < swapChainImageCount; i++) {
 				ImageViewSpecification specs;
 				specs.Image = m_SwapChainImages[i];
@@ -81,7 +81,7 @@ namespace Lucy {
 
 				m_SwapChainImageViews[i].Recreate(specs);
 			}
-		} else {
+		} else { //initial startup
 			m_SwapChainImageViews.reserve(swapChainImageCount);
 
 			for (uint32_t i = 0; i < swapChainImageCount; i++) {
@@ -101,7 +101,7 @@ namespace Lucy {
 
 	void VulkanSwapChain::Recreate() {
 		const VulkanDevice& device = VulkanDevice::Get();
-		vkDeviceWaitIdle(device.GetLogicalDevice());
+		LUCY_VK_ASSERT(vkDeviceWaitIdle(device.GetLogicalDevice()));
 
 		m_OldSwapChain = m_SwapChain;
 		m_SwapChain = Create(m_OldSwapChain);
@@ -123,30 +123,7 @@ namespace Lucy {
 	void VulkanSwapChain::EndFrame(const CommandQueue& commandQueue) {
 		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR)
 			return;
-
-		const auto& device = VulkanDevice::Get();
-		VkDevice deviceVulkanHandle = device.GetLogicalDevice();
-
-		VkFence currentFrameFence = m_InFlightFences[m_CurrentFrameIndex].GetFence();
-		VkSemaphore currentFrameWaitSemaphore = m_WaitSemaphores[m_CurrentFrameIndex].GetSemaphore(); // image is available, image is renderable
-		VkSemaphore currentFrameSignalSemaphore = m_SignalSemaphores[m_CurrentFrameIndex].GetSemaphore(); // rendering finished, signal it
-
-		VkSubmitInfo submitInfo{};
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-		VkPipelineStageFlags imageWaitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-		submitInfo.waitSemaphoreCount = 1;
-		submitInfo.pWaitSemaphores = &currentFrameWaitSemaphore;
-		submitInfo.pWaitDstStageMask = imageWaitStages;
-
-		VkCommandBuffer targetedCommandBuffer = commandQueue.GetCurrentCommandBuffer();
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &targetedCommandBuffer;
-		submitInfo.signalSemaphoreCount = 1;
-		submitInfo.pSignalSemaphores = &currentFrameSignalSemaphore;
-
-		LUCY_VK_ASSERT(vkQueueSubmit(device.GetGraphicsQueue(), 1, &submitInfo, currentFrameFence));
-		vkWaitForFences(deviceVulkanHandle, 1, &currentFrameFence, VK_TRUE, UINT64_MAX);
+		SubmitToQueue(commandQueue.GetCurrentCommandBuffer());
 	}
 
 	VkResult VulkanSwapChain::AcquireNextImage(VkSemaphore currentFrameImageAvailSemaphore, uint32_t& imageIndex) {
@@ -243,5 +220,29 @@ namespace Lucy {
 			m_SignalSemaphores[i].Destroy();
 			m_InFlightFences[i].Destroy();
 		}
+	}
+
+	void VulkanSwapChain::SubmitToQueue(VkCommandBuffer commandBuffer) {
+		VulkanDevice& device = VulkanDevice::Get();
+
+		VkFence currentFrameFence = m_InFlightFences[m_CurrentFrameIndex].GetFence();
+		VkSemaphore currentFrameWaitSemaphore = m_WaitSemaphores[m_CurrentFrameIndex].GetSemaphore(); // image is available, image is renderable
+		VkSemaphore currentFrameSignalSemaphore = m_SignalSemaphores[m_CurrentFrameIndex].GetSemaphore(); // rendering finished, signal it
+
+		VkSubmitInfo submitInfo{};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+		VkPipelineStageFlags imageWaitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+		submitInfo.waitSemaphoreCount = 1;
+		submitInfo.pWaitSemaphores = &currentFrameWaitSemaphore;
+		submitInfo.pWaitDstStageMask = imageWaitStages;
+
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &commandBuffer;
+		submitInfo.signalSemaphoreCount = 1;
+		submitInfo.pSignalSemaphores = &currentFrameSignalSemaphore;
+
+		LUCY_VK_ASSERT(vkQueueSubmit(device.GetGraphicsQueue(), 1, &submitInfo, currentFrameFence));
+		vkWaitForFences(device.GetLogicalDevice(), 1, &currentFrameFence, VK_TRUE, UINT64_MAX);
 	}
 }

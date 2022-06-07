@@ -26,6 +26,7 @@ namespace Lucy {
 		void EnqueueStaticMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform) override;
 		
 		//Parameter "func" are the individual passes, works in parallel
+		void RecordToCommandQueue(RecordFunc<>&& func) override;
 		void RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func) override;
 
 		void BindPipeline(RefLucy<Pipeline> pipeline) override;

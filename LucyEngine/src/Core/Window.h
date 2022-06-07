@@ -34,7 +34,8 @@ namespace Lucy {
 		virtual void InitVulkanSurface(VkInstance instance) = 0;
 		virtual void DestroyVulkanSurface(VkInstance instance) = 0;
 		virtual void Destroy() = 0;
-		virtual void Update() = 0;
+		virtual void WaitEventsIfMinimized() = 0;
+		void SwapBuffers();
 
 		void SetEventCallback(std::function<void(Event*)>);
 		GLFWwindow* Raw();
@@ -60,6 +61,6 @@ namespace Lucy {
 		void InitVulkanSurface(VkInstance instance) override;
 		void DestroyVulkanSurface(VkInstance instance) override;
 		void Destroy() override;
-		void Update() override;
+		void WaitEventsIfMinimized() override;
 	};
 }

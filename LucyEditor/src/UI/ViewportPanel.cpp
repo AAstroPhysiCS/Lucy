@@ -1,13 +1,12 @@
 #include "ViewportPanel.h"
-#include "SceneHierarchyPanel.h"
+#include "SceneExplorerPanel.h"
 
 #include "Renderer/Renderer.h"
 #include "Renderer/OpenGLRHI.h"
 #include "Renderer/VulkanRHI.h"
 #include "Renderer/RenderPass.h"
-#include "Renderer/Buffer/OpenGL/OpenGLFrameBuffer.h"
 #include "Renderer/ViewportRenderer.h"
-
+#include "Renderer/Buffer/OpenGL/OpenGLFrameBuffer.h"
 #include "Renderer/Buffer/Vulkan/VulkanFrameBuffer.h"
 
 #include "imgui_impl_vulkan.h"
@@ -25,7 +24,7 @@ namespace Lucy {
 			if (keyEvent == KeyCode::V)
 				UseSnap = !UseSnap;
 
-			if (!IsViewportActive || !SceneHierarchyPanel::GetInstance().GetEntityContext().IsValid()) return;
+			if (!m_IsViewportActive || !SceneExplorerPanel::GetInstance().GetEntityContext().IsValid()) return;
 
 			if (keyEvent == KeyCode::T) {
 				CurrentGizmoOperation = ImGuizmo::OPERATION::TRANSLATE;
@@ -51,11 +50,9 @@ namespace Lucy {
 		ImGui::Begin("Viewport", &pOpen, flags);
 		ImGui::PopStyleVar(2);
 
-		IsViewportHovered = ImGui::IsWindowHovered();
-		IsViewportActive = IsViewportHovered && ImGui::IsWindowFocused();
-		IsOverAnyGizmo = IsOverAnyGizmoM();
-
-		void* outputTextureID = 0;
+		m_IsViewportHovered = ImGui::IsWindowHovered();
+		m_IsViewportActive = m_IsViewportHovered && ImGui::IsWindowFocused();
+		m_IsOverAnyGizmo = IsOverAnyGizmoM();
 
 		//TODO: Bad access? Change it maybe?
 		ImVec2& size = ImGui::GetWindowSize();
@@ -63,13 +60,13 @@ namespace Lucy {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL: {
 				auto& blittedFrameBuffer = As(ViewportRenderer::GetGeometryPipeline()->GetFrameBuffer(), OpenGLFrameBuffer)->GetBlitted();
-				outputTextureID = (void*)blittedFrameBuffer->GetTexture(0)->GetID();
+				void* outputTextureID = (void*)blittedFrameBuffer->GetTexture(0)->GetID();
 				ImGui::Image(outputTextureID, size, { 0, 1 }, { 1, 0 });
 				break;
 			}
 			case RenderArchitecture::Vulkan: {
 				VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-				outputTextureID = As(ViewportRenderer::GetGeometryPipeline()->GetFrameBuffer(), VulkanFrameBuffer)->GetImages()[0]->GetID();
+				void* outputTextureID = As(ViewportRenderer::GetGeometryPipeline()->GetFrameBuffer(), VulkanFrameBuffer)->GetImages()[swapChain.GetCurrentFrameIndex()]->GetID();
 				ImGui::Image(outputTextureID, size);
 				break;
 			}
@@ -79,7 +76,7 @@ namespace Lucy {
 
 		auto [w, h] = Renderer::GetViewportSize();
 		if (w != size.x || h != size.y) {
-			//Renderer::OnFramebufferResize(size.x, size.y);
+			Renderer::SetViewportSize(w, h);
 		}
 
 		const ImVec2& mousePos = ImGui::GetMousePos();
@@ -89,11 +86,11 @@ namespace Lucy {
 		Renderer::SetViewportMousePosition(mousePos.x - windowPos.x - offset.x,
 										   mousePos.y - windowPos.y);
 		ImGuizmo::SetDrawlist();
-		ImGuizmo::SetRect(ImGui::GetWindowPos().x, ImGui::GetWindowPos().y, ImGui::GetWindowWidth(), ImGui::GetWindowHeight());
+		ImGuizmo::SetRect(windowPos.x, windowPos.y, ImGui::GetWindowWidth(), ImGui::GetWindowHeight());
 
-		Entity& e = SceneHierarchyPanel::GetInstance().GetEntityContext();
+		Entity& e = SceneExplorerPanel::GetInstance().GetEntityContext();
 		if (e.IsValid()) {
-			EditorCamera& editorCamera = Renderer::GetActiveScene()->GetEditorCamera();
+			EditorCamera& editorCamera = SceneExplorerPanel::GetInstance().GetActiveScene()->GetEditorCamera();
 			TransformComponent& t = e.GetComponent<TransformComponent>();
 			float matrixTranslation[3], matrixRotation[3], matrixScale[3];
 			t.CalculateMatrix();
@@ -106,6 +103,18 @@ namespace Lucy {
 		}
 
 		ImGui::End();
+	}
+
+	bool ViewportPanel::IsViewportHovered() {
+		return m_IsViewportHovered;
+	}
+
+	bool ViewportPanel::IsViewportActive() {
+		return m_IsViewportActive;
+	}
+
+	bool ViewportPanel::IsOverAnyGizmo() {
+		return m_IsOverAnyGizmo;
 	}
 
 	bool ViewportPanel::IsOverTranslateGizmo() {

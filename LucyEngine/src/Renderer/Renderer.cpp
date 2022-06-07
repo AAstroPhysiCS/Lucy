@@ -44,54 +44,42 @@ namespace Lucy {
 		s_UIDrawDataFunc = func;
 	}
 
+	void Renderer::UIPass(const ImGuiPipeline& imguiPipeline) {
+		if (s_Specs.Architecture != RenderArchitecture::Vulkan)
+			return;
+
+		//a hack (TODO: Change this)
+		Renderer::RecordToCommandQueue([=]() {
+			VkCommandBuffer commandBuffer = s_RHI->s_CommandQueue.GetCurrentCommandBuffer();
+			VulkanSwapChain& swapChain = VulkanSwapChain::Get();
+
+			auto& renderPass = As(imguiPipeline.UIRenderPass, VulkanRenderPass);
+			auto& frameBufferHandle = As(imguiPipeline.UIFramebuffer, VulkanFrameBuffer);
+			const auto& targetFrameBuffer = frameBufferHandle->GetVulkanHandles()[swapChain.GetCurrentImageIndex()];
+
+			RenderPassBeginInfo beginInfo;
+			beginInfo.Width = frameBufferHandle->GetWidth();
+			beginInfo.Height = frameBufferHandle->GetHeight();
+			beginInfo.CommandBuffer = commandBuffer;
+			beginInfo.VulkanFrameBuffer = targetFrameBuffer;
+			beginInfo.EnforceViewport = false; //since imgui provides its own dynamic viewport system
+			
+			renderPass->Begin(beginInfo);
+			Renderer::s_UIDrawDataFunc(commandBuffer);
+			renderPass->End();
+		});
+	}
+
 	void Renderer::EnqueueStaticMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform) {
 		s_RHI->EnqueueStaticMesh(mesh, entityTransform);
 	}
 
-	void Renderer::RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func) {
+	void Renderer::RecordToCommandQueue(RecordFunc<>&& func) {
 		s_RHI->RecordToCommandQueue(std::move(func));
 	}
 
-	void Renderer::RenderUI(const ImGuiPipeline& imGuiPipeline) {
-		if (s_Specs.Architecture != RenderArchitecture::Vulkan || !s_UIDrawDataFunc) 
-			return;
-
-		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-		auto& frameBufferHandle = As(imGuiPipeline.UIFramebuffer, VulkanFrameBuffer);
-		auto& renderPass = As(imGuiPipeline.UIRenderPass, VulkanRenderPass);
-
-		VkCommandBuffer commandBuffer = s_RHI->s_CommandQueue.GetCurrentCommandBuffer();
-		const auto& targetFrameBuffer = frameBufferHandle->GetVulkanHandles()[swapChain.GetCurrentImageIndex()];
-
-		VkCommandBufferBeginInfo cmdBeginInfo{};
-		cmdBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		cmdBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-		LUCY_VK_ASSERT(vkBeginCommandBuffer(commandBuffer, &cmdBeginInfo));
-
-		VkViewport viewport;
-		viewport.x = 0;
-		viewport.y = 0;
-		viewport.width = swapChain.GetExtent().width;
-		viewport.height = swapChain.GetExtent().height;
-		viewport.minDepth = 0.0f;
-		viewport.maxDepth = 1.0f;
-
-		VkRect2D scissor{};
-		scissor.offset = { 0, 0 };
-		scissor.extent = swapChain.GetExtent();
-
-		vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-		vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-
-		RenderPassBeginInfo beginInfo;
-		beginInfo.CommandBuffer = commandBuffer;
-		beginInfo.VulkanFrameBuffer = targetFrameBuffer;
-		renderPass->Begin(beginInfo);
-
-		s_UIDrawDataFunc(commandBuffer);
-
-		renderPass->End();
-		LUCY_VK_ASSERT(vkEndCommandBuffer(commandBuffer));
+	void Renderer::RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func) {
+		s_RHI->RecordToCommandQueue(std::move(func));
 	}
 
 	void Renderer::OnViewportResize() {
@@ -119,7 +107,6 @@ namespace Lucy {
 	}
 
 	void Renderer::BeginScene(Scene& scene) {
-		s_Specs.Window->Update();
 		scene.Update();
 		s_RHI->BeginScene(scene);
 	}
@@ -129,9 +116,7 @@ namespace Lucy {
 	}
 
 	PresentResult Renderer::EndScene() {
-		PresentResult result = s_RHI->EndScene();
-		glfwSwapBuffers(s_Specs.Window->Raw());
-		return result;
+		return s_RHI->EndScene();
 	}
 
 	void Renderer::Destroy() {
@@ -139,7 +124,6 @@ namespace Lucy {
 		for (const RefLucy<Shader> shader : shaderLibrary.m_Shaders)
 			shader->Destroy();
 		s_RHI->Destroy();
-		s_Specs.Window->Destroy();
 	}
 
 	void Renderer::SetViewportMousePosition(float x, float y) {

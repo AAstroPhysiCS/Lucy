@@ -9,11 +9,11 @@ namespace Lucy {
 		static PerformancePanel& GetInstance();
 
 		void SetShow(bool show);
-		virtual void Render();
-
 	private:
 		PerformancePanel() = default;
 		virtual ~PerformancePanel() = default;
+		
+		void Render();
 
 		bool m_Show;
 	};

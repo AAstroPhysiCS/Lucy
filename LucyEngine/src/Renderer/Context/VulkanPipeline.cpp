@@ -20,30 +20,6 @@ namespace Lucy {
 		});
 	}
 
-	void VulkanPipeline::Bind(PipelineBindInfo bindInfo) {
-		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-
-		vkCmdBindPipeline(bindInfo.CommandBuffer, bindInfo.PipelineBindPoint, m_PipelineHandle);
-
-		//organizing all "distinct!" sets
-		std::vector<VkDescriptorSet> descriptorSetsToBind;
-		for (VulkanDescriptorSet descriptorSet : m_IndividualSets) {
-			descriptorSetsToBind.push_back(descriptorSet.GetSetBasedOffCurrentFrame(swapChain.GetCurrentFrameIndex()));
-		}
-
-		if (descriptorSetsToBind.size() != 0)
-			vkCmdBindDescriptorSets(bindInfo.CommandBuffer, bindInfo.PipelineBindPoint, m_PipelineLayoutHandle, 0, descriptorSetsToBind.size(), descriptorSetsToBind.data(), 0, nullptr);
-
-		RenderPassBeginInfo renderPassBeginInfo;
-		renderPassBeginInfo.CommandBuffer = bindInfo.CommandBuffer;
-		renderPassBeginInfo.VulkanFrameBuffer = As(m_Specs.FrameBuffer, VulkanFrameBuffer)->GetVulkanHandles()[swapChain.GetCurrentImageIndex()];
-		m_Specs.RenderPass->Begin(renderPassBeginInfo);
-	}
-
-	void VulkanPipeline::Unbind() {
-		m_Specs.RenderPass->End();
-	}
-
 	void VulkanPipeline::Create() {
 		if (!m_DescriptorPool) {
 			const std::vector<VkDescriptorPoolSize>& poolSizes = CreateDescriptorPoolSizes();
@@ -183,6 +159,34 @@ namespace Lucy {
 		LUCY_INFO("Vulkan pipeline created successfully!");
 	}
 
+	void VulkanPipeline::Bind(PipelineBindInfo bindInfo) {
+		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
+
+		vkCmdBindPipeline(bindInfo.CommandBuffer, bindInfo.PipelineBindPoint, m_PipelineHandle);
+
+		//organizing all "distinct!" sets
+		std::vector<VkDescriptorSet> descriptorSetsToBind;
+		for (VulkanDescriptorSet descriptorSet : m_IndividualSets) {
+			descriptorSetsToBind.push_back(descriptorSet.GetSetBasedOffCurrentFrame(swapChain.GetCurrentFrameIndex()));
+		}
+
+		if (descriptorSetsToBind.size() != 0)
+			vkCmdBindDescriptorSets(bindInfo.CommandBuffer, bindInfo.PipelineBindPoint, m_PipelineLayoutHandle, 0, descriptorSetsToBind.size(), descriptorSetsToBind.data(), 0, nullptr);
+
+		auto& frameBuffer = As(m_Specs.FrameBuffer, VulkanFrameBuffer);
+
+		RenderPassBeginInfo renderPassBeginInfo;
+		renderPassBeginInfo.CommandBuffer = bindInfo.CommandBuffer;
+		renderPassBeginInfo.Width = frameBuffer->GetWidth();
+		renderPassBeginInfo.Height = frameBuffer->GetHeight();
+		renderPassBeginInfo.VulkanFrameBuffer = frameBuffer->GetVulkanHandles()[swapChain.GetCurrentFrameIndex()];
+		m_Specs.RenderPass->Begin(renderPassBeginInfo);
+	}
+
+	void VulkanPipeline::Unbind() {
+		m_Specs.RenderPass->End();
+	}
+
 	void VulkanPipeline::ParseUniformBuffers() {
 		if (m_DescriptorSetLayouts.size() != 0) return; //if the application has been resized
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
@@ -290,16 +294,13 @@ namespace Lucy {
 		//m_Specs.Shader->Destroy(); Shader destroying happens in Renderer::Destroy
 	}
 
-	void VulkanPipeline::Recreate() {
+	void VulkanPipeline::Recreate(uint32_t width, uint32_t height) {
 		//I dont need these uncommented lines, since we are dynamically setting the viewport
 		//vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);
 		//vkDestroyPipeline(device, m_Pipeline, nullptr);
 
 		//Create();
-		Renderer::Enqueue([&]() {
-			As(m_Specs.FrameBuffer, VulkanFrameBuffer)->Recreate();
-			As(m_Specs.RenderPass, VulkanRenderPass)->Recreate();
-		});
+		As(m_Specs.RenderPass, VulkanRenderPass)->Recreate();
+		As(m_Specs.FrameBuffer, VulkanFrameBuffer)->Recreate(width, height, nullptr);
 	}
-
 }

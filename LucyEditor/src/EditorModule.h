@@ -10,16 +10,15 @@
 #include "Events/EventDispatcher.h"
 #include "Events/InputEvent.h"
 
+#include "ImGuiOverlay.h"
+
 namespace Lucy {
 
 	class EditorModule : public Module {
 	public:
-		static EditorModule& GetInstance() {
-			static EditorModule s_Instance;
-			return s_Instance;
-		}
-
-		void Init(RefLucy<Window> window) override;
+		EditorModule(RefLucy<Window> window);
+		virtual ~EditorModule() = default;
+		
 		void Begin(PerformanceMetrics& rendererMetrics) override;
 		void End() override;
 		void OnRender() override;
@@ -28,10 +27,10 @@ namespace Lucy {
 
 		inline Scene& GetScene() { return m_Scene; }
 	private:
-		EditorModule() = default;
-		virtual ~EditorModule() = default;
-
 		Scene m_Scene;
 		ViewportRenderer m_ViewportRenderer;
+		ImGuiOverlay m_ImGuiOverlay;
+
+		PerformanceMetrics* m_PerformanceMetrics = nullptr; //for it to be visualized
 	};
 }

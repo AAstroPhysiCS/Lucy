@@ -53,6 +53,8 @@ namespace Lucy {
 
 		virtual void Enqueue(const SubmitFunc&& func) = 0;
 		virtual void EnqueueStaticMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform) = 0;
+		
+		virtual void RecordToCommandQueue(RecordFunc<>&& func) = 0;
 		virtual void RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func) = 0;
 
 		virtual void BeginScene(Scene& scene) = 0;
@@ -63,10 +65,13 @@ namespace Lucy {
 		virtual void UnbindPipeline(RefLucy<Pipeline> pipeline) = 0;
 		virtual void BindBuffers(RefLucy<VertexBuffer> vertexBuffer, RefLucy<IndexBuffer> indexBuffer) = 0;
 
-		virtual void OnViewportResize() = 0;
-		void SetViewportMousePosition(float x, float y);
-
 		virtual Entity OnMousePicking() = 0;
+		virtual void OnViewportResize() = 0;
+
+		inline void SetViewportMousePosition(float x, float y) {
+			m_ViewportMouseX = x;
+			m_ViewportMouseY = y;
+		}
 
 		inline void SetViewportSize(int32_t width, int32_t height) const {
 			m_ViewportWidth = width;
@@ -98,7 +103,7 @@ namespace Lucy {
 		RefLucy<RenderContext> m_RenderContext;
 		RenderArchitecture m_Architecture;
 
-		friend class Renderer;
+		friend class Renderer; //for s_CommandQueue
 		friend class ImGuiOverlay; //for m_RenderContext
 		friend class VulkanAllocator; //for m_RenderContext
 	};

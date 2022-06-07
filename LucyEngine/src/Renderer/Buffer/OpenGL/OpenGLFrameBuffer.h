@@ -10,8 +10,8 @@ namespace Lucy {
 		OpenGLFrameBuffer(FrameBufferSpecification& specs);
 		virtual ~OpenGLFrameBuffer() = default;
 
-		void Bind() override;
-		void Unbind() override;
+		void Bind();
+		void Unbind();
 		void Destroy() override;
 		void Blit();
 		void Resize(int32_t width, int32_t height);
@@ -21,7 +21,8 @@ namespace Lucy {
 
 		inline auto GetSizeFromTexture(uint32_t index) const {
 			struct Size { int32_t Width, Height; };
-			return Size{ m_Specs.TextureSpecs[index].Width, m_Specs.TextureSpecs[index].Height };
+			auto& desc = As(m_Specs.InternalInfo, OpenGLRHIFrameBufferDesc);
+			return Size{ desc->TextureSpecs[index].Width, desc->TextureSpecs[index].Height };
 		}
 
 		uint32_t GetID() const { return m_Id; }

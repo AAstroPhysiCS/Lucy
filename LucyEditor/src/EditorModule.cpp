@@ -7,9 +7,6 @@
 #include "Renderer/Buffer/FrameBuffer.h"
 #include "Renderer/Buffer/OpenGL/OpenGLFrameBuffer.h"
 
-#include "UI/ViewportPanel.h"
-#include "UI/SceneHierarchyPanel.h"
-
 #include "Events/KeyCodes.h"
 #include "Events/MouseCode.h"
 #include "Events/WindowEvent.h"
@@ -19,25 +16,32 @@
 
 namespace Lucy {
 
-	void EditorModule::Init(RefLucy<Window> window) {
-		m_Window = window;
+	EditorModule::EditorModule(RefLucy<Window> window)
+		: Module(window) {
 		m_ViewportRenderer.Init();
+		m_ImGuiOverlay.Init(m_Window, m_Scene);
 	}
 
 	void EditorModule::Begin(PerformanceMetrics& rendererMetrics) {
 		m_Scene.GetEditorCamera().OnEvent(rendererMetrics);
 		m_ViewportRenderer.Begin(m_Scene);
+
+		m_PerformanceMetrics = &rendererMetrics;
 	}
 
 	void EditorModule::OnRender() {
+		m_ImGuiOverlay.Render(m_PerformanceMetrics);
 		m_ViewportRenderer.Dispatch();
 	}
 
 	void EditorModule::End() {
 		m_ViewportRenderer.End();
+		m_Window->SwapBuffers();
 	}
 
 	void EditorModule::OnEvent(Event& e) {
+		m_ImGuiOverlay.OnEvent(e);
+		
 		EventDispatcher& dispatcher = EventDispatcher::GetInstance();
 		dispatcher.Dispatch<KeyEvent>(e, EventType::KeyEvent, [&](const KeyEvent& e) {
 			if (e == KeyCode::Escape) {
@@ -48,20 +52,10 @@ namespace Lucy {
 		dispatcher.Dispatch<WindowResizeEvent>(e, EventType::WindowResizeEvent, [&](const WindowResizeEvent& e) {
 			m_ViewportRenderer.OnWindowResize();
 		});
-
-		dispatcher.Dispatch<MouseEvent>(e, EventType::MouseEvent, [](const MouseEvent& e) {
-			const ViewportPanel& viewportPanel = ViewportPanel::GetInstance();
-			if (viewportPanel.IsOverAnyGizmo || !viewportPanel.IsViewportActive) return;
-
-			if (e == MouseCode::Button0) {
-				Entity e = Renderer::OnMousePicking();
-				SceneHierarchyPanel& sceneHierarchyPanel = SceneHierarchyPanel::GetInstance();
-				e.IsValid() ? sceneHierarchyPanel.SetEntityContext(e) : sceneHierarchyPanel.SetEntityContext({});
-			}
-		});
 	}
 
 	void EditorModule::Destroy() {
+		m_ImGuiOverlay.Destroy();
 		m_ViewportRenderer.Destroy();
 	}
 }

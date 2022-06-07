@@ -12,7 +12,8 @@ namespace Lucy {
 	struct OpenGLRHIFrameBufferDesc {
 		bool DisableReadWriteBuffer = false;
 		bool IsStorage = false;
-
+		
+		std::vector<ImageSpecification> TextureSpecs;
 		ImageSpecification BlittedTextureSpecs;
 
 		RefLucy<RenderBuffer> RenderBuffer;
@@ -29,9 +30,7 @@ namespace Lucy {
 	struct FrameBufferSpecification {
 		bool MultiSampled = false;
 		int32_t	Width = 0, Height = 0;
-		int32_t Level = 0;
-
-		std::vector<ImageSpecification> TextureSpecs;
+		int32_t Level = 1;
 
 		RefLucy<void> InternalInfo = nullptr; //to be overriden by different rhi's
 	};
@@ -41,10 +40,10 @@ namespace Lucy {
 		~FrameBuffer() = default;
 
 		static RefLucy<FrameBuffer> Create(FrameBufferSpecification& specs);
-
-		virtual void Bind() = 0;
-		virtual void Unbind() = 0;
 		virtual void Destroy() = 0;
+
+		inline uint32_t GetWidth() { return m_Specs.Width; }
+		inline uint32_t GetHeight() { return m_Specs.Height; }
 	protected:
 		FrameBuffer(FrameBufferSpecification& m_Specs);
 

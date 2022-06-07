@@ -14,6 +14,7 @@
 #include "Image/Image.h" //TODO: Delete
 
 #include "Synchronization/SynchItems.h"
+#include "Utils.h"
 
 namespace Lucy {
 
@@ -24,6 +25,9 @@ namespace Lucy {
 		auto& vulkanTestShader = Renderer::GetShaderLibrary().GetShader("LucyVulkanTest");
 		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 		RenderArchitecture rhi = Renderer::GetCurrentRenderArchitecture();
+
+		auto [width, height] = Utils::ReadSizeFromIni("Viewport");
+		Renderer::SetViewportSize(width, height);
 
 		std::vector<ShaderLayoutElement> vertexLayout = {
 				{ "a_Pos", ShaderDataSize::Float2 },
@@ -38,8 +42,8 @@ namespace Lucy {
 		geometryPassSpecs.ClearColor = { 0.0f, 0.0f, 0.5f, 1.0f };
 
 		ImageSpecification geometryTextureSpecification;
-		geometryTextureSpecification.Width = swapChain.GetExtent().width;
-		geometryTextureSpecification.Height = swapChain.GetExtent().height;
+		geometryTextureSpecification.Width = width;
+		geometryTextureSpecification.Height = height;
 		geometryTextureSpecification.Format = VK_FORMAT_B8G8R8A8_UNORM;
 		geometryTextureSpecification.ImageType = ImageType::Type2D;
 		geometryTextureSpecification.Parameter.Mag = VK_FILTER_LINEAR;
@@ -49,8 +53,8 @@ namespace Lucy {
 		geometryTextureSpecification.Parameter.W = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
 		FrameBufferSpecification geometryFrameBufferSpecs;
-		geometryFrameBufferSpecs.Width = swapChain.GetExtent().width;
-		geometryFrameBufferSpecs.Height = swapChain.GetExtent().height;
+		geometryFrameBufferSpecs.Width = width;
+		geometryFrameBufferSpecs.Height = height;
 
 		PipelineSpecification geometryPipelineSpecs;
 		geometryPipelineSpecs.VertexShaderLayout = VertexShaderLayout(vertexLayout);
@@ -84,7 +88,6 @@ namespace Lucy {
 			vulkanFrameBufferDesc->RenderPass = RenderPass::Create(geometryPassSpecs);
 
 			geometryFrameBufferSpecs.InternalInfo = vulkanFrameBufferDesc;
-
 			geometryPipelineSpecs.RenderPass = vulkanFrameBufferDesc->RenderPass;
 		}
 
@@ -121,7 +124,6 @@ namespace Lucy {
 			vulkanFrameBufferDesc->RenderPass = s_ImGuiPipeline.UIRenderPass;
 
 			uiFrameBufferSpecs.InternalInfo = vulkanFrameBufferDesc;
-
 			s_ImGuiPipeline.UIFramebuffer = FrameBuffer::Create(uiFrameBufferSpecs);
 		}
 
@@ -143,16 +145,16 @@ namespace Lucy {
 	}
 
 	void ViewportRenderer::Begin(Scene& scene) {
-		Renderer::BeginScene(scene);
 		Renderer::Dispatch(); //dispatch all the functions that should happen on the main render thread (before the passes)
+		Renderer::BeginScene(scene);
 	}
 
 	void ViewportRenderer::Dispatch() {
 		IDPass();
 		GeometryPass();
+		UIPass();
 
 		Renderer::RenderScene();
-		UIPass(); //UIPass is after rendering the scene and it does not depend on the RenderCommandQueue
 	}
 
 	void ViewportRenderer::End() {
@@ -173,10 +175,6 @@ namespace Lucy {
 		s_GeometryPipeline->Destroy();
 		s_ImGuiPipeline.UIFramebuffer->Destroy();
 		s_ImGuiPipeline.UIRenderPass->Destroy();
-	}
-
-	void ViewportRenderer::UIPass() {
-		Renderer::RenderUI(s_ImGuiPipeline);
 	}
 
 	void ViewportRenderer::GeometryPass() {
@@ -200,7 +198,7 @@ namespace Lucy {
 		uniformBuffer->Update();
 
 		//TODO: this function should work in parallel, meaning it should be multithreaded...
-		Renderer::RecordToCommandQueue([](MeshDrawCommand drawCommand) {
+		Renderer::RecordToCommandQueue([]() {
 			Renderer::BindPipeline(s_GeometryPipeline);
 			Renderer::BindBuffers(vertexBuffer, indexBuffer);
 			Renderer::DrawIndexed(6, 1, 0, 0, 0);
@@ -228,6 +226,10 @@ namespace Lucy {
 	}
 
 	void ViewportRenderer::IDPass() {
+		//TODO: later
+	}
 
+	void ViewportRenderer::UIPass() {
+		Renderer::UIPass(s_ImGuiPipeline);
 	}
 }

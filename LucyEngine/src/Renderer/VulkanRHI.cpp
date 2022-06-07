@@ -55,7 +55,7 @@ namespace Lucy {
 		return (PresentResult)swapChain.Present();
 	}
 
-	// Should not be used in a loop
+	// Should not be used in a loop 
 	void VulkanRHI::DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size) {
 		RecordSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
 			VkBufferCopy copyRegion{};
@@ -74,6 +74,22 @@ namespace Lucy {
 		Enqueue([=]() {
 			m_StaticMeshDrawCommandQueue.push_back(MeshDrawCommand(mesh, entityTransform));
 		});
+	}
+
+	void VulkanRHI::RecordToCommandQueue(RecordFunc<>&& func) {
+		//TODO: Temporary, delete afterwards
+		CommandElement element;
+		element.RecordFunc = *(RecordFunc<void*>*) & func;
+		element.Argument = nullptr;
+		s_CommandQueue.Enqueue(element);
+		/*
+		for (MeshDrawCommand cmd : m_StaticMeshDrawCommandQueue) {
+			CommandElement element;
+			element.RecordFunc = *(RecordFunc<void*>*)&func;
+			element.Argument = (void*)&cmd;
+			s_CommandQueue.Enqueue(element);
+		}
+		*/
 	}
 
 	void VulkanRHI::RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func) {
@@ -122,7 +138,8 @@ namespace Lucy {
 
 	void VulkanRHI::Destroy() {
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
-		vkDeviceWaitIdle(device);
+		LUCY_VK_ASSERT(vkDeviceWaitIdle(device));
+
 		s_CommandQueue.Free();
 		m_RenderContext->Destroy();
 	}
@@ -131,30 +148,17 @@ namespace Lucy {
 		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 		swapChain.Recreate();
 
-		As(ViewportRenderer::s_GeometryPipeline, VulkanPipeline)->Recreate();
+		s_CommandQueue.Recreate();
 
-		//Possible (there is also an error)
-		Renderer::Enqueue([]() {
-			ViewportRenderer::s_ImGuiPipeline.UIFramebuffer->Destroy();
-			ViewportRenderer::s_ImGuiPipeline.UIRenderPass->Recreate();
-		});
+		As(ViewportRenderer::s_GeometryPipeline, VulkanPipeline)->Recreate(m_ViewportWidth, m_ViewportHeight);
 
+		ViewportRenderer::s_ImGuiPipeline.UIRenderPass->Recreate();
+
+		auto& extent = swapChain.GetExtent();
 		auto& desc = swapChain.GetSwapChainFrameBufferDesc();
 		desc->RenderPass = ViewportRenderer::s_ImGuiPipeline.UIRenderPass;
 
-		FrameBufferSpecification frameBufferSpecs;
-		frameBufferSpecs.Width = swapChain.GetExtent().width;
-		frameBufferSpecs.Height = swapChain.GetExtent().height;
-		frameBufferSpecs.InternalInfo = desc;
-
-		Renderer::Enqueue([=]() mutable {
-			ViewportRenderer::s_ImGuiPipeline.UIFramebuffer = FrameBuffer::Create(frameBufferSpecs);
-		});
-
-		auto& extent = swapChain.GetExtent();
-		SetViewportSize(extent.width, extent.height);
-
-		//s_CommandQueue.Recreate();
+		As(ViewportRenderer::s_ImGuiPipeline.UIFramebuffer, VulkanFrameBuffer)->Recreate(extent.width, extent.height, desc);
 	}
 
 	Entity VulkanRHI::OnMousePicking() {

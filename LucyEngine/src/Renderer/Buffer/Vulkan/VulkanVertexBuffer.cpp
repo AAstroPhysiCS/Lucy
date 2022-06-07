@@ -11,13 +11,16 @@ namespace Lucy {
 
 	VulkanVertexBuffer::VulkanVertexBuffer(uint32_t size)
 		: VertexBuffer(size) {
-		Renderer::Enqueue([this, size]() {
+		Renderer::Enqueue([&, size]() {
 			Create(size);
 		});
 	}
 
 	VulkanVertexBuffer::VulkanVertexBuffer()
 		: VertexBuffer() {
+		Renderer::Enqueue([&]() {
+			Create();
+		});
 	}
 
 	void VulkanVertexBuffer::Create(uint32_t size) {

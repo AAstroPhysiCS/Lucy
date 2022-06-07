@@ -14,7 +14,7 @@ namespace Lucy {
 
 	struct CommandElement {
 		RecordFunc<void*> RecordFunc;
-		void* Argument;
+		void* Argument = nullptr;
 	};
 
 	class CommandQueue {
@@ -41,8 +41,6 @@ namespace Lucy {
 		VkCommandBuffer BeginSingleTimeCommand() const;
 		void EndSingleTimeCommand(VkCommandBuffer commandBuffer) const;
 	private:
-		//void Grow(const CommandElement& element) const;
-
 		std::vector<CommandElement> m_Buffer;
 		RefLucy<VulkanCommandPool> m_CommandPool;
 	};

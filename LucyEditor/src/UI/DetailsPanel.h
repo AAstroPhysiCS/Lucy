@@ -5,13 +5,16 @@
 
 namespace Lucy {
 
-	class PropertiesPanel : public Panel
+	class DetailsPanel : public Panel
 	{
 	public:
-		static PropertiesPanel& GetInstance();
+		static DetailsPanel& GetInstance();
+	private:
+		DetailsPanel() = default;
+		virtual ~DetailsPanel() = default;
 
 		void Render();
-	private:
+
 		template <typename T>
 		static void DrawComponentPanel(Entity& e, std::function<void(T&)> func) {
 			if (e.HasComponent<T>())

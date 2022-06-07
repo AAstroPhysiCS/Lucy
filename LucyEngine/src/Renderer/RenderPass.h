@@ -39,6 +39,9 @@ namespace Lucy {
 		RefLucy<OpenGLFrameBuffer> OpenGLFrameBuffer = nullptr;
 		VkFramebuffer VulkanFrameBuffer = nullptr;
 		VkCommandBuffer CommandBuffer = nullptr;
+		uint32_t Width = 0;
+		uint32_t Height = 0;
+		bool EnforceViewport = true;
 	};
 
 	class RenderPass {

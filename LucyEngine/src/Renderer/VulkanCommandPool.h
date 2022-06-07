@@ -12,11 +12,6 @@ namespace Lucy {
 		uint32_t CommandBufferCount = 0;
 	};
 
-	//abstract commandbuffer
-	class VulkanCommandBuffer {
-
-	};
-
 	class VulkanCommandPool {
 	public:
 		VulkanCommandPool(CommandPoolSpecs specs);

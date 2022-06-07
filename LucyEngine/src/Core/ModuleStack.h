@@ -11,11 +11,11 @@ namespace Lucy {
 		ModuleStack() = default;
 		~ModuleStack() = default;
 
-		void Push(std::initializer_list<Module*> list);
+		void Push(RefLucy<Module> m);
 		void Pop();
 
-		inline std::vector<Module*>& GetStack() { return m_ModuleStack; }
+		inline std::vector<RefLucy<Module>>& GetStack() { return m_ModuleStack; }
 	private:
-		std::vector<Module*> m_ModuleStack;
+		std::vector<RefLucy<Module>> m_ModuleStack;
 	};
 }

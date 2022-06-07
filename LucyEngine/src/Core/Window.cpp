@@ -21,6 +21,10 @@ namespace Lucy {
 #endif
 	}
 
+	void Window::SwapBuffers() {
+		glfwSwapBuffers(m_Window);
+	}
+
 	void WinWindow::Init(RenderArchitecture architecture) {
 
 		if (!glfwInit()) {
@@ -76,7 +80,7 @@ namespace Lucy {
 		return m_Window;
 	}
 
-	void WinWindow::Update() {
+	void WinWindow::WaitEventsIfMinimized() {
 		glfwGetWindowSize(m_Window, &m_Specs.Width, &m_Specs.Height);
 
 		while (m_Specs.Width == 0 || m_Specs.Height == 0) {
@@ -127,5 +131,6 @@ namespace Lucy {
 
 	void WinWindow::Destroy() {
 		glfwDestroyWindow(m_Window);
+		glfwTerminate();
 	}
 }

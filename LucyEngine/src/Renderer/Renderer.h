@@ -34,10 +34,12 @@ namespace Lucy {
 
 		static void Enqueue(const SubmitFunc&& func);
 		static void EnqueueStaticMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform);
+
+		static void RecordToCommandQueue(RecordFunc<>&& func);
 		static void RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func);
 
 		static void SetUIDrawData(std::function<void(VkCommandBuffer commandBuffer)>&& func);
-		static void RenderUI(const ImGuiPipeline& imguiPipeline);
+		static void UIPass(const ImGuiPipeline& imguiPipeline);
 
 		static void BindPipeline(RefLucy<Pipeline> pipeline);
 		static void UnbindPipeline();
@@ -52,8 +54,8 @@ namespace Lucy {
 		static void Dispatch();
 		static void ClearQueues();
 
-		inline static void SetViewportSize(int32_t width, int32_t height);
-		inline static void SetViewportMouse(float viewportMouseX, float viewportMouseY);
+		static void SetViewportSize(int32_t width, int32_t height);
+		static void SetViewportMouse(float viewportMouseX, float viewportMouseY);
 
 		inline static RefLucy<Window> GetWindow() { return s_Specs.Window; }
 		inline static auto GetWindowSize() {
@@ -64,12 +66,11 @@ namespace Lucy {
 		inline static auto GetViewportSize() { return s_RHI->GetViewportSize(); }
 		inline static RenderArchitecture GetCurrentRenderArchitecture() { return s_Specs.Architecture; }
 		inline static ShaderLibrary& GetShaderLibrary() { return s_ShaderLibrary; }
-		inline static Scene* GetActiveScene() { return s_RHI->m_ActiveScene; }
 		inline static RefLucy<RHI> GetCurrentRenderer() { return s_RHI; }
 	private:
 		Renderer() = delete;
 		~Renderer() = delete;
-
+		
 		static RefLucy<RHI> s_RHI;
 		static RefLucy<Pipeline> s_ActivePipeline;
 		static RendererSpecification s_Specs;

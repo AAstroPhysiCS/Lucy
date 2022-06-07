@@ -23,6 +23,7 @@ namespace Lucy {
 		void Enqueue(const SubmitFunc&& func) override;
 		void EnqueueStaticMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform) override;
 
+		void RecordToCommandQueue(RecordFunc<>&& func);
 		void RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func);
 
 		void BindPipeline(RefLucy<Pipeline> pipeline);

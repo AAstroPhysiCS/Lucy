@@ -19,7 +19,6 @@ namespace Lucy {
 
 		DestroyMessageCallback();
 		vkDestroyInstance(m_Instance, nullptr);
-		glfwTerminate();
 	}
 
 	void VulkanContext::PrintInfo() {

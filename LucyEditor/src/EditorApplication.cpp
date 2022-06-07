@@ -19,7 +19,6 @@ namespace Lucy {
 
 	EditorApplication::EditorApplication(const ApplicationArgs& args, ApplicationSpecification& specs)
 		: Application(args, specs) {
-		m_ModuleStack.Push({ &EditorModule::GetInstance() });
 		m_Running = true;
 
 		RendererSpecification rendererSpecs;
@@ -35,15 +34,15 @@ namespace Lucy {
 		rendererSpecs.Window = m_Window;
 
 		Renderer::Init(rendererSpecs);
-		EditorModule::GetInstance().Init(m_Window);
+		m_ModuleStack.Push(CreateRef<EditorModule>(m_Window));
 
 		LUCY_ASSERT(NFD_Init() == NFD_OKAY);
 	}
 
 	EditorApplication::~EditorApplication() {
 		m_Running = false;
-		for (Module* layer : m_ModuleStack.GetStack()) {
-			layer->Destroy();
+		for (RefLucy<Module> m : m_ModuleStack.GetStack()) {
+			m->Destroy();
 		}
 		Renderer::Destroy();
 		m_Window->Destroy();
@@ -53,10 +52,10 @@ namespace Lucy {
 	void EditorApplication::Run() {
 		while (m_Running && !glfwWindowShouldClose(m_Window->Raw())) {
 
-			for (Module* layer : m_ModuleStack.GetStack()) {
-				layer->Begin(s_Metrics);
-				layer->OnRender();
-				layer->End();
+			for (RefLucy<Module> mod : m_ModuleStack.GetStack()) {
+				mod->Begin(s_Metrics);
+				mod->OnRender();
+				mod->End();
 			}
 			s_Metrics.Update();
 			m_Window->PollEvents();
@@ -64,8 +63,9 @@ namespace Lucy {
 	}
 
 	void EditorApplication::OnEvent(Event* e) {
-		for (Module* layer : m_ModuleStack.GetStack()) {
-			layer->OnEvent(*e);
+		m_Window->WaitEventsIfMinimized();
+		for (RefLucy<Module> mod : m_ModuleStack.GetStack()) {
+			mod->OnEvent(*e);
 		}
 	}
 }

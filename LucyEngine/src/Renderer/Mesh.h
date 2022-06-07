@@ -39,7 +39,6 @@ namespace Lucy {
 	class Mesh {
 	public:
 		Mesh(const std::string& path);
-		Mesh(const Mesh& other) = default;
 		~Mesh();
 
 		static RefLucy<Mesh> Create(const std::string& path);

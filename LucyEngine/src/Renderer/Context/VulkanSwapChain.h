@@ -36,7 +36,7 @@ namespace Lucy {
 		VkResult Present();
 		void Destroy();
 
-		inline VkExtent2D& GetExtent() { return m_SelectedSwapExtent; }
+		inline VkExtent2D GetExtent() { return m_SelectedSwapExtent; }
 		inline VkSurfaceFormatKHR& GetSurfaceFormat() { return m_SelectedFormat; }
 		inline VkSwapchainKHR GetVulkanHandle() { return m_SwapChain; }
 		inline VkResult GetLastSwapChainResult() { return m_LastSwapChainResult; }
@@ -47,8 +47,11 @@ namespace Lucy {
 		inline uint32_t GetCurrentImageIndex() { return m_ImageIndex; }
 		inline uint32_t GetCurrentFrameIndex() { return m_CurrentFrameIndex; }
 		inline const uint32_t GetMaxFramesInFlight() const { return MAX_FRAMES_IN_FLIGHT; }
+
 		inline RefLucy<VulkanRHIFrameBufferDesc> GetSwapChainFrameBufferDesc() const { return m_SwapChainFrameBufferDesc; }
 	private:
+		void SubmitToQueue(VkCommandBuffer commandBuffer);
+
 		VkSwapchainKHR Create(VkSwapchainKHR oldSwapChain);
 		VkResult AcquireNextImage(VkSemaphore currentFrameImageAvailSemaphore, uint32_t& imageIndex);
 

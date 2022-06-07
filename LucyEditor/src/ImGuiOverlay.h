@@ -10,38 +10,31 @@
 
 #include "GLFW/glfw3.h"
 
-#include "Core/Layer.h"
+#include "Core/Module.h"
 #include "UI/Panel.h"
 
 #include "Core/Window.h"
+#include "Scene/Scene.h"
 
 #include "Renderer/VulkanDescriptors.h"
-#include "Renderer/Context/VulkanPipeline.h"
 
 namespace Lucy {
 
-	class VulkanRenderPass;
 	class VulkanDescriptorPool;
 
 	class ImGuiOverlay {
 	public:
-		static ImGuiOverlay& GetInstance() {
-			static ImGuiOverlay s_Instance;
-			return s_Instance;
-		}
-
-		void Init(RefLucy<Window> window);
-		void Begin(PerformanceMetrics& performanceMetrics);
-		void End();
-		void OnRender();
-		void OnEvent(Event& e);
-		void Destroy();
-	private:
 		ImGuiOverlay();
 		~ImGuiOverlay() = default;
 
-		void UIPass();
-		inline bool IsInitiated() { return ImGui::GetIO().BackendRendererUserData; }
+		void Init(RefLucy<Window> window, Scene& scene);
+		void Render(PerformanceMetrics* performanceMetrics);
+		void OnEvent(Event& e);
+		void Destroy();
+	private:
+		void Begin(PerformanceMetrics* performanceMetrics);
+		void SendImGuiDataToGPU();
+		void End();
 
 		std::vector<VkDescriptorPoolSize> m_ImGuiPoolSizes =
 		{
@@ -61,6 +54,7 @@ namespace Lucy {
 		VulkanDescriptorPoolSpecifications m_PoolSpecs = { m_ImGuiPoolSizes, VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT, 1000 };
 		RefLucy<VulkanDescriptorPool> m_ImGuiPool = nullptr;
 
+		Scene* m_Scene = nullptr;
 		uint32_t m_Time = 0;
 		std::vector<Panel*> m_Panels;
 	};

@@ -1,10 +1,10 @@
 #include "lypch.h"
-#include "ImGuiLayer.h"
+#include "ImGuiOverlay.h"
 
-#include "UI/SceneHierarchyPanel.h"
+#include "UI/SceneExplorerPanel.h"
 #include "UI/TaskbarPanel.h"
 #include "UI/ViewportPanel.h"
-#include "UI/PropertiesPanel.h"
+#include "UI/DetailsPanel.h"
 #include "UI/PerformancePanel.h"
 
 #include "Events/InputEvent.h"
@@ -14,9 +14,7 @@
 
 #include "Renderer/Renderer.h"
 #include "Renderer/VulkanRHI.h"
-#include "Renderer/VulkanRenderPass.h"
 #include "Renderer/ViewportRenderer.h"
-#include "Renderer/Buffer/Vulkan/VulkanFrameBuffer.h"
 #include "glad/glad.h"
 
 #include "Renderer/Context/VulkanContext.h"
@@ -24,14 +22,18 @@
 namespace Lucy {
 
 	ImGuiOverlay::ImGuiOverlay() {
-		m_Panels.push_back(&SceneHierarchyPanel::GetInstance());
+		m_Panels.push_back(&SceneExplorerPanel::GetInstance());
 		m_Panels.push_back(&TaskbarPanel::GetInstance());
-		m_Panels.push_back(&ViewportPanel::GetInstance());
-		m_Panels.push_back(&PropertiesPanel::GetInstance());
+		m_Panels.push_back(&DetailsPanel::GetInstance());
 		m_Panels.push_back(&PerformancePanel::GetInstance());
+		m_Panels.push_back(&ViewportPanel::GetInstance());
 	}
 
-	void ImGuiOverlay::Init(RefLucy<Window> window) {
+	void ImGuiOverlay::Init(RefLucy<Window> window, Scene& scene) {
+		m_Scene = &scene;
+
+		SceneExplorerPanel::GetInstance().SetScene(m_Scene);
+
 		ImGui::CreateContext();
 
 		ImGuiIO& io = ImGui::GetIO();
@@ -66,7 +68,6 @@ namespace Lucy {
 				initInfo.DescriptorPool = m_ImGuiPool->GetVulkanHandle();
 				initInfo.MinImageCount = 3;
 				initInfo.ImageCount = 3;
-				initInfo.ImageCount = 3;
 				initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 				initInfo.CheckVkResultFn = VulkanMessageCallback::ImGui_DebugCallback;
 
@@ -77,11 +78,7 @@ namespace Lucy {
 		}
 	}
 
-	void ImGuiOverlay::Begin(PerformanceMetrics& rendererMetrics) {
-		//waits for the renderer thread, to initialize imgui context
-		if (!IsInitiated()) 
-			return;
-
+	void ImGuiOverlay::Begin(PerformanceMetrics* rendererMetrics) {
 		auto currentArchitecture = Renderer::GetCurrentRenderArchitecture();
 		if (currentArchitecture == RenderArchitecture::OpenGL) {
 			ImGui_ImplOpenGL3_NewFrame();
@@ -98,9 +95,9 @@ namespace Lucy {
 		ImGuiIO& io = ImGui::GetIO();
 		
 		ImGuiViewport* viewport = ImGui::GetMainViewport();
-		//ImGui::SetNextWindowPos(viewport->Pos);
-		//ImGui::SetNextWindowSize(viewport->Size);
-		//ImGui::SetNextWindowViewport(viewport->ID);
+		ImGui::SetNextWindowPos(viewport->Pos);
+		ImGui::SetNextWindowSize(viewport->Size);
+		ImGui::SetNextWindowViewport(viewport->ID);
 
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
@@ -121,9 +118,6 @@ namespace Lucy {
 	}
 
 	void ImGuiOverlay::End() {
-		if (!IsInitiated()) 
-			return;
-
 		ImGui::End(); //end of dockspace window
 
 		ImGuiIO& io = ImGui::GetIO();
@@ -132,7 +126,7 @@ namespace Lucy {
 		m_Time = time;
 
 		ImGui::Render();
-		UIPass();
+		SendImGuiDataToGPU();
 
 		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
 			GLFWwindow* backup_current_context = glfwGetCurrentContext();
@@ -142,7 +136,7 @@ namespace Lucy {
 		}
 	}
 
-	void ImGuiOverlay::UIPass() {
+	void ImGuiOverlay::SendImGuiDataToGPU() {
 		auto currentArchitecture = Renderer::GetCurrentRenderArchitecture();
 
 		if (currentArchitecture == RenderArchitecture::OpenGL) {
@@ -154,13 +148,12 @@ namespace Lucy {
 		}
 	}
 
-	void ImGuiOverlay::OnRender() {
-		if (!IsInitiated())
-			return;
-
+	void ImGuiOverlay::Render(PerformanceMetrics* rendererMetrics) {
+		Begin(rendererMetrics);
 		for (Panel* panel : m_Panels) {
 			panel->Render();
 		}
+		End();
 	}
 
 	void ImGuiOverlay::OnEvent(Event& e) {
