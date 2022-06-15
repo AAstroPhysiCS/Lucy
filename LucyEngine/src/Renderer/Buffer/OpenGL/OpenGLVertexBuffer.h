@@ -12,9 +12,10 @@ namespace Lucy {
 
 		void Bind(const VertexBindInfo& info) override;
 		void Unbind() override;
-		void AddData(const std::vector<float>& dataToAdd) override;
-		void Load() override;
-		void Destroy() override;
+		void LoadToGPU() override;
+		void DestroyHandle() override;
+	private:
+		uint32_t m_Id;
 	};
 }
 

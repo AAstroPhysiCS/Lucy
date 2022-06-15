@@ -12,8 +12,9 @@ namespace Lucy {
 
 		void Bind(const IndexBindInfo& info) override;
 		void Unbind() override;
-		void AddData(const std::vector<uint32_t>& dataToAdd) override;
-		void Load() override;
-		void Destroy() override;
+		void LoadToGPU() override;
+		void DestroyHandle() override;
+	private:
+		uint32_t m_Id;
 	};
 }

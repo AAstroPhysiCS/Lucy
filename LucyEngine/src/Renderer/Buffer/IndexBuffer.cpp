@@ -3,6 +3,7 @@
 
 #include "OpenGL/OpenGLIndexBuffer.h"
 #include "Vulkan/VulkanIndexBuffer.h"
+
 #include "../Renderer.h"
 
 namespace Lucy {
@@ -31,13 +32,7 @@ namespace Lucy {
 		return nullptr;
 	}
 
-	IndexBuffer::IndexBuffer() {
-		m_DataHead = m_Data.data();
-		m_Size = 0;
-	}
-
-	IndexBuffer::IndexBuffer(uint32_t size)
-		: m_Size(size) {
-		m_DataHead = m_Data.data();
+	IndexBuffer::IndexBuffer(uint32_t size) {
+		Allocate(size); //internal std::vector allocation
 	}
 }

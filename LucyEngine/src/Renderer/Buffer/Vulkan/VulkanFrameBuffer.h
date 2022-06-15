@@ -18,12 +18,16 @@ namespace Lucy {
 	private:
 		void Recreate(uint32_t width, uint32_t height, RefLucy<void> internalInfo = nullptr);
 		void Create();
+		void CreateImagesBasedOnDescs();
+		void CreateDepthImage();
 
 		std::vector<VkFramebuffer> m_FrameBufferHandles;
 		RefLucy<VulkanRenderPass> m_RenderPass;
 
 		std::vector<RefLucy<VulkanImage2D>> m_Images;
 		std::vector<VulkanImageView> m_ImageViews;
+
+		RefLucy<VulkanImage2D> m_DepthImage = nullptr;
 
 		friend class VulkanRHI; //for OnViewportResize (ImGui)
 		friend class VulkanPipeline; //for Pipeline Recreate

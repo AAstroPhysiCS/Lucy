@@ -17,8 +17,8 @@ namespace Lucy {
 	}
 	
 	void VulkanMesh::LoadBuffers() {
-		m_VertexBuffer->Load();
-		m_IndexBuffer->Load();
+		m_VertexBuffer->LoadToGPU();
+		m_IndexBuffer->LoadToGPU();
 		m_Loaded = true;
 	}
 }

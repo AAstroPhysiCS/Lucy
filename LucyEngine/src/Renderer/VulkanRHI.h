@@ -35,6 +35,7 @@ namespace Lucy {
 
 		static void RecordSingleTimeCommand(std::function<void(VkCommandBuffer)>&& func);
 		
+		void OnWindowResize() override;
 		void OnViewportResize() override;
 		Entity OnMousePicking() override;
 	};

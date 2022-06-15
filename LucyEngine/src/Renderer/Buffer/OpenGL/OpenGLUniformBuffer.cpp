@@ -4,6 +4,7 @@
 #include "Renderer/Renderer.h"
 
 namespace Lucy {
+
 	OpenGLUniformBuffer::OpenGLUniformBuffer(uint32_t size, uint32_t binding) {
 		Renderer::Enqueue([=]() {
 			glCreateBuffers(1, &m_Id);

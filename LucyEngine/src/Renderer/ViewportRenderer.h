@@ -20,7 +20,7 @@ namespace Lucy {
 
 		void Init();
 		void Begin(Scene& scene);
-		void Dispatch();
+		void Dispatch(Scene& scene);
 		void End();
 		void Destroy();
 

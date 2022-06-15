@@ -17,6 +17,7 @@ namespace Lucy {
 		VkSamplerAddressMode ModeW;
 		bool GenerateMipmap = false;
 		bool GenerateSampler = false;
+		bool DepthEnable = false;
 	};
 
 	class VulkanImageView {
@@ -45,6 +46,7 @@ namespace Lucy {
 
 	class VulkanImage2D : public Image2D {
 	public:
+		VulkanImage2D(const std::string& path, ImageSpecification& specs);
 		VulkanImage2D(ImageSpecification& specs);
 
 		void Bind() override;
@@ -56,22 +58,23 @@ namespace Lucy {
 		inline VkImage GetVulkanHandle() const { return m_Image; }
 		inline VkImageLayout GetCurrentLayout() const { return m_CurrentLayout; }
 	private:
+		void CreateFromPath();
+		void CreateEmptyImage();
+		void CreateDepthImage();
+
+		void CreateVulkanImageViewHandle();
+
 		//helper functions
-		void CopyImage(); //should maybe be public?
+		void CopyImage(const VkBuffer& imageStagingBuffer); //should maybe be public?
 		void TransitionImageLayout(VkImage image, VkImageLayout newLayout);
 		void DefineMasksByLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags& srcAccessMask, VkAccessFlags& destAccessMask,
 								 VkPipelineStageFlags& sourceStage, VkPipelineStageFlags& destStage);
-		void CreateImage(VkImageUsageFlags usage);
-		void Create();
-
-		VkBuffer m_ImageStagingBuffer = VK_NULL_HANDLE;
-		VmaAllocation m_ImageStagingBufferVma = VK_NULL_HANDLE;
 
 		VkImage m_Image = VK_NULL_HANDLE;
 		VmaAllocation m_ImageVma = VK_NULL_HANDLE;
-		VkImageLayout m_CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
 		VulkanImageView m_ImageView;
+
+		VkImageLayout m_CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	};
 }
 

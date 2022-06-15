@@ -33,6 +33,7 @@ namespace Lucy {
 		inline RefLucy<OpenGLPipeline>& GetGeometryPipeline() { return m_GeometryPipeline; }
 		inline RefLucy<OpenGLPipeline>& GetIDPipeline() { return m_IDPipeline; }
 		
+		void OnWindowResize() override;
 		void OnViewportResize() override;
 		Entity OnMousePicking() override;
 	private:

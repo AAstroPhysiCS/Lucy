@@ -66,12 +66,8 @@ namespace Lucy {
 		virtual void BindBuffers(RefLucy<VertexBuffer> vertexBuffer, RefLucy<IndexBuffer> indexBuffer) = 0;
 
 		virtual Entity OnMousePicking() = 0;
+		virtual void OnWindowResize() = 0;
 		virtual void OnViewportResize() = 0;
-
-		inline void SetViewportMousePosition(float x, float y) {
-			m_ViewportMouseX = x;
-			m_ViewportMouseY = y;
-		}
 
 		inline void SetViewportSize(int32_t width, int32_t height) const {
 			m_ViewportWidth = width;

@@ -16,13 +16,6 @@ namespace Lucy {
 		});
 	}
 
-	VulkanVertexBuffer::VulkanVertexBuffer()
-		: VertexBuffer() {
-		Renderer::Enqueue([&]() {
-			Create();
-		});
-	}
-
 	void VulkanVertexBuffer::Create(uint32_t size) {
 		VulkanAllocator& allocator = VulkanAllocator::Get();
 		allocator.CreateVulkanBufferVma(size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
@@ -38,11 +31,7 @@ namespace Lucy {
 		//Empty
 	}
 
-	void VulkanVertexBuffer::AddData(const std::vector<float>& dataToAdd) {
-		m_Data.insert(m_Data.end(), dataToAdd.begin(), dataToAdd.end());
-	}
-
-	void VulkanVertexBuffer::Load() {
+	void VulkanVertexBuffer::LoadToGPU() {
 		Renderer::Enqueue([&]() {
 			VulkanAllocator& allocator = VulkanAllocator::Get();
 
@@ -51,7 +40,7 @@ namespace Lucy {
 			memcpy(data, m_Data.data(), m_Data.size() * sizeof(float));
 			vmaUnmapMemory(allocator.GetVmaInstance(), m_StagingBufferVma);
 
-			allocator.CreateVulkanBufferVma(m_Size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, 
+			allocator.CreateVulkanBufferVma(m_Data.size() * sizeof(float), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 											VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO, m_BufferHandle, m_BufferVma);
 			As(Renderer::GetCurrentRenderer(), VulkanRHI)->DirectCopyBuffer(m_StagingBufferHandle, m_BufferHandle, m_Data.size() * sizeof(float));
 
@@ -59,7 +48,7 @@ namespace Lucy {
 		});
 	}
 
-	void VulkanVertexBuffer::Destroy() {
+	void VulkanVertexBuffer::DestroyHandle() {
 		VulkanAllocator& allocator = VulkanAllocator::Get();
 		vmaDestroyBuffer(allocator.GetVmaInstance(), m_BufferHandle, m_BufferVma);
 	}

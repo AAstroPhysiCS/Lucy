@@ -26,8 +26,6 @@ namespace Lucy {
 		static void Init(const RendererSpecification& specs);
 		static void Destroy();
 
-		static void SetViewportMousePosition(float x, float y);
-
 		static void BeginScene(Scene& scene);
 		static void RenderScene();
 		static PresentResult EndScene();
@@ -48,6 +46,7 @@ namespace Lucy {
 		static void DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex,
 								int32_t vertexOffset, uint32_t firstInstance);
 
+		static void OnWindowResize();
 		static void OnViewportResize();
 		static Entity OnMousePicking();
 

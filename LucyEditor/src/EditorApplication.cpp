@@ -52,13 +52,13 @@ namespace Lucy {
 	void EditorApplication::Run() {
 		while (m_Running && !glfwWindowShouldClose(m_Window->Raw())) {
 
+			m_Window->PollEvents();
 			for (RefLucy<Module> mod : m_ModuleStack.GetStack()) {
 				mod->Begin(s_Metrics);
 				mod->OnRender();
 				mod->End();
 			}
 			s_Metrics.Update();
-			m_Window->PollEvents();
 		}
 	}
 

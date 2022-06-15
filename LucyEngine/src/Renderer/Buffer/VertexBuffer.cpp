@@ -32,13 +32,7 @@ namespace Lucy {
 		return nullptr;
 	}
 
-	VertexBuffer::VertexBuffer() {
-		m_DataHead = m_Data.data();
-		m_Size = 0;
-	}
-
-	VertexBuffer::VertexBuffer(uint32_t size)
-		: m_Size(size) {
-		m_DataHead = m_Data.data();
+	VertexBuffer::VertexBuffer(uint32_t size) {
+		Allocate(size); //internal std::vector allocation
 	}
 }

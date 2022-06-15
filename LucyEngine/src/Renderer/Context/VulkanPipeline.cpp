@@ -134,6 +134,16 @@ namespace Lucy {
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
 		LUCY_VK_ASSERT(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_PipelineLayoutHandle));
 
+		VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo{};
+		depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+		depthStencilCreateInfo.depthWriteEnable = VK_TRUE;
+		depthStencilCreateInfo.depthTestEnable = VK_TRUE;
+		depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+		depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;
+		depthStencilCreateInfo.minDepthBounds = 0.0f;
+		depthStencilCreateInfo.maxDepthBounds = 1.0f;
+		depthStencilCreateInfo.stencilTestEnable = VK_FALSE;
+
 		VkGraphicsPipelineCreateInfo pipelineCreateInfo{};
 		pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 		pipelineCreateInfo.stageCount = 2; //vertex and fragment
@@ -144,7 +154,7 @@ namespace Lucy {
 		pipelineCreateInfo.pViewportState = &viewportState;
 		pipelineCreateInfo.pRasterizationState = &rasterizationCreateInfo;
 		pipelineCreateInfo.pMultisampleState = &multisamplingCreateInfo;
-		pipelineCreateInfo.pDepthStencilState = nullptr; //TODO
+		pipelineCreateInfo.pDepthStencilState = &depthStencilCreateInfo;
 		pipelineCreateInfo.pColorBlendState = &colorBlending;
 		pipelineCreateInfo.pDynamicState = &dynamicState;
 		pipelineCreateInfo.layout = m_PipelineLayoutHandle;

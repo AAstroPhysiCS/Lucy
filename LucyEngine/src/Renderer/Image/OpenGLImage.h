@@ -6,6 +6,7 @@ namespace Lucy {
 
 	class OpenGLImage2D : public Image2D {
 	public:
+		OpenGLImage2D(const std::string& path, ImageSpecification& specs);
 		OpenGLImage2D(ImageSpecification& specs);
 		virtual ~OpenGLImage2D() = default;
 
@@ -17,6 +18,8 @@ namespace Lucy {
 		inline uint32_t GetID() const { return m_Id; }
 		inline uint32_t GetSlot() const { return m_Slot; }
 	private:
+		void SetParameters(const RefLucy<OpenGLRHIImageDesc>& imageDesc);
+
 		uint16_t m_Target;
 		uint32_t m_Id;
 		uint32_t m_Slot;

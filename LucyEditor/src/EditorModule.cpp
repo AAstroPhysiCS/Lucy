@@ -31,7 +31,7 @@ namespace Lucy {
 
 	void EditorModule::OnRender() {
 		m_ImGuiOverlay.Render(m_PerformanceMetrics);
-		m_ViewportRenderer.Dispatch();
+		m_ViewportRenderer.Dispatch(m_Scene);
 	}
 
 	void EditorModule::End() {

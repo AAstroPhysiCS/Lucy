@@ -62,7 +62,6 @@ namespace Lucy {
 			beginInfo.Height = frameBufferHandle->GetHeight();
 			beginInfo.CommandBuffer = commandBuffer;
 			beginInfo.VulkanFrameBuffer = targetFrameBuffer;
-			beginInfo.EnforceViewport = false; //since imgui provides its own dynamic viewport system
 			
 			renderPass->Begin(beginInfo);
 			Renderer::s_UIDrawDataFunc(commandBuffer);
@@ -80,6 +79,10 @@ namespace Lucy {
 
 	void Renderer::RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func) {
 		s_RHI->RecordToCommandQueue(std::move(func));
+	}
+
+	void Renderer::OnWindowResize() {
+		s_RHI->OnWindowResize();
 	}
 
 	void Renderer::OnViewportResize() {
@@ -124,10 +127,6 @@ namespace Lucy {
 		for (const RefLucy<Shader> shader : shaderLibrary.m_Shaders)
 			shader->Destroy();
 		s_RHI->Destroy();
-	}
-
-	void Renderer::SetViewportMousePosition(float x, float y) {
-		s_RHI->SetViewportMousePosition(x, y);
 	}
 
 	void Renderer::BindPipeline(RefLucy<Pipeline> pipeline) {

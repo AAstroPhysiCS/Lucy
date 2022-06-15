@@ -26,13 +26,14 @@ namespace Lucy {
 	};
 
 	struct VulkanRHIRenderPassDesc {
-		std::vector<VkAttachmentReference> AttachmentReferences;
-		VulkanAttachmentDescriptor Descriptor;
+		std::vector<VkAttachmentReference> ColorAttachments;
+		VulkanAttachmentDescriptor ColorDescriptor;
+		bool DepthEnable = false;
 	};
 
 	struct RenderPassSpecification {
 		ClearColor ClearColor;
-		RefLucy<void> InternalInfo = nullptr;  //to be overriden by different rhi's (OpenGL: empty)
+		RefLucy<void> InternalInfo = nullptr;  //to be overriden by different rhi's (OpenGL: none)
 	};
 
 	struct RenderPassBeginInfo {
@@ -41,7 +42,6 @@ namespace Lucy {
 		VkCommandBuffer CommandBuffer = nullptr;
 		uint32_t Width = 0;
 		uint32_t Height = 0;
-		bool EnforceViewport = true;
 	};
 
 	class RenderPass {
@@ -61,4 +61,3 @@ namespace Lucy {
 		RenderPassSpecification m_Specs;
 	};
 }
-

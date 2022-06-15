@@ -127,19 +127,18 @@ namespace Lucy {
 		*/
 	}
 
-	//void OpenGLRHI::OnFramebufferResize(float sizeX, float sizeY) {
-		//As(m_GeometryPipeline->GetFrameBuffer(), OpenGLFrameBuffer)->Resize(sizeX, sizeY);
-		//As(m_IDPipeline->GetFrameBuffer(), OpenGLFrameBuffer)->Resize(sizeX, sizeY);
-		//m_ViewportWidth = sizeX;
-		//m_ViewportHeight = sizeY;
-	//}
-
 	void OpenGLRHI::Init() {
 		s_CommandQueue.Init();
 	}
 
-	void OpenGLRHI::OnViewportResize() {
+	void OpenGLRHI::OnWindowResize() {
+	}
 
+	void OpenGLRHI::OnViewportResize() {
+		//As(m_GeometryPipeline->GetFrameBuffer(), OpenGLFrameBuffer)->Resize(sizeX, sizeY);
+		//As(m_IDPipeline->GetFrameBuffer(), OpenGLFrameBuffer)->Resize(sizeX, sizeY);
+		//m_ViewportWidth = sizeX;
+		//m_ViewportHeight = sizeY;
 	}
 
 	Entity OpenGLRHI::OnMousePicking() {

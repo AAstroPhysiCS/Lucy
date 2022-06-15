@@ -4,7 +4,6 @@
 #include "SceneExplorerPanel.h"
 
 #include "Utils.h"
-#include "UI/UIUtils.h"
 
 #include "imgui.h"
 

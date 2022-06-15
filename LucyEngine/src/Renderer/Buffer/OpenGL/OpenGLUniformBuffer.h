@@ -13,6 +13,8 @@ namespace Lucy {
 		void Unbind() override;
 		void Destroy() override;
 		void SetData(void* data, uint32_t size, uint32_t offset) override;
+	private:
+		uint32_t m_Id;
 	};
 }
 

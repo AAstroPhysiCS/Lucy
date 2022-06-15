@@ -64,7 +64,7 @@ namespace Lucy {
 
 		m_IndexBuffer = IndexBuffer::Create();
 		for (Submesh& submesh : m_Submeshes) {
-			m_IndexBuffer->AddData(submesh.Faces);
+			m_IndexBuffer->Append(submesh.Faces);
 		}
 
 		m_VertexBuffer = VertexBuffer::Create(totalVertexSize * 17);
@@ -102,14 +102,14 @@ namespace Lucy {
 					biTangents[i].y,
 					biTangents[i].z
 				};
-				m_VertexBuffer->AddData(vertex);
+				m_VertexBuffer->SetData(vertex);
 			}
 		}
 	}
 
 	Mesh::~Mesh() {
-		m_VertexBuffer->Destroy();
-		m_IndexBuffer->Destroy();
+		m_VertexBuffer->DestroyHandle();
+		m_IndexBuffer->DestroyHandle();
 	}
 
 	RefLucy<Mesh> Mesh::Create(const std::string& path) {

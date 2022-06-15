@@ -11,7 +11,7 @@
 #include "GLFW/glfw3.h"
 
 #include "Core/Module.h"
-#include "UI/Panel.h"
+#include "Core/Panel.h"
 
 #include "Core/Window.h"
 #include "Scene/Scene.h"

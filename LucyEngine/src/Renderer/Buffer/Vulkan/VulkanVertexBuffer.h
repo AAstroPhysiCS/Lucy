@@ -10,19 +10,19 @@ namespace Lucy {
 	class VulkanVertexBuffer : public VertexBuffer {
 	public:
 		VulkanVertexBuffer(uint32_t size);
-		VulkanVertexBuffer();
+		VulkanVertexBuffer() = default;
 		virtual ~VulkanVertexBuffer() = default;
 
 		void Bind(const VertexBindInfo& info) override;
 		void Unbind() override;
-		void AddData(const std::vector<float>& dataToAdd) override;
-		void Load() override;
-		void Destroy() override;
+		void LoadToGPU() override;
+		void DestroyHandle() override;
 	private:
-		void Create(uint32_t size = 0);
+		void Create(uint32_t size);
 
 		VkBuffer m_StagingBufferHandle = VK_NULL_HANDLE;
 		VkBuffer m_BufferHandle = VK_NULL_HANDLE;
+
 		VmaAllocation m_StagingBufferVma = VK_NULL_HANDLE;
 		VmaAllocation m_BufferVma = VK_NULL_HANDLE;
 	};

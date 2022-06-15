@@ -31,4 +31,3 @@ namespace Lucy {
 		bool m_Allocated = false;
 	};
 }
-

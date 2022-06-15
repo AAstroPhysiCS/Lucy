@@ -1,6 +1,6 @@
 #pragma once
 
-#include "UI/Panel.h"
+#include "Core/Panel.h"
 
 namespace Lucy {
 

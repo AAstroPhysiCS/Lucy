@@ -33,8 +33,8 @@ namespace Lucy {
 		glCreateVertexArrays(1, &m_Vao);
 		glBindVertexArray(m_Vao);
 
-		m_VertexBuffer->Load();
-		m_IndexBuffer->Load();
+		m_VertexBuffer->LoadToGPU();
+		m_IndexBuffer->LoadToGPU();
 
 		glBindVertexArray(0);
 

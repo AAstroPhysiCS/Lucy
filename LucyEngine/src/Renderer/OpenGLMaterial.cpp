@@ -61,16 +61,15 @@ namespace Lucy {
 			std::string properTexturePath = FileSystem::GetParentPath(importedFilePath) + "/" + std::string(path.data);
 
 			ImageSpecification specs;
-			specs.Path = properTexturePath.c_str();
 			specs.GenerateMipmap = true;
 			specs.Parameter = { 0, GL_REPEAT, GL_REPEAT, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR };
 
 			RefLucy<OpenGLRHIImageDesc> imageDesc = CreateRef<OpenGLRHIImageDesc>();
-			imageDesc->PixelType = PixelType::UnsignedByte;
+			imageDesc->PixelType = OpenGLRHIImageDesc::PixelType::UnsignedByte;
 			imageDesc->Slot = slot;
 			specs.InternalInfo = imageDesc;
 
-			RefLucy<Image2D> texture2D = Image2D::Create(specs);
+			RefLucy<Image2D> texture2D = Image2D::Create(properTexturePath, specs);
 			m_Textures.push_back(texture2D);
 		} else {
 			LUCY_WARN(fmt::format("Texture {0} could not be loaded: {1}", type.Name, path.data));

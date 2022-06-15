@@ -12,55 +12,86 @@
 
 namespace Lucy {
 
-	VulkanImage2D::VulkanImage2D(ImageSpecification& specs)
-		: Image2D(specs) {
+	VulkanImage2D::VulkanImage2D(const std::string& path, ImageSpecification& specs)
+		: Image2D(path, specs) {
+		if (m_Specs.ImageType != ImageType::Type2D) LUCY_ASSERT(false);
 		Renderer::Enqueue([=]() {
-			Create();
+			CreateFromPath();
 		});
 	}
 
-	void VulkanImage2D::Create() {
-		uint8_t* data = nullptr;
-		if (m_Specs.Path) {
-			data = stbi_load(m_Specs.Path, &m_Width, &m_Height, &m_Channels, STBI_rgb_alpha);
-
-			if (!data) LUCY_CRITICAL(fmt::format("Failed to load a texture. Texture path: {0}", m_Specs.Path));
-		} else {
-			m_Width = m_Specs.Width;
-			m_Height = m_Specs.Height;
-		}
-
-		if (m_Width == 0 && m_Height == 0) LUCY_ASSERT(false);
+	VulkanImage2D::VulkanImage2D(ImageSpecification& specs)
+		: Image2D(specs) {
 		if (m_Specs.ImageType != ImageType::Type2D) LUCY_ASSERT(false);
+		Renderer::Enqueue([=]() {
+			RefLucy<VulkanRHIImageDesc> imageDesc = As(m_Specs.InternalInfo, VulkanRHIImageDesc);
+			if (imageDesc->DepthEnable)
+				CreateDepthImage();
+			else
+				CreateEmptyImage();
+		});
+	}
+
+	void VulkanImage2D::CreateFromPath() {
+		uint8_t* data = nullptr;
+		data = stbi_load(m_Path.c_str(), &m_Width, &m_Height, &m_Channels, STBI_rgb_alpha);
+
+		if (!data)
+			LUCY_CRITICAL(fmt::format("Failed to load a texture. Texture path: {0}", m_Path));
+		if (m_Width == 0 && m_Height == 0)
+			LUCY_ASSERT(false);
 
 		uint64_t imageSize = (uint64_t)m_Width * m_Height * 4;
 
-		//if we dont want a empty image
-		if (data) {
-			VulkanAllocator& allocator = VulkanAllocator::Get();
-			allocator.CreateVulkanBufferVma(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO,
-											m_ImageStagingBuffer, m_ImageStagingBufferVma);
+		VkBuffer m_ImageStagingBuffer = VK_NULL_HANDLE;
+		VmaAllocation m_ImageStagingBufferVma = VK_NULL_HANDLE;
 
-			void* pixelData;
-			vmaMapMemory(allocator.GetVmaInstance(), m_ImageStagingBufferVma, &pixelData);
-			memcpy(pixelData, data, imageSize);
-			vmaUnmapMemory(allocator.GetVmaInstance(), m_ImageStagingBufferVma);
+		VulkanAllocator& allocator = VulkanAllocator::Get();
+		allocator.CreateVulkanBufferVma(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO,
+										m_ImageStagingBuffer, m_ImageStagingBufferVma);
 
-			stbi_image_free(data);
+		void* pixelData;
+		vmaMapMemory(allocator.GetVmaInstance(), m_ImageStagingBufferVma, &pixelData);
+		memcpy(pixelData, data, imageSize);
+		vmaUnmapMemory(allocator.GetVmaInstance(), m_ImageStagingBufferVma);
 
-			CreateImage(VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+		stbi_image_free(data);
 
-			TransitionImageLayout(m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-			CopyImage();
-			TransitionImageLayout(m_Image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		allocator.CreateVulkanImageVma(m_Width, m_Height, (VkFormat)m_Specs.Format, m_CurrentLayout, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+									   VK_IMAGE_TYPE_2D, VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO, m_Image, m_ImageVma);
 
-			vmaDestroyBuffer(allocator.GetVmaInstance(), m_ImageStagingBuffer, m_ImageStagingBufferVma);
-		} else {
-			CreateImage(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
-			m_CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			//TransitionImageLayout(m_Image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		}
+		TransitionImageLayout(m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		CopyImage(m_ImageStagingBuffer);
+		TransitionImageLayout(m_Image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
+		vmaDestroyBuffer(allocator.GetVmaInstance(), m_ImageStagingBuffer, m_ImageStagingBufferVma);
+
+		CreateVulkanImageViewHandle();
+	}
+
+	void VulkanImage2D::CreateEmptyImage() {
+		if (m_Width == 0 && m_Height == 0) LUCY_ASSERT(false);
+
+		VulkanAllocator& allocator = VulkanAllocator::Get();
+		allocator.CreateVulkanImageVma(m_Width, m_Height, (VkFormat)m_Specs.Format, m_CurrentLayout, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+									   VK_IMAGE_TYPE_2D, VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO, m_Image, m_ImageVma);
+
+		m_CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		CreateVulkanImageViewHandle();
+	}
+
+	void VulkanImage2D::CreateDepthImage() {
+		if (m_Width == 0 && m_Height == 0) LUCY_ASSERT(false);
+
+		VulkanAllocator& allocator = VulkanAllocator::Get();
+		allocator.CreateVulkanImageVma(m_Width, m_Height, (VkFormat)m_Specs.Format, m_CurrentLayout, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+									   VK_IMAGE_TYPE_2D, VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO, m_Image, m_ImageVma);
+
+		m_CurrentLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+		CreateVulkanImageViewHandle();
+	}
+
+	void VulkanImage2D::CreateVulkanImageViewHandle() {
 		RefLucy<VulkanRHIImageDesc> imageDesc = As(m_Specs.InternalInfo, VulkanRHIImageDesc);
 
 		ImageViewSpecification imageViewSpecification;
@@ -74,24 +105,22 @@ namespace Lucy {
 		imageViewSpecification.ModeU = (VkSamplerAddressMode)m_Specs.Parameter.U;
 		imageViewSpecification.ModeV = (VkSamplerAddressMode)m_Specs.Parameter.V;
 		imageViewSpecification.ModeW = (VkSamplerAddressMode)m_Specs.Parameter.W;
+		imageViewSpecification.DepthEnable = imageDesc->DepthEnable;
 
 		m_ImageView = VulkanImageView(imageViewSpecification);
 
 		if (imageDesc->ImGuiUsage) {
-			Renderer::Enqueue([&]() {
-				m_ID = ImGui_ImplVulkan_AddTexture(m_ImageView.GetSampler(), m_ImageView.GetVulkanHandle(), m_CurrentLayout);
-			});
+			if (!m_ID) {
+				Renderer::Enqueue([&]() {
+					m_ID = ImGui_ImplVulkan_AddTexture(m_ImageView.GetSampler(), m_ImageView.GetVulkanHandle(), m_CurrentLayout);
+				});
+			} else {
+				ImGui_ImplVulkanH_UpdateTexture((VkDescriptorSet) m_ID, m_ImageView.GetSampler(), m_ImageView.GetVulkanHandle(), m_CurrentLayout);
+			}
 		}
 	}
 
-	void VulkanImage2D::CreateImage(VkImageUsageFlags usage) {
-		VulkanAllocator& allocator = VulkanAllocator::Get();
-		allocator.CreateVulkanImageVma(m_Width, m_Height, (VkFormat)m_Specs.Format, m_CurrentLayout, usage,
-									   VK_IMAGE_TYPE_2D, VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO, m_Image, m_ImageVma);
-	}
-
-
-	void VulkanImage2D::CopyImage() {
+	void VulkanImage2D::CopyImage(const VkBuffer& imageStagingBuffer) {
 		VulkanRHI::RecordSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
 			VkBufferImageCopy region{};
 			region.bufferOffset = 0;
@@ -106,7 +135,7 @@ namespace Lucy {
 			region.imageExtent.height = (uint32_t)m_Height;
 			region.imageExtent.depth = 1;
 
-			vkCmdCopyBufferToImage(commandBuffer, m_ImageStagingBuffer, m_Image, m_CurrentLayout, 1, &region);
+			vkCmdCopyBufferToImage(commandBuffer, imageStagingBuffer, m_Image, m_CurrentLayout, 1, &region);
 		});
 	}
 
@@ -180,12 +209,18 @@ namespace Lucy {
 	}
 
 	void VulkanImage2D::Recreate(uint32_t width, uint32_t height) {
-		m_Specs.Width = width;
-		m_Specs.Height = height;
+		m_Width = width;
+		m_Height = height;
+		auto& desc = As(m_Specs.InternalInfo, VulkanRHIImageDesc);
 
 		Destroy();
 		m_CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		Create();
+		if (!m_Path.empty())
+			CreateFromPath();
+		else if (desc->DepthEnable)
+			CreateDepthImage();
+		else
+			CreateEmptyImage();
 	}
 
 	VulkanImageView::VulkanImageView(const ImageViewSpecification& specs)
@@ -203,7 +238,12 @@ namespace Lucy {
 		createInfo.image = m_Specs.Image;
 		createInfo.viewType = m_Specs.ViewType;
 		createInfo.format = m_Specs.Format;
-		createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+		if (m_Specs.DepthEnable)
+			createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		else
+			createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
 		createInfo.subresourceRange.baseMipLevel = 0;
 		createInfo.subresourceRange.levelCount = 1;
 		createInfo.subresourceRange.baseArrayLayer = 0;

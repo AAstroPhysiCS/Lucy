@@ -57,7 +57,7 @@ namespace Lucy {
 
 		EditorCamera& camera = GetEditorCamera();
 		camera.SetViewportSize(sizeX, sizeY);
-		//camera.Update();
+		camera.Update();
 
 		const auto& meshView = View<MeshComponent>();
 		for (auto entity : meshView) {

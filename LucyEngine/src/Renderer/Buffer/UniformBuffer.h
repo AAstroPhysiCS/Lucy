@@ -8,6 +8,8 @@ namespace Lucy {
 
 	class UniformBuffer : public Buffer<void*> {
 	public:
+		virtual ~UniformBuffer() = default;
+
 		static RefLucy<UniformBuffer> Create(uint32_t size, uint32_t binding, std::optional<VulkanDescriptorSet> descriptorSet);
 		
 		virtual void Bind() = 0;
@@ -16,6 +18,5 @@ namespace Lucy {
 		virtual void SetData(void* data, uint32_t size, uint32_t offset) = 0;
 	protected:
 		UniformBuffer() = default;
-		~UniformBuffer() = default;
 	};
 }

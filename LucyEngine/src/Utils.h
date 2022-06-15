@@ -25,6 +25,13 @@ namespace Utils {
 	void OpenDialog(std::string& outString, const DialogFilter filterList[], size_t count, const char* defaultPath);
 }
 
+namespace UIUtils {
+	void TextCenter(const std::string& text, float xPadding, uint32_t indent = 0);
+	void TextCenter(const char const* text, float xPadding, uint32_t indent = 0);
+	void TextCenterTable(const char const* text, float xPadding, float yPadding, uint32_t indent = 0);
+	void TransformControl(const char* id, float& x, float& y, float& z, float defaultValue, float speed);
+}
+
 namespace Maths {
 
 	struct Ray {

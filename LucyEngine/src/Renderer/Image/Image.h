@@ -4,20 +4,11 @@
 
 namespace Lucy {
 
-	typedef int32_t TextureSlot;
 	typedef uint32_t TextureFormat;
+	typedef int32_t TextureSlot;
 
 	enum class ImageType {
 		Type2D, Type3D
-	};
-
-	enum class PixelType {
-		Byte = 0x1400,
-		UnsignedByte = 0x1401,
-		UnsignedShort565 = 0x8363,
-		Short = 0x1402,
-		Int = 0x1404,
-		Float = 0x1406
 	};
 
 	struct ImageParameter {
@@ -34,13 +25,11 @@ namespace Lucy {
 	};
 
 	struct ImageSpecification {
-		const char* Path = nullptr;
-
 		int32_t Width = 0, Height = 0; //gets replaced if path is available
 		TextureFormat Format;
 		ImageParameter Parameter;
 
-		uint32_t Samples = 0;
+		uint32_t Samples = 1;
 		ImageType ImageType;
 		bool GenerateMipmap = false;
 
@@ -50,10 +39,25 @@ namespace Lucy {
 	struct VulkanRHIImageDesc {
 		bool ImGuiUsage = false;
 		bool GenerateSampler = false;
+	private:
+		bool DepthEnable = false; //for framebuffer to use for its depth image
+
+		friend class VulkanFrameBuffer;
+		friend class VulkanImage2D;
 	};
 
 	struct OpenGLRHIImageDesc {
-		Lucy::PixelType PixelType = Lucy::PixelType::UnsignedByte;
+
+		enum class PixelType {
+			Byte = 0x1400,
+			UnsignedByte = 0x1401,
+			UnsignedShort565 = 0x8363,
+			Short = 0x1402,
+			Int = 0x1404,
+			Float = 0x1406
+		};
+		
+		PixelType PixelType = PixelType::UnsignedByte;
 		uint32_t AttachmentIndex;
 		TextureSlot Slot = -1;
 		TextureFormat InternalFormat;
@@ -67,6 +71,7 @@ namespace Lucy {
 	class Image2D
 	{
 	public:
+		static RefLucy<Image2D> Create(const std::string& path, ImageSpecification& specs);
 		static RefLucy<Image2D> Create(ImageSpecification& specs);
 
 		virtual void Bind() = 0;
@@ -75,13 +80,17 @@ namespace Lucy {
 
 		ImageID GetID() const { return m_ID; }
 	protected:
+		//Loads an asset
+		Image2D(const std::string& path, ImageSpecification& specs);
+		//Creates an empty image
 		Image2D(ImageSpecification& specs);
 
 		ImageSpecification m_Specs;
 		int32_t m_Channels = 0;
-		int32_t m_Width;
-		int32_t m_Height;
+		int32_t m_Width = 0;
+		int32_t m_Height = 0;
 		ImageID m_ID = 0;
+
+		const std::string m_Path;
 	};
 }
-

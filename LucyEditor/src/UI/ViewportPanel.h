@@ -1,6 +1,6 @@
 #pragma once
 
-#include "UI/Panel.h"
+#include "Core/Panel.h"
 #include "imgui.h"
 #include "ImGuizmo.h"
 
@@ -21,11 +21,10 @@ namespace Lucy {
 		bool IsViewportActive();
 		bool IsOverAnyGizmo();
 
-		virtual void OnEvent(Event& e) override;
+		void OnEvent(Event& e) override;
 	private:
 		void Render();
 
-		ViewportPanel() = default;
 		virtual ~ViewportPanel() = default;
 
 		bool m_IsViewportHovered = false;
@@ -36,6 +35,8 @@ namespace Lucy {
 		bool IsOverRotateGizmo();
 		bool IsOverScaleGizmo();
 		bool IsOverAnyGizmoM();
+
+		ImVec2 m_Size;
 	};
 }
 

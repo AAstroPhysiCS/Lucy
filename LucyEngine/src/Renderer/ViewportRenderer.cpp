@@ -30,7 +30,7 @@ namespace Lucy {
 		Renderer::SetViewportSize(width, height);
 
 		std::vector<ShaderLayoutElement> vertexLayout = {
-				{ "a_Pos", ShaderDataSize::Float2 },
+				{ "a_Pos", ShaderDataSize::Float3 },
 				{ "a_TextureCoords", ShaderDataSize::Float2 },
 				//{ "a_ID", ShaderDataSize::Float3 },
 				//{ "a_Normals", ShaderDataSize::Float3 },
@@ -59,20 +59,22 @@ namespace Lucy {
 		PipelineSpecification geometryPipelineSpecs;
 		geometryPipelineSpecs.VertexShaderLayout = VertexShaderLayout(vertexLayout);
 		geometryPipelineSpecs.Topology = Topology::TRIANGLES;
-		geometryPipelineSpecs.Rasterization = { true, VK_CULL_MODE_BACK_BIT, 1.0f, PolygonMode::FILL };
+		geometryPipelineSpecs.Rasterization = { true, VK_CULL_MODE_NONE, 1.0f, PolygonMode::FILL };
 		geometryPipelineSpecs.Shader = vulkanTestShader;
 
 		if (rhi == RenderArchitecture::Vulkan) {
 			RefLucy<VulkanRHIRenderPassDesc> vulkanRenderPassDesc = CreateRef<VulkanRHIRenderPassDesc>();
-			vulkanRenderPassDesc->AttachmentReferences.push_back({ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
-			vulkanRenderPassDesc->Descriptor.Format = VK_FORMAT_B8G8R8A8_UNORM;
-			vulkanRenderPassDesc->Descriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			vulkanRenderPassDesc->Descriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-			vulkanRenderPassDesc->Descriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-			vulkanRenderPassDesc->Descriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-			vulkanRenderPassDesc->Descriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			vulkanRenderPassDesc->Descriptor.FinalLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR;
-
+			vulkanRenderPassDesc->ColorAttachments.push_back(
+				{ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL }
+			);
+			vulkanRenderPassDesc->DepthEnable = true; //enables the support for depth buffer
+			vulkanRenderPassDesc->ColorDescriptor.Format = VK_FORMAT_B8G8R8A8_UNORM;
+			vulkanRenderPassDesc->ColorDescriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			vulkanRenderPassDesc->ColorDescriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+			vulkanRenderPassDesc->ColorDescriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			vulkanRenderPassDesc->ColorDescriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			vulkanRenderPassDesc->ColorDescriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			vulkanRenderPassDesc->ColorDescriptor.FinalLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR;
 			geometryPassSpecs.InternalInfo = vulkanRenderPassDesc;
 
 			RefLucy<VulkanRHIImageDesc> vulkanTextureDesc = CreateRef<VulkanRHIImageDesc>();
@@ -103,14 +105,14 @@ namespace Lucy {
 			uiRenderPassSpecs.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 			RefLucy<VulkanRHIRenderPassDesc> vulkanRenderPassDesc = CreateRef<VulkanRHIRenderPassDesc>();
-			vulkanRenderPassDesc->AttachmentReferences.push_back({ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
-			vulkanRenderPassDesc->Descriptor.Format = swapChain.GetSurfaceFormat().format;
-			vulkanRenderPassDesc->Descriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			vulkanRenderPassDesc->Descriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-			vulkanRenderPassDesc->Descriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-			vulkanRenderPassDesc->Descriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-			vulkanRenderPassDesc->Descriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			vulkanRenderPassDesc->Descriptor.FinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+			vulkanRenderPassDesc->ColorAttachments.push_back({ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+			vulkanRenderPassDesc->ColorDescriptor.Format = swapChain.GetSurfaceFormat().format;
+			vulkanRenderPassDesc->ColorDescriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			vulkanRenderPassDesc->ColorDescriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+			vulkanRenderPassDesc->ColorDescriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			vulkanRenderPassDesc->ColorDescriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			vulkanRenderPassDesc->ColorDescriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			vulkanRenderPassDesc->ColorDescriptor.FinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
 			uiRenderPassSpecs.InternalInfo = vulkanRenderPassDesc;
 			s_ImGuiPipeline.UIRenderPass = RenderPass::Create(uiRenderPassSpecs);
@@ -127,21 +129,30 @@ namespace Lucy {
 			s_ImGuiPipeline.UIFramebuffer = FrameBuffer::Create(uiFrameBufferSpecs);
 		}
 
-		vertexBuffer = VertexBuffer::Create(16);
-		indexBuffer = IndexBuffer::Create(6);
-		vertexBuffer->AddData(
-			{ -0.5f, -0.5f, 1.0f, 0.0f,
-			   0.5f, -0.5f, 0.0f, 0.0f,
-			   0.5f, 0.5f, 0.0f, 1.0f,
-			  -0.5f, 0.5f, 1.0f, 1.0f
+		vertexBuffer = VertexBuffer::Create(40);
+		indexBuffer = IndexBuffer::Create(12);
+		vertexBuffer->SetData(
+			{ 
+				-0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
+				0.5f, -0.5f, 0.0f, 0.0f, 0.0f,
+				0.5f, 0.5f, 0.0f, 0.0f, 1.0f,
+				-0.5f, 0.5f, 0.0f, 1.0f, 1.0f,
+
+				-0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
+				0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+				0.5f, 0.5f, -0.5f, 0.0f, 1.0f,
+				-0.5f, 0.5f, -0.5f, 1.0f, 1.0f
 			}
 		);
-		vertexBuffer->Load();
+		vertexBuffer->LoadToGPU();
 
-		indexBuffer->AddData(
-			{ 0, 1, 2, 2, 3, 0 }
+		indexBuffer->SetData(
+			{ 
+				0, 1, 2, 2, 3, 0,
+				4, 5, 6, 6, 7, 4
+			}
 		);
-		indexBuffer->Load();
+		indexBuffer->LoadToGPU();
 	}
 
 	void ViewportRenderer::Begin(Scene& scene) {
@@ -149,7 +160,15 @@ namespace Lucy {
 		Renderer::BeginScene(scene);
 	}
 
-	void ViewportRenderer::Dispatch() {
+	void ViewportRenderer::Dispatch(Scene& scene) {
+		auto& uniformBuffer = s_GeometryPipeline->GetUniformBuffers<VulkanUniformBuffer>(0);
+
+		EditorCamera& camera = scene.GetEditorCamera();
+		auto mvp = camera.GetMVP();
+
+		uniformBuffer->SetData((void*)&mvp, sizeof(mvp), 0);
+		uniformBuffer->Update();
+
 		IDPass();
 		GeometryPass();
 		UIPass();
@@ -165,12 +184,12 @@ namespace Lucy {
 	}
 
 	void ViewportRenderer::OnWindowResize() {
-		Renderer::OnViewportResize();
+		Renderer::OnWindowResize();
 	}
 
 	void ViewportRenderer::Destroy() {
-		vertexBuffer->Destroy(); //TODO: Delete
-		indexBuffer->Destroy(); //TODO: Delete
+		vertexBuffer->DestroyHandle(); //TODO: Delete
+		indexBuffer->DestroyHandle(); //TODO: Delete
 
 		s_GeometryPipeline->Destroy();
 		s_ImGuiPipeline.UIFramebuffer->Destroy();
@@ -178,30 +197,12 @@ namespace Lucy {
 	}
 
 	void ViewportRenderer::GeometryPass() {
-		auto& uniformBuffer = s_GeometryPipeline->GetUniformBuffers<VulkanUniformBuffer>(0);
-
-		struct MVP {
-			glm::mat4 model;
-			glm::mat4 view;
-			glm::mat4 proj;
-		};
-
-		auto& extent = VulkanSwapChain::Get().GetExtent();
-
-		MVP mvp;
-		mvp.model = glm::rotate(glm::mat4(1.0f), 0.5f * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-		mvp.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-		mvp.proj = glm::perspective(glm::radians(45.0f), (float)extent.width / extent.height, 0.1f, 10.0f);
-		mvp.proj[1][1] *= -1;
-
-		uniformBuffer->SetData((void*)&mvp, sizeof(MVP), 0);
-		uniformBuffer->Update();
-
+		
 		//TODO: this function should work in parallel, meaning it should be multithreaded...
 		Renderer::RecordToCommandQueue([]() {
 			Renderer::BindPipeline(s_GeometryPipeline);
 			Renderer::BindBuffers(vertexBuffer, indexBuffer);
-			Renderer::DrawIndexed(6, 1, 0, 0, 0);
+			Renderer::DrawIndexed(12, 1, 0, 0, 0);
 			Renderer::UnbindPipeline();
 			/*
 			const RefLucy<Mesh>& mesh = drawCommand.Mesh;

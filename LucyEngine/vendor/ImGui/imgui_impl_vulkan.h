@@ -77,6 +77,9 @@ IMGUI_IMPL_API void         ImGui_ImplVulkan_SetMinImageCount(uint32_t min_image
 // FIXME: This is experimental in the sense that we are unsure how to best design/tackle this problem, please post to https://github.com/ocornut/imgui/pull/914 if you have suggestions.
 IMGUI_IMPL_API VkDescriptorSet ImGui_ImplVulkan_AddTexture(VkSampler sampler, VkImageView image_view, VkImageLayout image_layout);
 
+//Custom function - AAstr0
+IMGUI_IMPL_API void ImGui_ImplVulkanH_UpdateTexture(VkDescriptorSet descriptor_set, VkSampler sampler, VkImageView image_view, VkImageLayout image_layout);
+
 // Optional: load Vulkan functions with a custom function loader
 // This is only useful with IMGUI_IMPL_VULKAN_NO_PROTOTYPES / VK_NO_PROTOTYPES
 IMGUI_IMPL_API bool         ImGui_ImplVulkan_LoadFunctions(PFN_vkVoidFunction(*loader_func)(const char* function_name, void* user_data), void* user_data = NULL);

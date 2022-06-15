@@ -144,7 +144,7 @@ namespace Lucy {
 		m_RenderContext->Destroy();
 	}
 
-	void VulkanRHI::OnViewportResize() {
+	void VulkanRHI::OnWindowResize() {
 		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 		swapChain.Recreate();
 
@@ -159,6 +159,10 @@ namespace Lucy {
 		desc->RenderPass = ViewportRenderer::s_ImGuiPipeline.UIRenderPass;
 
 		As(ViewportRenderer::s_ImGuiPipeline.UIFramebuffer, VulkanFrameBuffer)->Recreate(extent.width, extent.height, desc);
+	}
+
+	void VulkanRHI::OnViewportResize() {
+		As(ViewportRenderer::s_GeometryPipeline, VulkanPipeline)->Recreate(m_ViewportWidth, m_ViewportHeight);
 	}
 
 	Entity VulkanRHI::OnMousePicking() {

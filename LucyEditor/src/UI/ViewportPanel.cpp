@@ -45,6 +45,9 @@ namespace Lucy {
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBringToFrontOnFocus;
 		static bool pOpen = true;
 
+		auto [w, h] = Renderer::GetViewportSize();
+		ImGui::SetNextWindowSize({ (float)w, (float)h }, ImGuiCond_Once);
+
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0, 0 });
 		ImGui::Begin("Viewport", &pOpen, flags);
@@ -54,37 +57,36 @@ namespace Lucy {
 		m_IsViewportActive = m_IsViewportHovered && ImGui::IsWindowFocused();
 		m_IsOverAnyGizmo = IsOverAnyGizmoM();
 
-		//TODO: Bad access? Change it maybe?
-		ImVec2& size = ImGui::GetWindowSize();
+		m_Size = ImGui::GetWindowSize();
 
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL: {
 				auto& blittedFrameBuffer = As(ViewportRenderer::GetGeometryPipeline()->GetFrameBuffer(), OpenGLFrameBuffer)->GetBlitted();
 				void* outputTextureID = (void*)blittedFrameBuffer->GetTexture(0)->GetID();
-				ImGui::Image(outputTextureID, size, { 0, 1 }, { 1, 0 });
+				ImGui::Image(outputTextureID, m_Size, { 0, 1 }, { 1, 0 });
 				break;
 			}
 			case RenderArchitecture::Vulkan: {
 				VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 				void* outputTextureID = As(ViewportRenderer::GetGeometryPipeline()->GetFrameBuffer(), VulkanFrameBuffer)->GetImages()[swapChain.GetCurrentFrameIndex()]->GetID();
-				ImGui::Image(outputTextureID, size);
+				ImGui::Image(outputTextureID, m_Size);
 				break;
 			}
 			default:
 				LUCY_ASSERT(false);
 		}
 
-		auto [w, h] = Renderer::GetViewportSize();
-		if (w != size.x || h != size.y) {
-			Renderer::SetViewportSize(w, h);
+		if (w != m_Size.x || h != m_Size.y) {
+			Renderer::SetViewportSize(m_Size.x, m_Size.y);
+			Renderer::OnViewportResize();
 		}
 
 		const ImVec2& mousePos = ImGui::GetMousePos();
 		const ImVec2& offset = ImGui::GetCursorPos();
 		const ImVec2& windowPos = ImGui::GetWindowPos();
 
-		Renderer::SetViewportMousePosition(mousePos.x - windowPos.x - offset.x,
-										   mousePos.y - windowPos.y);
+		Renderer::SetViewportMouse(mousePos.x - windowPos.x - offset.x,
+								   mousePos.y - windowPos.y);
 		ImGuizmo::SetDrawlist();
 		ImGuizmo::SetRect(windowPos.x, windowPos.y, ImGui::GetWindowWidth(), ImGui::GetWindowHeight());
 
