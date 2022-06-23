@@ -44,7 +44,9 @@ namespace Lucy {
 
 	class RHI {
 	public:
-		static RefLucy<RHI> Create(RenderArchitecture arch);
+		virtual ~RHI() = default;
+		
+		static Ref<RHI> Create(RenderArchitecture arch);
 
 		virtual void Init() = 0;
 		virtual void Destroy() = 0;
@@ -52,7 +54,7 @@ namespace Lucy {
 		void ClearQueues();
 
 		virtual void Enqueue(const SubmitFunc&& func) = 0;
-		virtual void EnqueueStaticMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform) = 0;
+		virtual void EnqueueStaticMesh(Ref<Mesh> mesh, const glm::mat4& entityTransform) = 0;
 		
 		virtual void RecordToCommandQueue(RecordFunc<>&& func) = 0;
 		virtual void RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func) = 0;
@@ -61,9 +63,9 @@ namespace Lucy {
 		virtual void RenderScene() = 0;
 		virtual PresentResult EndScene() = 0;
 
-		virtual void BindPipeline(RefLucy<Pipeline> pipeline) = 0;
-		virtual void UnbindPipeline(RefLucy<Pipeline> pipeline) = 0;
-		virtual void BindBuffers(RefLucy<VertexBuffer> vertexBuffer, RefLucy<IndexBuffer> indexBuffer) = 0;
+		virtual void BindPipeline(Ref<Pipeline> pipeline) = 0;
+		virtual void UnbindPipeline(Ref<Pipeline> pipeline) = 0;
+		virtual void BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) = 0;
 
 		virtual Entity OnMousePicking() = 0;
 		virtual void OnWindowResize() = 0;
@@ -85,7 +87,6 @@ namespace Lucy {
 		}
 	protected:
 		RHI(RenderArchitecture arch);
-		~RHI() = default;
 
 		mutable int32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
 		mutable float m_ViewportMouseX = 0, m_ViewportMouseY = 0;
@@ -96,7 +97,7 @@ namespace Lucy {
 		std::vector<MeshDrawCommand> m_StaticMeshDrawCommandQueue;
 		inline static CommandQueue s_CommandQueue;
 
-		RefLucy<RenderContext> m_RenderContext;
+		Ref<RenderContext> m_RenderContext;
 		RenderArchitecture m_Architecture;
 
 		friend class Renderer; //for s_CommandQueue

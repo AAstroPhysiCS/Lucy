@@ -27,12 +27,12 @@ namespace Lucy {
 		ImGuiOverlay();
 		~ImGuiOverlay() = default;
 
-		void Init(RefLucy<Window> window, Scene& scene);
-		void Render(PerformanceMetrics* performanceMetrics);
+		void Init(Ref<Window> window, Scene& scene);
+		void Render();
 		void OnEvent(Event& e);
 		void Destroy();
 	private:
-		void Begin(PerformanceMetrics* performanceMetrics);
+		void Begin();
 		void SendImGuiDataToGPU();
 		void End();
 
@@ -52,7 +52,7 @@ namespace Lucy {
 		};
 
 		VulkanDescriptorPoolSpecifications m_PoolSpecs = { m_ImGuiPoolSizes, VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT, 1000 };
-		RefLucy<VulkanDescriptorPool> m_ImGuiPool = nullptr;
+		Ref<VulkanDescriptorPool> m_ImGuiPool = nullptr;
 
 		Scene* m_Scene = nullptr;
 		uint32_t m_Time = 0;

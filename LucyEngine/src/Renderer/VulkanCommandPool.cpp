@@ -13,10 +13,10 @@ namespace Lucy {
 		});
 	}
 
-	RefLucy<VulkanCommandPool> VulkanCommandPool::Create(CommandPoolSpecs specs) {
+	Ref<VulkanCommandPool> VulkanCommandPool::Create(CommandPoolSpecs specs) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::Vulkan:
-				return CreateRef<VulkanCommandPool>(specs);
+				return Memory::CreateRef<VulkanCommandPool>(specs);
 				break;
 		}
 		LUCY_ASSERT(false);

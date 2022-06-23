@@ -43,7 +43,7 @@ namespace Lucy {
 		for (auto entity : view) {
 			Entity e{ this, entity };
 			MeshComponent& meshComponent = e.GetComponent<MeshComponent>();
-			const RefLucy<Mesh>& mesh = meshComponent.GetMesh();
+			const Ref<Mesh>& mesh = meshComponent.GetMesh();
 			const glm::vec3& meshPixelValue = mesh->GetMeshPixelValue() / 255.0f;
 
 			if (glm::round(meshPixelValue * 10e4f) / 10e4f == pixelValue) 

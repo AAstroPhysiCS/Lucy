@@ -116,7 +116,7 @@ namespace Lucy {
 		});
 
 		DrawComponentPanel<MeshComponent>(entityContext, [&](MeshComponent& c) {
-			RefLucy<Mesh> mesh = c.GetMesh();
+			Ref<Mesh> mesh = c.GetMesh();
 
 			if (ImGui::CollapsingHeader("Mesh Renderer", ImGuiTreeNodeFlags_DefaultOpen)) {
 
@@ -159,7 +159,7 @@ namespace Lucy {
 							UIUtils::TextCenterTable(fmt::format("Element {0}", i).c_str(), 8.0f, -8.0f);
 
 							Submesh& submesh = mesh->GetSubmeshes()[i];
-							RefLucy<Material> m = mesh->GetMaterials()[submesh.MaterialIndex];
+							Ref<Material> m = mesh->GetMaterials()[submesh.MaterialIndex];
 
 							ImGui::TableSetColumnIndex(1);
 							void* textureID = 0;
@@ -172,7 +172,7 @@ namespace Lucy {
 							
 							if (ImGui::BeginCombo(fmt::format("##hideLabel {0}", i).c_str(), m->GetName().c_str())) {
 								for (uint32_t j = 0; j < mesh->GetSubmeshes().size(); j++) {
-									RefLucy<Material> comboMaterial = mesh->GetMaterials()[j];
+									Ref<Material> comboMaterial = mesh->GetMaterials()[j];
 									if (ImGui::Selectable(comboMaterial->GetName().c_str())) {
 										selectedMaterial = j;
 										submesh.MaterialIndex = j;

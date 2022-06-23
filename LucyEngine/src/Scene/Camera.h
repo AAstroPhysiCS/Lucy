@@ -2,7 +2,6 @@
 
 #include "Events/Event.h"
 #include "Events/InputEvent.h"
-#include "Core/Metrics.h"
 
 #include "glm/gtx/quaternion.hpp"
 
@@ -19,6 +18,7 @@ namespace Lucy {
 		Camera(int32_t m_ViewportWidth, int32_t m_ViewportHeight, float farPlane, float nearPlane, float fov);
 		Camera() = default;
 		Camera(glm::vec3& position, float farPlane, float nearPlane, float fov);
+		virtual ~Camera() = default;
 
 		glm::mat4 m_ViewMatrix = glm::mat4(1.0f);
 		glm::mat4 m_Projection = glm::mat4(1.0f);
@@ -45,6 +45,7 @@ namespace Lucy {
 		inline glm::vec3& GetRotation() { return m_Rotation; }
 		inline glm::mat4& GetViewMatrix() { return m_ViewMatrix; }
 		inline glm::mat4& GetProjectionMatrix() { return m_Projection; }
+
 		inline MVP GetMVP() {
 			MVP mvp;
 			mvp.model = glm::rotate(glm::mat4(1.0f), 0.5f * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
@@ -55,7 +56,7 @@ namespace Lucy {
 			return mvp;
 		}
 
-		virtual void OnEvent(PerformanceMetrics& rendererMetrics) = 0;
+		virtual void OnEvent() = 0;
 		virtual void UpdateView() = 0;
 		virtual void UpdateProjection() = 0;
 	};
@@ -67,7 +68,7 @@ namespace Lucy {
 		EditorCamera(glm::vec3& position, float farPlane = 1000.0f, float nearPlane = 0.1f, float fov = 90.0f);
 		virtual ~EditorCamera() = default;
 
-		void OnEvent(PerformanceMetrics& rendererMetrics) override;
+		void OnEvent() override;
 		void Update();
 	private:
 

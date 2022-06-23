@@ -44,7 +44,7 @@ namespace Lucy {
 		inline int32_t GetHeight() const { return m_Specs.Height; }
 		VkSurfaceKHR GetVulkanSurface() const { return m_Surface; }
 
-		static RefLucy<Window> Create(const WindowSpecification& specs);
+		static Ref<Window> Create(const WindowSpecification& specs);
 	protected:
 		WindowSpecification m_Specs;
 		GLFWwindow* m_Window = nullptr;
@@ -55,6 +55,8 @@ namespace Lucy {
 	};
 
 	class WinWindow : public Window {
+	public:
+		virtual ~WinWindow() = default;
 	private:
 		void PollEvents() override;
 		void Init(RenderArchitecture architecture) override;

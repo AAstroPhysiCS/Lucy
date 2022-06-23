@@ -27,7 +27,7 @@ namespace Lucy {
 		: Camera(position, farPlane, nearPlane, fov) {
 	}
 
-	void EditorCamera::OnEvent(PerformanceMetrics& rendererMetrics) {
+	void EditorCamera::OnEvent() {
 		auto [x, y] = Input::GetMousePosition();
 
 		static float lastX = x;

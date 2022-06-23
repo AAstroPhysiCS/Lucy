@@ -6,11 +6,11 @@
 
 #include "Context/RHI.h"
 #include "Context/VulkanPipeline.h"
-#include "Buffer/Vulkan/VulkanFrameBuffer.h"
+#include "Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 
-#include "Buffer/Vulkan/VulkanVertexBuffer.h" //TODO: Delete
-#include "Buffer/Vulkan/VulkanIndexBuffer.h" //TODO: Delete
-#include "Buffer/Vulkan/VulkanUniformBuffer.h" //TODO: Delete
+#include "Memory/Buffer/Vulkan/VulkanVertexBuffer.h" //TODO: Delete
+#include "Memory/Buffer/Vulkan/VulkanIndexBuffer.h" //TODO: Delete
+#include "Memory/Buffer/Vulkan/VulkanUniformBuffer.h" //TODO: Delete
 #include "Image/Image.h" //TODO: Delete
 
 #include "Synchronization/SynchItems.h"
@@ -18,15 +18,15 @@
 
 namespace Lucy {
 
-	RefLucy<VertexBuffer> vertexBuffer = nullptr; //TODO: Delete
-	RefLucy<IndexBuffer> indexBuffer = nullptr; //TODO: Delete
+	Ref<VertexBuffer> vertexBuffer = nullptr; //TODO: Delete
+	Ref<IndexBuffer> indexBuffer = nullptr; //TODO: Delete
 
 	void ViewportRenderer::Init() {
 		auto& vulkanTestShader = Renderer::GetShaderLibrary().GetShader("LucyVulkanTest");
 		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 		RenderArchitecture rhi = Renderer::GetCurrentRenderArchitecture();
 
-		auto [width, height] = Utils::ReadSizeFromIni("Viewport");
+		auto [width, height] = Utils::ReadViewportSizeFromIni("Viewport");
 		Renderer::SetViewportSize(width, height);
 
 		std::vector<ShaderLayoutElement> vertexLayout = {
@@ -63,7 +63,7 @@ namespace Lucy {
 		geometryPipelineSpecs.Shader = vulkanTestShader;
 
 		if (rhi == RenderArchitecture::Vulkan) {
-			RefLucy<VulkanRHIRenderPassDesc> vulkanRenderPassDesc = CreateRef<VulkanRHIRenderPassDesc>();
+			Ref<VulkanRHIRenderPassDesc> vulkanRenderPassDesc = Memory::CreateRef<VulkanRHIRenderPassDesc>();
 			vulkanRenderPassDesc->ColorAttachments.push_back(
 				{ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL }
 			);
@@ -77,16 +77,16 @@ namespace Lucy {
 			vulkanRenderPassDesc->ColorDescriptor.FinalLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR;
 			geometryPassSpecs.InternalInfo = vulkanRenderPassDesc;
 
-			RefLucy<VulkanRHIImageDesc> vulkanTextureDesc = CreateRef<VulkanRHIImageDesc>();
+			Ref<VulkanRHIImageDesc> vulkanTextureDesc = Memory::CreateRef<VulkanRHIImageDesc>();
 			vulkanTextureDesc->GenerateSampler = true;
 			vulkanTextureDesc->ImGuiUsage = true;
 
 			geometryTextureSpecification.InternalInfo = vulkanTextureDesc;
 
-			RefLucy<VulkanRHIFrameBufferDesc> vulkanFrameBufferDesc = CreateRef<VulkanRHIFrameBufferDesc>();
+			Ref<VulkanRHIFrameBufferDesc> vulkanFrameBufferDesc = Memory::CreateRef<VulkanRHIFrameBufferDesc>();
 			vulkanFrameBufferDesc->ImageBuffers.reserve(swapChain.GetImageCount());
 			for (uint32_t i = 0; i < swapChain.GetImageCount(); i++)
-				vulkanFrameBufferDesc->ImageBuffers.emplace_back(As(Image2D::Create(geometryTextureSpecification), VulkanImage2D));
+				vulkanFrameBufferDesc->ImageBuffers.emplace_back(Image2D::Create(geometryTextureSpecification).As<VulkanImage2D>());
 			vulkanFrameBufferDesc->RenderPass = RenderPass::Create(geometryPassSpecs);
 
 			geometryFrameBufferSpecs.InternalInfo = vulkanFrameBufferDesc;
@@ -104,7 +104,7 @@ namespace Lucy {
 			RenderPassSpecification uiRenderPassSpecs;
 			uiRenderPassSpecs.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
 
-			RefLucy<VulkanRHIRenderPassDesc> vulkanRenderPassDesc = CreateRef<VulkanRHIRenderPassDesc>();
+			Ref<VulkanRHIRenderPassDesc> vulkanRenderPassDesc = Memory::CreateRef<VulkanRHIRenderPassDesc>();
 			vulkanRenderPassDesc->ColorAttachments.push_back({ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
 			vulkanRenderPassDesc->ColorDescriptor.Format = swapChain.GetSurfaceFormat().format;
 			vulkanRenderPassDesc->ColorDescriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -121,7 +121,7 @@ namespace Lucy {
 			uiFrameBufferSpecs.Width = swapChain.GetExtent().width;
 			uiFrameBufferSpecs.Height = swapChain.GetExtent().height;
 
-			RefLucy<VulkanRHIFrameBufferDesc> vulkanFrameBufferDesc = CreateRef<VulkanRHIFrameBufferDesc>();
+			Ref<VulkanRHIFrameBufferDesc> vulkanFrameBufferDesc = Memory::CreateRef<VulkanRHIFrameBufferDesc>();
 			vulkanFrameBufferDesc->ImageViews = swapChain.GetImageViews();
 			vulkanFrameBufferDesc->RenderPass = s_ImGuiPipeline.UIRenderPass;
 
@@ -205,16 +205,16 @@ namespace Lucy {
 			Renderer::DrawIndexed(12, 1, 0, 0, 0);
 			Renderer::UnbindPipeline();
 			/*
-			const RefLucy<Mesh>& mesh = drawCommand.Mesh;
+			const Ref<Mesh>& mesh = drawCommand.Mesh;
 			const glm::mat4& entityTransform = drawCommand.EntityTransform;
 
 			auto& uniformBuffers = s_GeometryPipeline->GetUniformBuffers<VulkanUniformBuffer>(1);
-			const std::vector<RefLucy<Material>>& materials = mesh->GetMaterials();
+			const std::vector<Ref<Material>>& materials = mesh->GetMaterials();
 			std::vector<Submesh>& submeshes = mesh->GetSubmeshes();
 
 			for (uint32_t i = 0; i < submeshes.size(); i++) {
 				Submesh& submesh = submeshes[i];
-				const RefLucy<Material> material = materials[submesh.MaterialIndex];
+				const Ref<Material> material = materials[submesh.MaterialIndex];
 				const glm::mat4& entityTransform = submesh.Transform;
 
 				material->Bind(s_GeometryPipeline);

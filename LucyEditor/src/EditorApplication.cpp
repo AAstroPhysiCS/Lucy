@@ -6,12 +6,11 @@
 #include "EditorModule.h"
 #include "Renderer/Renderer.h"
 
-#include "../nativefiledialog/include/nfd.h"
 #include "glad/glad.h"
 
 namespace Lucy {
 
-	PerformanceMetrics EditorApplication::s_Metrics;
+	Metrics EditorApplication::s_Metrics;
 
 	Application* CreateEditorApplication(const ApplicationArgs& args, ApplicationSpecification& specs) {
 		return new EditorApplication(args, specs);
@@ -34,27 +33,27 @@ namespace Lucy {
 		rendererSpecs.Window = m_Window;
 
 		Renderer::Init(rendererSpecs);
-		m_ModuleStack.Push(CreateRef<EditorModule>(m_Window));
+		m_ModuleStack.Push(Memory::CreateRef<EditorModule>(m_Window));
 
-		LUCY_ASSERT(NFD_Init() == NFD_OKAY);
+		FileSystem::Init();
 	}
 
 	EditorApplication::~EditorApplication() {
 		m_Running = false;
-		for (RefLucy<Module> m : m_ModuleStack.GetStack()) {
+		for (Ref<Module> m : m_ModuleStack.GetStack()) {
 			m->Destroy();
 		}
 		Renderer::Destroy();
 		m_Window->Destroy();
-		NFD_Quit();
+		FileSystem::Destroy();
 	}
 
 	void EditorApplication::Run() {
 		while (m_Running && !glfwWindowShouldClose(m_Window->Raw())) {
 
 			m_Window->PollEvents();
-			for (RefLucy<Module> mod : m_ModuleStack.GetStack()) {
-				mod->Begin(s_Metrics);
+			for (Ref<Module> mod : m_ModuleStack.GetStack()) {
+				mod->Begin();
 				mod->OnRender();
 				mod->End();
 			}
@@ -64,7 +63,7 @@ namespace Lucy {
 
 	void EditorApplication::OnEvent(Event* e) {
 		m_Window->WaitEventsIfMinimized();
-		for (RefLucy<Module> mod : m_ModuleStack.GetStack()) {
+		for (Ref<Module> mod : m_ModuleStack.GetStack()) {
 			mod->OnEvent(*e);
 		}
 	}

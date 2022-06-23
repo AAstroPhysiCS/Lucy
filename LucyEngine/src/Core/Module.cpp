@@ -3,7 +3,7 @@
 
 namespace Lucy {
 
-	Module::Module(RefLucy<Window> window)
+	Module::Module(Ref<Window> window)
 		: m_Window(window) {
 	}
 }

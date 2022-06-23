@@ -27,7 +27,7 @@ namespace Lucy {
 
 	struct VulkanDescriptorSetSpecifications {
 		VkDescriptorSetLayout Layout = VK_NULL_HANDLE;
-		RefLucy<VulkanDescriptorPool> Pool = nullptr;
+		Ref<VulkanDescriptorPool> Pool = nullptr;
 	};
 
 	class VulkanDescriptorSet {

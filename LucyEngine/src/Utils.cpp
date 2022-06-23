@@ -1,6 +1,7 @@
 #include "lypch.h"
 
 #include "Utils.h"
+#include "Core/FileSystem.h"
 #include "../ImGui/imgui.h"
 
 namespace Utils {
@@ -21,26 +22,9 @@ namespace Utils {
 		return buffer;
 	}
 
-	std::vector<std::string> ReadFile(const std::string& path) {
-		std::ifstream f(path);
-
-		if (!f) {
-			LUCY_CRITICAL(fmt::format("Error opening the file! Or it can not be found {0}", path));
-			LUCY_ASSERT(false);
-		}
-
-		std::string line;
+	Size ReadViewportSizeFromIni(const char* windowName) {
 		std::vector<std::string> buffer;
-
-		while (std::getline(f, line)) {
-			buffer.push_back(line);
-		}
-
-		return buffer;
-	}
-
-	Size ReadSizeFromIni(const char* windowName) {
-		auto buffer = ReadFile("lucyconfig.ini");
+		Lucy::FileSystem::ReadFileLine<std::string>("lucyconfig.ini", buffer);
 
 		std::string windowNameFull = "[Window][";
 		windowNameFull.append(windowName).append("]");
@@ -64,7 +48,6 @@ namespace Utils {
 			NFD_FreePath((nfdu8char_t*)outPath);
 		}
 	}
-
 }
 
 namespace UIUtils {

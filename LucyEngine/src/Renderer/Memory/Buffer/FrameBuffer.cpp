@@ -3,7 +3,8 @@
 
 #include "OpenGL/OpenGLFrameBuffer.h"
 #include "Vulkan/VulkanFrameBuffer.h"
-#include "../Renderer.h"
+
+#include "Renderer/Renderer.h"
 
 namespace Lucy {
 
@@ -11,13 +12,13 @@ namespace Lucy {
 		: m_Specs(specs) {
 	}
 
-	RefLucy<FrameBuffer> FrameBuffer::Create(FrameBufferSpecification& specs) {
+	Ref<FrameBuffer> FrameBuffer::Create(FrameBufferSpecification& specs) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
-				return CreateRef<OpenGLFrameBuffer>(specs);
+				return Memory::CreateRef<OpenGLFrameBuffer>(specs);
 				break;
 			case RenderArchitecture::Vulkan:
-				return CreateRef<VulkanFrameBuffer>(specs);
+				return Memory::CreateRef<VulkanFrameBuffer>(specs);
 				break;
 			default:
 				LUCY_CRITICAL("Other API's are not supported!");

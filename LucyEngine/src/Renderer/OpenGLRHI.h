@@ -21,17 +21,17 @@ namespace Lucy {
 		PresentResult EndScene() override;
 
 		void Enqueue(const SubmitFunc&& func) override;
-		void EnqueueStaticMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform) override;
+		void EnqueueStaticMesh(Ref<Mesh> mesh, const glm::mat4& entityTransform) override;
 
 		void RecordToCommandQueue(RecordFunc<>&& func);
 		void RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func);
 
-		void BindPipeline(RefLucy<Pipeline> pipeline);
-		void UnbindPipeline(RefLucy<Pipeline> pipeline);
-		void BindBuffers(RefLucy<VertexBuffer> vertexBuffer, RefLucy<IndexBuffer> indexBuffer);
+		void BindPipeline(Ref<Pipeline> pipeline);
+		void UnbindPipeline(Ref<Pipeline> pipeline);
+		void BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer);
 
-		inline RefLucy<OpenGLPipeline>& GetGeometryPipeline() { return m_GeometryPipeline; }
-		inline RefLucy<OpenGLPipeline>& GetIDPipeline() { return m_IDPipeline; }
+		inline Ref<OpenGLPipeline>& GetGeometryPipeline() { return m_GeometryPipeline; }
+		inline Ref<OpenGLPipeline>& GetIDPipeline() { return m_IDPipeline; }
 		
 		void OnWindowResize() override;
 		void OnViewportResize() override;
@@ -40,8 +40,8 @@ namespace Lucy {
 		void GeometryPass();
 		void IDPass();
 
-		RefLucy<OpenGLPipeline> m_GeometryPipeline;
-		RefLucy<OpenGLPipeline> m_IDPipeline;
+		Ref<OpenGLPipeline> m_GeometryPipeline;
+		Ref<OpenGLPipeline> m_IDPipeline;
 
 		friend class Renderer;
 	};
@@ -55,7 +55,7 @@ namespace Lucy {
 		static void DrawElementsBaseVertex(Topology topology, uint32_t count, uint32_t indices, int32_t basevertex);
 
 		static void ReadPixels(uint32_t x, uint32_t y, uint32_t width, uint32_t height, float* pixelValueOutput);
-		static void ReadBuffer(RefLucy<OpenGLFrameBuffer> frameBuffer, uint32_t mode);
+		static void ReadBuffer(Ref<OpenGLFrameBuffer> frameBuffer, uint32_t mode);
 		static void ReadBuffer(uint32_t mode);
 	};
 }

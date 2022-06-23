@@ -7,6 +7,7 @@ namespace Lucy {
 	class OpenGLShader : public Shader {
 	public:
 		OpenGLShader(const std::string& path, const std::string& name);
+		virtual ~OpenGLShader() = default;
 
 		inline uint32_t GetProgram() { return m_Program; }
 		

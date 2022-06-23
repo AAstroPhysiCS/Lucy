@@ -4,16 +4,16 @@
 #include "vulkan/vulkan.h"
 
 #include "Renderer/Renderer.h"
-#include "../../Context/VulkanDevice.h"
+#include "Renderer/Context/VulkanDevice.h"
 
 namespace Lucy {
 
 	VulkanFrameBuffer::VulkanFrameBuffer(FrameBufferSpecification& specs)
 		: FrameBuffer(specs) {
-		RefLucy<VulkanRHIFrameBufferDesc> frameBufferDesc = As(m_Specs.InternalInfo, VulkanRHIFrameBufferDesc);
+		Ref<VulkanRHIFrameBufferDesc> frameBufferDesc = m_Specs.InternalInfo.As<VulkanRHIFrameBufferDesc>();
 		//this would make problems when we resized the window, since the lifetime of this object is short
 		if (frameBufferDesc) {
-			m_RenderPass = As(frameBufferDesc->RenderPass, VulkanRenderPass);
+			m_RenderPass = frameBufferDesc->RenderPass.As<VulkanRenderPass>();
 			m_Images = frameBufferDesc->ImageBuffers;
 			m_ImageViews = frameBufferDesc->ImageViews;
 		}
@@ -62,11 +62,11 @@ namespace Lucy {
 		depthImageSpecs.Format = VK_FORMAT_D32_SFLOAT;
 		depthImageSpecs.Width = m_Specs.Width;
 		depthImageSpecs.Height = m_Specs.Height;
-		auto& desc = CreateRef<VulkanRHIImageDesc>();
+		auto& desc = Memory::CreateRef<VulkanRHIImageDesc>();
 		desc->DepthEnable = true;
 		depthImageSpecs.InternalInfo = desc;
 
-		m_DepthImage = As(Image2D::Create(depthImageSpecs), VulkanImage2D);
+		m_DepthImage = Image2D::Create(depthImageSpecs).As<VulkanImage2D>();
 	}
 
 	void VulkanFrameBuffer::Destroy() {
@@ -86,7 +86,7 @@ namespace Lucy {
 		m_Specs.InternalInfo = nullptr;
 	}
 
-	void VulkanFrameBuffer::Recreate(uint32_t width, uint32_t height, RefLucy<void> internalInfo) {
+	void VulkanFrameBuffer::Recreate(uint32_t width, uint32_t height, Ref<void> internalInfo) {
 		m_Specs.Width = width;
 		m_Specs.Height = height;
 
@@ -94,8 +94,8 @@ namespace Lucy {
 		if (internalInfo) {
 			m_Specs.InternalInfo = internalInfo;
 
-			RefLucy<VulkanRHIFrameBufferDesc> frameBufferDesc = As(m_Specs.InternalInfo, VulkanRHIFrameBufferDesc);
-			m_RenderPass = As(frameBufferDesc->RenderPass, VulkanRenderPass);
+			Ref<VulkanRHIFrameBufferDesc> frameBufferDesc = m_Specs.InternalInfo.As<VulkanRHIFrameBufferDesc>();
+			m_RenderPass = frameBufferDesc->RenderPass.As<VulkanRenderPass>();
 			m_Images = frameBufferDesc->ImageBuffers;
 			m_ImageViews = frameBufferDesc->ImageViews;
 		}

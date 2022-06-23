@@ -4,7 +4,7 @@
 #include "vulkan/vulkan.h"
 
 #include "Renderer.h"
-#include "Buffer/Vulkan/VulkanFrameBuffer.h"
+#include "Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 #include "Context/VulkanDevice.h"
 #include "Context/VulkanSwapChain.h"
 
@@ -12,7 +12,7 @@ namespace Lucy {
 
 	VulkanRenderPass::VulkanRenderPass(const RenderPassSpecification& specs)
 		: RenderPass(specs) {
-		RefLucy<VulkanRHIRenderPassDesc> renderPassDesc = As(m_Specs.InternalInfo, VulkanRHIRenderPassDesc);
+		Ref<VulkanRHIRenderPassDesc> renderPassDesc = m_Specs.InternalInfo.As<VulkanRHIRenderPassDesc>();
 		//we need this in framebuffer, outside the enqueue function, since otherwise there will be a conflict
 		m_DepthBuffered = renderPassDesc->DepthEnable;
 
@@ -24,7 +24,7 @@ namespace Lucy {
 	void VulkanRenderPass::Create() {
 		const VulkanDevice& device = VulkanDevice::Get();
 
-		RefLucy<VulkanRHIRenderPassDesc> renderPassDesc = As(m_Specs.InternalInfo, VulkanRHIRenderPassDesc);
+		Ref<VulkanRHIRenderPassDesc> renderPassDesc = m_Specs.InternalInfo.As<VulkanRHIRenderPassDesc>();
 
 		VkAttachmentDescription colorAttachmentDescription{};
 		colorAttachmentDescription.format = renderPassDesc->ColorDescriptor.Format;

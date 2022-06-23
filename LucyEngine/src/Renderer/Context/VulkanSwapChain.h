@@ -5,7 +5,7 @@
 #include "Renderer/Synchronization/SynchItems.h"
 
 #include "Renderer/Image/VulkanImage.h"
-#include "Renderer/Buffer/FrameBuffer.h"
+#include "Renderer/Memory/Buffer/FrameBuffer.h"
 
 namespace Lucy {
 
@@ -41,14 +41,14 @@ namespace Lucy {
 		inline VkSwapchainKHR GetVulkanHandle() { return m_SwapChain; }
 		inline VkResult GetLastSwapChainResult() { return m_LastSwapChainResult; }
 
-		inline uint32_t GetImageCount() { return m_SwapChainImages.size(); }
+		inline size_t GetImageCount() { return m_SwapChainImages.size(); }
 		inline std::vector<VulkanImageView>& GetImageViews() { return m_SwapChainImageViews; }
 		
 		inline uint32_t GetCurrentImageIndex() { return m_ImageIndex; }
 		inline uint32_t GetCurrentFrameIndex() { return m_CurrentFrameIndex; }
 		inline const uint32_t GetMaxFramesInFlight() const { return MAX_FRAMES_IN_FLIGHT; }
 
-		inline RefLucy<VulkanRHIFrameBufferDesc> GetSwapChainFrameBufferDesc() const { return m_SwapChainFrameBufferDesc; }
+		inline Ref<VulkanRHIFrameBufferDesc> GetSwapChainFrameBufferDesc() const { return m_SwapChainFrameBufferDesc; }
 	private:
 		void SubmitToQueue(VkCommandBuffer commandBuffer);
 
@@ -65,7 +65,7 @@ namespace Lucy {
 
 		std::vector<VkImage> m_SwapChainImages;
 		std::vector<VulkanImageView> m_SwapChainImageViews;
-		RefLucy<VulkanRHIFrameBufferDesc> m_SwapChainFrameBufferDesc = CreateRef<VulkanRHIFrameBufferDesc>();
+		Ref<VulkanRHIFrameBufferDesc> m_SwapChainFrameBufferDesc = Memory::CreateRef<VulkanRHIFrameBufferDesc>();
 
 		VkSurfaceFormatKHR m_SelectedFormat;
 		VkPresentModeKHR m_SelectedPresentMode;

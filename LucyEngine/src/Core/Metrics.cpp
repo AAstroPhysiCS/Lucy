@@ -9,6 +9,11 @@
 
 namespace Lucy {
 
+	void Metrics::Update() {
+		MemTracker.Update();
+		PerfMetrics.Update();
+	}
+
 	void PerformanceMetrics::Update() {
 		static auto startTime = NOW();
 		static float localFrames = 0;
@@ -26,5 +31,9 @@ namespace Lucy {
 			Frames = localFrames;
 			localFrames = 0;
 		}
+	}
+
+	void MemoryTracker::Update() {
+		m_CurrentUsage = m_TotalAllocated - m_TotalFreed;
 	}
 }

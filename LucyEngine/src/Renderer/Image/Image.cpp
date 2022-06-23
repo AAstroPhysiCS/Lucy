@@ -8,13 +8,13 @@
 
 namespace Lucy {
 
-	RefLucy<Image2D> Image2D::Create(const std::string& path, ImageSpecification& specs) {
+	Ref<Image2D> Image2D::Create(const std::string& path, ImageSpecification& specs) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
-				return CreateRef<OpenGLImage2D>(path, specs);
+				return Memory::CreateRef<OpenGLImage2D>(path, specs);
 				break;
 			case RenderArchitecture::Vulkan:
-				return CreateRef<VulkanImage2D>(path, specs);
+				return Memory::CreateRef<VulkanImage2D>(path, specs);
 				break;
 			default:
 				LUCY_ASSERT(false);
@@ -22,13 +22,13 @@ namespace Lucy {
 		return nullptr;
 	}
 	
-	RefLucy<Image2D> Image2D::Create(ImageSpecification& specs) {
+	Ref<Image2D> Image2D::Create(ImageSpecification& specs) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
-				return CreateRef<OpenGLImage2D>(specs);
+				return Memory::CreateRef<OpenGLImage2D>(specs);
 				break;
 			case RenderArchitecture::Vulkan:
-				return CreateRef<VulkanImage2D>(specs);
+				return Memory::CreateRef<VulkanImage2D>(specs);
 				break;
 			default:
 				LUCY_ASSERT(false);

@@ -7,16 +7,17 @@
 namespace Lucy {
 
 	class Module {
-	protected:
-		Module(RefLucy<Window> window);
-		~Module() = default;
 	public:
-		virtual void Begin(PerformanceMetrics& rendererMetrics) = 0;
+		virtual ~Module() = default;
+		
+		virtual void Begin() = 0;
 		virtual void End() = 0;
 		virtual void OnRender() = 0;
 		virtual void OnEvent(Event& e) = 0;
 		virtual void Destroy() = 0;
 	protected:
-		RefLucy<Window> m_Window;
+		Module(Ref<Window> window);
+		
+		Ref<Window> m_Window;
 	};
 }

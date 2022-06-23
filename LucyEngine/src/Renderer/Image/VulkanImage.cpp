@@ -24,7 +24,7 @@ namespace Lucy {
 		: Image2D(specs) {
 		if (m_Specs.ImageType != ImageType::Type2D) LUCY_ASSERT(false);
 		Renderer::Enqueue([=]() {
-			RefLucy<VulkanRHIImageDesc> imageDesc = As(m_Specs.InternalInfo, VulkanRHIImageDesc);
+			Ref<VulkanRHIImageDesc> imageDesc = m_Specs.InternalInfo.As<VulkanRHIImageDesc>();
 			if (imageDesc->DepthEnable)
 				CreateDepthImage();
 			else
@@ -92,7 +92,7 @@ namespace Lucy {
 	}
 
 	void VulkanImage2D::CreateVulkanImageViewHandle() {
-		RefLucy<VulkanRHIImageDesc> imageDesc = As(m_Specs.InternalInfo, VulkanRHIImageDesc);
+		Ref<VulkanRHIImageDesc> imageDesc = m_Specs.InternalInfo.As<VulkanRHIImageDesc>();
 
 		ImageViewSpecification imageViewSpecification;
 		imageViewSpecification.Format = (VkFormat)m_Specs.Format;
@@ -211,7 +211,7 @@ namespace Lucy {
 	void VulkanImage2D::Recreate(uint32_t width, uint32_t height) {
 		m_Width = width;
 		m_Height = height;
-		auto& desc = As(m_Specs.InternalInfo, VulkanRHIImageDesc);
+		auto& desc = m_Specs.InternalInfo.As<VulkanRHIImageDesc>();
 
 		Destroy();
 		m_CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;

@@ -1,7 +1,7 @@
 #include "lypch.h"
 #include "RenderBuffer.h"
 
-#include "../Renderer.h"
+#include "Renderer/Renderer.h"
 #include "OpenGL/OpenGLRenderBuffer.h"
 
 namespace Lucy {
@@ -10,10 +10,10 @@ namespace Lucy {
 		m_Specs(specs) {
 	}
 
-	RefLucy<RenderBuffer> RenderBuffer::Create(const RenderBufferSpecification& specs) {
+	Ref<RenderBuffer> RenderBuffer::Create(const RenderBufferSpecification& specs) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
-				return CreateRef<OpenGLRenderBuffer>(specs);
+				return Memory::CreateRef<OpenGLRenderBuffer>(specs);
 				break;
 		}
 		return nullptr;

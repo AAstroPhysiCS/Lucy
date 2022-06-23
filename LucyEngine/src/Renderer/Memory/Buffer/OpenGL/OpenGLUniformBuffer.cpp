@@ -21,7 +21,7 @@ namespace Lucy {
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 	}
 
-	void OpenGLUniformBuffer::Destroy() {
+	void OpenGLUniformBuffer::DestroyHandle() {
 		glDeleteBuffers(1, &m_Id);
 	}
 

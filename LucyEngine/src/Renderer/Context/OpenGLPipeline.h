@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Pipeline.h"
-#include "../Buffer/OpenGL/OpenGLVertexBuffer.h"
-#include "../Buffer/OpenGL/OpenGLFrameBuffer.h"
+#include  "../Memory/Buffer/OpenGL/OpenGLVertexBuffer.h"
+#include  "../Memory/Buffer/OpenGL/OpenGLFrameBuffer.h"
 
 #include "../RenderPass.h"
 
@@ -16,7 +16,7 @@ namespace Lucy {
 		void Bind(PipelineBindInfo bindInfo) override;
 		void Unbind();
 		void Destroy() override;
-		void UploadVertexLayout(RefLucy<VertexBuffer>& vertexBuffer);
+		void UploadVertexLayout(Ref<VertexBuffer>& vertexBuffer);
 	private:
 		void ParseUniformBuffers();
 	};

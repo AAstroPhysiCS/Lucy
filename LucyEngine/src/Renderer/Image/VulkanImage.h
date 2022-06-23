@@ -48,6 +48,7 @@ namespace Lucy {
 	public:
 		VulkanImage2D(const std::string& path, ImageSpecification& specs);
 		VulkanImage2D(ImageSpecification& specs);
+		virtual ~VulkanImage2D() = default;
 
 		void Bind() override;
 		void Unbind() override;

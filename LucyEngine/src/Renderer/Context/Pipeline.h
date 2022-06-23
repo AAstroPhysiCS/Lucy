@@ -1,14 +1,14 @@
 #pragma once
 
 #include "../Shader/Shader.h"
-#include "../Buffer/VertexBuffer.h"
+#include "Renderer/Memory/Buffer/VertexBuffer.h"
 
 #include "../Context/VulkanSwapChain.h"
 #include "../Context/VulkanDevice.h"
 
 #include "Renderer/RenderPass.h"
-#include "Renderer/Buffer/FrameBuffer.h"
-#include "Renderer/Buffer/UniformBuffer.h"
+#include "Renderer/Memory/Buffer/FrameBuffer.h"
+#include "Renderer/Memory/Buffer/UniformBuffer.h"
 #include "../Shader/Shader.h"
 
 namespace Lucy {
@@ -37,9 +37,9 @@ namespace Lucy {
 		Rasterization Rasterization;
 		VertexShaderLayout VertexShaderLayout;
 
-		RefLucy<RenderPass> RenderPass;
-		RefLucy<FrameBuffer> FrameBuffer;
-		RefLucy<Shader> Shader;
+		Ref<RenderPass> RenderPass;
+		Ref<FrameBuffer> FrameBuffer;
+		Ref<Shader> Shader;
 	};
 
 	struct PipelineBindInfo {
@@ -52,16 +52,18 @@ namespace Lucy {
 	class Pipeline {
 	public:
 		Pipeline(const PipelineSpecification& specs);
-		static RefLucy<Pipeline> Create(const PipelineSpecification& specs);
+		virtual ~Pipeline() = default;
+
+		static Ref<Pipeline> Create(const PipelineSpecification& specs);
 
 		inline Topology GetTopology() const { return m_Specs.Topology; }
 		inline Rasterization GetRasterization() const { return m_Specs.Rasterization; }
-		inline RefLucy<FrameBuffer>& GetFrameBuffer() { return m_Specs.FrameBuffer; }
-		inline RefLucy<RenderPass>& GetRenderPass() { return m_Specs.RenderPass; }
-		inline RefLucy<Shader>& GetShader() { return m_Specs.Shader; }
+		inline Ref<FrameBuffer>& GetFrameBuffer() { return m_Specs.FrameBuffer; }
+		inline Ref<RenderPass>& GetRenderPass() { return m_Specs.RenderPass; }
+		inline Ref<Shader>& GetShader() { return m_Specs.Shader; }
 
 		template <class T>
-		inline RefLucy<T> GetUniformBuffers(const uint32_t index) { return As(m_UniformBuffers[index], T); }
+		inline Ref<T> GetUniformBuffers(const uint32_t index) { return m_UniformBuffers[index].As<T>(); }
 		void DestroyUniformBuffers();
 
 		virtual void Bind(PipelineBindInfo bindInfo) = 0;
@@ -72,6 +74,6 @@ namespace Lucy {
 		static uint32_t CalculateStride(VertexShaderLayout vertexLayout);
 
 		PipelineSpecification m_Specs;
-		std::vector<RefLucy<UniformBuffer>> m_UniformBuffers;
+		std::vector<Ref<UniformBuffer>> m_UniformBuffers;
 	};
 }

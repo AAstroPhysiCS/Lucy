@@ -6,13 +6,13 @@
 
 namespace Lucy {
 
-	RefLucy<RHI> RHI::Create(RenderArchitecture arch) {
+	Ref<RHI> RHI::Create(RenderArchitecture arch) {
 		switch (arch) {
 			case RenderArchitecture::OpenGL:
-				return CreateRef<OpenGLRHI>(arch);
+				return Memory::CreateRef<OpenGLRHI>(arch);
 				break;
 			case RenderArchitecture::Vulkan:
-				return CreateRef<VulkanRHI>(arch);
+				return Memory::CreateRef<VulkanRHI>(arch);
 				break;
 		}
 		return nullptr;

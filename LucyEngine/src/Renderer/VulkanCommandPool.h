@@ -17,7 +17,7 @@ namespace Lucy {
 		VulkanCommandPool(CommandPoolSpecs specs);
 		~VulkanCommandPool() = default;
 
-		static RefLucy<VulkanCommandPool> Create(CommandPoolSpecs specs);
+		static Ref<VulkanCommandPool> Create(CommandPoolSpecs specs);
 
 		inline VkCommandBuffer GetCommandBuffer(uint32_t index) { return m_CommandBuffers[index]; }
 		inline size_t GetCommandBufferSize() { return m_CommandBuffers.size(); }

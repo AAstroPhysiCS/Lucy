@@ -1,6 +1,6 @@
 #pragma once
-#include "../Image/Image.h"
-#include "../../Core/Base.h"
+#include "Renderer/Image/Image.h"
+#include "Core/Base.h"
 
 namespace Lucy {
 
@@ -16,12 +16,12 @@ namespace Lucy {
 		std::vector<ImageSpecification> TextureSpecs;
 		ImageSpecification BlittedTextureSpecs;
 
-		RefLucy<RenderBuffer> RenderBuffer;
+		Ref<RenderBuffer> RenderBuffer;
 	};
 
 	struct VulkanRHIFrameBufferDesc {
-		std::vector<RefLucy<VulkanImage2D>> ImageBuffers;
-		RefLucy<RenderPass> RenderPass = nullptr;
+		std::vector<Ref<VulkanImage2D>> ImageBuffers;
+		Ref<RenderPass> RenderPass = nullptr;
 
 		//only for swapchain (use ImageBuffer)
 		std::vector<VulkanImageView> ImageViews;
@@ -32,14 +32,14 @@ namespace Lucy {
 		int32_t	Width = 0, Height = 0;
 		int32_t Level = 1;
 
-		RefLucy<void> InternalInfo = nullptr; //to be overriden by different rhi's
+		Ref<void> InternalInfo = nullptr; //to be overriden by different rhi's
 	};
 
 	class FrameBuffer {
 	public:
-		~FrameBuffer() = default;
+		virtual ~FrameBuffer() = default;
 
-		static RefLucy<FrameBuffer> Create(FrameBufferSpecification& specs);
+		static Ref<FrameBuffer> Create(FrameBufferSpecification& specs);
 		virtual void Destroy() = 0;
 
 		inline uint32_t GetWidth() { return m_Specs.Width; }

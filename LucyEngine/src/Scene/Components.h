@@ -41,12 +41,12 @@ namespace Lucy {
 		}
 		MeshComponent(const MeshComponent& other) = default;
 
-		void SetMesh(RefLucy<Mesh>&& mesh) { m_Mesh = std::move(mesh); }
+		void SetMesh(Ref<Mesh>&& mesh) { m_Mesh = std::move(mesh); }
 
-		inline RefLucy<Mesh>& GetMesh() { return m_Mesh; }
-		inline bool IsValid() { return m_Mesh.get() != nullptr && m_Mesh->GetSubmeshes().size() != 0; }
+		inline Ref<Mesh>& GetMesh() { return m_Mesh; }
+		inline bool IsValid() { return m_Mesh.Get() != nullptr && m_Mesh->GetSubmeshes().size() != 0; }
 	private:
-		RefLucy<Mesh> m_Mesh;
+		Ref<Mesh> m_Mesh = nullptr;
 	};
 
 	struct UUIDComponent {

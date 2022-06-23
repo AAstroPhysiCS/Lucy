@@ -5,7 +5,7 @@
 #include "UI/TaskbarPanel.h"
 #include "UI/ViewportPanel.h"
 #include "UI/DetailsPanel.h"
-#include "UI/PerformancePanel.h"
+#include "UI/ApplicationMetricsPanel.h"
 
 #include "Events/InputEvent.h"
 #include "Events/WindowEvent.h"
@@ -25,11 +25,11 @@ namespace Lucy {
 		m_Panels.push_back(&SceneExplorerPanel::GetInstance());
 		m_Panels.push_back(&TaskbarPanel::GetInstance());
 		m_Panels.push_back(&DetailsPanel::GetInstance());
-		m_Panels.push_back(&PerformancePanel::GetInstance());
+		m_Panels.push_back(&ApplicationMetricsPanel::GetInstance());
 		m_Panels.push_back(&ViewportPanel::GetInstance());
 	}
 
-	void ImGuiOverlay::Init(RefLucy<Window> window, Scene& scene) {
+	void ImGuiOverlay::Init(Ref<Window> window, Scene& scene) {
 		m_Scene = &scene;
 
 		SceneExplorerPanel::GetInstance().SetScene(m_Scene);
@@ -55,10 +55,10 @@ namespace Lucy {
 		} else if (currentArchitecture == RenderArchitecture::Vulkan) {
 			ImGui_ImplGlfw_InitForVulkan(window->Raw(), true);
 			Renderer::Enqueue([&]() mutable {
-				auto& vulkanContext = As(Renderer::GetCurrentRenderer()->m_RenderContext, VulkanContext);
+				auto& vulkanContext = Renderer::GetCurrentRenderer()->m_RenderContext.As<VulkanContext>();
 				VulkanDevice device = VulkanDevice::Get();
 
-				m_ImGuiPool = CreateRef<VulkanDescriptorPool>(m_PoolSpecs);
+				m_ImGuiPool = Memory::CreateRef<VulkanDescriptorPool>(m_PoolSpecs);
 
 				ImGui_ImplVulkan_InitInfo initInfo{};
 				initInfo.Instance = vulkanContext->GetVulkanInstance();
@@ -71,14 +71,14 @@ namespace Lucy {
 				initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 				initInfo.CheckVkResultFn = VulkanMessageCallback::ImGui_DebugCallback;
 
-				ImGui_ImplVulkan_Init(&initInfo, As(ViewportRenderer::GetImGuiPipeline().UIRenderPass, VulkanRenderPass)->GetVulkanHandle());
+				ImGui_ImplVulkan_Init(&initInfo, ViewportRenderer::GetImGuiPipeline().UIRenderPass.As<VulkanRenderPass>()->GetVulkanHandle());
 				VulkanRHI::RecordSingleTimeCommand(ImGui_ImplVulkan_CreateFontsTexture);
 				ImGui_ImplVulkan_DestroyFontUploadObjects();
 			});
 		}
 	}
 
-	void ImGuiOverlay::Begin(PerformanceMetrics* rendererMetrics) {
+	void ImGuiOverlay::Begin() {
 		auto currentArchitecture = Renderer::GetCurrentRenderArchitecture();
 		if (currentArchitecture == RenderArchitecture::OpenGL) {
 			ImGui_ImplOpenGL3_NewFrame();
@@ -148,8 +148,8 @@ namespace Lucy {
 		}
 	}
 
-	void ImGuiOverlay::Render(PerformanceMetrics* rendererMetrics) {
-		Begin(rendererMetrics);
+	void ImGuiOverlay::Render() {
+		Begin();
 		for (Panel* panel : m_Panels) {
 			panel->Render();
 		}

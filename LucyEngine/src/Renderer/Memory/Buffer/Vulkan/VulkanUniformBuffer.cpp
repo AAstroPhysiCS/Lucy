@@ -17,14 +17,10 @@ namespace Lucy {
 		const uint32_t maxFramesInFlight = swapChain.GetMaxFramesInFlight();
 		m_Buffers.resize(maxFramesInFlight, VK_NULL_HANDLE);
 		m_BufferVma.resize(maxFramesInFlight, VK_NULL_HANDLE);
-	}
 
-	void VulkanUniformBuffer::Bind() {
-		//no use
-	}
-
-	void VulkanUniformBuffer::Unbind() {
-		//no use
+		VulkanAllocator& allocator = VulkanAllocator::Get();
+		for (uint32_t i = 0; i < swapChain.GetMaxFramesInFlight(); i++)
+			allocator.CreateVulkanBufferVma(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO, m_Buffers[i], m_BufferVma[i]);
 	}
 
 	void VulkanUniformBuffer::SetData(void* data, uint32_t size, uint32_t offset) {
@@ -32,25 +28,18 @@ namespace Lucy {
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
 		VulkanAllocator& allocator = VulkanAllocator::Get();
 
-		if (!m_Allocated) {
-			for (uint32_t i = 0; i < swapChain.GetMaxFramesInFlight(); i++) {
-				allocator.CreateVulkanBufferVma(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO, m_Buffers[i], m_BufferVma[i]);
-			}
-			m_Allocated = true;
-		}
-
 		void* dataLocal;
 		vmaMapMemory(allocator.GetVmaInstance(), m_BufferVma[swapChain.GetCurrentFrameIndex()], &dataLocal);
 		memcpy(dataLocal, data, size);
 		vmaUnmapMemory(allocator.GetVmaInstance(), m_BufferVma[swapChain.GetCurrentFrameIndex()]);
 	}
 
-	void VulkanUniformBuffer::Update(RefLucy<VulkanImage2D> image) {
+	void VulkanUniformBuffer::Update(Ref<VulkanImage2D> image) {
 		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-		
+
 		const uint32_t index = swapChain.GetCurrentFrameIndex();
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
-		
+
 		VkWriteDescriptorSet setWrite{};
 		setWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		setWrite.dstSet = m_DescriptorSet.GetSetBasedOffCurrentFrame(index);
@@ -67,7 +56,7 @@ namespace Lucy {
 
 			setWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			setWrite.pImageInfo = &imageInfo;
-			
+
 			vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr);
 		} else {
 			VkDescriptorBufferInfo bufferInfo{};
@@ -82,11 +71,10 @@ namespace Lucy {
 		}
 	}
 
-	void VulkanUniformBuffer::Destroy() {
+	void VulkanUniformBuffer::DestroyHandle() {
 		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 		VulkanAllocator& allocator = VulkanAllocator::Get();
 		for (uint32_t i = 0; i < swapChain.GetMaxFramesInFlight(); i++)
 			vmaDestroyBuffer(allocator.GetVmaInstance(), m_Buffers[i], m_BufferVma[i]);
-		m_Allocated = false;
 	}
 }

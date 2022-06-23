@@ -18,7 +18,7 @@ namespace Lucy {
 
 	struct RendererSpecification {
 		RenderArchitecture Architecture;
-		RefLucy<Window> Window = nullptr;
+		Ref<Window> Window = nullptr;
 	};
 
 	class Renderer {
@@ -31,7 +31,7 @@ namespace Lucy {
 		static PresentResult EndScene();
 
 		static void Enqueue(const SubmitFunc&& func);
-		static void EnqueueStaticMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform);
+		static void EnqueueStaticMesh(Ref<Mesh> mesh, const glm::mat4& entityTransform);
 
 		static void RecordToCommandQueue(RecordFunc<>&& func);
 		static void RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func);
@@ -39,10 +39,10 @@ namespace Lucy {
 		static void SetUIDrawData(std::function<void(VkCommandBuffer commandBuffer)>&& func);
 		static void UIPass(const ImGuiPipeline& imguiPipeline);
 
-		static void BindPipeline(RefLucy<Pipeline> pipeline);
+		static void BindPipeline(Ref<Pipeline> pipeline);
 		static void UnbindPipeline();
-		static void BindBuffers(RefLucy<Mesh> mesh);
-		static void BindBuffers(RefLucy<VertexBuffer> vertexBuffer, RefLucy<IndexBuffer> indexBuffer);
+		static void BindBuffers(Ref<Mesh> mesh);
+		static void BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer);
 		static void DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex,
 								int32_t vertexOffset, uint32_t firstInstance);
 
@@ -56,7 +56,7 @@ namespace Lucy {
 		static void SetViewportSize(int32_t width, int32_t height);
 		static void SetViewportMouse(float viewportMouseX, float viewportMouseY);
 
-		inline static RefLucy<Window> GetWindow() { return s_Specs.Window; }
+		inline static Ref<Window> GetWindow() { return s_Specs.Window; }
 		inline static auto GetWindowSize() {
 			struct Size { int32_t Width, Height; };
 			return Size{ s_Specs.Window->GetWidth(), s_Specs.Window->GetHeight() };
@@ -65,13 +65,13 @@ namespace Lucy {
 		inline static auto GetViewportSize() { return s_RHI->GetViewportSize(); }
 		inline static RenderArchitecture GetCurrentRenderArchitecture() { return s_Specs.Architecture; }
 		inline static ShaderLibrary& GetShaderLibrary() { return s_ShaderLibrary; }
-		inline static RefLucy<RHI> GetCurrentRenderer() { return s_RHI; }
+		inline static Ref<RHI> GetCurrentRenderer() { return s_RHI; }
 	private:
 		Renderer() = delete;
 		~Renderer() = delete;
 		
-		static RefLucy<RHI> s_RHI;
-		static RefLucy<Pipeline> s_ActivePipeline;
+		static Ref<RHI> s_RHI;
+		static Ref<Pipeline> s_ActivePipeline;
 		static RendererSpecification s_Specs;
 
 		static ShaderLibrary s_ShaderLibrary;

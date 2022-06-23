@@ -4,7 +4,7 @@
 #include "vulkan/vulkan.h"
 #include "VulkanDevice.h"
 
-#include "Renderer/Buffer/Vulkan/VulkanFrameBuffer.h"
+#include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/CommandQueue.h"
 

@@ -17,6 +17,6 @@ namespace Lucy {
 		void Recreate() override;
 
 	private:
-		RefLucy<OpenGLFrameBuffer> m_BoundedFrameBuffer = nullptr;
+		Ref<OpenGLFrameBuffer> m_BoundedFrameBuffer = nullptr;
 	};
 }

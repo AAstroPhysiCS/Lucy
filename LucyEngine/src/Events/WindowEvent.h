@@ -11,6 +11,8 @@ namespace Lucy {
 			m_Type = EventType::WindowResizeEvent;
 		}
 
+		virtual ~WindowResizeEvent() = default;
+
 		inline int32_t GetWidth() const { return m_Width; }
 		inline int32_t GetHeight() const { return m_Height; }
 		inline GLFWwindow* GetWindowHandle() const { return m_Window; }
@@ -28,7 +30,9 @@ namespace Lucy {
 			: m_Window(window) {
 			m_Type = EventType::WindowCloseEvent;
 		}
-		
+
+		virtual ~WindowCloseEvent() = default;
+
 		inline GLFWwindow* GetWindowHandle() const { return m_Window; }
 
 		std::function<void()> dispatchFunc;

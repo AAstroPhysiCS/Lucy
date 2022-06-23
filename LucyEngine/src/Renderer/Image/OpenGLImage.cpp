@@ -16,7 +16,7 @@ namespace Lucy {
 
 	OpenGLImage2D::OpenGLImage2D(const std::string& path, ImageSpecification& specs)
 		: Image2D(path, specs) {
-		RefLucy<OpenGLRHIImageDesc> imageDesc = As(m_Specs.InternalInfo, OpenGLRHIImageDesc);
+		Ref<OpenGLRHIImageDesc> imageDesc = m_Specs.InternalInfo.As<OpenGLRHIImageDesc>();
 		m_Slot = imageDesc->Slot;
 
 		uint8_t* data = stbi_load(m_Path.c_str(), &m_Width, &m_Height, &m_Channels, 0);
@@ -50,7 +50,7 @@ namespace Lucy {
 		: Image2D(specs) {
 		if (m_Width == 0 && m_Height == 0) LUCY_ASSERT(false);
 
-		RefLucy<OpenGLRHIImageDesc> imageDesc = As(m_Specs.InternalInfo, OpenGLRHIImageDesc);
+		Ref<OpenGLRHIImageDesc> imageDesc = m_Specs.InternalInfo.As<OpenGLRHIImageDesc>();
 
 		m_Slot = imageDesc->Slot;
 		m_Target = GetOpenGLType(m_Specs);
@@ -65,7 +65,7 @@ namespace Lucy {
 		Unbind();
 	}
 
-	void OpenGLImage2D::SetParameters(const RefLucy<OpenGLRHIImageDesc>& imageDesc) {
+	void OpenGLImage2D::SetParameters(const Ref<OpenGLRHIImageDesc>& imageDesc) {
 		if (m_Specs.Parameter.W != 0 && m_Target != GL_TEXTURE_2D_MULTISAMPLE)	glTexParameteri(m_Target, GL_TEXTURE_WRAP_S, m_Specs.Parameter.W);
 		if (m_Specs.Parameter.V != 0 && m_Target != GL_TEXTURE_2D_MULTISAMPLE)	glTexParameteri(m_Target, GL_TEXTURE_WRAP_T, m_Specs.Parameter.V);
 		if (m_Specs.Parameter.U != 0 && m_Target != GL_TEXTURE_2D_MULTISAMPLE)	glTexParameteri(m_Target, GL_TEXTURE_WRAP_R, m_Specs.Parameter.U);

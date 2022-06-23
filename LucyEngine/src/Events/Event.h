@@ -9,6 +9,9 @@ namespace Lucy {
 
 	class Event {
 	public:
+		Event() = default;
+		virtual ~Event() = default;
+
 		EventType GetType() { return m_Type; }
 	protected:
 		EventType m_Type;

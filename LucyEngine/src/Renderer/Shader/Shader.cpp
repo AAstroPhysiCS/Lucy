@@ -22,18 +22,18 @@ namespace Lucy {
 		});
 	}
 
-	RefLucy<Shader> Shader::Create(const std::string& name, const std::string& path) {
+	Ref<Shader> Shader::Create(const std::string& name, const std::string& path) {
 		auto currentRenderArchitecture = Renderer::GetCurrentRenderArchitecture();
-		RefLucy<Shader> instance = nullptr;
+		Ref<Shader> instance = nullptr;
 		if (currentRenderArchitecture == RenderArchitecture::OpenGL) {
-			instance = CreateRef<OpenGLShader>(path, name);
+			instance = Memory::CreateRef<OpenGLShader>(path, name);
 		} else if (currentRenderArchitecture == RenderArchitecture::Vulkan) {
-			instance = CreateRef<VulkanShader>(path, name);
+			instance = Memory::CreateRef<VulkanShader>(path, name);
 		}
 		return instance;
 	}
 
-	RefLucy<Shader> ShaderLibrary::GetShader(const std::string& name) {
+	Ref<Shader> ShaderLibrary::GetShader(const std::string& name) {
 		for (auto& shader : m_Shaders) {
 			if (shader->GetName() == name) return shader;
 		}
@@ -42,7 +42,7 @@ namespace Lucy {
 		LUCY_ASSERT(false);
 	}
 
-	void ShaderLibrary::PushShader(const RefLucy<Shader>& instance) {
+	void ShaderLibrary::PushShader(const Ref<Shader>& instance) {
 		m_Shaders.push_back(instance);
 	}
 
@@ -68,7 +68,9 @@ namespace Lucy {
 	}
 
 	void Shader::LoadAndRedoCache(shaderc::Compiler& compiler, shaderc::CompileOptions& options, const std::string& cacheFileVert, const std::string& cacheFileFrag) {
-		std::vector<std::string>& lines = Utils::ReadFile(m_Path);
+		std::vector<std::string> lines;
+		FileSystem::ReadFileLine<std::string>(m_Path, lines);
+
 		std::string& vertex = LoadVertexData(lines);
 		std::string& fragment = LoadFragmentData(lines);
 
@@ -78,13 +80,7 @@ namespace Lucy {
 			LUCY_ASSERT(false);
 		}
 		std::vector<uint32_t> dataVert(resultVertex.cbegin(), resultVertex.cend());
-
-		std::ofstream ofVert(cacheFileVert, std::ios::binary | std::ios::out);
-		if (ofVert.is_open()) {
-			ofVert.write((const char*)dataVert.data(), dataVert.size() * sizeof(uint32_t));
-			ofVert.flush();
-			ofVert.close();
-		}
+		FileSystem::WriteToFile<uint32_t>(cacheFileVert, dataVert, OpenMode::Binary);
 
 		shaderc::SpvCompilationResult resultFrag = compiler.CompileGlslToSpv(fragment, shaderc_shader_kind::shaderc_glsl_fragment_shader, FileSystem::GetFileName(m_Path).c_str(), options);
 		if (resultFrag.GetCompilationStatus() != shaderc_compilation_status_success) {
@@ -93,13 +89,7 @@ namespace Lucy {
 		}
 
 		std::vector<uint32_t> dataFrag(resultFrag.cbegin(), resultFrag.cend());
-
-		std::ofstream ofFrag(cacheFileFrag, std::ios::binary | std::ios::out);
-		if (ofFrag.is_open()) {
-			ofFrag.write((const char*)dataFrag.data(), dataFrag.size() * sizeof(uint32_t));
-			ofFrag.flush();
-			ofFrag.close();
-		}
+		FileSystem::WriteToFile<uint32_t>(cacheFileFrag, dataFrag, OpenMode::Binary);
 
 		Info(dataVert, dataFrag);
 		LoadInternal(dataVert, dataFrag);
@@ -109,27 +99,8 @@ namespace Lucy {
 		std::vector<uint32_t> dataVert;
 		std::vector<uint32_t> dataFrag;
 
-		std::ifstream isVert(cacheFileVert, std::ios::in | std::ios::binary);
-		if (isVert.is_open()) {
-			isVert.seekg(0, std::ios::end);
-			size_t size = isVert.tellg();
-			isVert.seekg(0, std::ios::beg);
-
-			dataVert.resize(size / sizeof(uint32_t));
-			isVert.read((char*)dataVert.data(), size);
-			isVert.close();
-		}
-
-		std::ifstream isFrag(cacheFileFrag, std::ios::in | std::ios::binary);
-		if (isFrag.is_open()) {
-			isFrag.seekg(0, std::ios::end);
-			size_t size = isFrag.tellg();
-			isFrag.seekg(0, std::ios::beg);
-
-			dataFrag.resize(size / sizeof(uint32_t));
-			isFrag.read((char*)dataFrag.data(), size);
-			isFrag.close();
-		}
+		FileSystem::ReadFile<uint32_t>(cacheFileVert, dataVert, OpenMode::Binary);
+		FileSystem::ReadFile<uint32_t>(cacheFileFrag, dataFrag, OpenMode::Binary);
 
 		Info(dataVert, dataFrag);
 		LoadInternal(dataVert, dataFrag);

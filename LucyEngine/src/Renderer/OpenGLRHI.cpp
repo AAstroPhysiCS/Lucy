@@ -1,14 +1,14 @@
 #include "lypch.h"
 #include "OpenGLRHI.h"
 
-#include "Buffer/FrameBuffer.h"
-#include "Buffer/RenderBuffer.h"
-#include "Buffer/UniformBuffer.h"
+#include "Memory/Buffer/FrameBuffer.h"
+#include "Memory/Buffer/RenderBuffer.h"
+#include "Memory/Buffer/UniformBuffer.h"
 #include "Mesh.h"
 #include "Renderer.h"
 
 #include "OpenGLRenderPass.h"
-#include "Buffer/OpenGL/OpenGLUniformBuffer.h"
+#include "Memory/Buffer/OpenGL/OpenGLUniformBuffer.h"
 
 #include "glad/glad.h"
 
@@ -24,7 +24,7 @@ namespace Lucy {
 		auto& pbrShader = Renderer::GetShaderLibrary().GetShader("LucyPBR");
 		auto& idShader = Renderer::GetShaderLibrary().GetShader("LucyID");
 
-		auto [width, height] = Utils::ReadSizeFromIni("Viewport");
+		auto [width, height] = Utils::ReadViewportSizeFromIni("Viewport");
 		m_ViewportWidth = width;
 		m_ViewportHeight = height;
 
@@ -142,7 +142,7 @@ namespace Lucy {
 	}
 
 	Entity OpenGLRHI::OnMousePicking() {
-		As(m_IDPipeline->GetFrameBuffer(), OpenGLFrameBuffer)->Bind();
+		m_IDPipeline->GetFrameBuffer().As<OpenGLFrameBuffer>()->Bind();
 		glm::vec3 pixelValue;
 		OpenGLAPICommands::ReadBuffer(GL_COLOR_ATTACHMENT0);
 		OpenGLAPICommands::ReadPixels(m_ViewportMouseX, m_ViewportHeight - m_ViewportMouseY, 1, 1, (float*)&pixelValue);
@@ -158,7 +158,7 @@ namespace Lucy {
 			return {};
 
 		Entity selectedEntity = m_ActiveScene->GetEntityByPixelValue(pixelValue);
-		As(m_IDPipeline->GetFrameBuffer(), OpenGLFrameBuffer)->Unbind();
+		m_IDPipeline->GetFrameBuffer().As<OpenGLFrameBuffer>()->Unbind();
 
 		return selectedEntity;
 	}
@@ -167,15 +167,15 @@ namespace Lucy {
 		m_GeometryPipeline->Bind({});
 		auto& uniformBuffers = m_GeometryPipeline->GetUniformBuffers<OpenGLUniformBuffer>(0);
 		for (MeshDrawCommand meshComponent : m_StaticMeshDrawCommandQueue) {
-			const RefLucy<Mesh>& mesh = meshComponent.Mesh;
-			const std::vector<RefLucy<Material>>& materials = mesh->GetMaterials();
+			const Ref<Mesh>& mesh = meshComponent.Mesh;
+			const std::vector<Ref<Material>>& materials = mesh->GetMaterials();
 			std::vector<Submesh>& submeshes = mesh->GetSubmeshes();
 
 			mesh->Bind();
 			for (uint32_t i = 0; i < submeshes.size(); i++) {
 				Submesh& submesh = submeshes[i];
-				const RefLucy<Material> material = materials[submesh.MaterialIndex];
-				const RefLucy<Shader>& shader = material->GetShader();
+				const Ref<Material> material = materials[submesh.MaterialIndex];
+				const Ref<Shader>& shader = material->GetShader();
 
 				material->Bind(m_GeometryPipeline);
 				uniformBuffers->SetData((void*)&(meshComponent.EntityTransform * submesh.Transform), sizeof(glm::mat4), sizeof(glm::mat4) * 2);
@@ -189,12 +189,12 @@ namespace Lucy {
 
 	void OpenGLRHI::IDPass() {
 		m_GeometryPipeline->Bind({});
-		RefLucy<Shader> idShader = m_GeometryPipeline->GetShader();
+		Ref<Shader> idShader = m_GeometryPipeline->GetShader();
 		auto& uniformBuffers = m_GeometryPipeline->GetUniformBuffers<OpenGLUniformBuffer>(0);
 
 		idShader->Bind();
 		for (MeshDrawCommand meshComponent : m_StaticMeshDrawCommandQueue) {
-			const RefLucy<Mesh>& mesh = meshComponent.Mesh;
+			const Ref<Mesh>& mesh = meshComponent.Mesh;
 			std::vector<Submesh>& submeshes = mesh->GetSubmeshes();
 
 			mesh->Bind();
@@ -239,7 +239,7 @@ namespace Lucy {
 		m_RenderFunctionQueue.push_back(func);
 	}
 
-	void OpenGLRHI::EnqueueStaticMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform) {
+	void OpenGLRHI::EnqueueStaticMesh(Ref<Mesh> mesh, const glm::mat4& entityTransform) {
 		Enqueue([=]() {
 			m_StaticMeshDrawCommandQueue.push_back(MeshDrawCommand(mesh, entityTransform));
 		});
@@ -253,15 +253,15 @@ namespace Lucy {
 
 	}
 
-	void OpenGLRHI::BindPipeline(RefLucy<Pipeline> pipeline) {
+	void OpenGLRHI::BindPipeline(Ref<Pipeline> pipeline) {
 		pipeline->Bind({});
 	}
 
-	void OpenGLRHI::UnbindPipeline(RefLucy<Pipeline> pipeline) {
+	void OpenGLRHI::UnbindPipeline(Ref<Pipeline> pipeline) {
 		pipeline->Unbind();
 	}
 
-	void OpenGLRHI::BindBuffers(RefLucy<VertexBuffer> vertexBuffer, RefLucy<IndexBuffer> indexBuffer) {
+	void OpenGLRHI::BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) {
 		vertexBuffer->Bind({});
 		indexBuffer->Bind({});
 	}
@@ -308,7 +308,7 @@ namespace Lucy {
 		glReadPixels(x, y, width, height, GL_RGB, GL_FLOAT, pixelValueOutput);
 	}
 
-	void OpenGLAPICommands::ReadBuffer(RefLucy<OpenGLFrameBuffer> frameBuffer, uint32_t mode) {
+	void OpenGLAPICommands::ReadBuffer(Ref<OpenGLFrameBuffer> frameBuffer, uint32_t mode) {
 		glNamedFramebufferReadBuffer(frameBuffer->GetID(), mode);
 	}
 

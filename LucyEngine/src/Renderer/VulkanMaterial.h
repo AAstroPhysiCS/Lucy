@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Material.h"
-#include "Buffer/UniformBuffer.h"
+#include "Memory/Buffer/UniformBuffer.h"
 
 namespace Lucy {
 
@@ -9,11 +9,11 @@ namespace Lucy {
 
 	class VulkanMaterial : public Material {
 	public:
-		VulkanMaterial(RefLucy<Shader> shader, aiMaterial* aiMaterial, const char* submeshName, std::string& importedFilePath);
+		VulkanMaterial(Ref<Shader> shader, aiMaterial* aiMaterial, const char* submeshName, std::string& importedFilePath);
 		virtual ~VulkanMaterial() = default;
 
-		void Bind(RefLucy<Pipeline> pipeline);
-		void Unbind(RefLucy<Pipeline> pipeline);
+		void Bind(Ref<Pipeline> pipeline);
+		void Unbind(Ref<Pipeline> pipeline);
 	private:
 		void LoadTexture(aiMaterial* aiMaterial, TextureSlot slot, TextureType type, std::string& importedFilePath);
 	};

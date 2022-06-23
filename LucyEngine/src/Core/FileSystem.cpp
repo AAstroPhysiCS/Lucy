@@ -2,10 +2,19 @@
 #include "FileSystem.h"
 #include "Utils.h"
 
+#include "../nativefiledialog/include/nfd.h"
 
 namespace Lucy {
 
-	std::string Lucy::FileSystem::GetParentPath(std::string& path) {
+	void FileSystem::Init() {
+		LUCY_ASSERT(NFD_Init() == NFD_OKAY);
+	}
+
+	void FileSystem::Destroy() {
+		NFD_Quit();
+	}
+
+	std::string FileSystem::GetParentPath(std::string& path) {
 		std::filesystem::path relPath(path);
 		return relPath.parent_path().string();
 	}
@@ -19,7 +28,7 @@ namespace Lucy {
 		return std::filesystem::exists(file);
 	}
 
-	std::string Lucy::FileSystem::GetParentPath(const std::string& path) {
+	std::string FileSystem::GetParentPath(const std::string& path) {
 		std::filesystem::path relPath(path);
 		return relPath.parent_path().string();
 	}

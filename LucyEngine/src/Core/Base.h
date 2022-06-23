@@ -4,6 +4,8 @@
 #include <iostream>
 #include <functional>
 
+#include "Renderer/Memory/Memory.h"
+
 #include "Logger.h"
 
 #ifdef LUCY_WINDOWS
@@ -22,26 +24,10 @@
 										LUCY_DEBUG_BREAK }
 #endif
 
-#define As(arg, T) std::static_pointer_cast<T>(arg)
-
 namespace Lucy {
 
 	using SubmitFunc = std::function<void()>;
 
 	template <typename ... T>
 	using RecordFunc = std::function<void(T...)>;
-
-	template<typename T>
-	using RefLucy = std::shared_ptr<T>;
-	template<typename T, typename...Args>
-	inline RefLucy<T> CreateRef(Args&&...args) {
-		return std::make_shared<T>(std::forward<Args>(args)...);
-	}
-
-	template<typename T>
-	using ScopeLucy = std::unique_ptr<T>;
-	template<typename T, typename...Args>
-	inline ScopeLucy<T> CreateScope(Args&&...args) {
-		return std::make_unique<T>(std::forward<Args>(args)...);
-	}
 }

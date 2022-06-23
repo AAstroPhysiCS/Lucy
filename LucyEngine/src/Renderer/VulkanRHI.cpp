@@ -10,7 +10,7 @@
 #include "ViewportRenderer.h"
 #include "Renderer/Renderer.h"
 
-#include "Buffer/Vulkan/VulkanFrameBuffer.h"
+#include "Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 #include "Utils.h"
 
 namespace Lucy {
@@ -70,7 +70,7 @@ namespace Lucy {
 		m_RenderFunctionQueue.push_back(func);
 	}
 
-	void VulkanRHI::EnqueueStaticMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform) {
+	void VulkanRHI::EnqueueStaticMesh(Ref<Mesh> mesh, const glm::mat4& entityTransform) {
 		Enqueue([=]() {
 			m_StaticMeshDrawCommandQueue.push_back(MeshDrawCommand(mesh, entityTransform));
 		});
@@ -108,18 +108,18 @@ namespace Lucy {
 		*/
 	}
 
-	void VulkanRHI::BindPipeline(RefLucy<Pipeline> pipeline) {
+	void VulkanRHI::BindPipeline(Ref<Pipeline> pipeline) {
 		PipelineBindInfo info;
 		info.PipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		info.CommandBuffer = s_CommandQueue.GetCurrentCommandBuffer();
 		pipeline->Bind(info);
 	}
 
-	void VulkanRHI::UnbindPipeline(RefLucy<Pipeline> pipeline) {
+	void VulkanRHI::UnbindPipeline(Ref<Pipeline> pipeline) {
 		pipeline->Unbind();
 	}
 
-	void VulkanRHI::BindBuffers(RefLucy<VertexBuffer> vertexBuffer, RefLucy<IndexBuffer> indexBuffer) {
+	void VulkanRHI::BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) {
 		VertexBindInfo vertexInfo;
 		vertexInfo.CommandBuffer = s_CommandQueue.GetCurrentCommandBuffer();
 		vertexBuffer->Bind(vertexInfo);
@@ -150,7 +150,7 @@ namespace Lucy {
 
 		s_CommandQueue.Recreate();
 
-		As(ViewportRenderer::s_GeometryPipeline, VulkanPipeline)->Recreate(m_ViewportWidth, m_ViewportHeight);
+		ViewportRenderer::s_GeometryPipeline.As<VulkanPipeline>()->Recreate(m_ViewportWidth, m_ViewportHeight);
 
 		ViewportRenderer::s_ImGuiPipeline.UIRenderPass->Recreate();
 
@@ -158,11 +158,11 @@ namespace Lucy {
 		auto& desc = swapChain.GetSwapChainFrameBufferDesc();
 		desc->RenderPass = ViewportRenderer::s_ImGuiPipeline.UIRenderPass;
 
-		As(ViewportRenderer::s_ImGuiPipeline.UIFramebuffer, VulkanFrameBuffer)->Recreate(extent.width, extent.height, desc);
+		ViewportRenderer::s_ImGuiPipeline.UIFramebuffer.As<VulkanFrameBuffer>()->Recreate(extent.width, extent.height, desc);
 	}
 
 	void VulkanRHI::OnViewportResize() {
-		As(ViewportRenderer::s_GeometryPipeline, VulkanPipeline)->Recreate(m_ViewportWidth, m_ViewportHeight);
+		ViewportRenderer::s_GeometryPipeline.As<VulkanPipeline>()->Recreate(m_ViewportWidth, m_ViewportHeight);
 	}
 
 	Entity VulkanRHI::OnMousePicking() {

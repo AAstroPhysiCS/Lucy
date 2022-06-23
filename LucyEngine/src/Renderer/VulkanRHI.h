@@ -23,15 +23,15 @@ namespace Lucy {
 
 		void DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size);
 		void Enqueue(const SubmitFunc&& func) override;
-		void EnqueueStaticMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform) override;
+		void EnqueueStaticMesh(Ref<Mesh> mesh, const glm::mat4& entityTransform) override;
 		
 		//Parameter "func" are the individual passes, works in parallel
 		void RecordToCommandQueue(RecordFunc<>&& func) override;
 		void RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func) override;
 
-		void BindPipeline(RefLucy<Pipeline> pipeline) override;
-		void UnbindPipeline(RefLucy<Pipeline> pipeline) override;
-		void BindBuffers(RefLucy<VertexBuffer> vertexBuffer, RefLucy<IndexBuffer> indexBuffer) override;
+		void BindPipeline(Ref<Pipeline> pipeline) override;
+		void UnbindPipeline(Ref<Pipeline> pipeline) override;
+		void BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) override;
 
 		static void RecordSingleTimeCommand(std::function<void(VkCommandBuffer)>&& func);
 		

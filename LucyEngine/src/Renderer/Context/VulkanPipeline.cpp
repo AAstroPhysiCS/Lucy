@@ -5,11 +5,11 @@
 #include "../Shader/VulkanShader.h"
 
 #include "../VulkanRenderPass.h"
-#include "Renderer/Buffer/Vulkan/VulkanFrameBuffer.h"
+#include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 
 #include "Renderer/Renderer.h"
 #include "Renderer/VulkanDescriptors.h"
-#include "Renderer/Buffer/Vulkan/VulkanUniformBuffer.h"
+#include "Renderer/Memory/Buffer/Vulkan/VulkanUniformBuffer.h"
 
 namespace Lucy {
 
@@ -27,7 +27,7 @@ namespace Lucy {
 			VulkanDescriptorPoolSpecifications poolSpecs{};
 			poolSpecs.PoolSizesVector = poolSizes;
 			poolSpecs.MaxSet = 100;
-			m_DescriptorPool = CreateRef<VulkanDescriptorPool>(poolSpecs);
+			m_DescriptorPool = Memory::CreateRef<VulkanDescriptorPool>(poolSpecs);
 		}
 
 		const auto& bindingDescriptor = CreateBindingDescription();
@@ -147,7 +147,7 @@ namespace Lucy {
 		VkGraphicsPipelineCreateInfo pipelineCreateInfo{};
 		pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 		pipelineCreateInfo.stageCount = 2; //vertex and fragment
-		pipelineCreateInfo.pStages = As(m_Specs.Shader, VulkanShader)->GetShaderStageInfos();
+		pipelineCreateInfo.pStages = m_Specs.Shader.As<VulkanShader>()->GetShaderStageInfos();
 
 		pipelineCreateInfo.pVertexInputState = &vertexInputInfo;
 		pipelineCreateInfo.pInputAssemblyState = &inputAssemblyInfo;
@@ -158,7 +158,7 @@ namespace Lucy {
 		pipelineCreateInfo.pColorBlendState = &colorBlending;
 		pipelineCreateInfo.pDynamicState = &dynamicState;
 		pipelineCreateInfo.layout = m_PipelineLayoutHandle;
-		pipelineCreateInfo.renderPass = As(m_Specs.RenderPass, VulkanRenderPass)->GetVulkanHandle();
+		pipelineCreateInfo.renderPass = m_Specs.RenderPass.As<VulkanRenderPass>()->GetVulkanHandle();
 		pipelineCreateInfo.subpass = 0;
 
 		//not that relevant for now
@@ -183,7 +183,7 @@ namespace Lucy {
 		if (descriptorSetsToBind.size() != 0)
 			vkCmdBindDescriptorSets(bindInfo.CommandBuffer, bindInfo.PipelineBindPoint, m_PipelineLayoutHandle, 0, descriptorSetsToBind.size(), descriptorSetsToBind.data(), 0, nullptr);
 
-		auto& frameBuffer = As(m_Specs.FrameBuffer, VulkanFrameBuffer);
+		auto& frameBuffer = m_Specs.FrameBuffer.As<VulkanFrameBuffer>();
 
 		RenderPassBeginInfo renderPassBeginInfo;
 		renderPassBeginInfo.CommandBuffer = bindInfo.CommandBuffer;
@@ -231,7 +231,7 @@ namespace Lucy {
 
 			VulkanDescriptorSet descriptorSet(setSpecs);
 			for (auto& ub : info) {
-				RefLucy<VulkanUniformBuffer> uniformBuffer = As(UniformBuffer::Create(size, ub.Binding, std::optional<VulkanDescriptorSet>(descriptorSet)), VulkanUniformBuffer);
+				Ref<VulkanUniformBuffer> uniformBuffer = UniformBuffer::Create(size, ub.Binding, std::optional<VulkanDescriptorSet>(descriptorSet)).As<VulkanUniformBuffer>();
 				m_UniformBuffers.push_back(uniformBuffer);
 			}
 			m_IndividualSets.push_back(descriptorSet);
@@ -291,10 +291,10 @@ namespace Lucy {
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
 
 		m_Specs.FrameBuffer->Destroy();
-		As(m_Specs.RenderPass, VulkanRenderPass)->Destroy();
+		m_Specs.RenderPass.As<VulkanRenderPass>()->Destroy();
 
 		for (const auto& buffer : m_UniformBuffers)
-			buffer->Destroy();
+			buffer->DestroyHandle();
 		for (auto& descriptorSetLayout : m_DescriptorSetLayouts)
 			vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
@@ -310,7 +310,7 @@ namespace Lucy {
 		//vkDestroyPipeline(device, m_Pipeline, nullptr);
 
 		//Create();
-		As(m_Specs.RenderPass, VulkanRenderPass)->Recreate();
-		As(m_Specs.FrameBuffer, VulkanFrameBuffer)->Recreate(width, height, nullptr);
+		m_Specs.RenderPass.As<VulkanRenderPass>()->Recreate();
+		m_Specs.FrameBuffer.As<VulkanFrameBuffer>()->Recreate(width, height, nullptr);
 	}
 }

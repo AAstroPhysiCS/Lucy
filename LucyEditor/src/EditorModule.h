@@ -16,10 +16,10 @@ namespace Lucy {
 
 	class EditorModule : public Module {
 	public:
-		EditorModule(RefLucy<Window> window);
+		EditorModule(Ref<Window> window);
 		virtual ~EditorModule() = default;
 		
-		void Begin(PerformanceMetrics& rendererMetrics) override;
+		void Begin() override;
 		void End() override;
 		void OnRender() override;
 		void OnEvent(Event& e) override;
@@ -30,7 +30,5 @@ namespace Lucy {
 		Scene m_Scene;
 		ViewportRenderer m_ViewportRenderer;
 		ImGuiOverlay m_ImGuiOverlay;
-
-		PerformanceMetrics* m_PerformanceMetrics = nullptr; //for it to be visualized
 	};
 }

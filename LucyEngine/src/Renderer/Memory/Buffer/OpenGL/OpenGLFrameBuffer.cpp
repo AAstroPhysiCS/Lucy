@@ -2,8 +2,9 @@
 
 #include "OpenGLFrameBuffer.h"
 #include "OpenGLRenderBuffer.h"
-#include "../../Image/OpenGLImage.h"
-#include "../../Renderer.h"
+
+#include "Renderer/Image/OpenGLImage.h"
+#include "Renderer/Renderer.h"
 
 #include <glad/glad.h>
 
@@ -11,7 +12,7 @@ namespace Lucy {
 
 	OpenGLFrameBuffer::OpenGLFrameBuffer(FrameBufferSpecification& specs)
 		: FrameBuffer(specs) {
-		RefLucy<OpenGLRHIFrameBufferDesc> frameBufferDesc = As(specs.InternalInfo, OpenGLRHIFrameBufferDesc);
+		Ref<OpenGLRHIFrameBufferDesc> frameBufferDesc = specs.InternalInfo.As<OpenGLRHIFrameBufferDesc>();
 
 		Renderer::Enqueue([=]() {
 			m_Textures.clear();
@@ -21,8 +22,8 @@ namespace Lucy {
 
 			for (uint32_t i = 0; i < frameBufferDesc->TextureSpecs.size(); i++) {
 				auto textureSpec = frameBufferDesc->TextureSpecs[i];
-				RefLucy<OpenGLRHIImageDesc> imageDesc = As(textureSpec.InternalInfo, OpenGLRHIImageDesc);
-				RefLucy<OpenGLImage2D> texture = As(Image2D::Create(textureSpec), OpenGLImage2D);
+				Ref<OpenGLRHIImageDesc> imageDesc = textureSpec.InternalInfo.As<OpenGLRHIImageDesc>();
+				Ref<OpenGLImage2D> texture = Image2D::Create(textureSpec).As<OpenGLImage2D>();
 				texture->Bind();
 				if (textureSpec.Format == GL_DEPTH_COMPONENT || imageDesc->InternalFormat == GL_DEPTH_COMPONENT)
 					glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture->GetTarget(), texture->GetID(), 0);
@@ -41,7 +42,7 @@ namespace Lucy {
 			}
 
 			if (frameBufferDesc->RenderBuffer) {
-				RefLucy<OpenGLRenderBuffer>& renderBuffer = As(frameBufferDesc->RenderBuffer, OpenGLRenderBuffer);
+				Ref<OpenGLRenderBuffer>& renderBuffer = frameBufferDesc->RenderBuffer.As<OpenGLRenderBuffer>();
 				renderBuffer->AttachToFramebuffer();
 			}
 
@@ -50,7 +51,7 @@ namespace Lucy {
 				glReadBuffer(GL_NONE);
 			} else {
 				for (uint32_t i = 0; i < frameBufferDesc->TextureSpecs.size(); i++) {
-					RefLucy<OpenGLRHIImageDesc> imageDesc = As(frameBufferDesc->TextureSpecs[i].InternalInfo, OpenGLRHIImageDesc);
+					Ref<OpenGLRHIImageDesc> imageDesc = frameBufferDesc->TextureSpecs[i].InternalInfo.As<OpenGLRHIImageDesc>();
 					if (!imageDesc->DisableReadWriteBuffer && frameBufferDesc->TextureSpecs[i].Format != GL_DEPTH_COMPONENT)
 						glDrawBuffer(GL_COLOR_ATTACHMENT0 + imageDesc->AttachmentIndex);
 				}
@@ -67,7 +68,7 @@ namespace Lucy {
 			blittedSpec.Height = specs.Height;
 			blittedSpec.MultiSampled = false;
 			frameBufferDesc->TextureSpecs.push_back(frameBufferDesc->BlittedTextureSpecs);
-			m_Blitted = As(FrameBuffer::Create(blittedSpec), OpenGLFrameBuffer);
+			m_Blitted = FrameBuffer::Create(blittedSpec).As<OpenGLFrameBuffer>();
 			m_Blitted->CheckStatus();
 		}
 	}
@@ -85,19 +86,19 @@ namespace Lucy {
 	void OpenGLFrameBuffer::Destroy() {
 		glDeleteFramebuffers(1, &m_Id);
 
-		for (RefLucy<Image2D> texture : m_Textures) {
+		for (Ref<Image2D> texture : m_Textures) {
 			texture->Destroy();
 		}
 	}
 
 	void OpenGLFrameBuffer::Blit() {
-		RefLucy<OpenGLRHIFrameBufferDesc> frameBufferDesc = As(m_Specs.InternalInfo, OpenGLRHIFrameBufferDesc);
+		Ref<OpenGLRHIFrameBufferDesc> frameBufferDesc = m_Specs.InternalInfo.As<OpenGLRHIFrameBufferDesc>();
 		glBlitNamedFramebuffer(m_Id, m_Blitted->GetID(), 0, 0, frameBufferDesc->RenderBuffer->GetWidth(), frameBufferDesc->RenderBuffer->GetHeight(), 
 							   0, 0, frameBufferDesc->RenderBuffer->GetWidth(), frameBufferDesc->RenderBuffer->GetHeight(), GL_COLOR_BUFFER_BIT, GL_NEAREST);
 	}
 
 	void OpenGLFrameBuffer::Resize(int32_t width, int32_t height) {
-		RefLucy<OpenGLRHIFrameBufferDesc> frameBufferDesc = As(m_Specs.InternalInfo, OpenGLRHIFrameBufferDesc);
+		Ref<OpenGLRHIFrameBufferDesc> frameBufferDesc = m_Specs.InternalInfo.As<OpenGLRHIFrameBufferDesc>();
 
 		Renderer::Enqueue([=]() {
 			Destroy();
@@ -113,8 +114,8 @@ namespace Lucy {
 				auto& textureSpec = frameBufferDesc->TextureSpecs[i];
 				textureSpec.Width = width;
 				textureSpec.Height = height;
-				RefLucy<OpenGLRHIImageDesc> imageDesc = As(textureSpec.InternalInfo, OpenGLRHIImageDesc);
-				RefLucy<OpenGLImage2D> texture = As(Image2D::Create(textureSpec), OpenGLImage2D);
+				Ref<OpenGLRHIImageDesc> imageDesc = textureSpec.InternalInfo.As<OpenGLRHIImageDesc>();
+				Ref<OpenGLImage2D> texture = Image2D::Create(textureSpec).As<OpenGLImage2D>();
 				texture->Bind();
 				if (textureSpec.Format == GL_DEPTH_COMPONENT || imageDesc->InternalFormat == GL_DEPTH_COMPONENT)
 					glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture->GetTarget(), texture->GetID(), 0);
@@ -133,7 +134,7 @@ namespace Lucy {
 			}
 
 			if (frameBufferDesc->RenderBuffer) {
-				RefLucy<OpenGLRenderBuffer> renderBuffer = As(frameBufferDesc->RenderBuffer, OpenGLRenderBuffer);
+				Ref<OpenGLRenderBuffer> renderBuffer = frameBufferDesc->RenderBuffer.As<OpenGLRenderBuffer>();
 				renderBuffer->Resize(width, height);
 				renderBuffer->AttachToFramebuffer();
 			}
@@ -143,7 +144,7 @@ namespace Lucy {
 				glReadBuffer(GL_NONE);
 			} else {
 				for (uint32_t i = 0; i < frameBufferDesc->TextureSpecs.size(); i++) {
-					RefLucy<OpenGLRHIImageDesc> imageDesc = As(frameBufferDesc->TextureSpecs[i].InternalInfo, OpenGLRHIImageDesc);
+					Ref<OpenGLRHIImageDesc> imageDesc = frameBufferDesc->TextureSpecs[i].InternalInfo.As<OpenGLRHIImageDesc>();
 					if (!imageDesc->DisableReadWriteBuffer && frameBufferDesc->TextureSpecs[i].Format != GL_DEPTH_COMPONENT)
 						glDrawBuffer(GL_COLOR_ATTACHMENT0 + imageDesc->AttachmentIndex);
 				}

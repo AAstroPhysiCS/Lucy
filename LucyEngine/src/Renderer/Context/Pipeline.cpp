@@ -6,13 +6,13 @@
 
 namespace Lucy {
 	
-	RefLucy<Pipeline> Pipeline::Create(const PipelineSpecification& specs) {
+	Ref<Pipeline> Pipeline::Create(const PipelineSpecification& specs) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
-				return CreateRef<OpenGLPipeline>(specs);
+				return Memory::CreateRef<OpenGLPipeline>(specs);
 				break;
 			case RenderArchitecture::Vulkan:
-				return CreateRef<VulkanPipeline>(specs);
+				return Memory::CreateRef<VulkanPipeline>(specs);
 				break;
 			default:
 				LUCY_CRITICAL("Other API's not supported!");
@@ -28,7 +28,7 @@ namespace Lucy {
 
 	void Pipeline::DestroyUniformBuffers() {
 		for (const auto& uniformBuffer : m_UniformBuffers)
-			uniformBuffer->Destroy();
+			uniformBuffer->DestroyHandle();
 	}
 
 	uint32_t Pipeline::GetSizeFromType(ShaderDataSize size) {

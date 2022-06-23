@@ -32,7 +32,7 @@ namespace Lucy {
 	class Shader {
 	public:
 		//args should only be used when vulkan is being targeted
-		static RefLucy<Shader> Create(const std::string& path, const std::string& name);
+		static Ref<Shader> Create(const std::string& path, const std::string& name);
 
 		inline std::string& GetName() { return m_Name; }
 
@@ -42,6 +42,7 @@ namespace Lucy {
 	public:
 		Shader() = default;
 		Shader(const std::string& path, const std::string& m_Name);
+		virtual ~Shader() = default;
 
 		void Load();
 
@@ -103,10 +104,10 @@ namespace Lucy {
 	public:
 		ShaderLibrary() = default;
 		
-		RefLucy<Shader> GetShader(const std::string& name);
-		void PushShader(const RefLucy<Shader>& instance);
+		Ref<Shader> GetShader(const std::string& name);
+		void PushShader(const Ref<Shader>& instance);
 	private:
-		std::vector<RefLucy<Shader>> m_Shaders;
+		std::vector<Ref<Shader>> m_Shaders;
 		friend class Renderer;
 		friend class OpenGLRHI;
 	};

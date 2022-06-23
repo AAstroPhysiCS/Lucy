@@ -33,7 +33,7 @@ namespace Lucy {
 		ImageType ImageType;
 		bool GenerateMipmap = false;
 
-		RefLucy<void> InternalInfo = nullptr;
+		Ref<void> InternalInfo = nullptr;
 	};
 
 	struct VulkanRHIImageDesc {
@@ -71,8 +71,10 @@ namespace Lucy {
 	class Image2D
 	{
 	public:
-		static RefLucy<Image2D> Create(const std::string& path, ImageSpecification& specs);
-		static RefLucy<Image2D> Create(ImageSpecification& specs);
+		virtual ~Image2D() = default;
+
+		static Ref<Image2D> Create(const std::string& path, ImageSpecification& specs);
+		static Ref<Image2D> Create(ImageSpecification& specs);
 
 		virtual void Bind() = 0;
 		virtual void Unbind() = 0;

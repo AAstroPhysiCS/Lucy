@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Buffer/VertexBuffer.h"
-#include "Buffer/IndexBuffer.h"
+#include "Memory/Buffer/VertexBuffer.h"
+#include "Memory/Buffer/IndexBuffer.h"
 
 #include "assimp/Importer.hpp"
 #include "assimp/scene.h"
@@ -39,18 +39,18 @@ namespace Lucy {
 	class Mesh {
 	public:
 		Mesh(const std::string& path);
-		~Mesh();
+		virtual ~Mesh();
 
-		static RefLucy<Mesh> Create(const std::string& path);
+		static Ref<Mesh> Create(const std::string& path);
 
 		inline std::string& GetPath() { return m_Path; }
 		inline std::vector<Submesh>& GetSubmeshes() { return m_Submeshes; }
-		inline std::vector<RefLucy<Material>>& GetMaterials() { return m_Materials; }
+		inline std::vector<Ref<Material>>& GetMaterials() { return m_Materials; }
 		inline std::string& GetName() { return m_Name; }
 		inline glm::vec3 GetMeshPixelValue() { return m_PixelValue; }
 
-		inline RefLucy<VertexBuffer> GetVertexBuffer() { return m_VertexBuffer; }
-		inline RefLucy<IndexBuffer> GetIndexBuffer() { return m_IndexBuffer; }
+		inline Ref<VertexBuffer> GetVertexBuffer() { return m_VertexBuffer; }
+		inline Ref<IndexBuffer> GetIndexBuffer() { return m_IndexBuffer; }
 
 		virtual void Bind() = 0;
 		virtual void Unbind() = 0;
@@ -60,11 +60,11 @@ namespace Lucy {
 		void LoadMaterials(const aiScene* scene, const aiMesh* mesh);
 		void TraverseHierarchy(const aiNode* node, const aiNode* rootNode);
 
-		RefLucy<VertexBuffer> m_VertexBuffer;
-		RefLucy<IndexBuffer> m_IndexBuffer;
+		Ref<VertexBuffer> m_VertexBuffer;
+		Ref<IndexBuffer> m_IndexBuffer;
 
 		std::vector<Submesh> m_Submeshes;
-		std::vector<RefLucy<Material>> m_Materials;
+		std::vector<Ref<Material>> m_Materials;
 		std::string m_Path;
 		std::string m_Name;
 

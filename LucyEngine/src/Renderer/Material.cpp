@@ -12,19 +12,19 @@
 
 namespace Lucy {
 	
-	RefLucy<Material> Material::Create(RefLucy<Shader> shader, aiMaterial* aiMaterial, const char* submeshName, std::string& importedFilePath) {
+	Ref<Material> Material::Create(Ref<Shader> shader, aiMaterial* aiMaterial, const char* submeshName, std::string& importedFilePath) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
-				return CreateRef<OpenGLMaterial>(shader, aiMaterial, submeshName, importedFilePath);
+				return Memory::CreateRef<OpenGLMaterial>(shader, aiMaterial, submeshName, importedFilePath);
 				break;
 			case RenderArchitecture::Vulkan:
-				return CreateRef<VulkanMaterial>(shader, aiMaterial, submeshName, importedFilePath);
+				return Memory::CreateRef<VulkanMaterial>(shader, aiMaterial, submeshName, importedFilePath);
 				break;
 		}
 		return nullptr;
 	}
 
-	Material::Material(RefLucy<Shader> shader, aiMaterial* aiMaterial, const char* submeshName, std::string& importedFilePath)
+	Material::Material(Ref<Shader> shader, aiMaterial* aiMaterial, const char* submeshName, std::string& importedFilePath)
 		: m_Shader(shader) {
 		aiColor3D diffuse;
 		float shininess, reflectivity, roughness;

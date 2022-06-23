@@ -33,11 +33,11 @@ namespace Lucy {
 
 	struct RenderPassSpecification {
 		ClearColor ClearColor;
-		RefLucy<void> InternalInfo = nullptr;  //to be overriden by different rhi's (OpenGL: none)
+		Ref<void> InternalInfo = nullptr;  //to be overriden by different rhi's (OpenGL: none)
 	};
 
 	struct RenderPassBeginInfo {
-		RefLucy<OpenGLFrameBuffer> OpenGLFrameBuffer = nullptr;
+		Ref<OpenGLFrameBuffer> OpenGLFrameBuffer = nullptr;
 		VkFramebuffer VulkanFrameBuffer = nullptr;
 		VkCommandBuffer CommandBuffer = nullptr;
 		uint32_t Width = 0;
@@ -46,7 +46,7 @@ namespace Lucy {
 
 	class RenderPass {
 	public:
-		static RefLucy<RenderPass> Create(const RenderPassSpecification& specs);
+		static Ref<RenderPass> Create(const RenderPassSpecification& specs);
 
 		virtual void Begin(RenderPassBeginInfo& info) = 0;
 		virtual void End() = 0;
@@ -54,7 +54,7 @@ namespace Lucy {
 		virtual void Destroy() = 0;
 
 		RenderPass(const RenderPassSpecification& specs);
-		~RenderPass() = default;
+		virtual ~RenderPass() = default;
 
 		inline ClearColor GetClearColor() { return m_Specs.ClearColor; }
 	protected:

@@ -42,6 +42,6 @@ namespace Lucy {
 		void EndSingleTimeCommand(VkCommandBuffer commandBuffer) const;
 	private:
 		std::vector<CommandElement> m_Buffer;
-		RefLucy<VulkanCommandPool> m_CommandPool;
+		Ref<VulkanCommandPool> m_CommandPool;
 	};
 }

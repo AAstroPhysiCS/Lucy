@@ -4,8 +4,8 @@
 #include "Renderer/RenderPass.h"
 #include "Scene/Entity.h"
 #include "Scene/Components.h"
-#include "Renderer/Buffer/FrameBuffer.h"
-#include "Renderer/Buffer/OpenGL/OpenGLFrameBuffer.h"
+#include "Renderer/Memory/Buffer/FrameBuffer.h"
+#include "Renderer/Memory/Buffer/OpenGL/OpenGLFrameBuffer.h"
 
 #include "Events/KeyCodes.h"
 #include "Events/MouseCode.h"
@@ -16,21 +16,19 @@
 
 namespace Lucy {
 
-	EditorModule::EditorModule(RefLucy<Window> window)
+	EditorModule::EditorModule(Ref<Window> window)
 		: Module(window) {
 		m_ViewportRenderer.Init();
 		m_ImGuiOverlay.Init(m_Window, m_Scene);
 	}
 
-	void EditorModule::Begin(PerformanceMetrics& rendererMetrics) {
-		m_Scene.GetEditorCamera().OnEvent(rendererMetrics);
+	void EditorModule::Begin() {
+		m_Scene.GetEditorCamera().OnEvent();
 		m_ViewportRenderer.Begin(m_Scene);
-
-		m_PerformanceMetrics = &rendererMetrics;
 	}
 
 	void EditorModule::OnRender() {
-		m_ImGuiOverlay.Render(m_PerformanceMetrics);
+		m_ImGuiOverlay.Render();
 		m_ViewportRenderer.Dispatch(m_Scene);
 	}
 

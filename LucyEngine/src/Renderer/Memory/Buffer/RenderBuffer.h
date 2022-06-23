@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../Core/Base.h"
+#include "Core/Base.h"
 
 namespace Lucy {
 
@@ -15,9 +15,10 @@ namespace Lucy {
 	class RenderBuffer {
 	protected:
 		RenderBuffer(const RenderBufferSpecification& specs);
-		virtual ~RenderBuffer() = default;
 	public:
-		static RefLucy<RenderBuffer> Create(const RenderBufferSpecification& specs);
+		virtual ~RenderBuffer() = default;
+
+		static Ref<RenderBuffer> Create(const RenderBufferSpecification& specs);
 
 		virtual void Bind() = 0;
 		virtual void Unbind() = 0;

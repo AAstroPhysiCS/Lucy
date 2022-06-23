@@ -112,13 +112,13 @@ namespace Lucy {
 		m_IndexBuffer->DestroyHandle();
 	}
 
-	RefLucy<Mesh> Mesh::Create(const std::string& path) {
+	Ref<Mesh> Mesh::Create(const std::string& path) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
-				return CreateRef<OpenGLMesh>(path);
+				return Memory::CreateRef<OpenGLMesh>(path);
 				break;
 			case RenderArchitecture::Vulkan:
-				return CreateRef<VulkanMesh>(path);
+				return Memory::CreateRef<VulkanMesh>(path);
 				break;
 		}
 		return nullptr;

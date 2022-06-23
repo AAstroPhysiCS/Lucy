@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../Core/Base.h"
+#include "Core/Base.h"
 #include "Buffer.h"
 
 #include "vulkan/vulkan.h"
@@ -21,8 +21,8 @@ namespace Lucy {
 		virtual void LoadToGPU() = 0;
 		virtual void DestroyHandle() = 0;
 
-		static RefLucy<IndexBuffer> Create(uint32_t size);
-		static RefLucy<IndexBuffer> Create();
+		static Ref<IndexBuffer> Create(uint32_t size);
+		static Ref<IndexBuffer> Create();
 	protected:
 		IndexBuffer(uint32_t size);
 		IndexBuffer() = default;

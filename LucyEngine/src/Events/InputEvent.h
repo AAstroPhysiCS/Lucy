@@ -14,6 +14,8 @@ namespace Lucy {
 			m_Type = EventType::CursorPosEvent;
 		}
 
+		virtual ~CursorPosEvent() = default;
+
 		std::function<void(double, double)> dispatchFunc;
 
 		inline double GetXPos() const { return m_XPos; }
@@ -33,6 +35,8 @@ namespace Lucy {
 			m_Type = EventType::ScrollEvent;
 		}
 
+		virtual ~ScrollEvent() = default;
+
 		std::function<void(double, double)> dispatchFunc;
 
 		inline double GetXOffset() const { return m_XOffset; }
@@ -51,6 +55,8 @@ namespace Lucy {
 			m_Type = EventType::CharCallbackEvent;
 		}
 
+		virtual ~CharCallbackEvent() = default;
+
 		std::function<void(uint32_t)> dispatchFunc;
 
 		inline int32_t GetCodePoint() const { return m_CodePoint; }
@@ -66,6 +72,8 @@ namespace Lucy {
 			: m_Window(windowPtr), m_Key(key), m_ScanCode(scanCode), m_Action(action), m_Mods(mods) {
 			m_Type = EventType::KeyEvent;
 		}
+
+		virtual ~KeyEvent() = default;
 
 		std::function<void(int32_t, int32_t, int32_t, int32_t)> dispatchFunc;
 
@@ -96,6 +104,8 @@ namespace Lucy {
 			: m_Window(windowPtr), m_Button(button), m_Action(action), m_Mods(mods) {
 			m_Type = EventType::MouseEvent;
 		}
+
+		virtual ~MouseEvent() = default;
 
 		inline constexpr bool operator==(MouseCode mouseCode) {
 			return m_Button == (uint16_t)mouseCode && m_Action == GLFW_PRESS;

@@ -1,7 +1,7 @@
 #include "lypch.h"
 #include "OpenGLRenderPass.h"
 
-#include "Buffer/OpenGL/OpenGLFrameBuffer.h"
+#include "Memory/Buffer/OpenGL/OpenGLFrameBuffer.h"
 
 #include "glad/glad.h"
 

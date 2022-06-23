@@ -3,22 +3,22 @@
 #include "Renderer.h"
 #include "Context/RHI.h"
 
-#include "Buffer/UniformBuffer.h"
+#include "Memory/Buffer/UniformBuffer.h"
 
 #include "Shader/Shader.h"
 #include "Scene/Scene.h"
 #include "Scene/Entity.h"
 
 #include "ViewportRenderer.h"
-#include "Buffer/Vulkan/VulkanFrameBuffer.h"
+#include "Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 #include "Renderer/VulkanRHI.h"
 
 #include "Context/OpenGLPipeline.h"
 
 namespace Lucy {
 
-	RefLucy<RHI> Renderer::s_RHI;
-	RefLucy<Pipeline> Renderer::s_ActivePipeline;
+	Ref<RHI> Renderer::s_RHI;
+	Ref<Pipeline> Renderer::s_ActivePipeline;
 
 	RendererSpecification Renderer::s_Specs;
 	ShaderLibrary Renderer::s_ShaderLibrary;
@@ -53,8 +53,8 @@ namespace Lucy {
 			VkCommandBuffer commandBuffer = s_RHI->s_CommandQueue.GetCurrentCommandBuffer();
 			VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 
-			auto& renderPass = As(imguiPipeline.UIRenderPass, VulkanRenderPass);
-			auto& frameBufferHandle = As(imguiPipeline.UIFramebuffer, VulkanFrameBuffer);
+			auto& renderPass = imguiPipeline.UIRenderPass.As<VulkanRenderPass>();
+			auto& frameBufferHandle = imguiPipeline.UIFramebuffer.As<VulkanFrameBuffer>();
 			const auto& targetFrameBuffer = frameBufferHandle->GetVulkanHandles()[swapChain.GetCurrentImageIndex()];
 
 			RenderPassBeginInfo beginInfo;
@@ -69,7 +69,7 @@ namespace Lucy {
 		});
 	}
 
-	void Renderer::EnqueueStaticMesh(RefLucy<Mesh> mesh, const glm::mat4& entityTransform) {
+	void Renderer::EnqueueStaticMesh(Ref<Mesh> mesh, const glm::mat4& entityTransform) {
 		s_RHI->EnqueueStaticMesh(mesh, entityTransform);
 	}
 
@@ -124,12 +124,12 @@ namespace Lucy {
 
 	void Renderer::Destroy() {
 		const ShaderLibrary& shaderLibrary = GetShaderLibrary();
-		for (const RefLucy<Shader> shader : shaderLibrary.m_Shaders)
+		for (const Ref<Shader> shader : shaderLibrary.m_Shaders)
 			shader->Destroy();
 		s_RHI->Destroy();
 	}
 
-	void Renderer::BindPipeline(RefLucy<Pipeline> pipeline) {
+	void Renderer::BindPipeline(Ref<Pipeline> pipeline) {
 		s_ActivePipeline = pipeline;
 		s_RHI->BindPipeline(pipeline);
 	}
@@ -138,15 +138,15 @@ namespace Lucy {
 		s_RHI->UnbindPipeline(s_ActivePipeline);
 	}
 
-	void Renderer::BindBuffers(RefLucy<Mesh> mesh) {
+	void Renderer::BindBuffers(Ref<Mesh> mesh) {
 		auto& vertexBuffer = mesh->GetVertexBuffer();
 		auto& indexBuffer = mesh->GetIndexBuffer();
 		if (s_Specs.Architecture == RenderArchitecture::OpenGL)
-			As(s_ActivePipeline, OpenGLPipeline)->UploadVertexLayout(vertexBuffer);
+			s_ActivePipeline.As<OpenGLPipeline>()->UploadVertexLayout(vertexBuffer);
 		BindBuffers(vertexBuffer, mesh->GetIndexBuffer());
 	}
 
-	void Renderer::BindBuffers(RefLucy<VertexBuffer> vertexBuffer, RefLucy<IndexBuffer> indexBuffer) {
+	void Renderer::BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) {
 		s_RHI->BindBuffers(vertexBuffer, indexBuffer);
 	}
 

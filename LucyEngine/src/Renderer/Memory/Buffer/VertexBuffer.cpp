@@ -4,29 +4,29 @@
 #include "OpenGL/OpenGLVertexBuffer.h"
 #include "Vulkan/VulkanVertexBuffer.h"
 
-#include "../Renderer.h"
+#include "Renderer/Renderer.h"
 
 namespace Lucy {
 
-	RefLucy<VertexBuffer> VertexBuffer::Create(uint32_t size) {
+	Ref<VertexBuffer> VertexBuffer::Create(uint32_t size) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
-				return CreateRef<OpenGLVertexBuffer>(size);
+				return Memory::CreateRef<OpenGLVertexBuffer>(size);
 				break;
 			case RenderArchitecture::Vulkan:
-				return CreateRef<VulkanVertexBuffer>(size);
+				return Memory::CreateRef<VulkanVertexBuffer>(size);
 				break;
 		}
 		return nullptr;
 	}
 
-	RefLucy<VertexBuffer> VertexBuffer::Create() {
+	Ref<VertexBuffer> VertexBuffer::Create() {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
-				return CreateRef<OpenGLVertexBuffer>();
+				return Memory::CreateRef<OpenGLVertexBuffer>();
 				break;
 			case RenderArchitecture::Vulkan:
-				return CreateRef<VulkanVertexBuffer>();
+				return Memory::CreateRef<VulkanVertexBuffer>();
 				break;
 		}
 		return nullptr;

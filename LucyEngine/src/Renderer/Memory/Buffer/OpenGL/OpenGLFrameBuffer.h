@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../FrameBuffer.h"
-#include "../../Image/OpenGLImage.h"
+#include "Renderer/Image/OpenGLImage.h"
 
 namespace Lucy {
 
@@ -15,21 +15,21 @@ namespace Lucy {
 		void Destroy() override;
 		void Blit();
 		void Resize(int32_t width, int32_t height);
-		RefLucy<OpenGLFrameBuffer>& GetBlitted() { return m_Blitted; }
+		Ref<OpenGLFrameBuffer>& GetBlitted() { return m_Blitted; }
 
-		inline RefLucy<OpenGLImage2D>& GetTexture(uint32_t index) { return m_Textures[index]; }
+		inline Ref<OpenGLImage2D>& GetTexture(uint32_t index) { return m_Textures[index]; }
 
 		inline auto GetSizeFromTexture(uint32_t index) const {
 			struct Size { int32_t Width, Height; };
-			auto& desc = As(m_Specs.InternalInfo, OpenGLRHIFrameBufferDesc);
+			auto& desc = m_Specs.InternalInfo.As<OpenGLRHIFrameBufferDesc>();
 			return Size{ desc->TextureSpecs[index].Width, desc->TextureSpecs[index].Height };
 		}
 
 		uint32_t GetID() const { return m_Id; }
 	private:
 		bool CheckStatus();
-		std::vector<RefLucy<OpenGLImage2D>> m_Textures;
-		RefLucy<OpenGLFrameBuffer> m_Blitted;
+		std::vector<Ref<OpenGLImage2D>> m_Textures;
+		Ref<OpenGLFrameBuffer> m_Blitted;
 
 		uint32_t m_Id = 0;
 		FrameBufferSpecification m_Specs;

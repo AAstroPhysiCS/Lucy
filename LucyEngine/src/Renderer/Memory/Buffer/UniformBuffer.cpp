@@ -7,14 +7,14 @@
 
 namespace Lucy {
 
-	RefLucy<UniformBuffer> UniformBuffer::Create(uint32_t size, uint32_t binding, std::optional<VulkanDescriptorSet> descriptorSet) {
+	Ref<UniformBuffer> UniformBuffer::Create(uint32_t size, uint32_t binding, std::optional<VulkanDescriptorSet> descriptorSet) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
-				return CreateRef<OpenGLUniformBuffer>(size, binding);
+				return Memory::CreateRef<OpenGLUniformBuffer>(size, binding);
 				break;
 			case RenderArchitecture::Vulkan:
 				LUCY_ASSERT(descriptorSet.has_value());
-				return CreateRef<VulkanUniformBuffer>(size, binding, descriptorSet.value());
+				return Memory::CreateRef<VulkanUniformBuffer>(size, binding, descriptorSet.value());
 				break;
 		}
 		return nullptr;

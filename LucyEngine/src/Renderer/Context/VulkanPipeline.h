@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Pipeline.h"
-#include "Renderer/Buffer/Vulkan/VulkanUniformBuffer.h"
+#include "Renderer/Memory/Buffer/Vulkan/VulkanUniformBuffer.h"
 
 namespace Lucy {
 
@@ -31,7 +31,7 @@ namespace Lucy {
 		VkPipeline m_PipelineHandle = VK_NULL_HANDLE;
 		VkPipelineLayout m_PipelineLayoutHandle = VK_NULL_HANDLE;
 
-		RefLucy<VulkanDescriptorPool> m_DescriptorPool;
+		Ref<VulkanDescriptorPool> m_DescriptorPool;
 		std::vector<VkDescriptorSetLayout> m_DescriptorSetLayouts;
 		std::vector<VulkanDescriptorSet> m_IndividualSets; //meaning that only distinct sets are being stored (used for binding sets)
 	};

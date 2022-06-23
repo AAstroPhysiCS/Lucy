@@ -10,9 +10,9 @@ namespace Lucy {
 
 	std::function<void(Event*)> Window::s_EventFunc;
 
-	RefLucy<Window> Window::Create(const WindowSpecification& specs) {
+	Ref<Window> Window::Create(const WindowSpecification& specs) {
 #ifdef  LUCY_WINDOWS
-		RefLucy<Window> window = CreateRef<WinWindow>();
+		Ref<Window> window = Memory::CreateRef<WinWindow>();
 		window->m_Specs = specs;
 		return window;
 #else

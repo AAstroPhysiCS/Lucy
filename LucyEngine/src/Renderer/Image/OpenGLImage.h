@@ -18,7 +18,7 @@ namespace Lucy {
 		inline uint32_t GetID() const { return m_Id; }
 		inline uint32_t GetSlot() const { return m_Slot; }
 	private:
-		void SetParameters(const RefLucy<OpenGLRHIImageDesc>& imageDesc);
+		void SetParameters(const Ref<OpenGLRHIImageDesc>& imageDesc);
 
 		uint16_t m_Target;
 		uint32_t m_Id;

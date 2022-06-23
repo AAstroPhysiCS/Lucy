@@ -18,10 +18,10 @@ namespace Lucy {
 	}
 
 	void OpenGLPipeline::Bind(PipelineBindInfo bindInfo) {
-		auto& renderPass = As(GetRenderPass(), OpenGLRenderPass);
+		auto& renderPass = GetRenderPass().As<OpenGLRenderPass>();
 
 		RenderPassBeginInfo info;
-		info.OpenGLFrameBuffer = As(GetFrameBuffer(), OpenGLFrameBuffer);
+		info.OpenGLFrameBuffer = GetFrameBuffer().As<OpenGLFrameBuffer>();
 		renderPass->Begin(info);
 
 		Rasterization rasterization = GetRasterization();
@@ -44,7 +44,7 @@ namespace Lucy {
 			glCullFace(rasterization.CullingMode);
 		}
 
-		auto& frameBuffer = As(GetFrameBuffer(), OpenGLFrameBuffer);
+		auto& frameBuffer = GetFrameBuffer().As<OpenGLFrameBuffer>();
 		auto [r, g, b, a] = renderPass->GetClearColor();
 
 		if (frameBuffer->GetBlitted())
@@ -81,7 +81,7 @@ namespace Lucy {
 		}
 	}
 
-	void OpenGLPipeline::UploadVertexLayout(RefLucy<VertexBuffer>& vertexBuffer) {
+	void OpenGLPipeline::UploadVertexLayout(Ref<VertexBuffer>& vertexBuffer) {
 		vertexBuffer->Bind({});
 
 		uint32_t stride = CalculateStride(m_Specs.VertexShaderLayout);
