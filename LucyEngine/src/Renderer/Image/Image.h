@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../Core/Base.h"
+#include "Core/Base.h"
 
 namespace Lucy {
 
@@ -24,7 +24,7 @@ namespace Lucy {
 		uint32_t Index;
 	};
 
-	struct ImageSpecification {
+	struct ImageCreateInfo {
 		int32_t Width = 0, Height = 0; //gets replaced if path is available
 		TextureFormat Format;
 		ImageParameter Parameter;
@@ -73,21 +73,19 @@ namespace Lucy {
 	public:
 		virtual ~Image2D() = default;
 
-		static Ref<Image2D> Create(const std::string& path, ImageSpecification& specs);
-		static Ref<Image2D> Create(ImageSpecification& specs);
+		static Ref<Image2D> Create(const std::string& path, ImageCreateInfo& createInfo);
+		static Ref<Image2D> Create(ImageCreateInfo& createInfo);
 
-		virtual void Bind() = 0;
-		virtual void Unbind() = 0;
 		virtual void Destroy() = 0;
 
 		ImageID GetID() const { return m_ID; }
 	protected:
 		//Loads an asset
-		Image2D(const std::string& path, ImageSpecification& specs);
+		Image2D(const std::string& path, ImageCreateInfo& createInfo);
 		//Creates an empty image
-		Image2D(ImageSpecification& specs);
+		Image2D(ImageCreateInfo& createInfo);
 
-		ImageSpecification m_Specs;
+		ImageCreateInfo m_CreateInfo;
 		int32_t m_Channels = 0;
 		int32_t m_Width = 0;
 		int32_t m_Height = 0;

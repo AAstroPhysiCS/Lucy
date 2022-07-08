@@ -5,12 +5,13 @@
 
 #include "Renderer/Renderer.h"
 #include "Renderer/Context/VulkanDevice.h"
+#include "Renderer/Context/VulkanSwapChain.h"
 
 namespace Lucy {
 
-	VulkanFrameBuffer::VulkanFrameBuffer(FrameBufferSpecification& specs)
-		: FrameBuffer(specs) {
-		Ref<VulkanRHIFrameBufferDesc> frameBufferDesc = m_Specs.InternalInfo.As<VulkanRHIFrameBufferDesc>();
+	VulkanFrameBuffer::VulkanFrameBuffer(FrameBufferCreateInfo& createInfo)
+		: FrameBuffer(createInfo) {
+		Ref<VulkanRHIFrameBufferDesc> frameBufferDesc = m_CreateInfo.InternalInfo.As<VulkanRHIFrameBufferDesc>();
 		//this would make problems when we resized the window, since the lifetime of this object is short
 		if (frameBufferDesc) {
 			m_RenderPass = frameBufferDesc->RenderPass.As<VulkanRenderPass>();
@@ -28,11 +29,15 @@ namespace Lucy {
 
 	void VulkanFrameBuffer::Create() {
 		auto& swapChainInstance = VulkanSwapChain::Get();
-		m_FrameBufferHandles.resize(swapChainInstance.GetImageCount(), VK_NULL_HANDLE);
+		if (!m_ImageViews.empty()) { //if the framebuffer is being used for swapchain
+			m_FrameBufferHandles.resize(swapChainInstance.GetImageCount(), VK_NULL_HANDLE);
+		} else {
+			m_FrameBufferHandles.resize(swapChainInstance.GetMaxFramesInFlight(), VK_NULL_HANDLE);
+		}
 
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
 
-		for (uint32_t i = 0; i < swapChainInstance.GetImageCount(); i++) {
+		for (uint32_t i = 0; i < m_FrameBufferHandles.size(); i++) {
 			VkImageView imageViewHandle[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
 			if (m_ImageViews.empty())
 				imageViewHandle[0] = m_Images[i]->GetImageView().GetVulkanHandle();
@@ -48,8 +53,8 @@ namespace Lucy {
 			createInfo.renderPass = m_RenderPass->GetVulkanHandle();
 			createInfo.attachmentCount = m_RenderPass->GetAttachmentCount();
 			createInfo.pAttachments = imageViewHandle;
-			createInfo.width = m_Specs.Width;
-			createInfo.height = m_Specs.Height;
+			createInfo.width = m_CreateInfo.Width;
+			createInfo.height = m_CreateInfo.Height;
 			createInfo.layers = 1;
 
 			LUCY_VK_ASSERT(vkCreateFramebuffer(device, &createInfo, nullptr, &m_FrameBufferHandles[i]));
@@ -57,16 +62,16 @@ namespace Lucy {
 	}
 
 	void VulkanFrameBuffer::CreateDepthImage() {
-		ImageSpecification depthImageSpecs;
-		depthImageSpecs.ImageType = ImageType::Type2D;
-		depthImageSpecs.Format = VK_FORMAT_D32_SFLOAT;
-		depthImageSpecs.Width = m_Specs.Width;
-		depthImageSpecs.Height = m_Specs.Height;
-		auto& desc = Memory::CreateRef<VulkanRHIImageDesc>();
+		ImageCreateInfo depthImageCreateInfo;
+		depthImageCreateInfo.ImageType = ImageType::Type2D;
+		depthImageCreateInfo.Format = VK_FORMAT_D32_SFLOAT;
+		depthImageCreateInfo.Width = m_CreateInfo.Width;
+		depthImageCreateInfo.Height = m_CreateInfo.Height;
+		const auto& desc = Memory::CreateRef<VulkanRHIImageDesc>();
 		desc->DepthEnable = true;
-		depthImageSpecs.InternalInfo = desc;
+		depthImageCreateInfo.InternalInfo = desc;
 
-		m_DepthImage = Image2D::Create(depthImageSpecs).As<VulkanImage2D>();
+		m_DepthImage = Image2D::Create(depthImageCreateInfo).As<VulkanImage2D>();
 	}
 
 	void VulkanFrameBuffer::Destroy() {
@@ -83,18 +88,18 @@ namespace Lucy {
 		if (m_DepthImage)
 			m_DepthImage->Destroy();
 
-		m_Specs.InternalInfo = nullptr;
+		m_CreateInfo.InternalInfo = nullptr;
 	}
 
 	void VulkanFrameBuffer::Recreate(uint32_t width, uint32_t height, Ref<void> internalInfo) {
-		m_Specs.Width = width;
-		m_Specs.Height = height;
+		m_CreateInfo.Width = width;
+		m_CreateInfo.Height = height;
 
 		Destroy();
 		if (internalInfo) {
-			m_Specs.InternalInfo = internalInfo;
+			m_CreateInfo.InternalInfo = internalInfo;
 
-			Ref<VulkanRHIFrameBufferDesc> frameBufferDesc = m_Specs.InternalInfo.As<VulkanRHIFrameBufferDesc>();
+			Ref<VulkanRHIFrameBufferDesc> frameBufferDesc = m_CreateInfo.InternalInfo.As<VulkanRHIFrameBufferDesc>();
 			m_RenderPass = frameBufferDesc->RenderPass.As<VulkanRenderPass>();
 			m_Images = frameBufferDesc->ImageBuffers;
 			m_ImageViews = frameBufferDesc->ImageViews;

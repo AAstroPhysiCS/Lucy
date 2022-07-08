@@ -22,10 +22,8 @@ namespace Lucy {
 		virtual void DestroyHandle() = 0;
 
 		static Ref<VertexBuffer> Create(uint32_t size);
-		static Ref<VertexBuffer> Create();
 	protected:
 		VertexBuffer(uint32_t size);
-		VertexBuffer() = default;
 	};
 }
 

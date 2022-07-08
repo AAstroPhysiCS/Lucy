@@ -6,7 +6,7 @@ namespace Lucy {
 
 	class VulkanPipeline;
 
-	struct CommandPoolSpecs {
+	struct CommandPoolCreateInfo {
 		VkCommandPoolCreateFlags PoolFlags = 0;
 		VkCommandBufferLevel Level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 		uint32_t CommandBufferCount = 0;
@@ -14,10 +14,10 @@ namespace Lucy {
 
 	class VulkanCommandPool {
 	public:
-		VulkanCommandPool(CommandPoolSpecs specs);
+		VulkanCommandPool(const CommandPoolCreateInfo& createInfo);
 		~VulkanCommandPool() = default;
 
-		static Ref<VulkanCommandPool> Create(CommandPoolSpecs specs);
+		static Ref<VulkanCommandPool> Create(const CommandPoolCreateInfo& createInfo);
 
 		inline VkCommandBuffer GetCommandBuffer(uint32_t index) { return m_CommandBuffers[index]; }
 		inline size_t GetCommandBufferSize() { return m_CommandBuffers.size(); }
@@ -30,7 +30,7 @@ namespace Lucy {
 
 		void Allocate();
 
-		CommandPoolSpecs m_Specs;
+		CommandPoolCreateInfo m_CreateInfo;
 		VkCommandPool m_CommandPool = VK_NULL_HANDLE;
 		std::vector<VkCommandBuffer> m_CommandBuffers;
 

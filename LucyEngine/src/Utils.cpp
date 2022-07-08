@@ -22,21 +22,22 @@ namespace Utils {
 		return buffer;
 	}
 
-	Size ReadViewportSizeFromIni(const char* windowName) {
-		std::vector<std::string> buffer;
-		Lucy::FileSystem::ReadFileLine<std::string>("lucyconfig.ini", buffer);
+	Attribute ReadAttributeFromIni(const char* windowName, const char* attributeName) {
+		std::string buffer;
+		Lucy::FileSystem::ReadFile("lucyconfig.ini", buffer);
 
 		std::string windowNameFull = "[Window][";
 		windowNameFull.append(windowName).append("]");
 
-		auto iter = std::find(buffer.begin(), buffer.end(), windowNameFull);
-		if (iter == buffer.end()) return Size{ 0, 0 };
-		size_t windowNameIndex = iter - buffer.begin();
+		std::size_t windowIndex = buffer.find(windowName);
+		std::size_t attribIndex = buffer.find(attributeName, windowIndex);
 
-		std::string& size = buffer[windowNameIndex + 2];
-		std::vector<std::string>& vec = Split(Split(size, "=")[1], ",");
+		std::size_t endOfChar = buffer.find("\n", attribIndex);
 
-		Size sizeObject{ std::atoi(vec[0].c_str()), std::atoi(vec[1].c_str()) };
+		std::string attrib = buffer.substr(attribIndex, endOfChar - attribIndex);
+		std::vector<std::string>& vec = Split(Split(attrib, "=")[1], ",");
+
+		Attribute sizeObject{ std::atoi(vec[0].c_str()), std::atoi(vec[1].c_str()) };
 		return sizeObject;
 	}
 

@@ -4,8 +4,7 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/VulkanRHI.h"
 #include "Renderer/Context/VulkanDevice.h"
-
-#include "Renderer/VulkanAllocator.h"
+#include "Renderer/Memory/VulkanAllocator.h"
 
 namespace Lucy {
 
@@ -18,11 +17,12 @@ namespace Lucy {
 
 	void VulkanVertexBuffer::Create(uint32_t size) {
 		VulkanAllocator& allocator = VulkanAllocator::Get();
-		allocator.CreateVulkanBufferVma(size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
-										VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO, m_StagingBufferHandle, m_StagingBufferVma);
+		allocator.CreateVulkanBufferVma(LucyVulkanBufferUsage::CPUOnly, size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+										m_StagingBufferHandle, m_StagingBufferVma);
 	}
 
 	void VulkanVertexBuffer::Bind(const VertexBindInfo& info) {
+		LUCY_ASSERT(m_BufferHandle);
 		VkDeviceSize offset[] = { 0 };
 		vkCmdBindVertexBuffers(info.CommandBuffer, 0, 1, &m_BufferHandle, offset);
 	}
@@ -40,8 +40,8 @@ namespace Lucy {
 			memcpy(data, m_Data.data(), m_Data.size() * sizeof(float));
 			vmaUnmapMemory(allocator.GetVmaInstance(), m_StagingBufferVma);
 
-			allocator.CreateVulkanBufferVma(m_Data.size() * sizeof(float), VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-											VmaMemoryUsage::VMA_MEMORY_USAGE_AUTO, m_BufferHandle, m_BufferVma);
+			allocator.CreateVulkanBufferVma(LucyVulkanBufferUsage::GPUOnly, m_Data.size() * sizeof(float),
+											VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, m_BufferHandle, m_BufferVma);
 			Renderer::GetCurrentRenderer().As<VulkanRHI>()->DirectCopyBuffer(m_StagingBufferHandle, m_BufferHandle, m_Data.size() * sizeof(float));
 
 			vmaDestroyBuffer(allocator.GetVmaInstance(), m_StagingBufferHandle, m_StagingBufferVma);

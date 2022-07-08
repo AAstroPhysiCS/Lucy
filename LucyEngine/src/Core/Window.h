@@ -18,10 +18,10 @@ namespace Lucy {
 		FULLSCREEN, WINDOWED
 	};
 
-	struct WindowSpecification {
-		int32_t Width = -1, Height = -1;
+	struct WindowCreateInfo {
+		mutable int32_t Width = -1, Height = -1;
 		bool VSync = false, Resizable = false;
-		std::string Name = "Window Specification failed!";
+		mutable std::string Name = "Window Specification failed!";
 		Lucy::WindowMode WindowMode = WindowMode::WINDOWED;
 	};
 
@@ -32,21 +32,20 @@ namespace Lucy {
 		virtual void PollEvents() = 0;
 		virtual void Init(RenderArchitecture architecture) = 0;
 		virtual void InitVulkanSurface(VkInstance instance) = 0;
-		virtual void DestroyVulkanSurface(VkInstance instance) = 0;
-		virtual void Destroy() = 0;
+		virtual void DestroyVulkanSurface(VkInstance instance) = 0; //leaving to child class, to destroy it's contents.
+		virtual void Destroy() = 0; //leaving to child class, to destroy it's contents.
 		virtual void WaitEventsIfMinimized() = 0;
-		void SwapBuffers();
 
 		void SetEventCallback(std::function<void(Event*)>);
 		GLFWwindow* Raw();
 
-		inline int32_t GetWidth() const { return m_Specs.Width; }
-		inline int32_t GetHeight() const { return m_Specs.Height; }
+		inline int32_t GetWidth() const { return m_CreateInfo.Width; }
+		inline int32_t GetHeight() const { return m_CreateInfo.Height; }
 		VkSurfaceKHR GetVulkanSurface() const { return m_Surface; }
 
-		static Ref<Window> Create(const WindowSpecification& specs);
+		static Ref<Window> Create(const WindowCreateInfo& createInfo);
 	protected:
-		WindowSpecification m_Specs;
+		WindowCreateInfo m_CreateInfo;
 		GLFWwindow* m_Window = nullptr;
 
 		static std::function<void(Event*)> s_EventFunc;

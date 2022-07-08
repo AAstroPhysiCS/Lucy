@@ -1,14 +1,10 @@
 #include "lypch.h"
 
 #include "Material.h"
-#include "Context/Pipeline.h"
-
-#include "Image/Image.h"
-
 #include "OpenGLMaterial.h"
 #include "VulkanMaterial.h"
 
-#include "Renderer.h"
+#include "Renderer/Renderer.h"
 
 namespace Lucy {
 	
@@ -36,5 +32,11 @@ namespace Lucy {
 		roughness = 1.0f - glm::sqrt(shininess / 100.0f);
 
 		m_MaterialData = MaterialData(*(glm::vec3*)&diffuse, std::string(submeshName), shininess, reflectivity, roughness);
+	}
+
+	void Material::Destroy() {
+		for (Ref<Image2D> image : m_Textures) {
+			image->Destroy();
+		}
 	}
 }

@@ -41,7 +41,7 @@ namespace Lucy {
 		}
 
 	private:
-		entt::entity m_Entity = (entt::entity)std::numeric_limits<uint32_t>::max();
+		entt::entity m_Entity = (entt::entity) std::numeric_limits<uint32_t>::max();
 		Scene* m_Scene = nullptr;
 
 		friend class Scene;

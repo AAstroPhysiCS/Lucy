@@ -10,7 +10,7 @@ namespace Lucy {
 
 	class OpenGLPipeline : public Pipeline {
 	public:
-		OpenGLPipeline(const PipelineSpecification& specs);
+		OpenGLPipeline(const PipelineCreateInfo& createInfo);
 		virtual ~OpenGLPipeline() = default;
 
 		void Bind(PipelineBindInfo bindInfo) override;
@@ -18,6 +18,6 @@ namespace Lucy {
 		void Destroy() override;
 		void UploadVertexLayout(Ref<VertexBuffer>& vertexBuffer);
 	private:
-		void ParseUniformBuffers();
+		void ParseBuffers();
 	};
 }

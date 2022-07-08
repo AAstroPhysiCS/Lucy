@@ -22,10 +22,8 @@ namespace Lucy {
 		virtual void DestroyHandle() = 0;
 
 		static Ref<IndexBuffer> Create(uint32_t size);
-		static Ref<IndexBuffer> Create();
 	protected:
 		IndexBuffer(uint32_t size);
-		IndexBuffer() = default;
 	};
 }
 

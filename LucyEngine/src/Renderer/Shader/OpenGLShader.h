@@ -20,8 +20,8 @@ namespace Lucy {
 		void SetInt(const char* name, int32_t value);
 		void SetInt(const char* name, int32_t* value, uint32_t count);
 
-		void Bind() override;
-		void Unbind() override;
+		void Bind();
+		void Unbind();
 		void Destroy() override;
 	private:
 		void LoadInternal(std::vector<uint32_t>& dataVertex, std::vector<uint32_t>& dataFragment) override;

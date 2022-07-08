@@ -1,14 +1,10 @@
 #pragma once
 
-#include "Events/Event.h"
-#include "Events/InputEvent.h"
-
 #include "glm/gtx/quaternion.hpp"
 
 namespace Lucy {
 
-	struct MVP {
-		glm::mat4 model;
+	struct VP {
 		glm::mat4 view;
 		glm::mat4 proj;
 	};
@@ -46,9 +42,8 @@ namespace Lucy {
 		inline glm::mat4& GetViewMatrix() { return m_ViewMatrix; }
 		inline glm::mat4& GetProjectionMatrix() { return m_Projection; }
 
-		inline MVP GetMVP() {
-			MVP mvp;
-			mvp.model = glm::rotate(glm::mat4(1.0f), 0.5f * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		inline VP GetVP() {
+			VP mvp;
 			mvp.view = GetViewMatrix();
 			mvp.proj = GetProjectionMatrix();
 			mvp.proj[1][1] *= -1;

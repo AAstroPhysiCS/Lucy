@@ -1,20 +1,24 @@
 #pragma once
 
+#include <vector>
+
 #include "vulkan/vulkan.h"
 #include "Core/Base.h"
-
-#include <vector>
+#include "DrawCommand.h"
 
 namespace Lucy {
 
 	class VulkanCommandPool;
+	class Pipeline;
 
 	//for later
 	#define MAX_THREAD_COUNT std::thread::hardware_concurrency()
 
 	struct CommandElement {
-		RecordFunc<void*> RecordFunc;
-		void* Argument = nullptr;
+		Ref<Pipeline> Pipeline = nullptr;
+		std::vector<Ref<DrawCommand>> Arguments;
+
+		RecordFunc<Ref<DrawCommand>> RecordFunc;
 	};
 
 	class CommandQueue {
@@ -26,7 +30,7 @@ namespace Lucy {
 		CommandQueue(const CommandQueue& other) = delete;
 		CommandQueue(CommandQueue&& other) noexcept = delete;
 		CommandQueue& operator=(const CommandQueue& other) = delete;
-		CommandQueue& operator=(CommandQueue&& other) = delete;
+		CommandQueue& operator=(CommandQueue&& other) noexcept = delete;
 
 		void Init();
 		void Enqueue(const CommandElement& element);

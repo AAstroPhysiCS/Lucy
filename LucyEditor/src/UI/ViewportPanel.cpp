@@ -2,10 +2,13 @@
 #include "SceneExplorerPanel.h"
 
 #include "Renderer/Renderer.h"
-#include "Renderer/OpenGLRHI.h"
-#include "Renderer/VulkanRHI.h"
 #include "Renderer/RenderPass.h"
 #include "Renderer/ViewportRenderer.h"
+
+#include "Renderer/OpenGLRHI.h"
+#include "Renderer/VulkanRHI.h"
+#include "Renderer/Context/VulkanSwapChain.h"
+
 #include "Renderer/Memory/Buffer/OpenGL/OpenGLFrameBuffer.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 
@@ -42,11 +45,9 @@ namespace Lucy {
 	}
 
 	void ViewportPanel::Render() {
-		ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBringToFrontOnFocus;
+		ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBringToFrontOnFocus |
+			ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDecoration;
 		static bool pOpen = true;
-
-		auto [w, h] = Renderer::GetViewportSize();
-		ImGui::SetNextWindowSize({ (float)w, (float)h }, ImGuiCond_Once);
 
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0, 0 });
@@ -76,6 +77,7 @@ namespace Lucy {
 				LUCY_ASSERT(false);
 		}
 
+		auto [w, h] = Renderer::GetViewportSize();
 		if (w != m_Size.x || h != m_Size.y) {
 			Renderer::SetViewportSize(m_Size.x, m_Size.y);
 			Renderer::OnViewportResize();

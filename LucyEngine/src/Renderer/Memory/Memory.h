@@ -35,15 +35,15 @@ namespace Lucy {
 		Ref(std::nullptr_t)
 			: m_Count(nullptr),
 			m_Ptr(nullptr) {
-			DecRef();
 		}
 
 		//Nullptr assignment operator
 		inline Ref& operator=(std::nullptr_t) {
+			DecRef();
+
 			m_Ptr = nullptr;
 			m_Count = nullptr;
 
-			DecRef();
 			return *this;
 		}
 
@@ -122,10 +122,8 @@ namespace Lucy {
 #endif
 			}
 
-			Ref<Casted> castedRef = nullptr;
-			castedRef.m_Count = m_Count;
+			Ref<Casted> castedRef(std::move(*this));
 			castedRef.m_Ptr = castedPtr;
-			castedRef.IncRef();
 			return castedRef;
 		}
 
@@ -145,16 +143,21 @@ namespace Lucy {
 		void Copy(const Ref<U>& other) {
 			m_Count = other.m_Count;
 			m_Ptr = other.m_Ptr;
+
 			IncRef();
 		}
 
 		template <typename U>
 		void Move(Ref<U>&& other) {
-			m_Ptr = other.m_Ptr;
+			m_Ptr = static_cast<T*>(other.m_Ptr);
 			m_Count = other.m_Count;
 
 			other.m_Count = nullptr;
 			other.m_Ptr = nullptr;
+
+			//or
+			//std::swap(m_Ptr, other.m_Ptr)
+			//std::swap(m_Count, other.m_Count)
 		}
 
 		void IncRef() {
@@ -201,7 +204,32 @@ namespace Lucy {
 		~Unique() { delete m_Ptr; }
 
 		Unique(const Unique& other) = delete;
-		Unique(Unique&& other) = delete;
+
+		Unique(Unique&& other) noexcept {
+			Move(other);
+		}
+
+		template <typename Casted>
+		Unique(Unique<Casted>&& other) noexcept {
+			Move<Casted>(other);
+		}
+
+		inline Unique& operator=(const Unique& other) = delete;
+
+		inline Unique& operator=(Unique&& other) noexcept {
+			delete m_Ptr;
+			Move(other);
+		
+			return *this;
+		}
+
+		template <typename Casted>
+		inline Unique& operator=(Unique<Casted>&& other) noexcept {
+			delete m_Ptr;
+			Move<Casted>(other);
+			
+			return *this;
+		}
 
 		inline bool operator==(const Unique& other) { return m_Ptr == other.m_Ptr; }
 		inline bool operator!=(const Unique& other) { return !(*this == other); }
@@ -209,10 +237,25 @@ namespace Lucy {
 		explicit inline operator bool() const { return m_Ptr; }
 
 		template <typename Casted>
-		inline Unique<Casted> As() { return Unique<Casted>(dynamic_cast<Casted*>(m_Ptr)); }
+		inline Unique<Casted> As() const { 
+			if (!m_Ptr) {
+				Lucy::Logger::LogCritical("Trying to cast a nullptr!");
+#ifdef LUCY_WINDOWS
+				__debugbreak();
+#endif
+			}
 
-		inline Unique& operator=(Unique& other) = delete;
-		inline Unique& operator=(Unique&& other) = delete;
+			Casted* castedPtr = static_cast<Casted*>(m_Ptr);
+			if (!castedPtr) {
+				Lucy::Logger::LogCritical("Pointer casting failed!");
+#ifdef LUCY_WINDOWS
+				__debugbreak();
+#endif
+			}
+
+			Unique<Casted> castedRef(castedPtr);
+			return castedRef;
+		}
 
 		inline T* Get() { return m_Ptr; }
 		inline T* Get() const { return m_Ptr; }
@@ -221,6 +264,15 @@ namespace Lucy {
 		inline T* operator->() const { return m_Ptr; }
 	private:
 		T* m_Ptr = nullptr;
+
+		template <typename U>
+		void Move(Ref<U>&& other) {
+			m_Ptr = static_cast<T*>(other.m_Ptr);
+			other.m_Ptr = nullptr;
+
+			//or
+			//std::swap(m_Ptr, other.m_Ptr)
+		}
 	};
 
 	namespace Memory {

@@ -4,6 +4,7 @@
 
 namespace Lucy {
 
+	//TODO: VK Synchronization2
 	class Semaphore {
 	public:
 		Semaphore();

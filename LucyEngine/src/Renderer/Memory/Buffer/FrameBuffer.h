@@ -1,22 +1,23 @@
 #pragma once
-#include "Renderer/Image/Image.h"
-#include "Core/Base.h"
+
+#include "Renderer/Image/Image.h" //for ImageCreateInfo
 
 namespace Lucy {
 
-	class RenderBuffer;
 	class RenderPass;
 	class VulkanImage2D;
 	class VulkanImageView;
+
+	class OpenGLRenderBuffer;
 
 	struct OpenGLRHIFrameBufferDesc {
 		bool DisableReadWriteBuffer = false;
 		bool IsStorage = false;
 		
-		std::vector<ImageSpecification> TextureSpecs;
-		ImageSpecification BlittedTextureSpecs;
+		std::vector<ImageCreateInfo> TextureCreateInfos;
+		ImageCreateInfo BlittedTextureCreateInfo;
 
-		Ref<RenderBuffer> RenderBuffer;
+		Ref<OpenGLRenderBuffer> RenderBuffer;
 	};
 
 	struct VulkanRHIFrameBufferDesc {
@@ -27,7 +28,7 @@ namespace Lucy {
 		std::vector<VulkanImageView> ImageViews;
 	};
 
-	struct FrameBufferSpecification {
+	struct FrameBufferCreateInfo {
 		bool MultiSampled = false;
 		int32_t	Width = 0, Height = 0;
 		int32_t Level = 1;
@@ -39,14 +40,14 @@ namespace Lucy {
 	public:
 		virtual ~FrameBuffer() = default;
 
-		static Ref<FrameBuffer> Create(FrameBufferSpecification& specs);
+		static Ref<FrameBuffer> Create(FrameBufferCreateInfo& createInfo);
 		virtual void Destroy() = 0;
 
-		inline uint32_t GetWidth() { return m_Specs.Width; }
-		inline uint32_t GetHeight() { return m_Specs.Height; }
+		inline uint32_t GetWidth() { return m_CreateInfo.Width; }
+		inline uint32_t GetHeight() { return m_CreateInfo.Height; }
 	protected:
-		FrameBuffer(FrameBufferSpecification& m_Specs);
+		FrameBuffer(FrameBufferCreateInfo& m_CreateInfo);
 
-		FrameBufferSpecification m_Specs;
+		FrameBufferCreateInfo m_CreateInfo;
 	};
 }

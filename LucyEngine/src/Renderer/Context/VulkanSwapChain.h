@@ -3,7 +3,6 @@
 #include "vulkan/vulkan.h"
 
 #include "Renderer/Synchronization/SynchItems.h"
-
 #include "Renderer/Image/VulkanImage.h"
 #include "Renderer/Memory/Buffer/FrameBuffer.h"
 

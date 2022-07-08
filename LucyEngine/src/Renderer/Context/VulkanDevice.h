@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vulkan/vulkan.hpp"
+#include "vulkan/vulkan.h"
 
 namespace Lucy {
 
@@ -34,8 +34,10 @@ namespace Lucy {
 		inline VkPhysicalDevice GetPhysicalDevice() const { return m_PhysicalDevice; }
 		inline VkDevice GetLogicalDevice() const { return m_LogicalDevice; }
 		inline QueueFamilyIndices GetQueueFamilies() const { return m_QueueFamilyIndices; }
+		
 		inline VkQueue GetGraphicsQueue() const { return m_GraphicsQueue; }
 		inline VkQueue GetPresentQueue() const { return m_PresentQueue; }
+		
 		inline uint32_t GetMinUniformBufferOffsetAlignment() const { return m_DeviceInfo.MinUniformBufferAlignment; }
 	private:
 		void PickDeviceByRanking(const std::vector<VkPhysicalDevice>& devices);
@@ -50,7 +52,14 @@ namespace Lucy {
 		VkQueue m_PresentQueue = VK_NULL_HANDLE;
 
 		std::vector<const char*> m_DeviceExtensions = {
-			VK_KHR_SWAPCHAIN_EXTENSION_NAME
+			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+			
+			//minor features that were intentionally left out or overlooked from the original Vulkan 1.0 release.
+			VK_KHR_MAINTENANCE3_EXTENSION_NAME,
+
+			//several small features which together enable applications to create large descriptor sets containing 
+			//substantially all of their resources, and selecting amongst those resources with dynamic (non-uniform) indexes in the shader. 
+			VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME
 		};
 
 		VulkanDeviceInfo m_DeviceInfo;

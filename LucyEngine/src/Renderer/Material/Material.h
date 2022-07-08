@@ -1,13 +1,13 @@
 #pragma once
 
-#include "../Core/Base.h"
-#include "../Core/FileSystem.h"
+#include "Core/Base.h"
+#include "Core/FileSystem.h"
 
 #include "glm/glm.hpp"
 #include "assimp/scene.h"
 
-#include "Shader/Shader.h"
-#include "Image/Image.h"
+#include "Renderer/Shader/Shader.h"
+#include "Renderer/Image/Image.h"
 
 #include "glm/glm.hpp"
 #include "glad/glad.h"
@@ -34,14 +34,16 @@ namespace Lucy {
 		Material(Ref<Shader> shader, aiMaterial* aiMaterial, const char* submeshName, std::string& importedFilePath);
 		virtual ~Material() = default;
 
-		virtual void Bind(Ref<Pipeline> pipeline) = 0;
-		virtual void Unbind(Ref<Pipeline> pipeline) = 0;
+		virtual void Update(Ref<Pipeline> pipeline) = 0;
 
 		inline Ref<Shader> GetShader() { return m_Shader; }
-		inline std::string GetName() const { return m_MaterialData.Name; }
+		inline const std::string& GetName() const { return m_MaterialData.Name; }
 
 		inline bool HasTexture(TextureType type) const { return !m_Textures.empty() && m_Textures.size() > type.Index && m_Textures[type.Index]->GetID() != 0; }
 		inline Ref<Image2D> GetTexture(TextureType type) const { return m_Textures[type.Index]; }
+		inline uint32_t GetTextureCount() const { return m_Textures.size(); }
+
+		void Destroy();
 
 		inline static const TextureType ALBEDO_TYPE = { aiTextureType_DIFFUSE, "Albedo", 1, 0 };
 		inline static const TextureType NORMALS_TYPE = { aiTextureType_HEIGHT, "Normals", 2, 1 };

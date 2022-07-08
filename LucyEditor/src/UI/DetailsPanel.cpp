@@ -3,6 +3,8 @@
 #include "DetailsPanel.h"
 #include "SceneExplorerPanel.h"
 
+#include "Renderer/Renderer.h"
+
 #include "Utils.h"
 
 #include "imgui.h"
@@ -12,6 +14,29 @@ namespace Lucy {
 	DetailsPanel& DetailsPanel::GetInstance() {
 		static DetailsPanel s_Instance;
 		return s_Instance;
+	}
+
+	DetailsPanel::DetailsPanel() {
+		ImageCreateInfo createInfo;
+		createInfo.Format = VK_FORMAT_B8G8R8A8_SNORM;
+		createInfo.ImageType = ImageType::Type2D;
+		createInfo.Parameter.Mag = VK_FILTER_LINEAR;
+		createInfo.Parameter.Min = VK_FILTER_LINEAR;
+		createInfo.Parameter.U = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		createInfo.Parameter.V = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		createInfo.Parameter.W = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+		const auto& arch = Renderer::GetCurrentRenderArchitecture();
+		if (arch == RenderArchitecture::Vulkan) {
+			Ref<VulkanRHIImageDesc> imageDesc = Memory::CreateRef<VulkanRHIImageDesc>();
+			imageDesc->GenerateSampler = true;
+			imageDesc->ImGuiUsage = true;
+
+			createInfo.InternalInfo = imageDesc;
+		}
+		//TODO: OpenGL
+
+		s_CheckerBoardTexture = Image2D::Create("assets/textures/Checkerboard.png", createInfo);
 	}
 
 	void DetailsPanel::Render() {
@@ -116,7 +141,7 @@ namespace Lucy {
 		});
 
 		DrawComponentPanel<MeshComponent>(entityContext, [&](MeshComponent& c) {
-			Ref<Mesh> mesh = c.GetMesh();
+			const Ref<Mesh> mesh = c.GetMesh();
 
 			if (ImGui::CollapsingHeader("Mesh Renderer", ImGuiTreeNodeFlags_DefaultOpen)) {
 
@@ -154,7 +179,7 @@ namespace Lucy {
 						static int32_t selectedMaterial = -1;
 						for (uint32_t i = 0; i < mesh->GetSubmeshes().size(); i++) {
 							ImGui::TableNextRow();
-							
+
 							ImGui::TableSetColumnIndex(0);
 							UIUtils::TextCenterTable(fmt::format("Element {0}", i).c_str(), 8.0f, -8.0f);
 
@@ -166,10 +191,12 @@ namespace Lucy {
 
 							if (m->HasTexture(Material::ALBEDO_TYPE))
 								textureID = m->GetTexture(Material::ALBEDO_TYPE)->GetID();
+							else
+								textureID = s_CheckerBoardTexture->GetID();
 
-							ImGui::ImageButton((ImTextureID)textureID, { 64, 64 }, { 0, 0 }, { 1, 1 }, 1.0f);
+							ImGui::ImageButton((ImTextureID) textureID, { 64, 64 }, { 0, 0 }, { 1, 1 }, 1.0f);
 							ImGui::SameLine();
-							
+
 							if (ImGui::BeginCombo(fmt::format("##hideLabel {0}", i).c_str(), m->GetName().c_str())) {
 								for (uint32_t j = 0; j < mesh->GetSubmeshes().size(); j++) {
 									Ref<Material> comboMaterial = mesh->GetMaterials()[j];
@@ -196,5 +223,9 @@ namespace Lucy {
 		if (demoOpen) ImGui::ShowDemoWindow();
 
 		ImGui::End();
+	}
+
+	void DetailsPanel::OnDestroy() {
+		s_CheckerBoardTexture->Destroy();
 	}
 }

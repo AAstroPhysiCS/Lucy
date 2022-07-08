@@ -2,7 +2,6 @@
 #include "OpenGLShader.h"
 
 #include "glad/glad.h"
-#include "Utils.h"
 
 namespace Lucy {
 

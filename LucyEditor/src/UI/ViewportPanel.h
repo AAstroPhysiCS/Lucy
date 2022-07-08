@@ -25,6 +25,7 @@ namespace Lucy {
 	private:
 		void Render();
 
+		ViewportPanel() = default;
 		virtual ~ViewportPanel() = default;
 
 		bool m_IsViewportHovered = false;

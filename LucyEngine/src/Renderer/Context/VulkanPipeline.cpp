@@ -5,16 +5,17 @@
 #include "../Shader/VulkanShader.h"
 
 #include "../VulkanRenderPass.h"
-#include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 
 #include "Renderer/Renderer.h"
 #include "Renderer/VulkanDescriptors.h"
+
 #include "Renderer/Memory/Buffer/Vulkan/VulkanUniformBuffer.h"
+#include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 
 namespace Lucy {
 
-	VulkanPipeline::VulkanPipeline(const PipelineSpecification& specs)
-		: Pipeline(specs) {
+	VulkanPipeline::VulkanPipeline(const PipelineCreateInfo& createInfo)
+		: Pipeline(createInfo) {
 		Renderer::Enqueue([&]() {
 			Create();
 		});
@@ -24,10 +25,11 @@ namespace Lucy {
 		if (!m_DescriptorPool) {
 			const std::vector<VkDescriptorPoolSize>& poolSizes = CreateDescriptorPoolSizes();
 
-			VulkanDescriptorPoolSpecifications poolSpecs{};
-			poolSpecs.PoolSizesVector = poolSizes;
-			poolSpecs.MaxSet = 100;
-			m_DescriptorPool = Memory::CreateRef<VulkanDescriptorPool>(poolSpecs);
+			VulkanDescriptorPoolCreateInfo poolCreateInfo{};
+			poolCreateInfo.PoolSizesVector = poolSizes;
+			poolCreateInfo.MaxSet = 100;
+			poolCreateInfo.PoolFlags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
+			m_DescriptorPool = Memory::CreateRef<VulkanDescriptorPool>(poolCreateInfo);
 		}
 
 		const auto& bindingDescriptor = CreateBindingDescription();
@@ -42,7 +44,7 @@ namespace Lucy {
 
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo{};
 		inputAssemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-		switch (m_Specs.Topology) {
+		switch (m_CreateInfo.Topology) {
 			case Topology::TRIANGLES:
 				inputAssemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 				break;
@@ -67,7 +69,7 @@ namespace Lucy {
 		rasterizationCreateInfo.depthClampEnable = VK_FALSE;
 		rasterizationCreateInfo.rasterizerDiscardEnable = VK_FALSE;
 
-		switch (m_Specs.Rasterization.PolygonMode) {
+		switch (m_CreateInfo.Rasterization.PolygonMode) {
 			case PolygonMode::FILL:
 				rasterizationCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
 				break;
@@ -78,8 +80,8 @@ namespace Lucy {
 				rasterizationCreateInfo.polygonMode = VK_POLYGON_MODE_POINT;
 				break;
 		}
-		rasterizationCreateInfo.lineWidth = m_Specs.Rasterization.LineWidth;
-		rasterizationCreateInfo.cullMode = m_Specs.Rasterization.CullingMode;
+		rasterizationCreateInfo.lineWidth = m_CreateInfo.Rasterization.LineWidth;
+		rasterizationCreateInfo.cullMode = m_CreateInfo.Rasterization.CullingMode;
 		rasterizationCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 		rasterizationCreateInfo.depthBiasEnable = VK_FALSE;
 		rasterizationCreateInfo.depthBiasConstantFactor = 0.0f;
@@ -117,19 +119,25 @@ namespace Lucy {
 			VK_DYNAMIC_STATE_LINE_WIDTH,
 			VK_DYNAMIC_STATE_SCISSOR
 		};
+
 		VkPipelineDynamicStateCreateInfo dynamicState{};
 		dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 		dynamicState.dynamicStateCount = 3;
 		dynamicState.pDynamicStates = dynamicStates;
 
-		ParseUniformBuffers();
+		ParseBuffers();
 
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		pipelineLayoutInfo.setLayoutCount = m_DescriptorSetLayouts.size();
 		pipelineLayoutInfo.pSetLayouts = m_DescriptorSetLayouts.data();
-		pipelineLayoutInfo.pushConstantRangeCount = 0;
-		pipelineLayoutInfo.pPushConstantRanges = nullptr;
+
+		std::vector<VkPushConstantRange> pushConstantRanges;
+		for (PushConstant& pc : m_PushConstants)
+			pushConstantRanges.push_back(pc.GetHandle());
+
+		pipelineLayoutInfo.pushConstantRangeCount = pushConstantRanges.size();
+		pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.data();
 
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
 		LUCY_VK_ASSERT(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_PipelineLayoutHandle));
@@ -138,7 +146,7 @@ namespace Lucy {
 		depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 		depthStencilCreateInfo.depthWriteEnable = VK_TRUE;
 		depthStencilCreateInfo.depthTestEnable = VK_TRUE;
-		depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+		depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
 		depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;
 		depthStencilCreateInfo.minDepthBounds = 0.0f;
 		depthStencilCreateInfo.maxDepthBounds = 1.0f;
@@ -147,7 +155,7 @@ namespace Lucy {
 		VkGraphicsPipelineCreateInfo pipelineCreateInfo{};
 		pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 		pipelineCreateInfo.stageCount = 2; //vertex and fragment
-		pipelineCreateInfo.pStages = m_Specs.Shader.As<VulkanShader>()->GetShaderStageInfos();
+		pipelineCreateInfo.pStages = m_CreateInfo.Shader.As<VulkanShader>()->GetShaderStageInfos();
 
 		pipelineCreateInfo.pVertexInputState = &vertexInputInfo;
 		pipelineCreateInfo.pInputAssemblyState = &inputAssemblyInfo;
@@ -158,7 +166,7 @@ namespace Lucy {
 		pipelineCreateInfo.pColorBlendState = &colorBlending;
 		pipelineCreateInfo.pDynamicState = &dynamicState;
 		pipelineCreateInfo.layout = m_PipelineLayoutHandle;
-		pipelineCreateInfo.renderPass = m_Specs.RenderPass.As<VulkanRenderPass>()->GetVulkanHandle();
+		pipelineCreateInfo.renderPass = m_CreateInfo.RenderPass.As<VulkanRenderPass>()->GetVulkanHandle();
 		pipelineCreateInfo.subpass = 0;
 
 		//not that relevant for now
@@ -170,72 +178,88 @@ namespace Lucy {
 	}
 
 	void VulkanPipeline::Bind(PipelineBindInfo bindInfo) {
-		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-
 		vkCmdBindPipeline(bindInfo.CommandBuffer, bindInfo.PipelineBindPoint, m_PipelineHandle);
-
-		//organizing all "distinct!" sets
-		std::vector<VkDescriptorSet> descriptorSetsToBind;
-		for (VulkanDescriptorSet descriptorSet : m_IndividualSets) {
-			descriptorSetsToBind.push_back(descriptorSet.GetSetBasedOffCurrentFrame(swapChain.GetCurrentFrameIndex()));
-		}
-
-		if (descriptorSetsToBind.size() != 0)
-			vkCmdBindDescriptorSets(bindInfo.CommandBuffer, bindInfo.PipelineBindPoint, m_PipelineLayoutHandle, 0, descriptorSetsToBind.size(), descriptorSetsToBind.data(), 0, nullptr);
-
-		auto& frameBuffer = m_Specs.FrameBuffer.As<VulkanFrameBuffer>();
-
-		RenderPassBeginInfo renderPassBeginInfo;
-		renderPassBeginInfo.CommandBuffer = bindInfo.CommandBuffer;
-		renderPassBeginInfo.Width = frameBuffer->GetWidth();
-		renderPassBeginInfo.Height = frameBuffer->GetHeight();
-		renderPassBeginInfo.VulkanFrameBuffer = frameBuffer->GetVulkanHandles()[swapChain.GetCurrentFrameIndex()];
-		m_Specs.RenderPass->Begin(renderPassBeginInfo);
 	}
 
-	void VulkanPipeline::Unbind() {
-		m_Specs.RenderPass->End();
-	}
+	void VulkanPipeline::ParseBuffers() {
+		if (m_DescriptorSetLayouts.size() != 0) //if the application has been resized
+			return;
 
-	void VulkanPipeline::ParseUniformBuffers() {
-		if (m_DescriptorSetLayouts.size() != 0) return; //if the application has been resized
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
 
-		for (auto& [set, info] : m_Specs.Shader->GetDescriptorSetMap()) {
+		for (auto& [set, info] : m_CreateInfo.Shader->GetShaderUniformBlockMap()) {
 			std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
-			uint32_t size = 0;
+			std::vector<VkDescriptorBindingFlags> bindingFlags;
 
-			for (auto& ub : info) {
+			bool setIsDynamicallyAllocated = false;
+
+			for (auto& buffer : info) {
 				VkDescriptorSetLayoutBinding binding{};
-				binding.binding = ub.Binding;
-				binding.descriptorCount = 1;
-				binding.descriptorType = ub.Type;
-				binding.stageFlags = ub.StageFlag;
+				binding.binding = buffer.Binding;
+				binding.descriptorCount = buffer.ArraySize == 0 ? 1 : buffer.ArraySize;
+				if (buffer.DynamicallyAllocated) {
+					buffer.ArraySize = MAX_DYNAMICALLY_ALLOCATED_BUFFER;
+					binding.descriptorCount = buffer.ArraySize;
+					//ensures that we will fill the array later on, since the binding dynamic
+					bindingFlags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT);
+					setIsDynamicallyAllocated = true;
+				} else {
+					bindingFlags.push_back(0);
+				}
+				binding.descriptorType = buffer.Type;
+				binding.stageFlags = buffer.StageFlag;
 				binding.pImmutableSamplers = nullptr;
-				size += ub.BufferSize;
+
 				layoutBindings.push_back(binding);
 			}
+
+			VkDescriptorSetLayoutBindingFlagsCreateInfo extendedLayoutInfo{};
+			extendedLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT;
+			extendedLayoutInfo.bindingCount = layoutBindings.size();
+			extendedLayoutInfo.pBindingFlags = bindingFlags.data();
 
 			VkDescriptorSetLayoutCreateInfo descriptorLayoutInfo{};
 			descriptorLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 			descriptorLayoutInfo.bindingCount = layoutBindings.size();
 			descriptorLayoutInfo.pBindings = layoutBindings.data();
+			descriptorLayoutInfo.pNext = &extendedLayoutInfo;
 
 			VkDescriptorSetLayout descriptorSetLayout;
 			LUCY_VK_ASSERT(vkCreateDescriptorSetLayout(device, &descriptorLayoutInfo, nullptr, &descriptorSetLayout));
 			m_DescriptorSetLayouts.push_back(descriptorSetLayout);
 
-			VulkanDescriptorSetSpecifications setSpecs;
-			setSpecs.Layout = descriptorSetLayout;
-			setSpecs.Pool = m_DescriptorPool;
+			VulkanDescriptorSetCreateInfo setCreateInfo;
+			setCreateInfo.Layout = descriptorSetLayout;
+			setCreateInfo.Pool = m_DescriptorPool;
+			setCreateInfo.SetIndex = set;
+			setCreateInfo.SizeOfVariableCounting = setIsDynamicallyAllocated ? MAX_DYNAMICALLY_ALLOCATED_BUFFER : 0;
 
-			VulkanDescriptorSet descriptorSet(setSpecs);
-			for (auto& ub : info) {
-				Ref<VulkanUniformBuffer> uniformBuffer = UniformBuffer::Create(size, ub.Binding, std::optional<VulkanDescriptorSet>(descriptorSet)).As<VulkanUniformBuffer>();
+			Ref<VulkanDescriptorSet> descriptorSet = Memory::CreateRef<VulkanDescriptorSet>(setCreateInfo);
+
+			for (const auto& buffer : info) {
+				UniformBufferCreateInfo createInfo;
+				createInfo.Binding = buffer.Binding;
+				createInfo.Name = buffer.Name;
+				createInfo.BufferSize = buffer.BufferSize;
+
+				Ref<VulkanRHIUniformCreateInfo> internalInfo = Memory::CreateRef<VulkanRHIUniformCreateInfo>();
+				internalInfo->DescriptorSet = descriptorSet;
+				internalInfo->Type = buffer.Type;
+
+				createInfo.InternalInfo = internalInfo;
+				createInfo.ShaderMemberVariables = buffer.Members;
+				createInfo.ArraySize = buffer.ArraySize;
+
+				Ref<VulkanUniformBuffer> uniformBuffer = UniformBuffer::Create(createInfo).As<VulkanUniformBuffer>();
 				m_UniformBuffers.push_back(uniformBuffer);
 			}
+
 			m_IndividualSets.push_back(descriptorSet);
 		}
+
+		auto& pushConstantMap = m_CreateInfo.Shader->GetPushConstants();
+		for (auto& pc : pushConstantMap)
+			m_PushConstants.push_back(PushConstant(pc.Name, pc.BufferSize, 0, pc.StageFlag));
 	}
 
 	VkFormat VulkanPipeline::GetVulkanTypeFromSize(ShaderDataSize size) {
@@ -252,18 +276,17 @@ namespace Lucy {
 		}
 	}
 
-	//TODO: Understand this... 10 is a temporary number
 	std::vector<VkDescriptorPoolSize> VulkanPipeline::CreateDescriptorPoolSizes() {
 		std::vector<VkDescriptorPoolSize> poolSizes;
-		poolSizes.push_back({ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10 });
-		poolSizes.push_back({ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10 });
+		poolSizes.push_back({ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1024 });
+		poolSizes.push_back({ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024 });
 		return poolSizes;
 	}
 
 	VkVertexInputBindingDescription VulkanPipeline::CreateBindingDescription() {
 		VkVertexInputBindingDescription vertexInputBindingDescription{};
 		vertexInputBindingDescription.binding = 0;
-		vertexInputBindingDescription.stride = CalculateStride(m_Specs.VertexShaderLayout) * sizeof(float);
+		vertexInputBindingDescription.stride = CalculateStride(m_CreateInfo.VertexShaderLayout) * sizeof(float);
 		vertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 		return vertexInputBindingDescription;
 	}
@@ -274,7 +297,7 @@ namespace Lucy {
 		uint32_t bufferIndex = 0;
 		uint32_t offset = 0;
 
-		for (auto [name, size] : m_Specs.VertexShaderLayout.ElementList) {
+		for (auto [name, size] : m_CreateInfo.VertexShaderLayout.ElementList) {
 			VkVertexInputAttributeDescription attributeDescriptor;
 			attributeDescriptor.binding = binding;
 			attributeDescriptor.location = bufferIndex++;
@@ -290,8 +313,8 @@ namespace Lucy {
 	void VulkanPipeline::Destroy() {
 		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
 
-		m_Specs.FrameBuffer->Destroy();
-		m_Specs.RenderPass.As<VulkanRenderPass>()->Destroy();
+		m_CreateInfo.FrameBuffer->Destroy();
+		m_CreateInfo.RenderPass.As<VulkanRenderPass>()->Destroy();
 
 		for (const auto& buffer : m_UniformBuffers)
 			buffer->DestroyHandle();
@@ -301,7 +324,7 @@ namespace Lucy {
 		m_DescriptorPool->Destroy();
 		vkDestroyPipelineLayout(device, m_PipelineLayoutHandle, nullptr);
 		vkDestroyPipeline(device, m_PipelineHandle, nullptr);
-		//m_Specs.Shader->Destroy(); Shader destroying happens in Renderer::Destroy
+		//m_CreateInfo.Shader->Destroy(); Shader destroying happens in Renderer::Destroy
 	}
 
 	void VulkanPipeline::Recreate(uint32_t width, uint32_t height) {
@@ -310,7 +333,7 @@ namespace Lucy {
 		//vkDestroyPipeline(device, m_Pipeline, nullptr);
 
 		//Create();
-		m_Specs.RenderPass.As<VulkanRenderPass>()->Recreate();
-		m_Specs.FrameBuffer.As<VulkanFrameBuffer>()->Recreate(width, height, nullptr);
+		m_CreateInfo.RenderPass.As<VulkanRenderPass>()->Recreate();
+		m_CreateInfo.FrameBuffer.As<VulkanFrameBuffer>()->Recreate(width, height, nullptr);
 	}
 }

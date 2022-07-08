@@ -6,7 +6,7 @@
 
 namespace Lucy {
 
-	struct ImageViewSpecification {
+	struct ImageViewCreateInfo {
 		VkImage Image;
 		VkFormat Format;
 		VkImageViewType ViewType;
@@ -22,14 +22,14 @@ namespace Lucy {
 
 	class VulkanImageView {
 	public:
-		VulkanImageView(const ImageViewSpecification& specs);
+		VulkanImageView(const ImageViewCreateInfo& createInfo);
 		~VulkanImageView() = default;
 
 		inline VkImageView GetVulkanHandle() { return m_ImageView; }
 		inline VkImageView GetVulkanHandle() const { return m_ImageView; }
 		inline VkSampler GetSampler() const { return m_Sampler; }
 
-		void Recreate(const ImageViewSpecification& specs);
+		void Recreate(const ImageViewCreateInfo& createInfo);
 		void Destroy();
 	private:
 		VulkanImageView() = default; //for VulkanImage2D, so that we can initialize it as member
@@ -39,19 +39,17 @@ namespace Lucy {
 
 		VkImageView m_ImageView = VK_NULL_HANDLE;
 		VkSampler m_Sampler = VK_NULL_HANDLE;
-		ImageViewSpecification m_Specs;
+		ImageViewCreateInfo m_CreateInfo;
 
 		friend class VulkanImage2D;
 	};
 
 	class VulkanImage2D : public Image2D {
 	public:
-		VulkanImage2D(const std::string& path, ImageSpecification& specs);
-		VulkanImage2D(ImageSpecification& specs);
+		VulkanImage2D(const std::string& path, ImageCreateInfo& createInfo);
+		VulkanImage2D(ImageCreateInfo& createInfo);
 		virtual ~VulkanImage2D() = default;
 
-		void Bind() override;
-		void Unbind() override;
 		void Destroy() override;
 		void Recreate(uint32_t width, uint32_t height);
 

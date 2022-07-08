@@ -1,13 +1,14 @@
 #pragma once
 
-#include "Scene/Scene.h"
 #include "Context/Pipeline.h"
+
 #include "Memory/Buffer/FrameBuffer.h"
 #include "RenderPass.h"
-#include "CommandQueue.h"
 
 namespace Lucy {
-	
+
+	class Scene;
+
 	struct ImGuiPipeline {
 		Ref<RenderPass> UIRenderPass = nullptr;
 		Ref<FrameBuffer> UIFramebuffer = nullptr;

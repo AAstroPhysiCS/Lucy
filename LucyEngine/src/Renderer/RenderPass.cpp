@@ -7,17 +7,17 @@
 
 namespace Lucy {
 
-	RenderPass::RenderPass(const RenderPassSpecification& specs)
-		: m_Specs(specs) {
+	RenderPass::RenderPass(const RenderPassCreateInfo& createInfo)
+		: m_CreateInfo(createInfo) {
 	}
 
-	Ref<RenderPass> Lucy::RenderPass::Create(const RenderPassSpecification& specs) {
+	Ref<RenderPass> Lucy::RenderPass::Create(const RenderPassCreateInfo& createInfo) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
-				return Memory::CreateRef<OpenGLRenderPass>(specs);
+				return Memory::CreateRef<OpenGLRenderPass>(createInfo);
 				break;
 			case RenderArchitecture::Vulkan:
-				return Memory::CreateRef<VulkanRenderPass>(specs);
+				return Memory::CreateRef<VulkanRenderPass>(createInfo);
 				break;
 			default:
 				LUCY_CRITICAL("Other API's are not supported!");

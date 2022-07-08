@@ -3,8 +3,6 @@
 #include "RenderContext.h"
 
 #include "vulkan/vulkan.h"
-#include "Renderer/Context/VulkanDevice.h"
-#include "Renderer/Context/VulkanSwapChain.h"
 
 namespace Lucy {
 
@@ -32,6 +30,11 @@ namespace Lucy {
 
 		std::vector<const char*> m_ValidationLayers = {
 			"VK_LAYER_KHRONOS_validation"
+		};
+
+		std::vector<const char*> m_InstanceExtensions = {
+			VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+			VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
 		};
 
 		VkInstance m_Instance;

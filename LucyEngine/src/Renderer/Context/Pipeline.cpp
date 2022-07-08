@@ -1,18 +1,19 @@
 #include "lypch.h"
+
 #include "OpenGLPipeline.h"
 #include "VulkanPipeline.h"
 
 #include "Renderer/Renderer.h"
 
 namespace Lucy {
-	
-	Ref<Pipeline> Pipeline::Create(const PipelineSpecification& specs) {
+
+	Ref<Pipeline> Pipeline::Create(const PipelineCreateInfo& createInfo) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
-				return Memory::CreateRef<OpenGLPipeline>(specs);
+				return Memory::CreateRef<OpenGLPipeline>(createInfo);
 				break;
 			case RenderArchitecture::Vulkan:
-				return Memory::CreateRef<VulkanPipeline>(specs);
+				return Memory::CreateRef<VulkanPipeline>(createInfo);
 				break;
 			default:
 				LUCY_CRITICAL("Other API's not supported!");
@@ -22,13 +23,18 @@ namespace Lucy {
 		return nullptr;
 	}
 
-	Pipeline::Pipeline(const PipelineSpecification& specs)
-		: m_Specs(specs) {
+	Pipeline::Pipeline(const PipelineCreateInfo& createInfo)
+		: m_CreateInfo(createInfo) {
 	}
 
-	void Pipeline::DestroyUniformBuffers() {
-		for (const auto& uniformBuffer : m_UniformBuffers)
-			uniformBuffer->DestroyHandle();
+	PushConstant& Pipeline::GetPushConstants(const char* name) {
+		for (PushConstant& pushConstant : m_PushConstants) {
+			if (name == pushConstant.GetName()) {
+				return pushConstant;
+			}
+		}
+		LUCY_CRITICAL(fmt::format("Could not find a suitable Push Constant for the given name: {0}", name));
+		LUCY_ASSERT(false);
 	}
 
 	uint32_t Pipeline::GetSizeFromType(ShaderDataSize size) {
@@ -52,5 +58,10 @@ namespace Lucy {
 			stride += GetSizeFromType(size);
 		}
 		return stride;
+	}
+
+	void Pipeline::DestroyUniformBuffers() {
+		for (const auto& uniformBuffer : m_UniformBuffers)
+			uniformBuffer->DestroyHandle();
 	}
 }

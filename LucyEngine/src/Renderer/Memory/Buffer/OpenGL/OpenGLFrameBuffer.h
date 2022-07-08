@@ -7,7 +7,7 @@ namespace Lucy {
 
 	class OpenGLFrameBuffer : public FrameBuffer {
 	public:
-		OpenGLFrameBuffer(FrameBufferSpecification& specs);
+		OpenGLFrameBuffer(FrameBufferCreateInfo& createInfo);
 		virtual ~OpenGLFrameBuffer() = default;
 
 		void Bind();
@@ -21,8 +21,8 @@ namespace Lucy {
 
 		inline auto GetSizeFromTexture(uint32_t index) const {
 			struct Size { int32_t Width, Height; };
-			auto& desc = m_Specs.InternalInfo.As<OpenGLRHIFrameBufferDesc>();
-			return Size{ desc->TextureSpecs[index].Width, desc->TextureSpecs[index].Height };
+			auto& desc = m_CreateInfo.InternalInfo.As<OpenGLRHIFrameBufferDesc>();
+			return Size{ desc->TextureCreateInfos[index].Width, desc->TextureCreateInfos[index].Height };
 		}
 
 		uint32_t GetID() const { return m_Id; }
@@ -32,7 +32,6 @@ namespace Lucy {
 		Ref<OpenGLFrameBuffer> m_Blitted;
 
 		uint32_t m_Id = 0;
-		FrameBufferSpecification m_Specs;
 	};
 }
 

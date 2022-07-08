@@ -8,7 +8,7 @@ namespace Lucy {
 
 	class VulkanRenderPass : public RenderPass {
 	public:
-		VulkanRenderPass(const RenderPassSpecification& specs);
+		VulkanRenderPass(const RenderPassCreateInfo& createInfo);
 		virtual ~VulkanRenderPass() = default;
 
 		void Begin(RenderPassBeginInfo& info) override;

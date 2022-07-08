@@ -10,16 +10,20 @@ namespace Lucy {
 	public:
 		static DetailsPanel& GetInstance();
 	private:
-		DetailsPanel() = default;
+		DetailsPanel();
 		virtual ~DetailsPanel() = default;
 
-		void Render();
+		void OnDestroy() override;
+		void Render() override;
 
 		template <typename T>
 		static void DrawComponentPanel(Entity& e, std::function<void(T&)> func) {
 			if (e.HasComponent<T>())
 				func(e.GetComponent<T>());
 		}
+
+		//relevant for DetailsPanel, since I cant render a nullptr vulkan descriptor set.
+		inline static Ref<Image2D> s_CheckerBoardTexture = nullptr;
 	};
 }
 

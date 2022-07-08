@@ -1,8 +1,11 @@
 #include "lypch.h"
 
 #include "OpenGLMaterial.h"
-#include "Image/OpenGLImage.h"
-#include "Context/Pipeline.h"
+#include "Renderer/Image/OpenGLImage.h"
+#include "Renderer/Context/Pipeline.h"
+
+#include "Renderer/Memory/Buffer/OpenGL/OpenGLUniformBuffer.h"
+#include "Renderer/Shader/OpenGLShader.h"
 
 namespace Lucy {
 
@@ -15,15 +18,18 @@ namespace Lucy {
 		LoadTexture(aiMaterial, 5, AO_TYPE, importedFilePath);
 	}
 
+	void OpenGLMaterial::Update(Ref<Pipeline> pipeline) {
+	}
+
 	void OpenGLMaterial::Bind(Ref<Pipeline> pipeline) {
-		m_Shader->Bind();
+		m_Shader.As<OpenGLShader>()->Bind();
 		for (uint32_t i = 0; i < m_Textures.size(); i++) {
 			Ref<OpenGLImage2D> texture = m_Textures[i].As<OpenGLImage2D>();
 			uint32_t slot = texture->GetSlot();
 			glBindTextureUnit(slot, texture->GetID());
 		}
 
-		auto& uniformBuffer = pipeline->GetUniformBuffers<UniformBuffer>(0);
+		auto& uniformBuffer = pipeline->GetUniformBuffers<OpenGLUniformBuffer>("TextureSlots");
 
 		//TODO: Kinda bad/ugly code and its slow somehow although i dont do anything wrong here...!
 		if (HasTexture(Material::ALBEDO_TYPE)) {
@@ -46,9 +52,9 @@ namespace Lucy {
 
 	void OpenGLMaterial::Unbind(Ref<Pipeline> pipeline) {
 		int32_t clearValue = -1;
-		auto& uniformBuffer = pipeline->GetUniformBuffers<UniformBuffer>(0);
+		auto& uniformBuffer = pipeline->GetUniformBuffers<OpenGLUniformBuffer>("TextureSlots");
 		uniformBuffer->SetData((void*)&clearValue, sizeof(int32_t) * 5, 0);
-		m_Shader->Unbind();
+		m_Shader.As<OpenGLShader>()->Unbind();
 		for (uint32_t i = 0; i < m_Textures.size(); i++) {
 			Ref<OpenGLImage2D> texture = m_Textures[i].As<OpenGLImage2D>();
 			glBindTextureUnit(texture->GetSlot(), 0);
@@ -60,16 +66,16 @@ namespace Lucy {
 		if (aiMaterial->GetTexture((aiTextureType)type.Type, 0, &path) == aiReturn_SUCCESS) {
 			std::string properTexturePath = FileSystem::GetParentPath(importedFilePath) + "/" + std::string(path.data);
 
-			ImageSpecification specs;
-			specs.GenerateMipmap = true;
-			specs.Parameter = { 0, GL_REPEAT, GL_REPEAT, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR };
+			ImageCreateInfo createInfo;
+			createInfo.GenerateMipmap = true;
+			createInfo.Parameter = { 0, GL_REPEAT, GL_REPEAT, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR };
 
 			Ref<OpenGLRHIImageDesc> imageDesc = Memory::CreateRef<OpenGLRHIImageDesc>();
 			imageDesc->PixelType = OpenGLRHIImageDesc::PixelType::UnsignedByte;
 			imageDesc->Slot = slot;
-			specs.InternalInfo = imageDesc;
+			createInfo.InternalInfo = imageDesc;
 
-			Ref<Image2D> texture2D = Image2D::Create(properTexturePath, specs);
+			Ref<Image2D> texture2D = Image2D::Create(properTexturePath, createInfo);
 			m_Textures.push_back(texture2D);
 		} else {
 			LUCY_WARN(fmt::format("Texture {0} could not be loaded: {1}", type.Name, path.data));

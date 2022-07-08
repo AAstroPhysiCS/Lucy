@@ -7,10 +7,13 @@
 
 namespace Utils {
 
-	struct Size { int32_t width; int32_t height; };
+	struct Attribute { 
+		int32_t Width; 
+		int32_t Height;
+	};
 
 	std::vector<std::string> Split(std::string& s, const std::string& delimiter);
-	Size ReadViewportSizeFromIni(const char* windowName);
+	Attribute ReadAttributeFromIni(const char* windowName, const char* attributeName);
 
 	struct DialogFilter {
 		const char* name;

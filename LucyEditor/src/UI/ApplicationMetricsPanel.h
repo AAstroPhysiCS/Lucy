@@ -10,12 +10,12 @@ namespace Lucy {
 
 		void SetShow(bool show);
 	private:
-		ApplicationMetricsPanel() = default;
-		virtual ~ApplicationMetricsPanel() = default;
-		
+		bool m_Show = false;
+
 		void Render();
 
-		bool m_Show;
+		ApplicationMetricsPanel() = default;
+		virtual ~ApplicationMetricsPanel() = default;
 	};
 }
 

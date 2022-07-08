@@ -1,18 +1,15 @@
 #include "lypch.h"
 #include "VulkanRenderPass.h"
 
-#include "vulkan/vulkan.h"
-
 #include "Renderer.h"
-#include "Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 #include "Context/VulkanDevice.h"
 #include "Context/VulkanSwapChain.h"
 
 namespace Lucy {
 
-	VulkanRenderPass::VulkanRenderPass(const RenderPassSpecification& specs)
-		: RenderPass(specs) {
-		Ref<VulkanRHIRenderPassDesc> renderPassDesc = m_Specs.InternalInfo.As<VulkanRHIRenderPassDesc>();
+	VulkanRenderPass::VulkanRenderPass(const RenderPassCreateInfo& createInfo)
+		: RenderPass(createInfo) {
+		Ref<VulkanRHIRenderPassDesc> renderPassDesc = m_CreateInfo.InternalInfo.As<VulkanRHIRenderPassDesc>();
 		//we need this in framebuffer, outside the enqueue function, since otherwise there will be a conflict
 		m_DepthBuffered = renderPassDesc->DepthEnable;
 
@@ -24,7 +21,7 @@ namespace Lucy {
 	void VulkanRenderPass::Create() {
 		const VulkanDevice& device = VulkanDevice::Get();
 
-		Ref<VulkanRHIRenderPassDesc> renderPassDesc = m_Specs.InternalInfo.As<VulkanRHIRenderPassDesc>();
+		Ref<VulkanRHIRenderPassDesc> renderPassDesc = m_CreateInfo.InternalInfo.As<VulkanRHIRenderPassDesc>();
 
 		VkAttachmentDescription colorAttachmentDescription{};
 		colorAttachmentDescription.format = renderPassDesc->ColorDescriptor.Format;
@@ -56,15 +53,15 @@ namespace Lucy {
 		subpassColorDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 		subpassColorDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 		subpassColorDependency.srcAccessMask = 0;
-		subpassColorDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
-		subpassColorDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+		subpassColorDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		subpassColorDependency.dependencyFlags = 0;
 
 		VkSubpassDependency subpassDepthDependency;
 		subpassDepthDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
 		subpassDepthDependency.dstSubpass = 0;
 		subpassDepthDependency.srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-		subpassDepthDependency.srcAccessMask = 0;
 		subpassDepthDependency.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+		subpassDepthDependency.srcAccessMask = 0;
 		subpassDepthDependency.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 		subpassDepthDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
@@ -99,7 +96,7 @@ namespace Lucy {
 	}
 
 	void VulkanRenderPass::Begin(RenderPassBeginInfo& info) {
-		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
+		const VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 
 		VkRenderPassBeginInfo beginInfo{};
 		beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -109,7 +106,7 @@ namespace Lucy {
 		beginInfo.renderArea.extent = { info.Width, info.Height };
 
 		VkClearValue clearColor;
-		clearColor.color = { m_Specs.ClearColor.r, m_Specs.ClearColor.g, m_Specs.ClearColor.b, m_Specs.ClearColor.a };
+		clearColor.color = { m_CreateInfo.ClearColor.r, m_CreateInfo.ClearColor.g, m_CreateInfo.ClearColor.b, m_CreateInfo.ClearColor.a };
 		
 		VkClearValue clearDepth;
 		clearDepth.depthStencil.depth = 1.0f;

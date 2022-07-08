@@ -3,6 +3,9 @@
 
 #include "Context/RenderContext.h"
 #include "Context/VulkanPipeline.h"
+#include "Context/VulkanSwapChain.h"
+#include "Context/VulkanDevice.h"
+#include "Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 
 #include "Scene/Scene.h"
 #include "Scene/Entity.h"
@@ -10,7 +13,6 @@
 #include "ViewportRenderer.h"
 #include "Renderer/Renderer.h"
 
-#include "Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 #include "Utils.h"
 
 namespace Lucy {
@@ -70,53 +72,17 @@ namespace Lucy {
 		m_RenderFunctionQueue.push_back(func);
 	}
 
-	void VulkanRHI::EnqueueStaticMesh(Ref<Mesh> mesh, const glm::mat4& entityTransform) {
-		Enqueue([=]() {
-			m_StaticMeshDrawCommandQueue.push_back(MeshDrawCommand(mesh, entityTransform));
-		});
+	void VulkanRHI::EnqueueStaticMesh(Priority priority, Ref<Mesh> mesh, const glm::mat4& entityTransform) {
+		m_StaticMeshDrawCommands.push_back(Memory::CreateRef<MeshDrawCommand>(priority, mesh, entityTransform));
 	}
 
-	void VulkanRHI::RecordToCommandQueue(RecordFunc<>&& func) {
-		//TODO: Temporary, delete afterwards
+	void VulkanRHI::RecordStaticMeshToCommandQueue(Ref<Pipeline> pipeline, RecordFunc<Ref<DrawCommand>>&& func) {
 		CommandElement element;
-		element.RecordFunc = *(RecordFunc<void*>*) & func;
-		element.Argument = nullptr;
+		element.Pipeline = pipeline;
+		element.RecordFunc = func;
+		element.Arguments = m_StaticMeshDrawCommands;
+
 		s_CommandQueue.Enqueue(element);
-		/*
-		for (MeshDrawCommand cmd : m_StaticMeshDrawCommandQueue) {
-			CommandElement element;
-			element.RecordFunc = *(RecordFunc<void*>*)&func;
-			element.Argument = (void*)&cmd;
-			s_CommandQueue.Enqueue(element);
-		}
-		*/
-	}
-
-	void VulkanRHI::RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func) {
-		//TODO: Temporary, delete afterwards
-		CommandElement element;
-		element.RecordFunc = *(RecordFunc<void*>*) & func;
-		element.Argument = nullptr;
-		s_CommandQueue.Enqueue(element);
-		/*
-		for (MeshDrawCommand cmd : m_StaticMeshDrawCommandQueue) {
-			CommandElement element;
-			element.RecordFunc = *(RecordFunc<void*>*)&func;
-			element.Argument = (void*)&cmd;
-			s_CommandQueue.Enqueue(element);
-		}
-		*/
-	}
-
-	void VulkanRHI::BindPipeline(Ref<Pipeline> pipeline) {
-		PipelineBindInfo info;
-		info.PipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		info.CommandBuffer = s_CommandQueue.GetCurrentCommandBuffer();
-		pipeline->Bind(info);
-	}
-
-	void VulkanRHI::UnbindPipeline(Ref<Pipeline> pipeline) {
-		pipeline->Unbind();
 	}
 
 	void VulkanRHI::BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) {
@@ -130,16 +96,13 @@ namespace Lucy {
 	}
 
 	void VulkanRHI::RecordSingleTimeCommand(std::function<void(VkCommandBuffer)>&& func) {
-		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
+		const VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 		VkCommandBuffer commandBuffer = s_CommandQueue.BeginSingleTimeCommand();
 		func(commandBuffer);
 		s_CommandQueue.EndSingleTimeCommand(commandBuffer);
 	}
 
 	void VulkanRHI::Destroy() {
-		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
-		LUCY_VK_ASSERT(vkDeviceWaitIdle(device));
-
 		s_CommandQueue.Free();
 		m_RenderContext->Destroy();
 	}
@@ -162,10 +125,40 @@ namespace Lucy {
 	}
 
 	void VulkanRHI::OnViewportResize() {
+		const VulkanDevice& device = VulkanDevice::Get();
+		vkDeviceWaitIdle(device.GetLogicalDevice());
+
 		ViewportRenderer::s_GeometryPipeline.As<VulkanPipeline>()->Recreate(m_ViewportWidth, m_ViewportHeight);
 	}
 
 	Entity VulkanRHI::OnMousePicking() {
 		return {};
+	}
+
+	void VulkanRHI::UIPass(const ImGuiPipeline& imguiPipeline, std::function<void(VkCommandBuffer commandBuffer)>&& imguiRenderFunc) {
+		//we won't be using the drawcommand here, it's empty
+		RecordFunc<Ref<DrawCommand>> recordFunc = [=](Ref<DrawCommand>) {
+			VkCommandBuffer commandBuffer = s_CommandQueue.GetCurrentCommandBuffer();
+			VulkanSwapChain& swapChain = VulkanSwapChain::Get();
+
+			auto& renderPass = imguiPipeline.UIRenderPass.As<VulkanRenderPass>();
+			auto& frameBufferHandle = imguiPipeline.UIFramebuffer.As<VulkanFrameBuffer>();
+			const auto& targetFrameBuffer = frameBufferHandle->GetVulkanHandles()[swapChain.GetCurrentImageIndex()];
+
+			RenderPassBeginInfo beginInfo;
+			beginInfo.Width = frameBufferHandle->GetWidth();
+			beginInfo.Height = frameBufferHandle->GetHeight();
+			beginInfo.CommandBuffer = commandBuffer;
+			beginInfo.VulkanFrameBuffer = targetFrameBuffer;
+
+			renderPass->Begin(beginInfo);
+			imguiRenderFunc(commandBuffer);
+			renderPass->End();
+		};
+
+		CommandElement imguiElement;
+		imguiElement.RecordFunc = recordFunc;
+
+		s_CommandQueue.Enqueue(imguiElement);
 	}
 }

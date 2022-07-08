@@ -24,6 +24,13 @@ namespace Lucy {
 		return Utils::Split(relPath.filename().string(), ".")[0];
 	}
 
+	void FileSystem::ReadFile(const char* path, std::string& data) {
+		std::ifstream f(path);
+		std::stringstream buffer;
+		buffer << f.rdbuf();
+		data = buffer.str();
+	}
+
 	bool FileSystem::FileExists(std::string& file) {
 		return std::filesystem::exists(file);
 	}

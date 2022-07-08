@@ -9,14 +9,6 @@ namespace Lucy {
 		: Shader(path, name) {
 	}
 
-	void VulkanShader::Bind() {
-
-	}
-
-	void VulkanShader::Unbind() {
-
-	}
-
 	void VulkanShader::Destroy() {
 		if (!m_VertexShaderModule || !m_FragmentShaderModule) return;
 		const VulkanDevice& device = VulkanDevice::Get();

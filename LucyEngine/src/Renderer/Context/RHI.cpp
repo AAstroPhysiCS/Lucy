@@ -23,7 +23,7 @@ namespace Lucy {
 	}
 
 	void RHI::ClearQueues() {
-		m_StaticMeshDrawCommandQueue.clear();
+		m_StaticMeshDrawCommands.clear();
 		s_CommandQueue.Clear();
 	}
 }

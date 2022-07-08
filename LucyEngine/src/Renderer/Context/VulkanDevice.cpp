@@ -4,7 +4,7 @@
 #include "Renderer/Renderer.h"
 
 namespace Lucy {
-	
+
 	VulkanDevice& VulkanDevice::Get() {
 		static VulkanDevice s_Instance;
 		return s_Instance;
@@ -86,14 +86,31 @@ namespace Lucy {
 			queueCreateInfos.push_back(queueCreateInfo);
 		}
 
-		VkPhysicalDeviceFeatures features{};
-		features.samplerAnisotropy = VK_TRUE;
+		VkPhysicalDeviceFeatures2 features{};
+		features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+		vkGetPhysicalDeviceFeatures2(m_PhysicalDevice, &features);
+
+		// This should be already set to VK_TRUE, as we queried before.
+		features.features.samplerAnisotropy = VK_TRUE;
+
+		//for bindless descriptor sets
+		VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures{};
+		indexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
+
+		// This should be already set to VK_TRUE, as we queried before.
+		indexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
+		indexingFeatures.runtimeDescriptorArray = VK_TRUE;
+		indexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
+		indexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+
+		features.pNext = &indexingFeatures; //extending this structure
 
 		VkDeviceCreateInfo deviceCreateInfo{};
 		deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 		deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
 		deviceCreateInfo.queueCreateInfoCount = queueCreateInfos.size();
-		deviceCreateInfo.pEnabledFeatures = &features;
+		//deviceCreateInfo.pEnabledFeatures = &features;
+		deviceCreateInfo.pNext = &features;
 
 		deviceCreateInfo.ppEnabledExtensionNames = m_DeviceExtensions.data();
 		deviceCreateInfo.enabledExtensionCount = m_DeviceExtensions.size();
@@ -157,7 +174,22 @@ namespace Lucy {
 			LUCY_ASSERT(false);
 		}
 
-		return requiredExtensions.empty();
+		//for bindless descriptor sets
+		VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures{};
+		indexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
+
+		VkPhysicalDeviceFeatures2 advancedFeatures{};
+		advancedFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+		advancedFeatures.pNext = &indexingFeatures;
+
+		vkGetPhysicalDeviceFeatures2(device, &advancedFeatures);
+
+		bool isBindlessDescriptorSetsSupported = indexingFeatures.descriptorBindingPartiallyBound &&
+			indexingFeatures.runtimeDescriptorArray &&
+			indexingFeatures.shaderSampledImageArrayNonUniformIndexing &&
+			indexingFeatures.descriptorBindingVariableDescriptorCount;
+
+		return requiredExtensions.empty() && isBindlessDescriptorSetsSupported;
 	}
 
 	void VulkanDevice::PrintDeviceInfo() {

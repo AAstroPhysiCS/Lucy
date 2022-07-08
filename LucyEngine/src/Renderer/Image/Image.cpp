@@ -8,13 +8,13 @@
 
 namespace Lucy {
 
-	Ref<Image2D> Image2D::Create(const std::string& path, ImageSpecification& specs) {
+	Ref<Image2D> Image2D::Create(const std::string& path, ImageCreateInfo& createInfo) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
-				return Memory::CreateRef<OpenGLImage2D>(path, specs);
+				return Memory::CreateRef<OpenGLImage2D>(path, createInfo);
 				break;
 			case RenderArchitecture::Vulkan:
-				return Memory::CreateRef<VulkanImage2D>(path, specs);
+				return Memory::CreateRef<VulkanImage2D>(path, createInfo);
 				break;
 			default:
 				LUCY_ASSERT(false);
@@ -22,13 +22,13 @@ namespace Lucy {
 		return nullptr;
 	}
 	
-	Ref<Image2D> Image2D::Create(ImageSpecification& specs) {
+	Ref<Image2D> Image2D::Create(ImageCreateInfo& createInfo) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
-				return Memory::CreateRef<OpenGLImage2D>(specs);
+				return Memory::CreateRef<OpenGLImage2D>(createInfo);
 				break;
 			case RenderArchitecture::Vulkan:
-				return Memory::CreateRef<VulkanImage2D>(specs);
+				return Memory::CreateRef<VulkanImage2D>(createInfo);
 				break;
 			default:
 				LUCY_ASSERT(false);
@@ -36,11 +36,11 @@ namespace Lucy {
 		return nullptr;
 	}
 
-	Image2D::Image2D(ImageSpecification& specs)
-		: m_Specs(specs), m_Width(specs.Width), m_Height(specs.Height) {
+	Image2D::Image2D(ImageCreateInfo& createInfo)
+		: m_CreateInfo(createInfo), m_Width(createInfo.Width), m_Height(createInfo.Height) {
 	}
 
-	Image2D::Image2D(const std::string& path, ImageSpecification& specs)
-		: m_Path(path), m_Specs(specs) {
+	Image2D::Image2D(const std::string& path, ImageCreateInfo& createInfo)
+		: m_Path(path), m_CreateInfo(createInfo) {
 	}
 }

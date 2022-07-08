@@ -16,9 +16,16 @@
 
 	//for potential platform diversion (in android for example its some asm instruction)
 	#define LUCY_DEBUG_BREAK __debugbreak();
+
 	#define LUCY_ASSERT(arg) if(!arg) { \
 										LUCY_CRITICAL("Assert failed!"); \
 										LUCY_DEBUG_BREAK }
+
+	#define LUCY_ASSERT_TEXT(arg, text) if(!arg) { \
+										LUCY_CRITICAL(text); \
+										LUCY_CRITICAL("Assert failed!"); \
+										LUCY_DEBUG_BREAK }
+
 	#define LUCY_VK_ASSERT(arg) if(arg != VK_SUCCESS) { \
 										LUCY_CRITICAL("Assert failed!"); \
 										LUCY_DEBUG_BREAK }

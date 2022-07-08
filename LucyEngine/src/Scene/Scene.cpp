@@ -1,12 +1,10 @@
 #include "lypch.h"
 
+#include "Entity.h"
 #include "Scene.h"
 #include "Components.h"
 
 #include "Renderer/Renderer.h"
-#include "Renderer/Context/Pipeline.h"
-
-#include "Entity.h"
 
 namespace Lucy {
 
@@ -53,19 +51,33 @@ namespace Lucy {
 	}
 	
 	void Scene::Update() {
-		auto& [sizeX, sizeY] = Renderer::GetViewportSize();
+		const auto& [sizeX, sizeY] = Renderer::GetViewportSize();
 
 		EditorCamera& camera = GetEditorCamera();
 		camera.SetViewportSize(sizeX, sizeY);
 		camera.Update();
 
+		//High priority stuff must be called earlier than mid or low, since those meshes get render first.
+		//I won't be sorting the draw commands accordingly, the sort must happen here (for performance reason)
+
 		const auto& meshView = View<MeshComponent>();
 		for (auto entity : meshView) {
 			Entity e{ this, entity };
-			MeshComponent& meshComponent = e.GetComponent<MeshComponent>();
+			MeshComponent meshComponent = e.GetComponent<MeshComponent>();
 			if (!meshComponent.IsValid()) continue;
 
-			Renderer::EnqueueStaticMesh(meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
+			Renderer::EnqueueStaticMesh(Priority::LOW, meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
+		}
+	}
+
+	void Scene::Destroy() {
+		const auto& meshView = View<MeshComponent>();
+		for (auto entity : meshView) {
+			Entity e{ this, entity };
+			MeshComponent meshComponent = e.GetComponent<MeshComponent>();
+			if (!meshComponent.IsValid()) continue;
+
+			meshComponent.GetMesh()->Destroy();
 		}
 	}
 }

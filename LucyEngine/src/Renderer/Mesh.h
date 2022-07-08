@@ -7,8 +7,7 @@
 #include "assimp/scene.h"
 #include "assimp/postprocess.h"
 
-#include "OpenGLMaterial.h"
-#include "VulkanMaterial.h"
+#include "Material/Material.h"
 
 #include "glm/glm.hpp"
 
@@ -32,6 +31,11 @@ namespace Lucy {
 		uint32_t BaseIndexCount = 0;
 	};
 
+	struct MetadataInfo {
+		uint32_t TotalIndicesSize = 0;
+		uint32_t TotalVerticesSize = 0;
+	};
+
 	static int MESH_ID_COUNT_X = 0;
 	static int MESH_ID_COUNT_Y = 0;
 	static int MESH_ID_COUNT_Z = 0;
@@ -39,7 +43,7 @@ namespace Lucy {
 	class Mesh {
 	public:
 		Mesh(const std::string& path);
-		virtual ~Mesh();
+		~Mesh() = default;
 
 		static Ref<Mesh> Create(const std::string& path);
 
@@ -52,13 +56,12 @@ namespace Lucy {
 		inline Ref<VertexBuffer> GetVertexBuffer() { return m_VertexBuffer; }
 		inline Ref<IndexBuffer> GetIndexBuffer() { return m_IndexBuffer; }
 
-		virtual void Bind() = 0;
-		virtual void Unbind() = 0;
-	protected:
-		virtual void LoadBuffers() = 0;
-		void LoadData(const aiScene* scene, uint32_t& totalSize);
+		inline MetadataInfo GetMetadataInfo() { return m_MetadataInfo; }
+
+		void LoadData(const aiScene* scene);
 		void LoadMaterials(const aiScene* scene, const aiMesh* mesh);
 		void TraverseHierarchy(const aiNode* node, const aiNode* rootNode);
+		void Destroy();
 
 		Ref<VertexBuffer> m_VertexBuffer;
 		Ref<IndexBuffer> m_IndexBuffer;
@@ -69,8 +72,7 @@ namespace Lucy {
 		std::string m_Name;
 
 		glm::vec3 m_PixelValue;
-
-		bool m_Loaded = false;
+		MetadataInfo m_MetadataInfo;
 	private:
 		friend static void IncreaseMeshCount(Mesh* m);
 	};

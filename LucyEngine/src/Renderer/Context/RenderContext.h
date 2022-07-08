@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../Core/Base.h"
+#include "Core/Base.h"
 
 namespace Lucy {
 
@@ -18,9 +18,9 @@ namespace Lucy {
 
 		static Ref<RenderContext> Create(RenderArchitecture arch);
 	protected:
-		RenderContext() = default;
-
 		virtual void Init() = 0;
+
+		RenderContext() = default;
 	};
 }
 

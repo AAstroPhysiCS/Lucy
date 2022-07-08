@@ -1,9 +1,9 @@
 //type vertex
-#version 460 core
+#version 450
 
 layout (location = 0) in vec3 a_Pos;
-layout (location = 1) in vec3 a_ID;
-layout (location = 2) in vec2 a_TextureCoords;
+layout (location = 1) in vec2 a_TextureCoords;
+layout (location = 2) in vec3 a_ID;
 layout (location = 3) in vec3 a_Normals;
 layout (location = 4) in vec3 a_Tangents;
 layout (location = 5) in vec3 a_BiTangents;
@@ -17,7 +17,21 @@ layout(location = 0) out LucyRendererOutput r_Output;
 layout(set = 0, binding = 0) uniform Camera {
 	mat4 u_ViewMatrix;
 	mat4 u_ProjMatrix;
+};
+
+//for fragment shader
+struct TextureIndices {
+	int AlbedoTextureIndex;
+	int NormalTextureIndex;
+	int RoughnessTextureIndex;
+	int MetallicTextureIndex;
+	int AOTextureIndex;
+};
+
+//Max Size: 128 bytes
+layout(push_constant) uniform LocalPushConstant {
 	mat4 u_ModelMatrix;
+	TextureIndices u_TextureIndices; //for fragment shader
 };
 
 void main() {
@@ -27,7 +41,9 @@ void main() {
 }
 
 //type fragment
-#version 460 core
+#version 450
+
+#extension GL_EXT_nonuniform_qualifier : require
 
 #define NULL_TEXTURE_SLOT -1
 
@@ -39,19 +55,17 @@ struct LucyRendererOutput {
 
 layout(location = 0) in LucyRendererOutput r_Output;
 
-layout(set = 0, binding = 1) uniform TextureSlots {
-	int u_AlbedoTextureSlot;
-	int u_NormalTextureSlot;
-	int u_RoughnessTextureSlot;
-	int u_MetallicTextureSlot;
-	int u_AOTextureSlot;
+//Max Size: 128 bytes
+layout(push_constant) uniform LocalPushConstant {
+	mat4 u_ModelMatrix; //unused in fragment shader
+	int u_MaterialIndex;
 };
 
-layout (binding = 0) uniform sampler2D u_Textures[32];
+layout (set = 1, binding = 0) uniform sampler2D u_Textures[];
 
 void main() {
-	if (u_AlbedoTextureSlot != NULL_TEXTURE_SLOT)
-		a_Color = texture(u_Textures[u_AlbedoTextureSlot], r_Output.TextCoords);
-	else
-		a_Color = vec4(1.0f, 0.0f, 0.0f, 1.0f);
+	//if (u_TextureIndices.AlbedoTextureIndex != NULL_TEXTURE_SLOT)
+		a_Color = texture(u_Textures[u_MaterialIndex], r_Output.TextCoords);
+	//else
+	//a_Color = vec4(u_MaterialIndex, 0.0f, 0.0f, 1.0f);
 }

@@ -21,6 +21,7 @@ namespace Lucy {
 		inline EditorCamera& GetEditorCamera() { return m_Camera; }
 
 		void Update();
+		void Destroy();
 
 		template <typename ... T>
 		inline auto View() { return m_Registry.view<T...>(); }

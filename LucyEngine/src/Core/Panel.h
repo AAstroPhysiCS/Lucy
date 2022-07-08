@@ -1,7 +1,11 @@
 #pragma once
 
 #include "Events/Event.h"
-#include "Events/EventDispatcher.h"
+#include "Events/EventDispatcher.h" //for child classes
+#include "Events/KeyCodes.h" //for child classes
+#include "Events/InputEvent.h" //for child classes
+#include "Events/WindowEvent.h" //for child classes
+#include "Events/MouseCode.h" //for child classes
 
 namespace Lucy {
 
@@ -11,6 +15,7 @@ namespace Lucy {
 		virtual ~Panel() = default;
 
 		virtual void OnEvent(Event& e) {}
+		virtual void OnDestroy() {}
 		virtual void Render() = 0;
 	};
 }

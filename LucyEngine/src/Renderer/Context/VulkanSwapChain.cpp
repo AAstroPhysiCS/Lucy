@@ -1,7 +1,6 @@
 #include "lypch.h"
-#include "VulkanSwapChain.h"
 
-#include "vulkan/vulkan.h"
+#include "VulkanSwapChain.h"
 #include "VulkanDevice.h"
 
 #include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
@@ -74,23 +73,23 @@ namespace Lucy {
 
 		if (oldSwapChain) { //if resized
 			for (uint32_t i = 0; i < swapChainImageCount; i++) {
-				ImageViewSpecification specs;
-				specs.Image = m_SwapChainImages[i];
-				specs.Format = m_SelectedFormat.format;
-				specs.ViewType = VK_IMAGE_VIEW_TYPE_2D;
+				ImageViewCreateInfo imageViewCreateInfo;
+				imageViewCreateInfo.Image = m_SwapChainImages[i];
+				imageViewCreateInfo.Format = m_SelectedFormat.format;
+				imageViewCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_2D;
 
-				m_SwapChainImageViews[i].Recreate(specs);
+				m_SwapChainImageViews[i].Recreate(imageViewCreateInfo);
 			}
 		} else { //initial startup
 			m_SwapChainImageViews.reserve(swapChainImageCount);
 
 			for (uint32_t i = 0; i < swapChainImageCount; i++) {
-				ImageViewSpecification specs;
-				specs.Image = m_SwapChainImages[i];
-				specs.Format = m_SelectedFormat.format;
-				specs.ViewType = VK_IMAGE_VIEW_TYPE_2D;
+				ImageViewCreateInfo imageViewCreateInfo;
+				imageViewCreateInfo.Image = m_SwapChainImages[i];
+				imageViewCreateInfo.Format = m_SelectedFormat.format;
+				imageViewCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_2D;
 
-				m_SwapChainImageViews.emplace_back(specs);
+				m_SwapChainImageViews.emplace_back(imageViewCreateInfo);
 			}
 		}
 
@@ -129,6 +128,30 @@ namespace Lucy {
 	VkResult VulkanSwapChain::AcquireNextImage(VkSemaphore currentFrameImageAvailSemaphore, uint32_t& imageIndex) {
 		VkDevice deviceVulkanHandle = VulkanDevice::Get().GetLogicalDevice();
 		return vkAcquireNextImageKHR(deviceVulkanHandle, m_SwapChain, UINT64_MAX, currentFrameImageAvailSemaphore, VK_NULL_HANDLE, &imageIndex);
+	}
+
+	void VulkanSwapChain::SubmitToQueue(VkCommandBuffer commandBuffer) {
+		const VulkanDevice& device = VulkanDevice::Get();
+
+		VkFence currentFrameFence = m_InFlightFences[m_CurrentFrameIndex].GetFence();
+		VkSemaphore currentFrameWaitSemaphore = m_WaitSemaphores[m_CurrentFrameIndex].GetSemaphore(); // image is available, image is renderable
+		VkSemaphore currentFrameSignalSemaphore = m_SignalSemaphores[m_CurrentFrameIndex].GetSemaphore(); // rendering finished, signal it
+
+		VkSubmitInfo submitInfo{};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+		VkPipelineStageFlags imageWaitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+		submitInfo.waitSemaphoreCount = 1;
+		submitInfo.pWaitSemaphores = &currentFrameWaitSemaphore;
+		submitInfo.pWaitDstStageMask = imageWaitStages;
+
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &commandBuffer;
+		submitInfo.signalSemaphoreCount = 1;
+		submitInfo.pSignalSemaphores = &currentFrameSignalSemaphore;
+
+		LUCY_VK_ASSERT(vkQueueSubmit(device.GetGraphicsQueue(), 1, &submitInfo, currentFrameFence));
+		//vkWaitForFences(device.GetLogicalDevice(), 1, &currentFrameFence, VK_TRUE, UINT64_MAX);
 	}
 
 	VkResult VulkanSwapChain::Present() {
@@ -175,7 +198,7 @@ namespace Lucy {
 
 	VkSurfaceFormatKHR VulkanSwapChain::ChooseSwapSurfaceFormat(const SwapChainCapabilities& capabilities) {
 		for (const auto& availableFormat : capabilities.formats) {
-			if (availableFormat.format == VK_FORMAT_B8G8R8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+			if (availableFormat.format == VK_FORMAT_R8G8B8A8_UNORM && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
 				return availableFormat;
 			}
 		}
@@ -220,29 +243,5 @@ namespace Lucy {
 			m_SignalSemaphores[i].Destroy();
 			m_InFlightFences[i].Destroy();
 		}
-	}
-
-	void VulkanSwapChain::SubmitToQueue(VkCommandBuffer commandBuffer) {
-		VulkanDevice& device = VulkanDevice::Get();
-
-		VkFence currentFrameFence = m_InFlightFences[m_CurrentFrameIndex].GetFence();
-		VkSemaphore currentFrameWaitSemaphore = m_WaitSemaphores[m_CurrentFrameIndex].GetSemaphore(); // image is available, image is renderable
-		VkSemaphore currentFrameSignalSemaphore = m_SignalSemaphores[m_CurrentFrameIndex].GetSemaphore(); // rendering finished, signal it
-
-		VkSubmitInfo submitInfo{};
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-		VkPipelineStageFlags imageWaitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-		submitInfo.waitSemaphoreCount = 1;
-		submitInfo.pWaitSemaphores = &currentFrameWaitSemaphore;
-		submitInfo.pWaitDstStageMask = imageWaitStages;
-
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &commandBuffer;
-		submitInfo.signalSemaphoreCount = 1;
-		submitInfo.pSignalSemaphores = &currentFrameSignalSemaphore;
-
-		LUCY_VK_ASSERT(vkQueueSubmit(device.GetGraphicsQueue(), 1, &submitInfo, currentFrameFence));
-		vkWaitForFences(device.GetLogicalDevice(), 1, &currentFrameFence, VK_TRUE, UINT64_MAX);
 	}
 }

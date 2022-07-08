@@ -8,7 +8,6 @@ namespace Lucy {
 	class VulkanIndexBuffer : public IndexBuffer {
 	public:
 		VulkanIndexBuffer(uint32_t size);
-		VulkanIndexBuffer() = default;
 		virtual ~VulkanIndexBuffer() = default;
 		
 		void Bind(const IndexBindInfo& info) override;

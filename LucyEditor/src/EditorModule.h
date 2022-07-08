@@ -7,9 +7,6 @@
 
 #include "Renderer/ViewportRenderer.h"
 
-#include "Events/EventDispatcher.h"
-#include "Events/InputEvent.h"
-
 #include "ImGuiOverlay.h"
 
 namespace Lucy {

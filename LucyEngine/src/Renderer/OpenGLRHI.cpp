@@ -4,13 +4,10 @@
 #include "Memory/Buffer/FrameBuffer.h"
 #include "Memory/Buffer/RenderBuffer.h"
 #include "Memory/Buffer/UniformBuffer.h"
-#include "Mesh.h"
 #include "Renderer.h"
 
 #include "OpenGLRenderPass.h"
 #include "Memory/Buffer/OpenGL/OpenGLUniformBuffer.h"
-
-#include "glad/glad.h"
 
 #include "Utils.h"
 
@@ -21,26 +18,26 @@ namespace Lucy {
 		m_RenderContext = RenderContext::Create(m_Architecture);
 		m_RenderContext->PrintInfo();
 
-		auto& pbrShader = Renderer::GetShaderLibrary().GetShader("LucyPBR");
-		auto& idShader = Renderer::GetShaderLibrary().GetShader("LucyID");
+		const auto& pbrShader = Renderer::GetShaderLibrary().GetShader("LucyPBR");
+		const auto& idShader = Renderer::GetShaderLibrary().GetShader("LucyID");
 
-		auto [width, height] = Utils::ReadViewportSizeFromIni("Viewport");
+		auto [width, height] = Utils::ReadAttributeFromIni("Viewport", "Size");
 		m_ViewportWidth = width;
 		m_ViewportHeight = height;
 
-		uint32_t TargetSamples = 4;
+		const uint32_t TargetSamples = 4;
 
 		/*
 		//------------ Main Framebuffer ------------
 		{
-			RenderBufferSpecification renderBufferSpecs;
+			RenderBufferCreateInfo renderBufferSpecs;
 			renderBufferSpecs.Attachment = GL_DEPTH_STENCIL_ATTACHMENT;
 			renderBufferSpecs.InternalFormat = GL_DEPTH24_STENCIL8;
 			renderBufferSpecs.Width = width;
 			renderBufferSpecs.Height = height;
 			renderBufferSpecs.Samples = TargetSamples;
 
-			ImageSpecification textureAntialiased;
+			ImageCreateInfo textureAntialiased;
 			textureAntialiased.Width = width;
 			textureAntialiased.Height = height;
 			textureAntialiased.Samples = TargetSamples;
@@ -48,7 +45,7 @@ namespace Lucy {
 			textureAntialiased.Format = { GL_RGBA8, GL_RGBA };
 			textureAntialiased.PixelType = PixelType::UnsignedByte;
 
-			ImageSpecification finalTextureSpec;
+			ImageCreateInfo finalTextureSpec;
 			finalTextureSpec.Width = width;
 			finalTextureSpec.Height = height;
 			finalTextureSpec.GenerateMipmap = true;
@@ -63,10 +60,10 @@ namespace Lucy {
 			geometryFrameBufferSpecs.ContentInfo.Width = width;
 			geometryFrameBufferSpecs.ContentInfo.Height = height;
 			geometryFrameBufferSpecs.RenderBuffer = RenderBuffer::Create(renderBufferSpecs);
-			geometryFrameBufferSpecs.ContentInfo.TextureSpecs.push_back(textureAntialiased);
-			geometryFrameBufferSpecs.BlittedTextureSpecs = finalTextureSpec;
+			geometryFrameBufferSpecs.ContentInfo.TextureCreateInfos.push_back(textureAntialiased);
+			geometryFrameBufferSpecs.BlittedTextureCreateInfo = finalTextureSpec;
 
-			PipelineSpecification geometryPipelineSpecs;
+			PipelineCreateInfo geometryPipelineSpecs;
 			std::vector<ShaderLayoutElement> vertexLayout = {
 					{ "a_Pos", ShaderDataSize::Float3 },
 					{ "a_ID", ShaderDataSize::Float3 },
@@ -89,7 +86,7 @@ namespace Lucy {
 			m_GeometryPipeline = As(Pipeline::Create(geometryPipelineSpecs), OpenGLPipeline);
 
 			//------------ Mouse Picking ------------
-			ImageSpecification idTextureRGBSpecs;
+			ImageCreateInfo idTextureRGBSpecs;
 			idTextureRGBSpecs.Width = width;
 			idTextureRGBSpecs.Height = height;
 			idTextureRGBSpecs.AttachmentIndex = 0;
@@ -98,7 +95,7 @@ namespace Lucy {
 			idTextureRGBSpecs.Format = { GL_RGB32F , GL_RGB };
 			idTextureRGBSpecs.PixelType = PixelType::Float;
 
-			ImageSpecification idTextureDepthSpecs;
+			ImageCreateInfo idTextureDepthSpecs;
 			idTextureDepthSpecs.Width = width;
 			idTextureDepthSpecs.Height = height;
 			idTextureDepthSpecs.AttachmentIndex = 1;
@@ -110,8 +107,8 @@ namespace Lucy {
 			OpenGLFrameBufferSpecification idFrameBufferSpecs;
 			idFrameBufferSpecs.ContentInfo.Width = width;
 			idFrameBufferSpecs.ContentInfo.Height = height;
-			idFrameBufferSpecs.ContentInfo.TextureSpecs.push_back(idTextureRGBSpecs);
-			idFrameBufferSpecs.ContentInfo.TextureSpecs.push_back(idTextureDepthSpecs);
+			idFrameBufferSpecs.ContentInfo.TextureCreateInfos.push_back(idTextureRGBSpecs);
+			idFrameBufferSpecs.ContentInfo.TextureCreateInfos.push_back(idTextureDepthSpecs);
 			idFrameBufferSpecs.IsStorage = true;
 
 			OpenGLRenderPassSpecification idRenderPassSpecs;
@@ -164,6 +161,7 @@ namespace Lucy {
 	}
 
 	void OpenGLRHI::GeometryPass() {
+		/*
 		m_GeometryPipeline->Bind({});
 		auto& uniformBuffers = m_GeometryPipeline->GetUniformBuffers<OpenGLUniformBuffer>(0);
 		for (MeshDrawCommand meshComponent : m_StaticMeshDrawCommandQueue) {
@@ -171,23 +169,24 @@ namespace Lucy {
 			const std::vector<Ref<Material>>& materials = mesh->GetMaterials();
 			std::vector<Submesh>& submeshes = mesh->GetSubmeshes();
 
-			mesh->Bind();
 			for (uint32_t i = 0; i < submeshes.size(); i++) {
 				Submesh& submesh = submeshes[i];
 				const Ref<Material> material = materials[submesh.MaterialIndex];
 				const Ref<Shader>& shader = material->GetShader();
+				//TODO: Mesh bind
 
 				material->Bind(m_GeometryPipeline);
 				uniformBuffers->SetData((void*)&(meshComponent.EntityTransform * submesh.Transform), sizeof(glm::mat4), sizeof(glm::mat4) * 2);
 				OpenGLAPICommands::DrawElementsBaseVertex(m_GeometryPipeline->GetTopology(), submesh.IndexCount, submesh.BaseIndexCount, submesh.BaseVertexCount);
 				material->Unbind(m_GeometryPipeline);
 			}
-			mesh->Unbind();
 		}
 		m_GeometryPipeline->Unbind();
+		*/
 	}
 
 	void OpenGLRHI::IDPass() {
+		/*
 		m_GeometryPipeline->Bind({});
 		Ref<Shader> idShader = m_GeometryPipeline->GetShader();
 		auto& uniformBuffers = m_GeometryPipeline->GetUniformBuffers<OpenGLUniformBuffer>(0);
@@ -197,16 +196,16 @@ namespace Lucy {
 			const Ref<Mesh>& mesh = meshComponent.Mesh;
 			std::vector<Submesh>& submeshes = mesh->GetSubmeshes();
 
-			mesh->Bind();
+			//TODO: Mesh bind
 			for (uint32_t i = 0; i < submeshes.size(); i++) {
 				Submesh& submesh = submeshes[i];
 				uniformBuffers->SetData((void*)&(meshComponent.EntityTransform * submesh.Transform), sizeof(glm::mat4), sizeof(glm::mat4) * 2);
 				OpenGLAPICommands::DrawElementsBaseVertex(m_IDPipeline->GetTopology(), submesh.IndexCount, submesh.BaseIndexCount, submesh.BaseVertexCount);
 			}
-			mesh->Unbind();
 		}
 		idShader->Unbind();
 		m_GeometryPipeline->Unbind();
+		*/
 	}
 
 	void OpenGLRHI::BeginScene(Scene& scene) {
@@ -214,7 +213,7 @@ namespace Lucy {
 		camera.SetViewportSize(m_ViewportWidth, m_ViewportHeight);
 		camera.Update();
 
-		auto& uniformBuffers = m_GeometryPipeline->GetUniformBuffers<OpenGLUniformBuffer>(0);
+		auto& uniformBuffers = m_GeometryPipeline->GetUniformBuffers<OpenGLUniformBuffer>("Camera");
 		uniformBuffers->SetData((void*)&camera.GetViewMatrix(), sizeof(glm::mat4), 0);
 		uniformBuffers->SetData((void*)&camera.GetProjectionMatrix(), sizeof(glm::mat4), sizeof(glm::mat4));
 
@@ -224,6 +223,7 @@ namespace Lucy {
 	void OpenGLRHI::RenderScene() {
 		GeometryPass();
 		IDPass();
+		//glfwSwapBuffers();
 	}
 
 	PresentResult OpenGLRHI::EndScene() {
@@ -239,26 +239,14 @@ namespace Lucy {
 		m_RenderFunctionQueue.push_back(func);
 	}
 
-	void OpenGLRHI::EnqueueStaticMesh(Ref<Mesh> mesh, const glm::mat4& entityTransform) {
+	void OpenGLRHI::EnqueueStaticMesh(Priority priority, Ref<Mesh> mesh, const glm::mat4& entityTransform) {
 		Enqueue([=]() {
-			m_StaticMeshDrawCommandQueue.push_back(MeshDrawCommand(mesh, entityTransform));
+			m_StaticMeshDrawCommands.push_back(Memory::CreateRef<MeshDrawCommand>(priority, mesh, entityTransform));
 		});
 	}
 
-	void OpenGLRHI::RecordToCommandQueue(RecordFunc<>&& func) {
+	void OpenGLRHI::RecordStaticMeshToCommandQueue(Ref<Pipeline> pipeline, RecordFunc<Ref<DrawCommand>>&& func) {
 
-	}
-
-	void OpenGLRHI::RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func) {
-
-	}
-
-	void OpenGLRHI::BindPipeline(Ref<Pipeline> pipeline) {
-		pipeline->Bind({});
-	}
-
-	void OpenGLRHI::UnbindPipeline(Ref<Pipeline> pipeline) {
-		pipeline->Unbind();
 	}
 
 	void OpenGLRHI::BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) {

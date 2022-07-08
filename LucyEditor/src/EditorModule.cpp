@@ -2,17 +2,18 @@
 
 #include "Renderer/Renderer.h"
 #include "Renderer/RenderPass.h"
+
 #include "Scene/Entity.h"
 #include "Scene/Components.h"
+
 #include "Renderer/Memory/Buffer/FrameBuffer.h"
 #include "Renderer/Memory/Buffer/OpenGL/OpenGLFrameBuffer.h"
 
+#include "Events/EventDispatcher.h"
 #include "Events/KeyCodes.h"
 #include "Events/MouseCode.h"
 #include "Events/WindowEvent.h"
 #include "Events/InputEvent.h"
-
-#include "glad/glad.h"
 
 namespace Lucy {
 
@@ -34,7 +35,6 @@ namespace Lucy {
 
 	void EditorModule::End() {
 		m_ViewportRenderer.End();
-		m_Window->SwapBuffers();
 	}
 
 	void EditorModule::OnEvent(Event& e) {
@@ -53,6 +53,7 @@ namespace Lucy {
 	}
 
 	void EditorModule::Destroy() {
+		m_Scene.Destroy();
 		m_ImGuiOverlay.Destroy();
 		m_ViewportRenderer.Destroy();
 	}

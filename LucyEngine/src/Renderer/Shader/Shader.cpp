@@ -1,4 +1,5 @@
 #include "lypch.h"
+
 #include "Shader.h"
 #include "OpenGLShader.h"
 #include "VulkanShader.h"
@@ -7,15 +8,9 @@
 #include "Utils.h"
 #include "Core/FileSystem.h"
 
-#include "shaderc/shaderc.hpp"
-
-#include "spirv_cross/spirv_cross.hpp"
-#include "spirv_cross/spirv_glsl.hpp"
-#include "spirv_cross/spirv_reflect.hpp"
-
 namespace Lucy {
 
-	Shader::Shader(const std::string& path, const std::string& name)
+	Shader::Shader(const std::string& name, const std::string& path)
 		: m_Path(path), m_Name(name) {
 		Renderer::Enqueue([=]() {
 			Load();
@@ -26,16 +21,17 @@ namespace Lucy {
 		auto currentRenderArchitecture = Renderer::GetCurrentRenderArchitecture();
 		Ref<Shader> instance = nullptr;
 		if (currentRenderArchitecture == RenderArchitecture::OpenGL) {
-			instance = Memory::CreateRef<OpenGLShader>(path, name);
+			instance = Memory::CreateRef<OpenGLShader>(name, path);
 		} else if (currentRenderArchitecture == RenderArchitecture::Vulkan) {
-			instance = Memory::CreateRef<VulkanShader>(path, name);
+			instance = Memory::CreateRef<VulkanShader>(name, path);
 		}
 		return instance;
 	}
 
 	Ref<Shader> ShaderLibrary::GetShader(const std::string& name) {
 		for (auto& shader : m_Shaders) {
-			if (shader->GetName() == name) return shader;
+			if (shader->GetName() == name)
+				return shader;
 		}
 
 		LUCY_CRITICAL("Shader not found!");
@@ -50,6 +46,7 @@ namespace Lucy {
 		shaderc::Compiler compiler;
 		shaderc::CompileOptions options;
 		options.SetOptimizationLevel(shaderc_optimization_level::shaderc_optimization_level_performance);
+		options.SetGenerateDebugInfo();
 
 		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::OpenGL) {
 			options.SetTargetEnvironment(shaderc_target_env_opengl, shaderc_env_version_opengl_4_5);
@@ -75,23 +72,25 @@ namespace Lucy {
 		std::string& fragment = LoadFragmentData(lines);
 
 		shaderc::SpvCompilationResult resultVertex = compiler.CompileGlslToSpv(vertex, shaderc_shader_kind::shaderc_glsl_vertex_shader, FileSystem::GetFileName(m_Path).c_str(), options);
-		if (resultVertex.GetCompilationStatus() != shaderc_compilation_status_success) {
-			LUCY_CRITICAL(resultVertex.GetErrorMessage());
+		uint32_t status = resultVertex.GetCompilationStatus();
+		if (status != shaderc_compilation_status_success) {
+			LUCY_CRITICAL(fmt::format("Vertex Shader; Status: {0}, Message: {1}", status, resultVertex.GetErrorMessage()));
 			LUCY_ASSERT(false);
 		}
 		std::vector<uint32_t> dataVert(resultVertex.cbegin(), resultVertex.cend());
 		FileSystem::WriteToFile<uint32_t>(cacheFileVert, dataVert, OpenMode::Binary);
 
 		shaderc::SpvCompilationResult resultFrag = compiler.CompileGlslToSpv(fragment, shaderc_shader_kind::shaderc_glsl_fragment_shader, FileSystem::GetFileName(m_Path).c_str(), options);
-		if (resultFrag.GetCompilationStatus() != shaderc_compilation_status_success) {
-			LUCY_CRITICAL(resultVertex.GetErrorMessage());
+		status = resultFrag.GetCompilationStatus();
+		if (status != shaderc_compilation_status_success) {
+			LUCY_CRITICAL(fmt::format("Fragment Shader; Status: {0}, Message: {1}", status, resultFrag.GetErrorMessage()));
 			LUCY_ASSERT(false);
 		}
 
 		std::vector<uint32_t> dataFrag(resultFrag.cbegin(), resultFrag.cend());
 		FileSystem::WriteToFile<uint32_t>(cacheFileFrag, dataFrag, OpenMode::Binary);
 
-		Info(dataVert, dataFrag);
+		m_Reflect.Info(m_Path, dataVert, dataFrag);
 		LoadInternal(dataVert, dataFrag);
 	}
 
@@ -102,100 +101,8 @@ namespace Lucy {
 		FileSystem::ReadFile<uint32_t>(cacheFileVert, dataVert, OpenMode::Binary);
 		FileSystem::ReadFile<uint32_t>(cacheFileFrag, dataFrag, OpenMode::Binary);
 
-		Info(dataVert, dataFrag);
+		m_Reflect.Info(m_Path, dataVert, dataFrag);
 		LoadInternal(dataVert, dataFrag);
-	}
-
-	void Shader::Info(std::vector<uint32_t>& dataVertex, std::vector<uint32_t>& dataFragment) {
-		//heap allocating it because of the compiler warning/stack size: "function uses X bytes of stack consider moving some data to heap"
-		spirv_cross::Compiler* compilerVertex = new spirv_cross::Compiler(dataVertex);
-		spirv_cross::Compiler* compilerFragment = new spirv_cross::Compiler(dataFragment);
-
-		spirv_cross::ShaderResources resourcesVertex = compilerVertex->get_shader_resources();
-		spirv_cross::ShaderResources resourcesFragment = compilerFragment->get_shader_resources();
-
-		auto reflect = [this](spirv_cross::Compiler* compiler, spirv_cross::ShaderResources resource, ShaderStageInfo& stageInfo, VkShaderStageFlags stageFlag) {
-			stageInfo.UniformCount = resource.uniform_buffers.size();
-			stageInfo.SampledImagesCount = resource.sampled_images.size();
-			stageInfo.PushConstantBufferCount = resource.push_constant_buffers.size();
-			stageInfo.StageInputCount = resource.stage_inputs.size();
-			stageInfo.StageOutputCount = resource.stage_outputs.size();
-
-			LUCY_INFO(fmt::format("------{0} Shader {1}------", stageFlag == VK_SHADER_STAGE_VERTEX_BIT ? "Vertex" : "Fragment", m_Path));
-			LUCY_INFO(fmt::format("{0} uniform buffers", stageInfo.UniformCount));
-			LUCY_INFO(fmt::format("{0} sampled images", stageInfo.SampledImagesCount));
-			LUCY_INFO(fmt::format("{0} push constant buffers", stageInfo.PushConstantBufferCount));
-			LUCY_INFO(fmt::format("{0} stage inputs", stageInfo.StageInputCount));
-			LUCY_INFO(fmt::format("{0} stage outputs", stageInfo.StageOutputCount));
-
-			for (const auto& ub : resource.uniform_buffers) {
-				const auto& bufferType = compiler->get_type(ub.base_type_id);
-				uint32_t set = compiler->get_decoration(ub.id, spv::DecorationDescriptorSet);
-				uint32_t bufferSize = compiler->get_declared_struct_size(bufferType);
-				uint32_t binding = compiler->get_decoration(ub.id, spv::DecorationBinding);
-				int32_t memberCount = bufferType.member_types.size();
-
-				LUCY_INFO(fmt::format("Name = '{0}'", ub.name));
-				LUCY_INFO(fmt::format("Set = {0}", set));
-				LUCY_INFO(fmt::format("Size = {0}", bufferSize));
-				LUCY_INFO(fmt::format("Binding = {0}", binding));
-				LUCY_INFO(fmt::format("Members = {0}", memberCount));
-
-				ShaderUniformBufferInfo info;
-				info.Set = set;
-				info.Binding = binding;
-				info.BufferSize = bufferSize;
-				info.MemberCount = memberCount;
-				info.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				info.Name = ub.name;
-				info.StageFlag = stageFlag;
-
-				if (!m_DescriptorSetMap.count(set)) {
-					std::vector<ShaderUniformBufferInfo> buffer;
-					buffer.push_back(info);
-					m_DescriptorSetMap.emplace(set, buffer);
-				} else {
-					const auto& it = m_DescriptorSetMap.find(set);
-					it->second.push_back(info);
-				}
-			}
-
-			for (const auto& ui : resource.sampled_images) {
-				const auto& bufferType = compiler->get_type(ui.base_type_id);
-				uint32_t set = compiler->get_decoration(ui.id, spv::DecorationDescriptorSet);
-				uint32_t binding = compiler->get_decoration(ui.id, spv::DecorationBinding);
-				int32_t memberCount = bufferType.member_types.size();
-
-				LUCY_INFO(fmt::format("Name = '{0}'", ui.name));
-				LUCY_INFO(fmt::format("Set = {0}", set));
-				LUCY_INFO(fmt::format("Binding = {0}", binding));
-				LUCY_INFO(fmt::format("Members = {0}", memberCount));
-
-				ShaderUniformBufferInfo info;
-				info.Set = set;
-				info.Binding = binding;
-				info.BufferSize = 0;
-				info.MemberCount = memberCount;
-				info.Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-				info.Name = ui.name;
-				info.StageFlag = stageFlag;
-
-				if (!m_DescriptorSetMap.count(set)) {
-					std::vector<ShaderUniformBufferInfo> buffer;
-					buffer.push_back(info);
-					m_DescriptorSetMap.emplace(set, buffer);
-				} else {
-					const auto& it = m_DescriptorSetMap.find(set);
-					it->second.push_back(info);
-				}
-			}
-		};
-
-		reflect(compilerVertex, resourcesVertex, m_ShaderInfoVertex, VK_SHADER_STAGE_VERTEX_BIT);
-		reflect(compilerFragment, resourcesFragment, m_ShaderInfoFragment, VK_SHADER_STAGE_FRAGMENT_BIT);
-
-		delete compilerVertex;
-		delete compilerFragment;
 	}
 
 	std::string Shader::LoadVertexData(std::vector<std::string>& lines) {

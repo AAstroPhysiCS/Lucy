@@ -1,4 +1,5 @@
 #include "lypch.h"
+
 #include "SynchItems.h"
 #include "Renderer/Context/VulkanDevice.h"
 
@@ -7,7 +8,7 @@ namespace Lucy {
 	Semaphore::Semaphore() {
 		VkSemaphoreCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-		auto& a = VulkanDevice::Get();
+
 		LUCY_VK_ASSERT(vkCreateSemaphore(VulkanDevice::Get().GetLogicalDevice(), &createInfo, nullptr, &m_Handle));
 	}
 
@@ -19,6 +20,7 @@ namespace Lucy {
 		VkFenceCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 		createInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
 		LUCY_VK_ASSERT(vkCreateFence(VulkanDevice::Get().GetLogicalDevice(), &createInfo, nullptr, &m_Handle));
 	}
 

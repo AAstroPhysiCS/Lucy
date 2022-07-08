@@ -4,9 +4,7 @@
 
 namespace Lucy {
 
-	class Renderer;
-
-	struct RenderBufferSpecification {
+	struct RenderBufferCreateInfo {
 		uint32_t Width = 0, Height = 0;
 		uint32_t InternalFormat = 0, Attachment = 0;
 		uint32_t Samples = 0;
@@ -14,11 +12,11 @@ namespace Lucy {
 
 	class RenderBuffer {
 	protected:
-		RenderBuffer(const RenderBufferSpecification& specs);
+		RenderBuffer(const RenderBufferCreateInfo& createInfo);
 	public:
 		virtual ~RenderBuffer() = default;
 
-		static Ref<RenderBuffer> Create(const RenderBufferSpecification& specs);
+		static Ref<RenderBuffer> Create(const RenderBufferCreateInfo& createInfo);
 
 		virtual void Bind() = 0;
 		virtual void Unbind() = 0;
@@ -26,10 +24,10 @@ namespace Lucy {
 		virtual void Destroy() = 0;
 
 		inline uint32_t GetID() const { return m_Id; }
-		inline uint32_t GetWidth() const { return m_Specs.Width; }
-		inline uint32_t GetHeight() const { return m_Specs.Height; }
+		inline uint32_t GetWidth() const { return m_CreateInfo.Width; }
+		inline uint32_t GetHeight() const { return m_CreateInfo.Height; }
 	protected:
-		RenderBufferSpecification m_Specs;
+		RenderBufferCreateInfo m_CreateInfo;
 		uint32_t m_Id = 0;
 	};
 }

@@ -6,17 +6,17 @@
 int main(int argc, char** argv) {
 	Lucy::Logger::Init();
 
-	Lucy::WindowSpecification windowSpecs;
-	windowSpecs.Width = 1366;
-	windowSpecs.Height = 766;
-	windowSpecs.Name = "LucyEditor";
-	windowSpecs.Resizable = true;
-	windowSpecs.VSync = false;
+	Lucy::WindowCreateInfo windowCreateInfo;
+	windowCreateInfo.Width = 1366;
+	windowCreateInfo.Height = 766;
+	windowCreateInfo.Name = "LucyEditor";
+	windowCreateInfo.Resizable = true;
+	windowCreateInfo.VSync = false;
 
-	Lucy::ApplicationSpecification applicationSpecs;
-	applicationSpecs.WindowSpecification = windowSpecs;
+	Lucy::ApplicationCreateInfo applicationCreateInfo;
+	applicationCreateInfo.WindowCreateInfo = windowCreateInfo;
 
-	Lucy::Application* lucyApplication = Lucy::CreateEditorApplication({ argc, argv }, applicationSpecs);
+	Lucy::Application* lucyApplication = Lucy::CreateEditorApplication({ argc, argv }, applicationCreateInfo);
 	lucyApplication->Run();
 	delete lucyApplication;
 	

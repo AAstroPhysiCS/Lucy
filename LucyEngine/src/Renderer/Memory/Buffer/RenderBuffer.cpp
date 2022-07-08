@@ -6,14 +6,14 @@
 
 namespace Lucy {
 
-	RenderBuffer::RenderBuffer(const RenderBufferSpecification& specs) :
-		m_Specs(specs) {
+	RenderBuffer::RenderBuffer(const RenderBufferCreateInfo& createInfo) :
+		m_CreateInfo(createInfo) {
 	}
 
-	Ref<RenderBuffer> RenderBuffer::Create(const RenderBufferSpecification& specs) {
+	Ref<RenderBuffer> RenderBuffer::Create(const RenderBufferCreateInfo& createInfo) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
 			case RenderArchitecture::OpenGL:
-				return Memory::CreateRef<OpenGLRenderBuffer>(specs);
+				return Memory::CreateRef<OpenGLRenderBuffer>(createInfo);
 				break;
 		}
 		return nullptr;

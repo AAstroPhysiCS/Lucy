@@ -61,7 +61,6 @@ namespace Lucy {
 			s_Logger->set_level((spdlog::level::level_enum)LoggerInfo::LUCY_WARN);
 			s_Logger->warn(log);
 		}
-
 	private:
 		Logger() = delete;
 		~Logger() = delete;

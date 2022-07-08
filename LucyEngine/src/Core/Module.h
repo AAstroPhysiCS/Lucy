@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../Events/Event.h"
-#include "Core/Metrics.h"
+
 #include "Window.h"
 
 namespace Lucy {
@@ -18,6 +18,6 @@ namespace Lucy {
 	protected:
 		Module(Ref<Window> window);
 		
-		Ref<Window> m_Window;
+		Ref<Window> m_Window = nullptr;
 	};
 }

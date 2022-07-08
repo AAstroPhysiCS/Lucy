@@ -1,39 +1,37 @@
 #include "lypch.h"
 
 #include "Renderer.h"
-#include "Context/RHI.h"
 
-#include "Memory/Buffer/UniformBuffer.h"
-
-#include "Shader/Shader.h"
 #include "Scene/Scene.h"
 #include "Scene/Entity.h"
 
-#include "ViewportRenderer.h"
-#include "Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 #include "Renderer/VulkanRHI.h"
+#include "Memory/Buffer/PushConstant.h"
+#include "Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
+#include "Memory/Buffer/Vulkan/VulkanUniformBuffer.h"
+#include "Context/VulkanPipeline.h"
+#include "Context/VulkanSwapChain.h"
+#include "Context/VulkanDevice.h"
 
-#include "Context/OpenGLPipeline.h"
+//#include "Context/OpenGLPipeline.h"
 
 namespace Lucy {
 
 	Ref<RHI> Renderer::s_RHI;
-	Ref<Pipeline> Renderer::s_ActivePipeline;
 
-	RendererSpecification Renderer::s_Specs;
+	RendererCreateInfo Renderer::s_CreateInfo;
 	ShaderLibrary Renderer::s_ShaderLibrary;
 
 	std::function<void(VkCommandBuffer commandBuffer)> Renderer::s_UIDrawDataFunc;
 
-	void Renderer::Init(const RendererSpecification& specs) {
-		s_Specs = specs;
-		s_RHI = RHI::Create(s_Specs.Architecture);
+	void Renderer::Init(const RendererCreateInfo& rendererCreateInfo) {
+		s_CreateInfo = rendererCreateInfo;
+		s_RHI = RHI::Create(s_CreateInfo.Architecture);
 		s_RHI->Init();
 
 		auto& shaderLibrary = GetShaderLibrary();
 		shaderLibrary.PushShader(Shader::Create("LucyPBR", "assets/shaders/LucyPBR.glsl"));
 		shaderLibrary.PushShader(Shader::Create("LucyID", "assets/shaders/LucyID.glsl"));
-		shaderLibrary.PushShader(Shader::Create("LucyVulkanTest", "assets/shaders/LucyVulkanTest.glsl"));
 	}
 
 	void Renderer::Enqueue(const SubmitFunc&& func) {
@@ -45,40 +43,17 @@ namespace Lucy {
 	}
 
 	void Renderer::UIPass(const ImGuiPipeline& imguiPipeline) {
-		if (s_Specs.Architecture != RenderArchitecture::Vulkan)
+		if (s_CreateInfo.Architecture != RenderArchitecture::Vulkan)
 			return;
-
-		//a hack (TODO: Change this)
-		Renderer::RecordToCommandQueue([=]() {
-			VkCommandBuffer commandBuffer = s_RHI->s_CommandQueue.GetCurrentCommandBuffer();
-			VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-
-			auto& renderPass = imguiPipeline.UIRenderPass.As<VulkanRenderPass>();
-			auto& frameBufferHandle = imguiPipeline.UIFramebuffer.As<VulkanFrameBuffer>();
-			const auto& targetFrameBuffer = frameBufferHandle->GetVulkanHandles()[swapChain.GetCurrentImageIndex()];
-
-			RenderPassBeginInfo beginInfo;
-			beginInfo.Width = frameBufferHandle->GetWidth();
-			beginInfo.Height = frameBufferHandle->GetHeight();
-			beginInfo.CommandBuffer = commandBuffer;
-			beginInfo.VulkanFrameBuffer = targetFrameBuffer;
-			
-			renderPass->Begin(beginInfo);
-			Renderer::s_UIDrawDataFunc(commandBuffer);
-			renderPass->End();
-		});
+		s_RHI.As<VulkanRHI>()->UIPass(imguiPipeline, std::move(Renderer::s_UIDrawDataFunc));
 	}
 
-	void Renderer::EnqueueStaticMesh(Ref<Mesh> mesh, const glm::mat4& entityTransform) {
-		s_RHI->EnqueueStaticMesh(mesh, entityTransform);
+	void Renderer::EnqueueStaticMesh(Priority priority, Ref<Mesh> mesh, const glm::mat4& entityTransform) {
+		s_RHI->EnqueueStaticMesh(priority, mesh, entityTransform);
 	}
 
-	void Renderer::RecordToCommandQueue(RecordFunc<>&& func) {
-		s_RHI->RecordToCommandQueue(std::move(func));
-	}
-
-	void Renderer::RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func) {
-		s_RHI->RecordToCommandQueue(std::move(func));
+	void Renderer::RecordStaticMeshToCommandQueue(Ref<Pipeline> pipeline, RecordFunc<Ref<DrawCommand>>&& func) {
+		s_RHI->RecordStaticMeshToCommandQueue(pipeline, std::move(func));
 	}
 
 	void Renderer::OnWindowResize() {
@@ -122,28 +97,80 @@ namespace Lucy {
 		return s_RHI->EndScene();
 	}
 
+	void Renderer::WaitForDevice() {
+		//since it does not make any sense, for opengl to wait on "any device"
+		if (s_CreateInfo.Architecture != RenderArchitecture::Vulkan)
+			return;
+		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+		LUCY_VK_ASSERT(vkDeviceWaitIdle(device));
+	}
+
 	void Renderer::Destroy() {
 		const ShaderLibrary& shaderLibrary = GetShaderLibrary();
-		for (const Ref<Shader> shader : shaderLibrary.m_Shaders)
+		for (const Ref<Shader>& shader : shaderLibrary.m_Shaders)
 			shader->Destroy();
 		s_RHI->Destroy();
 	}
 
 	void Renderer::BindPipeline(Ref<Pipeline> pipeline) {
-		s_ActivePipeline = pipeline;
-		s_RHI->BindPipeline(pipeline);
+		PipelineBindInfo info;
+		info.PipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		info.CommandBuffer = s_RHI->s_CommandQueue.GetCurrentCommandBuffer();
+
+		pipeline->Bind(info);
 	}
 
-	void Renderer::UnbindPipeline() {
-		s_RHI->UnbindPipeline(s_ActivePipeline);
+	void Renderer::BindDescriptorSet(Ref<Pipeline> pipeline, Ref<VulkanDescriptorSet> descriptorSet) {
+		if (s_CreateInfo.Architecture == RenderArchitecture::Vulkan) {
+			VulkanDescriptorSetBindInfo bindInfo;
+			bindInfo.CommandBuffer = s_RHI->s_CommandQueue.GetCurrentCommandBuffer();
+			bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+			bindInfo.PipelineLayout = pipeline.As<VulkanPipeline>()->GetPipelineLayout();
+
+			descriptorSet->Bind(bindInfo);
+			return;
+		}
+		//TODO: OpenGL
+	}
+
+	Ref<VulkanDescriptorSet> Renderer::GetDescriptorSet(Ref<Pipeline> pipeline, GlobalDescriptorSets descriptorSet) {
+		if (s_CreateInfo.Architecture == RenderArchitecture::Vulkan) {
+			Ref<VulkanPipeline> vulkanPipeline = pipeline.As<VulkanPipeline>();
+			return vulkanPipeline->GetIndividualSetsToBind((uint32_t) descriptorSet);
+		}
+		//TODO: OpenGL
+		return nullptr;
+	}
+
+	void Renderer::BeginRenderPass(Ref<Pipeline> pipeline, VkCommandBuffer commandBuffer) {
+		Ref<RenderPass> renderPass = pipeline->GetRenderPass();
+		Ref<FrameBuffer> frameBuffer = pipeline->GetFrameBuffer();
+
+		RenderPassBeginInfo renderPassBeginInfo;
+		renderPassBeginInfo.CommandBuffer = commandBuffer;
+		renderPassBeginInfo.Width = frameBuffer->GetWidth();
+		renderPassBeginInfo.Height = frameBuffer->GetHeight();
+
+		if (s_CreateInfo.Architecture == RenderArchitecture::Vulkan) {
+			VulkanSwapChain& swapChain = VulkanSwapChain::Get();
+			renderPassBeginInfo.VulkanFrameBuffer = frameBuffer.As<VulkanFrameBuffer>()->GetVulkanHandles()[swapChain.GetCurrentFrameIndex()];
+		}
+		//TODO: OpenGL variant
+
+		renderPass->Begin(renderPassBeginInfo);
+	}
+
+	void Renderer::EndRenderPass(Ref<Pipeline> pipeline) {
+		Ref<RenderPass> renderPass = pipeline->GetRenderPass();
+		renderPass->End();
 	}
 
 	void Renderer::BindBuffers(Ref<Mesh> mesh) {
-		auto& vertexBuffer = mesh->GetVertexBuffer();
-		auto& indexBuffer = mesh->GetIndexBuffer();
-		if (s_Specs.Architecture == RenderArchitecture::OpenGL)
-			s_ActivePipeline.As<OpenGLPipeline>()->UploadVertexLayout(vertexBuffer);
-		BindBuffers(vertexBuffer, mesh->GetIndexBuffer());
+		const auto& vertexBuffer = mesh->GetVertexBuffer();
+		const auto& indexBuffer = mesh->GetIndexBuffer();
+		//if (s_CreateInfo.Architecture == RenderArchitecture::OpenGL)
+			//s_ActivePipeline.As<OpenGLPipeline>()->UploadVertexLayout(vertexBuffer);
+		BindBuffers(vertexBuffer, indexBuffer);
 	}
 
 	void Renderer::BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) {
@@ -156,5 +183,24 @@ namespace Lucy {
 			VkCommandBuffer commandBuffer = s_RHI->s_CommandQueue.GetCurrentCommandBuffer();
 			vkCmdDrawIndexed(commandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 		}
+	}
+
+	void Renderer::BindPushConstant(Ref<Pipeline> pipeline, const PushConstant& pushConstant) {
+		PushConstantBindInfo bindInfo;
+		bindInfo.CommandBuffer = s_RHI->s_CommandQueue.GetCurrentCommandBuffer();
+		bindInfo.PipelineLayout = pipeline.As<VulkanPipeline>()->GetPipelineLayout();
+		pushConstant.Bind(bindInfo);
+	}
+	
+	void Renderer::UpdateResources(const std::vector<Ref<DrawCommand>>& drawCommands, Ref<Pipeline> pipeline) {
+		auto& uniformImageBuffer = pipeline->GetUniformBuffers<VulkanUniformImageBuffer>("u_Textures");
+		for (Ref<MeshDrawCommand> cmd : drawCommands) {
+			for (Ref<Material> material : cmd->Mesh->GetMaterials()) {
+				if (material->GetTextureCount() == 0) 
+					continue;
+				uniformImageBuffer->BindImage(material->GetTexture(Material::ALBEDO_TYPE));
+			}
+		}
+		uniformImageBuffer->Update();
 	}
 }

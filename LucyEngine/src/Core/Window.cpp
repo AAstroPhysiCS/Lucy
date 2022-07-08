@@ -10,10 +10,10 @@ namespace Lucy {
 
 	std::function<void(Event*)> Window::s_EventFunc;
 
-	Ref<Window> Window::Create(const WindowSpecification& specs) {
+	Ref<Window> Window::Create(const WindowCreateInfo& createInfo) {
 #ifdef  LUCY_WINDOWS
 		Ref<Window> window = Memory::CreateRef<WinWindow>();
-		window->m_Specs = specs;
+		window->m_CreateInfo = createInfo;
 		return window;
 #else
 		LUCY_CRITICAL("Operating system not being supported!");
@@ -21,11 +21,11 @@ namespace Lucy {
 #endif
 	}
 
-	void Window::SwapBuffers() {
-		glfwSwapBuffers(m_Window);
-	}
-
 	void WinWindow::Init(RenderArchitecture architecture) {
+		if (m_CreateInfo.Width == 0 || m_CreateInfo.Height == 0) {
+			LUCY_CRITICAL("Window size is 0.");
+			LUCY_ASSERT(false);
+		}
 
 		if (!glfwInit()) {
 			LUCY_CRITICAL("GLFW init failed!");
@@ -40,16 +40,16 @@ namespace Lucy {
 			glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 			glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 		}
-		glfwWindowHint(GLFW_RESIZABLE, m_Specs.Resizable);
+		glfwWindowHint(GLFW_RESIZABLE, m_CreateInfo.Resizable);
 
-		switch (m_Specs.WindowMode) {
+		switch (m_CreateInfo.WindowMode) {
 			case WindowMode::FULLSCREEN: {
 				GLFWmonitor* mainMonitor = glfwGetPrimaryMonitor();
-				m_Window = glfwCreateWindow(m_Specs.Width, m_Specs.Height, m_Specs.Name.c_str(), mainMonitor, nullptr);
+				m_Window = glfwCreateWindow(m_CreateInfo.Width, m_CreateInfo.Height, m_CreateInfo.Name.c_str(), mainMonitor, nullptr);
 				break;
 			}
 			case WindowMode::WINDOWED: {
-				m_Window = glfwCreateWindow(m_Specs.Width, m_Specs.Height, m_Specs.Name.c_str(), nullptr, nullptr);
+				m_Window = glfwCreateWindow(m_CreateInfo.Width, m_CreateInfo.Height, m_CreateInfo.Name.c_str(), nullptr, nullptr);
 				break;
 			}
 			default:
@@ -60,7 +60,7 @@ namespace Lucy {
 
 		if (architecture == RenderArchitecture::OpenGL) {
 			glfwMakeContextCurrent(m_Window);
-			glfwSwapInterval(m_Specs.VSync);
+			glfwSwapInterval(m_CreateInfo.VSync);
 		}
 	}
 
@@ -81,10 +81,10 @@ namespace Lucy {
 	}
 
 	void WinWindow::WaitEventsIfMinimized() {
-		glfwGetWindowSize(m_Window, &m_Specs.Width, &m_Specs.Height);
+		glfwGetWindowSize(m_Window, &m_CreateInfo.Width, &m_CreateInfo.Height);
 
-		while (m_Specs.Width == 0 || m_Specs.Height == 0) {
-			glfwGetWindowSize(m_Window, &m_Specs.Width, &m_Specs.Height);
+		while (m_CreateInfo.Width == 0 || m_CreateInfo.Height == 0) {
+			glfwGetWindowSize(m_Window, &m_CreateInfo.Width, &m_CreateInfo.Height);
 			glfwWaitEvents();
 		}
 	}

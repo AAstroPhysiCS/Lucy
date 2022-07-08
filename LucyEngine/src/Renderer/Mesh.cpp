@@ -3,13 +3,6 @@
 
 #include "../Core/Timer.h"
 #include "Renderer.h"
-#include "Shader/Shader.h"
-
-#include "RenderPass.h"
-#include "Context/OpenGLPipeline.h"
-
-#include "VulkanMesh.h"
-#include "OpenGLMesh.h"
 
 namespace Lucy {
 
@@ -58,17 +51,28 @@ namespace Lucy {
 
 		m_Name = scene->mRootNode->mName.C_Str();
 
-		uint32_t totalVertexSize = 0;
-		LoadData(scene, totalVertexSize);
+		LoadData(scene);
 		TraverseHierarchy(scene->mRootNode, nullptr);
 
-		m_IndexBuffer = IndexBuffer::Create();
+		//Getting the size of the buffer
 		for (Submesh& submesh : m_Submeshes) {
-			m_IndexBuffer->Append(submesh.Faces);
+			m_MetadataInfo.TotalIndicesSize += submesh.IndexCount;
+			m_MetadataInfo.TotalVerticesSize += submesh.VertexCount;
 		}
 
-		m_VertexBuffer = VertexBuffer::Create(totalVertexSize * 17);
+		m_IndexBuffer = IndexBuffer::Create(m_MetadataInfo.TotalIndicesSize);
+		m_VertexBuffer = VertexBuffer::Create(m_MetadataInfo.TotalVerticesSize * 17);
 		IncreaseMeshCount(this);
+
+		uint32_t from = 0;
+		for (uint32_t i = 0; i < m_Submeshes.size(); i++) {
+			Submesh& submesh = m_Submeshes[i];
+			auto& faces = submesh.Faces;
+			m_IndexBuffer->SetData(faces, from);
+			from += faces.size();
+		}
+
+		from = 0;
 
 		for (Submesh& submesh : m_Submeshes) {
 			auto& vertices = submesh.Vertices;
@@ -83,12 +87,12 @@ namespace Lucy {
 					vertices[i].y,
 					vertices[i].z,
 
+					textureCoords[i].x,
+					textureCoords[i].y,
+
 					(float)MESH_ID_COUNT_X,
 					(float)MESH_ID_COUNT_Y,
 					(float)MESH_ID_COUNT_Z,
-
-					textureCoords[i].x,
-					textureCoords[i].y,
 
 					normals[i].x,
 					normals[i].y,
@@ -102,29 +106,20 @@ namespace Lucy {
 					biTangents[i].y,
 					biTangents[i].z
 				};
-				m_VertexBuffer->SetData(vertex);
+				m_VertexBuffer->SetData(vertex, from);
+				from += vertex.size();
 			}
 		}
-	}
 
-	Mesh::~Mesh() {
-		m_VertexBuffer->DestroyHandle();
-		m_IndexBuffer->DestroyHandle();
+		m_VertexBuffer->LoadToGPU();
+		m_IndexBuffer->LoadToGPU();
 	}
 
 	Ref<Mesh> Mesh::Create(const std::string& path) {
-		switch (Renderer::GetCurrentRenderArchitecture()) {
-			case RenderArchitecture::OpenGL:
-				return Memory::CreateRef<OpenGLMesh>(path);
-				break;
-			case RenderArchitecture::Vulkan:
-				return Memory::CreateRef<VulkanMesh>(path);
-				break;
-		}
-		return nullptr;
+		return Memory::CreateRef<Mesh>(path);
 	}
 
-	void Mesh::LoadData(const aiScene* scene, uint32_t& totalVertexSize) {
+	void Mesh::LoadData(const aiScene* scene) {
 		aiMesh** meshes = scene->mMeshes;
 		uint32_t meshCount = scene->mNumMeshes;
 
@@ -146,8 +141,6 @@ namespace Lucy {
 			baseIndexCount += submesh.IndexCount;
 
 			LoadMaterials(scene, mesh);
-
-			totalVertexSize += submesh.VertexCount;
 
 			uint32_t sizeVertices = submesh.VertexCount;
 
@@ -216,5 +209,13 @@ namespace Lucy {
 			aiNode* childrenNode = node->mChildren[i];
 			TraverseHierarchy(childrenNode, node);
 		}
+	}
+
+	void Mesh::Destroy() {
+		for (Ref<Material> material : m_Materials)
+			material->Destroy();
+
+		m_VertexBuffer->DestroyHandle();
+		m_IndexBuffer->DestroyHandle();
 	}
 }

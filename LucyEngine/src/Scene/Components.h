@@ -4,8 +4,8 @@
 #include "glm/gtx/quaternion.hpp"
 
 #include "UUID.h"
-#include "../Renderer/Mesh.h"
-#include "../Renderer/Material.h"
+#include "Renderer/Mesh.h"
+#include "Renderer/Material/Material.h"
 
 namespace Lucy {
 
@@ -41,9 +41,11 @@ namespace Lucy {
 		}
 		MeshComponent(const MeshComponent& other) = default;
 
-		void SetMesh(Ref<Mesh>&& mesh) { m_Mesh = std::move(mesh); }
+		void SetMesh(Ref<Mesh>&& mesh) { 
+			m_Mesh = std::move(mesh);
+		}
 
-		inline Ref<Mesh>& GetMesh() { return m_Mesh; }
+		inline Ref<Mesh> GetMesh() { return m_Mesh; }
 		inline bool IsValid() { return m_Mesh.Get() != nullptr && m_Mesh->GetSubmeshes().size() != 0; }
 	private:
 		Ref<Mesh> m_Mesh = nullptr;

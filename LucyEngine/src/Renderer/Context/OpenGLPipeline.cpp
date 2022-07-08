@@ -1,7 +1,6 @@
 #include "lypch.h"
 
 #include "OpenGLPipeline.h"
-#include "../VulkanDescriptors.h"
 
 #include "Renderer/OpenGLRenderPass.h"
 #include "Renderer/Renderer.h"
@@ -10,10 +9,10 @@
 
 namespace Lucy {
 
-	OpenGLPipeline::OpenGLPipeline(const PipelineSpecification& specs)
-		: Pipeline(specs) {
+	OpenGLPipeline::OpenGLPipeline(const PipelineCreateInfo& createInfo)
+		: Pipeline(createInfo) {
 		Renderer::Enqueue([this] {
-			ParseUniformBuffers();
+			ParseBuffers();
 		});
 	}
 
@@ -68,27 +67,30 @@ namespace Lucy {
 	}
 
 	//OpenGL does not care about sets etc.
-	void OpenGLPipeline::ParseUniformBuffers() {
-		for (auto& [set, info] : m_Specs.Shader->GetDescriptorSetMap()) {
+	//TODO: Make the names correctly
+	void OpenGLPipeline::ParseBuffers() {
+		/*
+		for (auto& [set, info] : m_CreateInfo.Shader->GetShaderBufferMap()) {
 			uint32_t setSize = 0;
 			uint32_t setBinding = 0;
 			for (auto& ub : info) {
 				setSize += ub.BufferSize;
 				setBinding = ub.Binding;
 			}
-			auto& ubo = UniformBuffer::Create(setSize, setBinding, {});
+			auto& ubo = UniformBuffer::Create(UniformTarget::Buffer, "", setSize, setBinding, {});
 			m_UniformBuffers.push_back(ubo);
 		}
+		*/
 	}
 
 	void OpenGLPipeline::UploadVertexLayout(Ref<VertexBuffer>& vertexBuffer) {
 		vertexBuffer->Bind({});
 
-		uint32_t stride = CalculateStride(m_Specs.VertexShaderLayout);
+		uint32_t stride = CalculateStride(m_CreateInfo.VertexShaderLayout);
 		uint32_t offset = 0;
 		uint32_t bufferIndex = 0;
 
-		for (auto [name, size] : m_Specs.VertexShaderLayout.ElementList) {
+		for (auto [name, size] : m_CreateInfo.VertexShaderLayout.ElementList) {
 			glEnableVertexAttribArray(bufferIndex);
 			uint32_t apiSize = GetSizeFromType(size);
 			//TODO: Ugly code

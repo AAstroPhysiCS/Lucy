@@ -1,19 +1,12 @@
 #include "lypch.h"
 #include "OpenGLIndexBuffer.h"
 
-#include <iostream>
-#include <algorithm>
-
 #include "glad/glad.h"
 
 namespace Lucy {
 
 	OpenGLIndexBuffer::OpenGLIndexBuffer(uint32_t size)
 		: IndexBuffer(size) {
-		glCreateBuffers(1, &m_Id);
-	}
-
-	OpenGLIndexBuffer::OpenGLIndexBuffer() {
 		glCreateBuffers(1, &m_Id);
 	}
 

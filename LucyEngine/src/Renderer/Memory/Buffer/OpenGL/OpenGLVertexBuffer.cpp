@@ -1,4 +1,5 @@
 #include "lypch.h"
+
 #include "OpenGLVertexBuffer.h"
 #include "glad/glad.h"
 
@@ -6,10 +7,6 @@ namespace Lucy {
 
 	OpenGLVertexBuffer::OpenGLVertexBuffer(uint32_t size)
 		: VertexBuffer(size) {
-		glCreateBuffers(1, &m_Id);
-	}
-
-	OpenGLVertexBuffer::OpenGLVertexBuffer() {
 		glCreateBuffers(1, &m_Id);
 	}
 

@@ -1,14 +1,13 @@
 #pragma once
 
 #include "../FrameBuffer.h"
-#include "Renderer/Context/VulkanSwapChain.h"
 #include "Renderer/VulkanRenderPass.h"
 
 namespace Lucy {
 
 	class VulkanFrameBuffer : public FrameBuffer {
 	public:
-		VulkanFrameBuffer(FrameBufferSpecification& specs);
+		VulkanFrameBuffer(FrameBufferCreateInfo& createInfo);
 		virtual ~VulkanFrameBuffer() = default;
 		
 		void Destroy() override;
@@ -18,7 +17,6 @@ namespace Lucy {
 	private:
 		void Recreate(uint32_t width, uint32_t height, Ref<void> internalInfo = nullptr);
 		void Create();
-		void CreateImagesBasedOnDescs();
 		void CreateDepthImage();
 
 		std::vector<VkFramebuffer> m_FrameBufferHandles;

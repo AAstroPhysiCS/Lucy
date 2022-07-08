@@ -1,20 +1,19 @@
 #include "lypch.h"
 
 #include "OpenGLRenderBuffer.h"
-#include "OpenGLFrameBuffer.h"
 #include <glad/glad.h>
 
 namespace Lucy {
 
-	OpenGLRenderBuffer::OpenGLRenderBuffer(const RenderBufferSpecification& specs)
-		: RenderBuffer(specs) {
+	OpenGLRenderBuffer::OpenGLRenderBuffer(const RenderBufferCreateInfo& createInfo)
+		: RenderBuffer(createInfo) {
 		glCreateRenderbuffers(1, &m_Id);
 		Bind();
-		if (specs.Samples != 0) {
-			glRenderbufferStorageMultisample(GL_RENDERBUFFER, specs.Samples, specs.InternalFormat, specs.Width, specs.Height);
+		if (createInfo.Samples != 0) {
+			glRenderbufferStorageMultisample(GL_RENDERBUFFER, createInfo.Samples, createInfo.InternalFormat, createInfo.Width, createInfo.Height);
 		}
 		else {
-			glRenderbufferStorage(GL_RENDERBUFFER, specs.InternalFormat, specs.Width, specs.Height);
+			glRenderbufferStorage(GL_RENDERBUFFER, createInfo.InternalFormat, createInfo.Width, createInfo.Height);
 		}
 		Unbind();
 	}
@@ -29,23 +28,23 @@ namespace Lucy {
 
 	void OpenGLRenderBuffer::AttachToFramebuffer() {
 		Bind();
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, m_Specs.Attachment, GL_RENDERBUFFER, m_Id);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, m_CreateInfo.Attachment, GL_RENDERBUFFER, m_Id);
 		Unbind();
 	}
 
 	void OpenGLRenderBuffer::Resize(int32_t width, int32_t height) {
 		Destroy();
 
-		m_Specs.Width = width;
-		m_Specs.Height = height;
+		m_CreateInfo.Width = width;
+		m_CreateInfo.Height = height;
 
 		glCreateRenderbuffers(1, &m_Id);
 		Bind();
-		if (m_Specs.Samples != 0) {
-			glRenderbufferStorageMultisample(GL_RENDERBUFFER, m_Specs.Samples, m_Specs.InternalFormat, m_Specs.Width, m_Specs.Height);
+		if (m_CreateInfo.Samples != 0) {
+			glRenderbufferStorageMultisample(GL_RENDERBUFFER, m_CreateInfo.Samples, m_CreateInfo.InternalFormat, m_CreateInfo.Width, m_CreateInfo.Height);
 		}
 		else {
-			glRenderbufferStorage(GL_RENDERBUFFER, m_Specs.InternalFormat, m_Specs.Width, m_Specs.Height);
+			glRenderbufferStorage(GL_RENDERBUFFER, m_CreateInfo.InternalFormat, m_CreateInfo.Width, m_CreateInfo.Height);
 		}
 		Unbind();
 	}

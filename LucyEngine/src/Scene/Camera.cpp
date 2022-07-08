@@ -1,8 +1,9 @@
 #include "lypch.h"
 
 #include "Camera.h"
-#include "../Renderer/Renderer.h"
 
+#include "Events/Event.h"
+#include "Events/InputEvent.h"
 #include "Core/Input.h"
 
 namespace Lucy {

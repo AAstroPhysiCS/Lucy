@@ -3,7 +3,10 @@
 
 #include "GLFW/glfw3.h"
 #include "Renderer/Renderer.h"
-#include "Renderer/VulkanAllocator.h"
+#include "Renderer/Memory/VulkanAllocator.h"
+
+#include "Renderer/Context/VulkanDevice.h"
+#include "Renderer/Context/VulkanSwapChain.h"
 
 namespace Lucy {
 	
@@ -32,7 +35,7 @@ namespace Lucy {
 		appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
 		appInfo.pEngineName = "LucyEngine";
 		appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-		appInfo.apiVersion = VK_API_VERSION_1_2;
+		appInfo.apiVersion = VK_API_VERSION_1_3;
 
 		VkInstanceCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -40,7 +43,7 @@ namespace Lucy {
 
 		uint32_t glfwExtensionCount = 0;
 		const char** glfwExtensionNames = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-		std::vector<const char*> extensions(glfwExtensionNames, glfwExtensionNames + glfwExtensionCount);
+		std::vector<const char*> instanceExtensions(glfwExtensionNames, glfwExtensionNames + glfwExtensionCount);
 #ifdef LUCY_DEBUG
 		CheckValidationSupport();
 		createInfo.enabledLayerCount = m_ValidationLayers.size();
@@ -53,13 +56,13 @@ namespace Lucy {
 		debugForVkInstanceAndDestroy.pfnUserCallback = VulkanMessageCallback::DebugCallback;
 		createInfo.pNext = &debugForVkInstanceAndDestroy;
 
-		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+		instanceExtensions.insert(instanceExtensions.end(), m_InstanceExtensions.begin(), m_InstanceExtensions.end());
 #else
 		createInfo.enabledLayerCount = 0;
 		createInfo.ppEnabledLayerNames = nullptr;
 #endif
-		createInfo.enabledExtensionCount = extensions.size();
-		createInfo.ppEnabledExtensionNames = extensions.data();
+		createInfo.enabledExtensionCount = instanceExtensions.size();
+		createInfo.ppEnabledExtensionNames = instanceExtensions.data();
 
 		LUCY_VK_ASSERT(vkCreateInstance(&createInfo, nullptr, &m_Instance));
 		LUCY_INFO("Vulkan successfully initialized");

@@ -19,19 +19,7 @@ namespace Lucy {
 		}
 		return nullptr;
 	}
-
-	Ref<VertexBuffer> VertexBuffer::Create() {
-		switch (Renderer::GetCurrentRenderArchitecture()) {
-			case RenderArchitecture::OpenGL:
-				return Memory::CreateRef<OpenGLVertexBuffer>();
-				break;
-			case RenderArchitecture::Vulkan:
-				return Memory::CreateRef<VulkanVertexBuffer>();
-				break;
-		}
-		return nullptr;
-	}
-
+	
 	VertexBuffer::VertexBuffer(uint32_t size) {
 		Allocate(size); //internal std::vector allocation
 	}

@@ -10,7 +10,6 @@ namespace Lucy {
 	class VulkanVertexBuffer : public VertexBuffer {
 	public:
 		VulkanVertexBuffer(uint32_t size);
-		VulkanVertexBuffer() = default;
 		virtual ~VulkanVertexBuffer() = default;
 
 		void Bind(const VertexBindInfo& info) override;

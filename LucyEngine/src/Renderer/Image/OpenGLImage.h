@@ -6,12 +6,12 @@ namespace Lucy {
 
 	class OpenGLImage2D : public Image2D {
 	public:
-		OpenGLImage2D(const std::string& path, ImageSpecification& specs);
-		OpenGLImage2D(ImageSpecification& specs);
+		OpenGLImage2D(const std::string& path, ImageCreateInfo& createInfo);
+		OpenGLImage2D(ImageCreateInfo& createInfo);
 		virtual ~OpenGLImage2D() = default;
 
-		void Bind() override;
-		void Unbind() override;
+		void Bind();
+		void Unbind();
 		void Destroy() override;
 
 		inline uint16_t GetTarget() const { return m_Target; }

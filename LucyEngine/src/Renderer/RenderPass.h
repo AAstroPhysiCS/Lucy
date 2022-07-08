@@ -31,7 +31,7 @@ namespace Lucy {
 		bool DepthEnable = false;
 	};
 
-	struct RenderPassSpecification {
+	struct RenderPassCreateInfo {
 		ClearColor ClearColor;
 		Ref<void> InternalInfo = nullptr;  //to be overriden by different rhi's (OpenGL: none)
 	};
@@ -46,18 +46,18 @@ namespace Lucy {
 
 	class RenderPass {
 	public:
-		static Ref<RenderPass> Create(const RenderPassSpecification& specs);
+		static Ref<RenderPass> Create(const RenderPassCreateInfo& createInfo);
 
 		virtual void Begin(RenderPassBeginInfo& info) = 0;
 		virtual void End() = 0;
 		virtual void Recreate() = 0;
 		virtual void Destroy() = 0;
 
-		RenderPass(const RenderPassSpecification& specs);
+		RenderPass(const RenderPassCreateInfo& createInfo);
 		virtual ~RenderPass() = default;
 
-		inline ClearColor GetClearColor() { return m_Specs.ClearColor; }
+		inline ClearColor GetClearColor() { return m_CreateInfo.ClearColor; }
 	protected:
-		RenderPassSpecification m_Specs;
+		RenderPassCreateInfo m_CreateInfo;
 	};
 }

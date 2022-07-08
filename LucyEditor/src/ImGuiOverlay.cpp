@@ -15,9 +15,11 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/VulkanRHI.h"
 #include "Renderer/ViewportRenderer.h"
-#include "glad/glad.h"
 
+#include "Renderer/Context/VulkanDevice.h"
 #include "Renderer/Context/VulkanContext.h"
+#include "Renderer/Context/VulkanSwapChain.h"
+#include "Renderer/VulkanRenderPass.h"
 
 namespace Lucy {
 
@@ -55,6 +57,8 @@ namespace Lucy {
 		} else if (currentArchitecture == RenderArchitecture::Vulkan) {
 			ImGui_ImplGlfw_InitForVulkan(window->Raw(), true);
 			Renderer::Enqueue([&]() mutable {
+				VulkanSwapChain& swapChain = VulkanSwapChain::Get();
+
 				auto& vulkanContext = Renderer::GetCurrentRenderer()->m_RenderContext.As<VulkanContext>();
 				VulkanDevice device = VulkanDevice::Get();
 
@@ -66,8 +70,8 @@ namespace Lucy {
 				initInfo.Device = device.GetLogicalDevice();
 				initInfo.Queue = device.GetGraphicsQueue();
 				initInfo.DescriptorPool = m_ImGuiPool->GetVulkanHandle();
-				initInfo.MinImageCount = 3;
-				initInfo.ImageCount = 3;
+				initInfo.MinImageCount = swapChain.GetImageCount();
+				initInfo.ImageCount = swapChain.GetImageCount();
 				initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 				initInfo.CheckVkResultFn = VulkanMessageCallback::ImGui_DebugCallback;
 
@@ -93,7 +97,7 @@ namespace Lucy {
 		ImGuizmo::BeginFrame();
 
 		ImGuiIO& io = ImGui::GetIO();
-		
+
 		ImGuiViewport* viewport = ImGui::GetMainViewport();
 		ImGui::SetNextWindowPos(viewport->Pos);
 		ImGui::SetNextWindowSize(viewport->Size);
@@ -164,12 +168,11 @@ namespace Lucy {
 		});
 
 		dispatcher.Dispatch<CursorPosEvent>(e, EventType::CursorPosEvent, [&](CursorPosEvent& e) {
-			ImGuiIO& io = ImGui::GetIO();
 			Input::MouseX = e.GetXPos();
 			Input::MouseY = e.GetYPos();
 			ImGui_ImplGlfw_CursorPosCallback(e.GetWindowHandle(), Input::MouseX, Input::MouseY);
 		});
-		
+
 		dispatcher.Dispatch<MouseEvent>(e, EventType::MouseEvent, [&](MouseEvent& e) {
 			ImGui_ImplGlfw_MouseButtonCallback(e.GetWindowHandle(), e.GetButton(), e.GetAction(), e.GetMods());
 		});
@@ -194,6 +197,9 @@ namespace Lucy {
 	}
 
 	void ImGuiOverlay::Destroy() {
+		for (Panel* panel : m_Panels)
+			panel->OnDestroy();
+
 		auto currentArchitecture = Renderer::GetCurrentRenderArchitecture();
 		if (currentArchitecture == RenderArchitecture::OpenGL) {
 			ImGui_ImplOpenGL3_Shutdown();
@@ -201,6 +207,7 @@ namespace Lucy {
 			ImGui_ImplVulkan_Shutdown();
 			m_ImGuiPool->Destroy();
 		}
+
 		ImGui_ImplGlfw_Shutdown();
 		ImGui::DestroyContext();
 	}

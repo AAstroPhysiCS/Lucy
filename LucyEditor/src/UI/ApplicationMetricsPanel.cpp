@@ -25,15 +25,16 @@ namespace Lucy {
 		static bool pOpen = false;
 		ImGui::Begin("Application Metrics", &pOpen, ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoCollapse);
 
-		ImGui::Text(fmt::format("Frame Time: {0} ms", perfMetrics.FrameTime).c_str());
-		ImGui::Text(fmt::format("Frames: {0} FPS", perfMetrics.Frames).c_str());
-		//ImGui::Text(fmt::format("Delta Time: {0} ms", metrics.DeltaTime).c_str());
+		std::string outputStr;
 
-		ImGui::Separator();
+		fmt::format_to(std::back_inserter(outputStr), "Frame Time: {0} ms \n", perfMetrics.FrameTime);
+		fmt::format_to(std::back_inserter(outputStr), "Frames: {0} FPS \n", perfMetrics.Frames);
 
-		ImGui::Text(fmt::format("Total Allocated Memory: {0} mb", tracker.GetTotalAllocated()).c_str());
-		ImGui::Text(fmt::format("Total Freed Memory: {0} mb", tracker.GetTotalFreed()).c_str());
-		ImGui::Text(fmt::format("Current Usage: {0} mb", tracker.GetCurrentUsage()).c_str());
+		fmt::format_to(std::back_inserter(outputStr), "Total Allocated Memory: {0} mb \n", tracker.GetTotalAllocated());
+		fmt::format_to(std::back_inserter(outputStr), "Total Freed Memory: {0} mb \n", tracker.GetTotalFreed());
+		fmt::format_to(std::back_inserter(outputStr), "Current Usage: {0} mb \n", tracker.GetCurrentUsage());
+
+		ImGui::Text(outputStr.c_str());
 
 		ImGui::End();
 	}

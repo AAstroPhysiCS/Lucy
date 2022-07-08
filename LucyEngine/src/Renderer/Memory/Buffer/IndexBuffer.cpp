@@ -20,18 +20,6 @@ namespace Lucy {
 		return nullptr;
 	}
 
-	Ref<IndexBuffer> IndexBuffer::Create() {
-		switch (Renderer::GetCurrentRenderArchitecture()) {
-			case RenderArchitecture::OpenGL:
-				return Memory::CreateRef<OpenGLIndexBuffer>();
-				break;
-			case RenderArchitecture::Vulkan:
-				return Memory::CreateRef<VulkanIndexBuffer>();
-				break;
-		}
-		return nullptr;
-	}
-
 	IndexBuffer::IndexBuffer(uint32_t size) {
 		Allocate(size); //internal std::vector allocation
 	}

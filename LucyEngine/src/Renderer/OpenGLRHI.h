@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Context/RHI.h"
-#include "../Core/Window.h"
 
 #include "Context/OpenGLPipeline.h"
 
@@ -21,14 +20,11 @@ namespace Lucy {
 		PresentResult EndScene() override;
 
 		void Enqueue(const SubmitFunc&& func) override;
-		void EnqueueStaticMesh(Ref<Mesh> mesh, const glm::mat4& entityTransform) override;
+		void EnqueueStaticMesh(Priority priority, Ref<Mesh> mesh, const glm::mat4& entityTransform) override;
 
-		void RecordToCommandQueue(RecordFunc<>&& func);
-		void RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func);
+		void RecordStaticMeshToCommandQueue(Ref<Pipeline> pipeline, RecordFunc<Ref<DrawCommand>>&& func) override;
 
-		void BindPipeline(Ref<Pipeline> pipeline);
-		void UnbindPipeline(Ref<Pipeline> pipeline);
-		void BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer);
+		void BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) override;
 
 		inline Ref<OpenGLPipeline>& GetGeometryPipeline() { return m_GeometryPipeline; }
 		inline Ref<OpenGLPipeline>& GetIDPipeline() { return m_IDPipeline; }
@@ -40,8 +36,8 @@ namespace Lucy {
 		void GeometryPass();
 		void IDPass();
 
-		Ref<OpenGLPipeline> m_GeometryPipeline;
-		Ref<OpenGLPipeline> m_IDPipeline;
+		Ref<OpenGLPipeline> m_GeometryPipeline = nullptr;
+		Ref<OpenGLPipeline> m_IDPipeline = nullptr;
 
 		friend class Renderer;
 	};

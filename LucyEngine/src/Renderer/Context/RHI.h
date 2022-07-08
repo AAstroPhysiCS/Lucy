@@ -1,14 +1,13 @@
 #pragma once
 
-#include "../../Core/Base.h"
-#include "../DrawCommand.h"
+#include "Core/Base.h"
 #include "RenderContext.h"
+
+#include "../DrawCommand.h"
 #include "../CommandQueue.h"
 
 #include "Scene/Entity.h"
 #include "../Shader/Shader.h"
-
-#include "glad/glad.h"
 
 namespace Lucy {
 
@@ -40,7 +39,7 @@ namespace Lucy {
 		ERROR_VALIDATION_FAILED_EXT = -1000011001,
 	};
 
-	struct RendererSpecification;
+	struct RendererCreateInfo;
 
 	class RHI {
 	public:
@@ -54,17 +53,14 @@ namespace Lucy {
 		void ClearQueues();
 
 		virtual void Enqueue(const SubmitFunc&& func) = 0;
-		virtual void EnqueueStaticMesh(Ref<Mesh> mesh, const glm::mat4& entityTransform) = 0;
+		virtual void EnqueueStaticMesh(Priority priority, Ref<Mesh> mesh, const glm::mat4& entityTransform) = 0;
 		
-		virtual void RecordToCommandQueue(RecordFunc<>&& func) = 0;
-		virtual void RecordToCommandQueue(RecordFunc<MeshDrawCommand>&& func) = 0;
+		virtual void RecordStaticMeshToCommandQueue(Ref<Pipeline> pipeline, RecordFunc<Ref<DrawCommand>>&& func) = 0;
 
 		virtual void BeginScene(Scene& scene) = 0;
 		virtual void RenderScene() = 0;
 		virtual PresentResult EndScene() = 0;
 
-		virtual void BindPipeline(Ref<Pipeline> pipeline) = 0;
-		virtual void UnbindPipeline(Ref<Pipeline> pipeline) = 0;
 		virtual void BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) = 0;
 
 		virtual Entity OnMousePicking() = 0;
@@ -94,8 +90,9 @@ namespace Lucy {
 		Scene* m_ActiveScene = nullptr;
 
 		std::vector<SubmitFunc> m_RenderFunctionQueue;
-		std::vector<MeshDrawCommand> m_StaticMeshDrawCommandQueue;
 		inline static CommandQueue s_CommandQueue;
+
+		std::vector<Ref<DrawCommand>> m_StaticMeshDrawCommands;
 
 		Ref<RenderContext> m_RenderContext;
 		RenderArchitecture m_Architecture;

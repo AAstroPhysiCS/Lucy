@@ -16,7 +16,7 @@ namespace Lucy {
 			std::copy(other.m_Data.begin(), other.m_Data.end(), std::back_inserter(m_Data));
 		}
 
-		inline Buffer& operator=(const Buffer& other) { 
+		Buffer& operator=(const Buffer& other) { 
 			if (this != &other) {
 				Clear();
 				std::copy(other.m_Data.begin(), other.m_Data.end(), std::back_inserter(m_Data));
@@ -32,25 +32,26 @@ namespace Lucy {
 
 		///Size in Bytes
 		void Allocate(size_t size) {
-			if (size < 0) {
-				LUCY_CRITICAL("Trying to allocate negative bytes.");
-				LUCY_ASSERT(false);
-			}
 			m_Data.resize(size);
 		}
 
-		void SetData(const std::vector<T>& data, uint32_t from = 0, uint32_t to = 0) {
+		void SetData(const std::vector<T>& data, std::size_t from = 0, std::size_t to = 0) {
 			if (to == 0)
 				to = data.size();
 
-			if (to > data.size() || from < 0 || m_Data.size() < data.size()) {
+			if (to > data.size() || m_Data.size() < data.size()) {
 				LUCY_CRITICAL("Index out of bounds");
 				LUCY_ASSERT(false);
 			}
 
-			for (uint32_t i = from; i < to; i++) {
-				m_Data[i] = data[i];
+			std::size_t indexData = 0;
+			for (uint32_t i = from; i < to + from; i++) {
+				m_Data[i] = data[indexData++];
 			}
+		}
+
+		void SetData(const T& data, std::size_t size) {
+			memcpy(m_Data.data(), data, size);
 		}
 
 		inline void Append(const std::vector<T>& data) {

@@ -3,12 +3,10 @@
 
 #include "Memory/Buffer/OpenGL/OpenGLFrameBuffer.h"
 
-#include "glad/glad.h"
-
 namespace Lucy {
 
-	OpenGLRenderPass::OpenGLRenderPass(const RenderPassSpecification& specs)
-		: RenderPass(specs) {
+	OpenGLRenderPass::OpenGLRenderPass(const RenderPassCreateInfo& createInfo)
+		: RenderPass(createInfo) {
 	}
 
 	void OpenGLRenderPass::Begin(RenderPassBeginInfo& info) {

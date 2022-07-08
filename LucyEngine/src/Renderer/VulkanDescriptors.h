@@ -4,7 +4,14 @@
 
 namespace Lucy {
 
-	struct VulkanDescriptorPoolSpecifications {
+#define MAX_DYNAMICALLY_ALLOCATED_BUFFER 1000u
+
+	enum class GlobalDescriptorSets : uint8_t {
+		Camera = 0,
+		Material = 1
+	};
+
+	struct VulkanDescriptorPoolCreateInfo {
 		std::vector<VkDescriptorPoolSize> PoolSizesVector;
 		VkDescriptorPoolCreateFlags PoolFlags = 0;
 		uint32_t MaxSet = 0;
@@ -12,7 +19,7 @@ namespace Lucy {
 
 	class VulkanDescriptorPool {
 	public:
-		VulkanDescriptorPool(VulkanDescriptorPoolSpecifications& specs);
+		VulkanDescriptorPool(const VulkanDescriptorPoolCreateInfo& createInfo);
 		~VulkanDescriptorPool() = default;
 
 		void Destroy();
@@ -22,25 +29,35 @@ namespace Lucy {
 		void Create();
 
 		VkDescriptorPool m_DescriptorPool = VK_NULL_HANDLE;
-		VulkanDescriptorPoolSpecifications m_Specs;
+		VulkanDescriptorPoolCreateInfo m_CreateInfo;
 	};
 
-	struct VulkanDescriptorSetSpecifications {
+	struct VulkanDescriptorSetCreateInfo {
 		VkDescriptorSetLayout Layout = VK_NULL_HANDLE;
 		Ref<VulkanDescriptorPool> Pool = nullptr;
+		uint32_t SetIndex;
+		uint32_t SizeOfVariableCounting = 0;
+	};
+
+	struct VulkanDescriptorSetBindInfo {
+		VkCommandBuffer CommandBuffer;
+		VkPipelineBindPoint PipelineBindPoint;
+		VkPipelineLayout PipelineLayout;
 	};
 
 	class VulkanDescriptorSet {
 	public:
-		VulkanDescriptorSet(VulkanDescriptorSetSpecifications& specs);
+		VulkanDescriptorSet(const VulkanDescriptorSetCreateInfo& createInfo);
 		~VulkanDescriptorSet() = default;
+
+		void Bind(const VulkanDescriptorSetBindInfo& bindInfo);
 
 		inline VkDescriptorSet GetSetBasedOffCurrentFrame(uint32_t currentFrame) const noexcept { return m_DescriptorSets[currentFrame]; }
 	private:
 		void Create();
 
 		std::vector<VkDescriptorSet> m_DescriptorSets;
-		VulkanDescriptorSetSpecifications m_Specs;
+		VulkanDescriptorSetCreateInfo m_CreateInfo;
 	};
 }
 

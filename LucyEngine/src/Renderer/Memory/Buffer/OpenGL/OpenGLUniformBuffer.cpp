@@ -5,20 +5,24 @@
 
 namespace Lucy {
 
-	OpenGLUniformBuffer::OpenGLUniformBuffer(uint32_t size, uint32_t binding) {
+	OpenGLUniformBuffer::OpenGLUniformBuffer(UniformBufferCreateInfo& createInfo)
+		: UniformBuffer(createInfo) {
 		Renderer::Enqueue([=]() {
 			glCreateBuffers(1, &m_Id);
-			glNamedBufferData(m_Id, size, nullptr, GL_DYNAMIC_DRAW);
-			glBindBufferBase(GL_UNIFORM_BUFFER, binding, m_Id);
+			glNamedBufferData(m_Id, m_CreateInfo.BufferSize, nullptr, GL_DYNAMIC_DRAW);
+			glBindBufferBase(GL_UNIFORM_BUFFER, m_CreateInfo.Binding, m_Id);
 		});
 	}
-	
+
 	void OpenGLUniformBuffer::Bind() {
 		glBindBuffer(GL_UNIFORM_BUFFER, m_Id);
 	}
 
 	void OpenGLUniformBuffer::Unbind() {
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+	}
+
+	void OpenGLUniformBuffer::Update() {
 	}
 
 	void OpenGLUniformBuffer::DestroyHandle() {
