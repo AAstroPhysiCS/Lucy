@@ -19,6 +19,8 @@
 
 namespace Lucy {
 
+#define IMGUI_MAX_POOL_SIZES 100
+
 	class VulkanDescriptorPool;
 
 	class ImGuiOverlay {
@@ -35,22 +37,7 @@ namespace Lucy {
 		void SendImGuiDataToGPU();
 		void End();
 
-		std::vector<VkDescriptorPoolSize> m_ImGuiPoolSizes =
-		{
-			{ VK_DESCRIPTOR_TYPE_SAMPLER, 10 },
-			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10 },
-			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 10 },
-			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 10 },
-			{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 10 },
-			{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 10 },
-			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10 },
-			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10 },
-			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 10 },
-			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 10 },
-			{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 10 }
-		};
-
-		VulkanDescriptorPoolCreateInfo m_PoolSpecs = { m_ImGuiPoolSizes, VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT, 10 };
+		VulkanDescriptorPoolCreateInfo m_PoolSpecs = { {}, VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT, IMGUI_MAX_POOL_SIZES};
 		Ref<VulkanDescriptorPool> m_ImGuiPool = nullptr;
 
 		Scene* m_Scene = nullptr;

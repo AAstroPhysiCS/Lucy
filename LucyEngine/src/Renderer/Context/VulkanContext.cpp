@@ -16,6 +16,7 @@ namespace Lucy {
 	}
 
 	void VulkanContext::Destroy() {
+		VulkanAllocator::Get().Destroy();
 		VulkanSwapChain::Get().Destroy();
 		VulkanDevice::Get().Destroy();
 		Renderer::GetWindow()->DestroyVulkanSurface(m_Instance);

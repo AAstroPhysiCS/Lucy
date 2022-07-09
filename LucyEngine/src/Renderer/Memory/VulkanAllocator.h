@@ -4,7 +4,7 @@
 
 namespace Lucy {
 
-	enum class LucyVulkanBufferUsage {
+	enum class VulkanBufferUsage {
 		/*
 		* Auto, with no additional flag
 		*/
@@ -34,8 +34,9 @@ namespace Lucy {
 		static VulkanAllocator& Get();
 		
 		void Init(VkInstance instance);
+		void Destroy();
 		
-		void CreateVulkanBufferVma(LucyVulkanBufferUsage lucyBufferUsage, uint32_t size, 
+		void CreateVulkanBufferVma(VulkanBufferUsage lucyBufferUsage, uint32_t size,
 								   VkBufferUsageFlags usage, VkBuffer& bufferHandle, VmaAllocation& vmaAllocation);
 
 		void CreateVulkanImageVma(uint32_t width, uint32_t height, VkFormat format, VkImageLayout currentLayout, VkImageUsageFlags usage, 

@@ -1,13 +1,7 @@
 #include "EditorModule.h"
 
-#include "Renderer/Renderer.h"
-#include "Renderer/RenderPass.h"
-
 #include "Scene/Entity.h"
 #include "Scene/Components.h"
-
-#include "Renderer/Memory/Buffer/FrameBuffer.h"
-#include "Renderer/Memory/Buffer/OpenGL/OpenGLFrameBuffer.h"
 
 #include "Events/EventDispatcher.h"
 #include "Events/KeyCodes.h"

@@ -33,8 +33,7 @@ namespace Lucy {
 		};
 
 		std::vector<const char*> m_InstanceExtensions = {
-			VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-			VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
+			VK_EXT_DEBUG_UTILS_EXTENSION_NAME
 		};
 
 		VkInstance m_Instance;

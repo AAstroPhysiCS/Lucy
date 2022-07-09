@@ -1176,7 +1176,7 @@ VkDescriptorSet ImGui_ImplVulkan_AddTexture(VkSampler sampler, VkImageView image
     return descriptor_set;
 }
 
-//Custom function - AAstr0
+//Custom functions - AAstr0
 void ImGui_ImplVulkanH_UpdateTexture(VkDescriptorSet descriptor_set, VkSampler sampler, VkImageView image_view, VkImageLayout image_layout) {
     ImGui_ImplVulkan_Data* bd = ImGui_ImplVulkan_GetBackendData();
     ImGui_ImplVulkan_InitInfo* v = &bd->VulkanInitInfo;
@@ -1195,6 +1195,13 @@ void ImGui_ImplVulkanH_UpdateTexture(VkDescriptorSet descriptor_set, VkSampler s
         write_desc[0].pImageInfo = desc_image;
         vkUpdateDescriptorSets(v->Device, 1, write_desc, 0, NULL);
     }
+}
+
+void ImGui_ImplVulkanH_FreeDescriptorSet(VkDescriptorSet descriptor_set) {
+    ImGui_ImplVulkan_Data* bd = ImGui_ImplVulkan_GetBackendData();
+    ImGui_ImplVulkan_InitInfo* v = &bd->VulkanInitInfo;
+
+    vkFreeDescriptorSets(v->Device, v->DescriptorPool, 1, &descriptor_set);
 }
 
 //-------------------------------------------------------------------------

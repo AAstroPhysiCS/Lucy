@@ -4,7 +4,7 @@
 
 namespace Lucy {
 
-#define MAX_DYNAMICALLY_ALLOCATED_BUFFER 1000u
+	constexpr uint32_t MAX_DYNAMICALLY_ALLOCATED_BUFFER = 1000u;
 
 	enum class GlobalDescriptorSets : uint8_t {
 		Camera = 0,
@@ -36,7 +36,6 @@ namespace Lucy {
 		VkDescriptorSetLayout Layout = VK_NULL_HANDLE;
 		Ref<VulkanDescriptorPool> Pool = nullptr;
 		uint32_t SetIndex;
-		uint32_t SizeOfVariableCounting = 0;
 	};
 
 	struct VulkanDescriptorSetBindInfo {

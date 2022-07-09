@@ -18,7 +18,7 @@ namespace Lucy {
 
 	DetailsPanel::DetailsPanel() {
 		ImageCreateInfo createInfo;
-		createInfo.Format = VK_FORMAT_B8G8R8A8_SNORM;
+		createInfo.Format = VK_FORMAT_R8G8B8A8_UNORM;
 		createInfo.ImageType = ImageType::Type2D;
 		createInfo.Parameter.Mag = VK_FILTER_LINEAR;
 		createInfo.Parameter.Min = VK_FILTER_LINEAR;

@@ -18,7 +18,7 @@ namespace Lucy {
 
 	void VulkanIndexBuffer::Create(uint32_t size) {
 		VulkanAllocator& allocator = VulkanAllocator::Get(); 
-		allocator.CreateVulkanBufferVma(LucyVulkanBufferUsage::CPUOnly, size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 										m_StagingBufferHandle, m_StagingBufferVma);
 	}
 
@@ -41,7 +41,7 @@ namespace Lucy {
 			memcpy(data, m_Data.data(), m_Data.size() * sizeof(float));
 			vmaUnmapMemory(vmaAllocatorHandle, m_StagingBufferVma);
 
-			allocator.CreateVulkanBufferVma(LucyVulkanBufferUsage::GPUOnly, m_Data.size() * sizeof(float),
+			allocator.CreateVulkanBufferVma(VulkanBufferUsage::GPUOnly, m_Data.size() * sizeof(float),
 											VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, m_BufferHandle, m_BufferVma);
 			Renderer::GetCurrentRenderer().As<VulkanRHI>()->DirectCopyBuffer(m_StagingBufferHandle, m_BufferHandle, m_Data.size() * sizeof(float));
 

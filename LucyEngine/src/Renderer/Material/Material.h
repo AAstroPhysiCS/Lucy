@@ -39,7 +39,7 @@ namespace Lucy {
 		inline Ref<Shader> GetShader() { return m_Shader; }
 		inline const std::string& GetName() const { return m_MaterialData.Name; }
 
-		inline bool HasTexture(TextureType type) const { return !m_Textures.empty() && m_Textures.size() > type.Index && m_Textures[type.Index]->GetID() != 0; }
+		inline bool HasTexture(TextureType type) const { return !m_Textures.empty() && m_Textures[type.Index]->GetID() != 0; }
 		inline Ref<Image2D> GetTexture(TextureType type) const { return m_Textures[type.Index]; }
 		inline uint32_t GetTextureCount() const { return m_Textures.size(); }
 

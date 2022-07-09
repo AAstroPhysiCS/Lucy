@@ -191,8 +191,6 @@ namespace Lucy {
 			std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
 			std::vector<VkDescriptorBindingFlags> bindingFlags;
 
-			bool setIsDynamicallyAllocated = false;
-
 			for (auto& buffer : info) {
 				VkDescriptorSetLayoutBinding binding{};
 				binding.binding = buffer.Binding;
@@ -200,9 +198,8 @@ namespace Lucy {
 				if (buffer.DynamicallyAllocated) {
 					buffer.ArraySize = MAX_DYNAMICALLY_ALLOCATED_BUFFER;
 					binding.descriptorCount = buffer.ArraySize;
-					//ensures that we will fill the array later on, since the binding dynamic
+					//ensures that we will fill the array later on, since the binding is dynamic
 					bindingFlags.push_back(VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT);
-					setIsDynamicallyAllocated = true;
 				} else {
 					bindingFlags.push_back(0);
 				}
@@ -232,7 +229,6 @@ namespace Lucy {
 			setCreateInfo.Layout = descriptorSetLayout;
 			setCreateInfo.Pool = m_DescriptorPool;
 			setCreateInfo.SetIndex = set;
-			setCreateInfo.SizeOfVariableCounting = setIsDynamicallyAllocated ? MAX_DYNAMICALLY_ALLOCATED_BUFFER : 0;
 
 			Ref<VulkanDescriptorSet> descriptorSet = Memory::CreateRef<VulkanDescriptorSet>(setCreateInfo);
 
@@ -318,6 +314,7 @@ namespace Lucy {
 
 		for (const auto& buffer : m_UniformBuffers)
 			buffer->DestroyHandle();
+
 		for (auto& descriptorSetLayout : m_DescriptorSetLayouts)
 			vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 

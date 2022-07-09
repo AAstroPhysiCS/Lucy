@@ -53,13 +53,6 @@ namespace Lucy {
 
 		std::vector<const char*> m_DeviceExtensions = {
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-			
-			//minor features that were intentionally left out or overlooked from the original Vulkan 1.0 release.
-			VK_KHR_MAINTENANCE3_EXTENSION_NAME,
-
-			//several small features which together enable applications to create large descriptor sets containing 
-			//substantially all of their resources, and selecting amongst those resources with dynamic (non-uniform) indexes in the shader. 
-			VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME
 		};
 
 		VulkanDeviceInfo m_DeviceInfo;

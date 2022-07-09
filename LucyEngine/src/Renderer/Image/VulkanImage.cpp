@@ -48,7 +48,7 @@ namespace Lucy {
 		VmaAllocation m_ImageStagingBufferVma = VK_NULL_HANDLE;
 
 		VulkanAllocator& allocator = VulkanAllocator::Get();
-		allocator.CreateVulkanBufferVma(LucyVulkanBufferUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, m_ImageStagingBuffer, m_ImageStagingBufferVma);
+		allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, m_ImageStagingBuffer, m_ImageStagingBufferVma);
 
 		void* pixelData;
 		vmaMapMemory(allocator.GetVmaInstance(), m_ImageStagingBufferVma, &pixelData);
@@ -57,7 +57,7 @@ namespace Lucy {
 
 		stbi_image_free(data);
 
-		allocator.CreateVulkanImageVma(m_Width, m_Height, (VkFormat)m_CreateInfo.Format, m_CurrentLayout, 
+		allocator.CreateVulkanImageVma(m_Width, m_Height, (VkFormat)m_CreateInfo.Format, m_CurrentLayout,
 									   VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 									   VK_IMAGE_TYPE_2D, m_Image, m_ImageVma);
 
@@ -74,7 +74,7 @@ namespace Lucy {
 		if (m_Width == 0 && m_Height == 0) LUCY_ASSERT(false);
 
 		VulkanAllocator& allocator = VulkanAllocator::Get();
-		allocator.CreateVulkanImageVma(m_Width, m_Height, (VkFormat)m_CreateInfo.Format, m_CurrentLayout, 
+		allocator.CreateVulkanImageVma(m_Width, m_Height, (VkFormat)m_CreateInfo.Format, m_CurrentLayout,
 									   VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 									   VK_IMAGE_TYPE_2D, m_Image, m_ImageVma);
 
@@ -86,7 +86,7 @@ namespace Lucy {
 		if (m_Width == 0 && m_Height == 0) LUCY_ASSERT(false);
 
 		VulkanAllocator& allocator = VulkanAllocator::Get();
-		allocator.CreateVulkanImageVma(m_Width, m_Height, (VkFormat)m_CreateInfo.Format, m_CurrentLayout, 
+		allocator.CreateVulkanImageVma(m_Width, m_Height, (VkFormat)m_CreateInfo.Format, m_CurrentLayout,
 									   VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 									   VK_IMAGE_TYPE_2D, m_Image, m_ImageVma);
 
@@ -118,7 +118,7 @@ namespace Lucy {
 					m_ID = ImGui_ImplVulkan_AddTexture(m_ImageView.GetSampler(), m_ImageView.GetVulkanHandle(), m_CurrentLayout);
 				});
 			} else {
-				ImGui_ImplVulkanH_UpdateTexture((VkDescriptorSet) m_ID, m_ImageView.GetSampler(), m_ImageView.GetVulkanHandle(), m_CurrentLayout);
+				ImGui_ImplVulkanH_UpdateTexture((VkDescriptorSet)m_ID, m_ImageView.GetSampler(), m_ImageView.GetVulkanHandle(), m_CurrentLayout);
 			}
 		}
 	}
@@ -198,6 +198,7 @@ namespace Lucy {
 	void VulkanImage2D::Destroy() {
 		if (!m_Image) return;
 		m_ImageView.Destroy();
+
 		VulkanAllocator& allocator = VulkanAllocator::Get();
 		vmaDestroyImage(allocator.GetVmaInstance(), m_Image, m_ImageVma);
 		m_Image = VK_NULL_HANDLE;
@@ -208,8 +209,10 @@ namespace Lucy {
 		m_Height = height;
 		const auto& desc = m_CreateInfo.InternalInfo.As<VulkanRHIImageDesc>();
 
-		Destroy();
 		m_CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+		Destroy();
+
 		if (!m_Path.empty())
 			CreateFromPath();
 		else if (desc->DepthEnable)
@@ -261,7 +264,7 @@ namespace Lucy {
 		createInfo.addressModeW = m_CreateInfo.ModeW;
 
 		createInfo.anisotropyEnable = VK_TRUE;
-		
+
 		VkPhysicalDeviceProperties properties{};
 		vkGetPhysicalDeviceProperties(device.GetPhysicalDevice(), &properties);
 

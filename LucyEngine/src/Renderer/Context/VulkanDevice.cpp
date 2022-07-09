@@ -100,8 +100,6 @@ namespace Lucy {
 		// This should be already set to VK_TRUE, as we queried before.
 		indexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
 		indexingFeatures.runtimeDescriptorArray = VK_TRUE;
-		indexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
-		indexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
 
 		features.pNext = &indexingFeatures; //extending this structure
 
@@ -174,22 +172,7 @@ namespace Lucy {
 			LUCY_ASSERT(false);
 		}
 
-		//for bindless descriptor sets
-		VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures{};
-		indexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
-
-		VkPhysicalDeviceFeatures2 advancedFeatures{};
-		advancedFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-		advancedFeatures.pNext = &indexingFeatures;
-
-		vkGetPhysicalDeviceFeatures2(device, &advancedFeatures);
-
-		bool isBindlessDescriptorSetsSupported = indexingFeatures.descriptorBindingPartiallyBound &&
-			indexingFeatures.runtimeDescriptorArray &&
-			indexingFeatures.shaderSampledImageArrayNonUniformIndexing &&
-			indexingFeatures.descriptorBindingVariableDescriptorCount;
-
-		return requiredExtensions.empty() && isBindlessDescriptorSetsSupported;
+		return requiredExtensions.empty();
 	}
 
 	void VulkanDevice::PrintDeviceInfo() {

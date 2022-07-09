@@ -65,23 +65,24 @@ namespace Lucy {
 		static void BindBuffers(Ref<Mesh> mesh);
 		static void BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer);
 
-		static void BindPipeline(Ref<Pipeline> pipeline);
-
-		static void BindDescriptorSet(Ref<Pipeline> pipeline, Ref<VulkanDescriptorSet> descriptorSet);
-		static Ref<VulkanDescriptorSet> GetDescriptorSet(Ref<Pipeline> pipeline, GlobalDescriptorSets descriptorSet);
-
 		static void DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex,
 								int32_t vertexOffset, uint32_t firstInstance);
-		
-		static void UpdateResources(const std::vector<Ref<DrawCommand>>& drawCommands, Ref<Pipeline> pipeline);
 
 		static void BindPushConstant(Ref<Pipeline> pipeline, const PushConstant& pushConstant);
 	private:
+		//for CommandQueue
+		static void BindPipeline(Ref<Pipeline> pipeline);
+
+		static void BeginRenderPass(Ref<Pipeline> pipeline, VkCommandBuffer commandBuffer);
+		static void EndRenderPass(Ref<Pipeline> pipeline);
+		
+		static void UpdateResources(const std::vector<Ref<DrawCommand>>& drawCommands, Ref<Pipeline> pipeline);
+
+		static void BindDescriptorSet(Ref<Pipeline> pipeline, Ref<VulkanDescriptorSet> descriptorSet);
+		static Ref<VulkanDescriptorSet> GetDescriptorSet(Ref<Pipeline> pipeline, GlobalDescriptorSets descriptorSet);
+	private:
 		Renderer() = delete;
 		~Renderer() = delete;
-
-		static void BeginRenderPass(Ref<Pipeline> pipeline, VkCommandBuffer commandBuffer); //for CommandQueue
-		static void EndRenderPass(Ref<Pipeline> pipeline); //for CommandQueue
 
 		static Ref<RHI> s_RHI;
 		static RendererCreateInfo s_CreateInfo;

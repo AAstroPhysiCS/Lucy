@@ -51,21 +51,6 @@ namespace Lucy {
 		allocInfo.descriptorPool = m_CreateInfo.Pool->GetVulkanHandle();
 		allocInfo.descriptorSetCount = maxFramesInFlight;
 
-		//because its stack allocated
-		VkDescriptorSetVariableDescriptorCountAllocateInfo variableDescriptorCountAllocInfo{};
-
-		if (m_CreateInfo.SizeOfVariableCounting != 0) {
-			uint32_t variableDescCounts[] = { m_CreateInfo.SizeOfVariableCounting, m_CreateInfo.SizeOfVariableCounting, m_CreateInfo.SizeOfVariableCounting };
-
-			variableDescriptorCountAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO_EXT;
-			variableDescriptorCountAllocInfo.descriptorSetCount = maxFramesInFlight;
-			variableDescriptorCountAllocInfo.pDescriptorCounts = variableDescCounts;
-
-			allocInfo.pNext = &variableDescriptorCountAllocInfo;
-		} else {
-			allocInfo.pNext = nullptr;
-		}
-
 		m_DescriptorSets.resize(maxFramesInFlight);
 		LUCY_VK_ASSERT(vkAllocateDescriptorSets(device, &allocInfo, m_DescriptorSets.data()));
 	}

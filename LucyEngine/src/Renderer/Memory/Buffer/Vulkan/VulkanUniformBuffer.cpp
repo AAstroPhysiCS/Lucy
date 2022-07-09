@@ -25,7 +25,7 @@ namespace Lucy {
 
 		VulkanAllocator& allocator = VulkanAllocator::Get();
 		for (uint32_t i = 0; i < swapChain.GetMaxFramesInFlight(); i++)
-			allocator.CreateVulkanBufferVma(LucyVulkanBufferUsage::CPUOnly, m_CreateInfo.BufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, m_Buffers[i], m_BufferVma[i]);
+			allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, m_CreateInfo.BufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, m_Buffers[i], m_BufferVma[i]);
 	}
 
 	void VulkanUniformBuffer::SetData(void* data, uint32_t size, uint32_t offset) {

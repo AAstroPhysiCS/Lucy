@@ -31,7 +31,6 @@ namespace Lucy {
 		}
 		uniformBuffer->Update();
 		*/
-		
 	}
 
 	void VulkanMaterial::LoadTexture(aiMaterial* aiMaterial, TextureSlot slot, TextureType type, std::string& importedFilePath) {
@@ -49,6 +48,7 @@ namespace Lucy {
 			createInfo.Parameter.W = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
 			Ref<VulkanRHIImageDesc> imageDesc = Memory::CreateRef<VulkanRHIImageDesc>();
+			imageDesc->ImGuiUsage = true;
 			imageDesc->GenerateSampler = true;
 
 			createInfo.InternalInfo = imageDesc;
