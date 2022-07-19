@@ -11,9 +11,9 @@ project "LucyEngine"
     pchsource "lypch.cpp"
 
     files {
-        "src/**.h",
-        "src/**.hpp",
-        "src/**.cpp"
+        "Source/**.h",
+        "Source/**.hpp",
+        "Source/**.cpp"
     }
 
     includedirs {
@@ -27,7 +27,7 @@ project "LucyEngine"
         "%{LibraryPath.nativefiledialog}/include",
         "%{LibraryPath.VulkanInclude}",
         "%{LibraryPath.VMA}",
-        "src"
+        "Source"
     }
 
     links {

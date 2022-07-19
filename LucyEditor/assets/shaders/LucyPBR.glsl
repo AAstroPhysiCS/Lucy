@@ -3,35 +3,25 @@
 
 layout (location = 0) in vec3 a_Pos;
 layout (location = 1) in vec2 a_TextureCoords;
-layout (location = 2) in vec3 a_ID;
+layout (location = 2) in vec4 a_ID;
 layout (location = 3) in vec3 a_Normals;
 layout (location = 4) in vec3 a_Tangents;
 layout (location = 5) in vec3 a_BiTangents;
 
-struct LucyRendererOutput {
+struct LucyOutput {
 	vec2 TextCoords;
 };
 
-layout(location = 0) out LucyRendererOutput r_Output;
+layout (location = 0) out LucyOutput r_Output;
 
-layout(set = 0, binding = 0) uniform Camera {
+layout (set = 0, binding = 0) uniform Camera {
 	mat4 u_ViewMatrix;
 	mat4 u_ProjMatrix;
 };
 
-//for fragment shader
-struct TextureIndices {
-	int AlbedoTextureIndex;
-	int NormalTextureIndex;
-	int RoughnessTextureIndex;
-	int MetallicTextureIndex;
-	int AOTextureIndex;
-};
-
-//Max Size: 128 bytes
-layout(push_constant) uniform LocalPushConstant {
+layout (push_constant) uniform LocalPushConstant {
 	mat4 u_ModelMatrix;
-	TextureIndices u_TextureIndices; //for fragment shader
+	float u_MaterialID;
 };
 
 void main() {
@@ -49,23 +39,40 @@ void main() {
 
 layout (location = 0) out vec4 a_Color;
 
-struct LucyRendererOutput {
+struct LucyOutput {
 	vec2 TextCoords;
 };
 
-layout(location = 0) in LucyRendererOutput r_Output;
+layout (push_constant) uniform LocalPushConstant {
+	layout (offset = 64) float u_MaterialID;
+};
 
-//Max Size: 128 bytes
-layout(push_constant) uniform LocalPushConstant {
-	mat4 u_ModelMatrix; //unused in fragment shader
-	int u_MaterialIndex;
+layout (location = 0) in LucyOutput r_Output;
+
+struct MaterialAttributes {
+	float AlbedoSlot;
+	float NormalSlot;
+	float RoughnessSlot;
+	float MetallicSlot;
+
+	vec4 BaseDiffuseColor;
+	float Shininess;
+	float Roughness;
+	float Reflectivity;
+	float AOSlot;
+};
+
+layout (set = 0, binding = 1) readonly buffer LucyMaterialAttributes {
+	MaterialAttributes b_MaterialAttributes[];
 };
 
 layout (set = 1, binding = 0) uniform sampler2D u_Textures[];
 
 void main() {
-	//if (u_TextureIndices.AlbedoTextureIndex != NULL_TEXTURE_SLOT)
-		a_Color = texture(u_Textures[u_MaterialIndex], r_Output.TextCoords);
-	//else
-	//a_Color = vec4(u_MaterialIndex, 0.0f, 0.0f, 1.0f);
+	float albedo = b_MaterialAttributes[int(u_MaterialID)].AlbedoSlot;
+
+	if (albedo != NULL_TEXTURE_SLOT)
+		a_Color = texture(u_Textures[int(albedo)], r_Output.TextCoords);
+	else
+		a_Color = vec4(albedo);
 }

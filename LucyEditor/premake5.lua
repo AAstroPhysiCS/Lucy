@@ -8,9 +8,9 @@ project "LucyEditor"
     objdir ("../bin-obj/" .. outputdir .. "/%{prj.name}")
 
     files {
-        "src/**.h",
-        "src/**.hpp",
-        "src/**.cpp"
+        "Source/**.h",
+        "Source/**.hpp",
+        "Source/**.cpp"
     }
 
     includedirs {
@@ -24,7 +24,7 @@ project "LucyEditor"
         "%{LibraryPath.ImGuizmo}/include",
         "%{LibraryPath.VulkanInclude}",
         "%{LibraryPath.VMA}",
-        "../LucyEngine/src"
+        "../LucyEngine/Source"
     }
 
     links {

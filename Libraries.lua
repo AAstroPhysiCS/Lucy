@@ -1,19 +1,19 @@
 LibraryPath = {}
 
-LibraryPath["GLFW"] = "%{wks.location}/LucyEngine/vendor/GLFW"
-LibraryPath["spdlog"] = "%{wks.location}/LucyEngine/vendor/spdlog"
-LibraryPath["Glad"] = "%{wks.location}/LucyEngine/vendor/Glad"
-LibraryPath["entt"] = "%{wks.location}/LucyEngine/vendor/entt"
-LibraryPath["stb"] = "%{wks.location}/LucyEngine/vendor/stb"
-LibraryPath["assimp"] = "%{wks.location}/LucyEngine/vendor/assimp"
-LibraryPath["nativefiledialog"] = "%{wks.location}/LucyEngine/vendor/nativefiledialog"
-LibraryPath["ImGui"] = "%{wks.location}/LucyEngine/vendor/ImGui"
-LibraryPath["ImGuizmo"] = "%{wks.location}/LucyEditor/vendor/ImGuizmo"
-LibraryPath["glm"] = "%{wks.location}/LucyEngine/vendor/glm"
+LibraryPath["GLFW"] = "%{wks.location}/LucyEngine/ThirdParty/GLFW"
+LibraryPath["spdlog"] = "%{wks.location}/LucyEngine/ThirdParty/spdlog"
+LibraryPath["Glad"] = "%{wks.location}/LucyEngine/ThirdParty/Glad"
+LibraryPath["entt"] = "%{wks.location}/LucyEngine/ThirdParty/entt"
+LibraryPath["stb"] = "%{wks.location}/LucyEngine/ThirdParty/stb"
+LibraryPath["assimp"] = "%{wks.location}/LucyEngine/ThirdParty/assimp"
+LibraryPath["nativefiledialog"] = "%{wks.location}/LucyEngine/ThirdParty/nativefiledialog"
+LibraryPath["ImGui"] = "%{wks.location}/LucyEngine/ThirdParty/ImGui"
+LibraryPath["ImGuizmo"] = "%{wks.location}/LucyEditor/ThirdParty/ImGuizmo"
+LibraryPath["glm"] = "%{wks.location}/LucyEngine/ThirdParty/glm"
 
-LibraryPath["VMA"] = "%{wks.location}/LucyEngine/vendor/vma"
-LibraryPath["VMADebug"] = "%{wks.location}/LucyEngine/vendor/vma/vma/Debug/VulkanMemoryAllocatord.lib"
-LibraryPath["VMARelease"] = "%{wks.location}/LucyEngine/vendor/vma/vma/Release/VulkanMemoryAllocator.lib"
+LibraryPath["VMA"] = "%{wks.location}/LucyEngine/ThirdParty/vma"
+LibraryPath["VMADebug"] = "%{wks.location}/LucyEngine/ThirdParty/vma/vma/Debug/VulkanMemoryAllocatord.lib"
+LibraryPath["VMARelease"] = "%{wks.location}/LucyEngine/ThirdParty/vma/vma/Release/VulkanMemoryAllocator.lib"
 
 LibraryPath["VulkanSDK"] = os.getenv("VULKAN_SDK")
 LibraryPath["VulkanInclude"] = "%{LibraryPath.VulkanSDK}/Include"
