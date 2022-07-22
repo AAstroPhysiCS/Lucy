@@ -1,7 +1,6 @@
 #include "lypch.h"
 
 #include "Material.h"
-#include "OpenGLMaterial.h"
 #include "VulkanMaterial.h"
 
 #include "Renderer/Renderer.h"
@@ -10,9 +9,6 @@ namespace Lucy {
 
 	Ref<Material> Material::Create(Ref<Shader> shader, aiMaterial* aiMaterial, const char* submeshName, const std::string& importedFilePath) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
-			case RenderArchitecture::OpenGL:
-				return Memory::CreateRef<OpenGLMaterial>(shader, aiMaterial, submeshName, importedFilePath);
-				break;
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanMaterial>(shader, aiMaterial, submeshName, importedFilePath);
 				break;

@@ -6,11 +6,6 @@
 
 namespace Lucy {
 
-	class OpenGLFrameBuffer;
-	class OpenGLRenderPass;
-
-	class VulkanRenderPass;
-
 	struct ClearColor {
 		float r = 0.0f, g = 0.0f, b = 0.0f, a = 0.0f;
 	};
@@ -25,7 +20,7 @@ namespace Lucy {
 		VkImageLayout FinalLayout;
 	};
 
-	struct VulkanRHIRenderPassDesc {
+	struct VulkanRenderPassInfo {
 		std::vector<VkAttachmentReference> ColorAttachments;
 		VulkanAttachmentDescriptor ColorDescriptor;
 		bool DepthEnable = false;
@@ -33,11 +28,10 @@ namespace Lucy {
 
 	struct RenderPassCreateInfo {
 		ClearColor ClearColor;
-		Ref<void> InternalInfo = nullptr;  //to be overriden by different rhi's (OpenGL: none)
+		Ref<void> InternalInfo = nullptr;  //to be overriden by different api's
 	};
 
 	struct RenderPassBeginInfo {
-		Ref<OpenGLFrameBuffer> OpenGLFrameBuffer = nullptr;
 		VkFramebuffer VulkanFrameBuffer = nullptr;
 		VkCommandBuffer CommandBuffer = nullptr;
 		uint32_t Width = 0;

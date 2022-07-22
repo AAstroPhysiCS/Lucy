@@ -31,7 +31,7 @@ namespace Lucy {
 		void Create();
 		void Recreate();
 		void BeginFrame();
-		void EndFrame(const CommandQueue& commandQueue);
+		void EndFrame(const Ref<CommandQueue>& commandQueue);
 		VkResult Present();
 		void Destroy();
 
@@ -47,7 +47,7 @@ namespace Lucy {
 		inline const uint32_t GetCurrentFrameIndex() const { return m_CurrentFrameIndex; }
 		inline const uint32_t GetMaxFramesInFlight() const { return MAX_FRAMES_IN_FLIGHT; }
 
-		inline Ref<VulkanRHIFrameBufferDesc> GetSwapChainFrameBufferDesc() const { return m_SwapChainFrameBufferDesc; }
+		inline Ref<VulkanFrameBufferInfo> GetSwapChainFrameBufferInfo() const { return m_SwapChainFrameBufferInfo; }
 	private:
 		void SubmitToQueue(VkCommandBuffer commandBuffer);
 
@@ -64,7 +64,7 @@ namespace Lucy {
 
 		std::vector<VkImage> m_SwapChainImages;
 		std::vector<VulkanImageView> m_SwapChainImageViews;
-		Ref<VulkanRHIFrameBufferDesc> m_SwapChainFrameBufferDesc = Memory::CreateRef<VulkanRHIFrameBufferDesc>();
+		Ref<VulkanFrameBufferInfo> m_SwapChainFrameBufferInfo = Memory::CreateRef<VulkanFrameBufferInfo>();
 
 		VkSurfaceFormatKHR m_SelectedFormat;
 		VkPresentModeKHR m_SelectedPresentMode;

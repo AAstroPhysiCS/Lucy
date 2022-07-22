@@ -19,7 +19,6 @@ project "LucyEngine"
     includedirs {
         "%{LibraryPath.spdlog}/include",
         "%{LibraryPath.GLFW}/include",
-        "%{LibraryPath.Glad}/include",
         "%{LibraryPath.entt}/include",
         "%{LibraryPath.glm}",
         "%{LibraryPath.stb}/include",
@@ -32,7 +31,6 @@ project "LucyEngine"
 
     links {
         "GLFW",
-        "Glad",
         "ImGui",
         "glm",
         

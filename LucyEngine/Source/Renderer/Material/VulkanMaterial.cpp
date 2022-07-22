@@ -67,11 +67,11 @@ namespace Lucy {
 			createInfo.Parameter.W = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 			createInfo.GenerateMipmap = true;
 
-			Ref<VulkanRHIImageDesc> imageDesc = Memory::CreateRef<VulkanRHIImageDesc>();
-			imageDesc->ImGuiUsage = true;
-			imageDesc->GenerateSampler = true;
+			Ref<VulkanImageInfo> imageInfo = Memory::CreateRef<VulkanImageInfo>();
+			imageInfo->ImGuiUsage = true;
+			imageInfo->GenerateSampler = true;
 
-			createInfo.InternalInfo = imageDesc;
+			createInfo.InternalInfo = imageInfo;
 
 			Ref<Image2D> texture2D = Image2D::Create(properTexturePath, createInfo);
 			m_Textures.push_back(texture2D);

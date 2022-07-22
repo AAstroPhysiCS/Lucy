@@ -1,7 +1,6 @@
 #include "lypch.h"
 
 #include "Shader.h"
-#include "OpenGLShader.h"
 #include "VulkanShader.h"
 
 #include "../Renderer.h"
@@ -20,9 +19,7 @@ namespace Lucy {
 	Ref<Shader> Shader::Create(const std::string& name, const std::string& path) {
 		auto currentRenderArchitecture = Renderer::GetCurrentRenderArchitecture();
 		Ref<Shader> instance = nullptr;
-		if (currentRenderArchitecture == RenderArchitecture::OpenGL) {
-			instance = Memory::CreateRef<OpenGLShader>(name, path);
-		} else if (currentRenderArchitecture == RenderArchitecture::Vulkan) {
+		if (currentRenderArchitecture == RenderArchitecture::Vulkan) {
 			instance = Memory::CreateRef<VulkanShader>(name, path);
 		}
 		return instance;
@@ -48,9 +45,7 @@ namespace Lucy {
 		options.SetOptimizationLevel(shaderc_optimization_level::shaderc_optimization_level_performance);
 		options.SetGenerateDebugInfo();
 
-		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::OpenGL) {
-			options.SetTargetEnvironment(shaderc_target_env_opengl, shaderc_env_version_opengl_4_5);
-		} else if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::Vulkan) {
+		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::Vulkan) {
 			options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_2);
 		}
 
@@ -134,9 +129,7 @@ namespace Lucy {
 	}
 
 	const Shader::Extensions Shader::GetCachedFileExtension() {
-		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::OpenGL) {
-			return Extensions{ ".cached_opengl.vert", ".cached_opengl.frag" };
-		} else {
+		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::Vulkan) {
 			return Extensions{ ".cached_vulkan.vert", ".cached_vulkan.frag" };
 		}
 	}

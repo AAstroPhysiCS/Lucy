@@ -8,7 +8,7 @@ namespace Lucy {
 
 	class RendererModule : public Module {
 	public:
-		RendererModule(Ref<Window> window, Ref<Scene> scene);
+		RendererModule(RenderArchitecture arch, Ref<Window> window, Ref<Scene> scene);
 		virtual ~RendererModule() = default;
 
 		void Begin() override;
@@ -16,8 +16,8 @@ namespace Lucy {
 		void OnRender() override;
 		void OnEvent(Event& e) override;
 		void Destroy() override;
+		void Wait() override;
 	private:
 		ViewportRenderer m_ViewportRenderer;
 	};
 }
-

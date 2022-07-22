@@ -27,4 +27,8 @@ namespace Lucy {
 	void EditorModule::Destroy() {
 		m_ImGuiOverlay.Destroy();
 	}
+
+	void EditorModule::Wait() {
+		//Empty
+	}
 }

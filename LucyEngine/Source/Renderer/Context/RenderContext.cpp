@@ -1,16 +1,12 @@
 #include "lypch.h"
 
 #include "RenderContext.h"
-#include "OpenGLContext.h"
 #include "VulkanContext.h"
 
 namespace Lucy {
 
 	Ref<RenderContext> RenderContext::Create(RenderArchitecture arch) {
 		switch (arch) {
-			case RenderArchitecture::OpenGL:
-				return Memory::CreateRef<OpenGLContext>();
-				break;
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanContext>();
 				break;

@@ -23,9 +23,13 @@ namespace Lucy {
 		POINT
 	};
 
+	enum class CullingMode {
+		None, Front, Back, FrontAndBack
+	};
+
 	struct Rasterization {
 		bool DisableBackCulling = false;
-		uint32_t CullingMode = 0;
+		CullingMode CullingMode = CullingMode::None;
 		float LineWidth = 1.0f;
 		PolygonMode PolygonMode = PolygonMode::FILL;
 	};
@@ -59,8 +63,7 @@ namespace Lucy {
 		inline Ref<RenderPass>& GetRenderPass() { return m_CreateInfo.RenderPass; }
 		inline Ref<Shader>& GetShader() { return m_CreateInfo.Shader; }
 
-		template <class T>
-		inline Ref<T> GetDescriptorSet(const uint32_t setIndex) { return m_DescriptorSets[setIndex].As<T>(); }
+		inline const std::vector<Ref<DescriptorSet>>& GetDescriptorSets() const { return m_DescriptorSets; }
 
 		template <class T>
 		inline Ref<T> GetUniformBuffers(const char* name) {

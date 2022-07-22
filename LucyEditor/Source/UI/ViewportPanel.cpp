@@ -5,11 +5,9 @@
 #include "Renderer/RenderPass.h"
 #include "Renderer/ViewportRenderer.h"
 
-#include "Renderer/OpenGLRHI.h"
-#include "Renderer/VulkanRHI.h"
+#include "Renderer/VulkanRenderDevice.h"
 #include "Renderer/Context/VulkanSwapChain.h"
 
-#include "Renderer/Memory/Buffer/OpenGL/OpenGLFrameBuffer.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 
 #include "imgui_impl_vulkan.h"
@@ -61,12 +59,6 @@ namespace Lucy {
 		m_Size = ImGui::GetWindowSize();
 
 		switch (Renderer::GetCurrentRenderArchitecture()) {
-			case RenderArchitecture::OpenGL: {
-				auto& blittedFrameBuffer = ViewportRenderer::GetGeometryPipeline()->GetFrameBuffer().As<OpenGLFrameBuffer>()->GetBlitted();
-				void* outputTextureID = (void*)blittedFrameBuffer->GetTexture(0)->GetID();
-				ImGui::Image(outputTextureID, m_Size, { 0, 1 }, { 1, 0 });
-				break;
-			}
 			case RenderArchitecture::Vulkan: {
 				VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 				void* outputTextureID = ViewportRenderer::GetGeometryPipeline()->GetFrameBuffer().As<VulkanFrameBuffer>()->GetImages()[swapChain.GetCurrentFrameIndex()]->GetImGuiID();

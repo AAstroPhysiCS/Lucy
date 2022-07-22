@@ -51,7 +51,7 @@ struct ImGui_ImplVulkan_InitInfo
 {
     VkInstance                      Instance;
     VkPhysicalDevice                PhysicalDevice;
-    VkDevice                        Device;
+    VkDevice                        GPUDevice;
     uint32_t                        QueueFamily;
     VkQueue                         Queue;
     VkPipelineCache                 PipelineCache;

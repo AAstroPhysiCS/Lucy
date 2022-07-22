@@ -3,6 +3,9 @@ bin-obj/
 
 *.log
 
+*.frag
+*.vert
+
 .vs/
 **.sln
 **.vcxproj

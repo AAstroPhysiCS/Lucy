@@ -29,13 +29,12 @@ namespace Lucy {
 
 		const auto& arch = Renderer::GetCurrentRenderArchitecture();
 		if (arch == RenderArchitecture::Vulkan) {
-			Ref<VulkanRHIImageDesc> imageDesc = Memory::CreateRef<VulkanRHIImageDesc>();
-			imageDesc->GenerateSampler = true;
-			imageDesc->ImGuiUsage = true;
+			Ref<VulkanImageInfo> vulkanImageInfo = Memory::CreateRef<VulkanImageInfo>();
+			vulkanImageInfo->GenerateSampler = true;
+			vulkanImageInfo->ImGuiUsage = true;
 
-			createInfo.InternalInfo = imageDesc;
+			createInfo.InternalInfo = vulkanImageInfo;
 		}
-		//TODO: OpenGL
 
 		s_CheckerBoardTexture = Image2D::Create("Assets/Textures/Checkerboard.png", createInfo);
 	}

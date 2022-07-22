@@ -8,10 +8,6 @@ namespace Lucy {
 
 	Ref<SharedStorageBuffer> SharedStorageBuffer::Create(const SharedStorageBufferCreateInfo& createInfo) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
-			case RenderArchitecture::OpenGL:
-				LUCY_ASSERT(false);
-				//return Memory::CreateRef<OpenGLSharedStorageBuffer>(createInfo);
-				break;
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanSharedStorageBuffer>(createInfo);
 				break;

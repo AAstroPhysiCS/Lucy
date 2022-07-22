@@ -3,7 +3,7 @@
 
 #include "Renderer.h"
 
-#include "Context/RHI.h"
+#include "RenderDevice.h"
 #include "Context/VulkanPipeline.h"
 #include "Context/VulkanSwapChain.h"
 #include "Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
@@ -13,11 +13,11 @@
 
 namespace Lucy {
 
-	void ViewportRenderer::Init() {
-		auto& pbrShader = Renderer::GetShaderLibrary().GetShader("LucyPBR");
+	void ViewportRenderer::Init(RenderArchitecture arch, Ref<Window> window) {
+		Renderer::Init(arch, window);
 
-		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-		RenderArchitecture rhi = Renderer::GetCurrentRenderArchitecture();
+		auto& pbrShader = Renderer::GetShaderLibrary().GetShader("LucyPBR");
+		auto& idShader = Renderer::GetShaderLibrary().GetShader("LucyID");
 
 		auto [width, height] = Utils::ReadAttributeFromIni("Viewport", "Size");
 		Renderer::SetViewportSize(width, height);
@@ -30,6 +30,8 @@ namespace Lucy {
 				{ "a_Tangents", ShaderDataSize::Float3 },
 				{ "a_BiTangents", ShaderDataSize::Float3 }
 		};
+
+#pragma region GeometryPipeline
 
 		RenderPassCreateInfo geometryPassCreateInfo;
 		geometryPassCreateInfo.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
@@ -53,73 +55,124 @@ namespace Lucy {
 		PipelineCreateInfo geometryPipelineCreateInfo;
 		geometryPipelineCreateInfo.VertexShaderLayout = VertexShaderLayout(vertexLayout);
 		geometryPipelineCreateInfo.Topology = Topology::TRIANGLES;
-		geometryPipelineCreateInfo.Rasterization = { true, VK_CULL_MODE_NONE, 1.0f, PolygonMode::FILL };
+		geometryPipelineCreateInfo.Rasterization = { true, CullingMode::None, 1.0f, PolygonMode::FILL };
 		geometryPipelineCreateInfo.Shader = pbrShader;
 
-		if (rhi == RenderArchitecture::Vulkan) {
-			Ref<VulkanRHIRenderPassDesc> vulkanRenderPassDesc = Memory::CreateRef<VulkanRHIRenderPassDesc>();
-			vulkanRenderPassDesc->ColorAttachments.push_back(
+		if (arch == RenderArchitecture::Vulkan) {
+			VulkanSwapChain& swapChain = VulkanSwapChain::Get();
+
+			Ref<VulkanRenderPassInfo> vulkanRenderPassInfo = Memory::CreateRef<VulkanRenderPassInfo>();
+			vulkanRenderPassInfo->ColorAttachments.push_back(
 				{ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL }
 			);
-			vulkanRenderPassDesc->DepthEnable = true; //enables the support for depth buffer
-			vulkanRenderPassDesc->ColorDescriptor.Format = VK_FORMAT_R8G8B8A8_UNORM;
-			vulkanRenderPassDesc->ColorDescriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			vulkanRenderPassDesc->ColorDescriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-			vulkanRenderPassDesc->ColorDescriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-			vulkanRenderPassDesc->ColorDescriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-			vulkanRenderPassDesc->ColorDescriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			vulkanRenderPassDesc->ColorDescriptor.FinalLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR;
-			geometryPassCreateInfo.InternalInfo = vulkanRenderPassDesc;
+			vulkanRenderPassInfo->DepthEnable = true; //enables the support for depth buffer
+			vulkanRenderPassInfo->ColorDescriptor.Format = (VkFormat) geometryTextureCreateInfo.Format;
+			vulkanRenderPassInfo->ColorDescriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			vulkanRenderPassInfo->ColorDescriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+			vulkanRenderPassInfo->ColorDescriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			vulkanRenderPassInfo->ColorDescriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			vulkanRenderPassInfo->ColorDescriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			vulkanRenderPassInfo->ColorDescriptor.FinalLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR;
+			geometryPassCreateInfo.InternalInfo = vulkanRenderPassInfo;
 
-			Ref<VulkanRHIImageDesc> vulkanTextureDesc = Memory::CreateRef<VulkanRHIImageDesc>();
-			vulkanTextureDesc->GenerateSampler = true;
-			vulkanTextureDesc->ImGuiUsage = true;
+			Ref<VulkanImageInfo> vulkanTextureInfo = Memory::CreateRef<VulkanImageInfo>();
+			vulkanTextureInfo->GenerateSampler = true;
+			vulkanTextureInfo->ImGuiUsage = true;
 
-			geometryTextureCreateInfo.InternalInfo = vulkanTextureDesc;
+			geometryTextureCreateInfo.InternalInfo = vulkanTextureInfo;
 
-			Ref<VulkanRHIFrameBufferDesc> vulkanFrameBufferDesc = Memory::CreateRef<VulkanRHIFrameBufferDesc>();
-			vulkanFrameBufferDesc->ImageBuffers.reserve(swapChain.GetMaxFramesInFlight());
+			Ref<VulkanFrameBufferInfo> vulkanFrameBufferInfo = Memory::CreateRef<VulkanFrameBufferInfo>();
+			vulkanFrameBufferInfo->ImageBuffers.reserve(swapChain.GetMaxFramesInFlight());
 			for (uint32_t i = 0; i < swapChain.GetMaxFramesInFlight(); i++)
-				vulkanFrameBufferDesc->ImageBuffers.emplace_back(Image2D::Create(geometryTextureCreateInfo).As<VulkanImage2D>());
-			vulkanFrameBufferDesc->RenderPass = RenderPass::Create(geometryPassCreateInfo);
+				vulkanFrameBufferInfo->ImageBuffers.emplace_back(Image2D::Create(geometryTextureCreateInfo).As<VulkanImage2D>());
+			vulkanFrameBufferInfo->RenderPass = RenderPass::Create(geometryPassCreateInfo);
 
-			geometryFrameBufferCreateInfo.InternalInfo = vulkanFrameBufferDesc;
-			geometryPipelineCreateInfo.RenderPass = vulkanFrameBufferDesc->RenderPass;
+			geometryFrameBufferCreateInfo.InternalInfo = vulkanFrameBufferInfo;
+			geometryPipelineCreateInfo.RenderPass = vulkanFrameBufferInfo->RenderPass;
 		}
-
 		geometryPipelineCreateInfo.FrameBuffer = FrameBuffer::Create(geometryFrameBufferCreateInfo);
 		s_GeometryPipeline = Pipeline::Create(geometryPipelineCreateInfo);
 
+#pragma region IDPipeline
+
+		RenderPassCreateInfo idPassCreateInfo = geometryPassCreateInfo;
+
+		ImageCreateInfo idTextureCreateInfo;
+		idTextureCreateInfo = geometryTextureCreateInfo;
+		idTextureCreateInfo.Format = VK_FORMAT_R8G8B8A8_UNORM;
+
+		FrameBufferCreateInfo idFrameBufferCreateInfo = geometryFrameBufferCreateInfo;
+
+		PipelineCreateInfo idPipelineCreateInfo = geometryPipelineCreateInfo;
+		idPipelineCreateInfo.Shader = idShader;
+
+		if (arch == RenderArchitecture::Vulkan) {
+			VulkanSwapChain& swapChain = VulkanSwapChain::Get();
+			
+			Ref<VulkanRenderPassInfo> idVulkanRenderPassInfo = Memory::CreateRef<VulkanRenderPassInfo>();
+			idVulkanRenderPassInfo->ColorAttachments.push_back(
+				{ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL }
+			);
+			idVulkanRenderPassInfo->DepthEnable = true; //enables the support for depth buffer
+			idVulkanRenderPassInfo->ColorDescriptor.Format = (VkFormat) idTextureCreateInfo.Format;
+			idVulkanRenderPassInfo->ColorDescriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			idVulkanRenderPassInfo->ColorDescriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+			idVulkanRenderPassInfo->ColorDescriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			idVulkanRenderPassInfo->ColorDescriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			idVulkanRenderPassInfo->ColorDescriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			idVulkanRenderPassInfo->ColorDescriptor.FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+			idPassCreateInfo.InternalInfo = idVulkanRenderPassInfo;
+
+			Ref<VulkanImageInfo> idVulkanTextureInfo = Memory::CreateRef<VulkanImageInfo>();
+			idVulkanTextureInfo->GenerateSampler = true;
+
+			idTextureCreateInfo.InternalInfo = idVulkanTextureInfo;
+
+			Ref<VulkanFrameBufferInfo> idVulkanFrameBufferInfo = Memory::CreateRef<VulkanFrameBufferInfo>();
+			idVulkanFrameBufferInfo->ImageBuffers.reserve(swapChain.GetMaxFramesInFlight());
+			for (uint32_t i = 0; i < swapChain.GetMaxFramesInFlight(); i++)
+				idVulkanFrameBufferInfo->ImageBuffers.emplace_back(Image2D::Create(idTextureCreateInfo).As<VulkanImage2D>());
+			idVulkanFrameBufferInfo->RenderPass = RenderPass::Create(idPassCreateInfo);
+
+			idFrameBufferCreateInfo.InternalInfo = idVulkanFrameBufferInfo;
+			idPipelineCreateInfo.RenderPass = idVulkanFrameBufferInfo->RenderPass;
+		}
+		idPipelineCreateInfo.FrameBuffer = FrameBuffer::Create(idFrameBufferCreateInfo);
+		s_IDPipeline = Pipeline::Create(idPipelineCreateInfo);
+
+#pragma region ImGuiPipeline
 		/*
 		----ImGui (for Vulkan; does not need a separate pipeline)----
 		*/
+		if (arch == RenderArchitecture::Vulkan) {
+			VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 
-		if (rhi == RenderArchitecture::Vulkan) {
 			RenderPassCreateInfo uiRenderPassCreateInfo;
 			uiRenderPassCreateInfo.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
 
-			Ref<VulkanRHIRenderPassDesc> vulkanRenderPassDesc = Memory::CreateRef<VulkanRHIRenderPassDesc>();
-			vulkanRenderPassDesc->ColorAttachments.push_back({ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
-			vulkanRenderPassDesc->ColorDescriptor.Format = swapChain.GetSurfaceFormat().format;
-			vulkanRenderPassDesc->ColorDescriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			vulkanRenderPassDesc->ColorDescriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-			vulkanRenderPassDesc->ColorDescriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-			vulkanRenderPassDesc->ColorDescriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-			vulkanRenderPassDesc->ColorDescriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			vulkanRenderPassDesc->ColorDescriptor.FinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+			Ref<VulkanRenderPassInfo> vulkanRenderPassInfo = Memory::CreateRef<VulkanRenderPassInfo>();
+			vulkanRenderPassInfo->ColorAttachments.push_back({ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+			vulkanRenderPassInfo->ColorDescriptor.Format = swapChain.GetSurfaceFormat().format;
+			vulkanRenderPassInfo->ColorDescriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			vulkanRenderPassInfo->ColorDescriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+			vulkanRenderPassInfo->ColorDescriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			vulkanRenderPassInfo->ColorDescriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			vulkanRenderPassInfo->ColorDescriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			vulkanRenderPassInfo->ColorDescriptor.FinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-			uiRenderPassCreateInfo.InternalInfo = vulkanRenderPassDesc;
+			uiRenderPassCreateInfo.InternalInfo = vulkanRenderPassInfo;
 			s_ImGuiPipeline.UIRenderPass = RenderPass::Create(uiRenderPassCreateInfo);
 
 			FrameBufferCreateInfo uiFrameBufferCreateInfo;
 			uiFrameBufferCreateInfo.Width = swapChain.GetExtent().width;
 			uiFrameBufferCreateInfo.Height = swapChain.GetExtent().height;
 
-			Ref<VulkanRHIFrameBufferDesc> vulkanFrameBufferDesc = Memory::CreateRef<VulkanRHIFrameBufferDesc>();
-			vulkanFrameBufferDesc->ImageViews = swapChain.GetImageViews();
-			vulkanFrameBufferDesc->RenderPass = s_ImGuiPipeline.UIRenderPass;
+			Ref<VulkanFrameBufferInfo> vulkanFrameBufferInfo = Memory::CreateRef<VulkanFrameBufferInfo>();
+			vulkanFrameBufferInfo->ImageViews = swapChain.GetImageViews();
+			vulkanFrameBufferInfo->RenderPass = s_ImGuiPipeline.UIRenderPass;
 
-			uiFrameBufferCreateInfo.InternalInfo = vulkanFrameBufferDesc;
+			uiFrameBufferCreateInfo.InternalInfo = vulkanFrameBufferInfo;
 			s_ImGuiPipeline.UIFramebuffer = FrameBuffer::Create(uiFrameBufferCreateInfo);
 		}
 	}
@@ -136,7 +189,7 @@ namespace Lucy {
 		auto vp = camera.GetVP();
 		cameraBuffer->SetData((uint8_t*)&vp, sizeof(vp));
 
-		IDPass();
+		//IDPass();
 		GeometryPass();
 		UIPass();
 
@@ -156,12 +209,20 @@ namespace Lucy {
 
 	void ViewportRenderer::Destroy() {
 		s_GeometryPipeline->Destroy();
+		s_IDPipeline->Destroy();
+
 		s_ImGuiPipeline.UIFramebuffer->Destroy();
 		s_ImGuiPipeline.UIRenderPass->Destroy();
+
+		Renderer::Destroy();
+	}
+
+	void ViewportRenderer::WaitForDevice() {
+		Renderer::WaitForDevice();
 	}
 
 	void ViewportRenderer::GeometryPass() {
-		Renderer::RecordStaticMeshToCommandQueue(s_GeometryPipeline, [](Ref<MeshDrawCommand> staticMeshDrawCommand) {
+		Renderer::RecordStaticMeshToCommandQueue(s_GeometryPipeline, [](VkCommandBuffer commandBuffer, Ref<MeshDrawCommand> staticMeshDrawCommand) {
 			const Ref<Mesh>& staticMesh = staticMeshDrawCommand->Mesh;
 			const glm::mat4& entityTransform = staticMeshDrawCommand->EntityTransform;
 
@@ -170,7 +231,7 @@ namespace Lucy {
 			const std::vector<Ref<Material>>& materials = staticMesh->GetMaterials();
 			std::vector<Submesh>& submeshes = staticMesh->GetSubmeshes();
 
-			Renderer::BindBuffers(staticMesh);
+			Renderer::BindBuffers(commandBuffer, staticMesh);
 
 			for (uint32_t i = 0; i < submeshes.size(); i++) {
 				Submesh& submesh = submeshes[i];
@@ -181,14 +242,36 @@ namespace Lucy {
 				pushConstantData.MaterialID = material->GetID();
 				meshPushConstant.SetData((uint8_t*)&pushConstantData, sizeof(pushConstantData));
 
-				Renderer::BindPushConstant(s_GeometryPipeline, meshPushConstant);
-				Renderer::DrawIndexed(submesh.IndexCount, 1, submesh.BaseIndexCount, submesh.BaseVertexCount, 0);
+				Renderer::BindPushConstant(commandBuffer, s_GeometryPipeline, meshPushConstant);
+				Renderer::DrawIndexed(commandBuffer, submesh.IndexCount, 1, submesh.BaseIndexCount, submesh.BaseVertexCount, 0);
 			}
 		});
 	}
 
 	void ViewportRenderer::IDPass() {
-		//TODO: later
+		Renderer::RecordStaticMeshToCommandQueue(s_IDPipeline, [](VkCommandBuffer commandBuffer, Ref<MeshDrawCommand> staticMeshDrawCommand) {
+			const Ref<Mesh>& staticMesh = staticMeshDrawCommand->Mesh;
+			const glm::mat4& entityTransform = staticMeshDrawCommand->EntityTransform;
+
+			PushConstant& meshPushConstant = s_IDPipeline->GetPushConstants("LocalPushConstant");
+
+			const std::vector<Ref<Material>>& materials = staticMesh->GetMaterials();
+			std::vector<Submesh>& submeshes = staticMesh->GetSubmeshes();
+
+			Renderer::BindBuffers(commandBuffer, staticMesh);
+
+			for (uint32_t i = 0; i < submeshes.size(); i++) {
+				Submesh& submesh = submeshes[i];
+				const Ref<Material>& material = materials[submesh.MaterialIndex];
+
+				PushConstantData pushConstantData;
+				pushConstantData.FinalTransform = entityTransform * submesh.Transform;
+				meshPushConstant.SetData((uint8_t*)&pushConstantData, sizeof(pushConstantData.FinalTransform));
+
+				Renderer::BindPushConstant(commandBuffer, s_IDPipeline, meshPushConstant);
+				Renderer::DrawIndexed(commandBuffer, submesh.IndexCount, 1, submesh.BaseIndexCount, submesh.BaseVertexCount, 0);
+			}
+		});
 	}
 
 	void ViewportRenderer::UIPass() {

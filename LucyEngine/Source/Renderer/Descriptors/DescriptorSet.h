@@ -16,6 +16,8 @@ namespace Lucy {
 		DescriptorSet(const DescriptorSetCreateInfo& createInfo);
 		virtual ~DescriptorSet() = default;
 		
+		virtual void Update() = 0;
+
 		void AddBuffer(const Ref<UniformBuffer>& buffer);
 		void AddBuffer(const Ref<SharedStorageBuffer>& buffer);
 		void Destroy();

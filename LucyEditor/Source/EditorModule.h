@@ -19,6 +19,7 @@ namespace Lucy {
 		void OnRender() override;
 		void OnEvent(Event& e) override;
 		void Destroy() override;
+		void Wait() override;
 
 		inline const Ref<Scene>& GetScene() const { return m_Scene; }
 	private:

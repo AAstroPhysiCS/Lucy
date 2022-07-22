@@ -4,8 +4,8 @@
 #include "VulkanDevice.h"
 
 #include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
+#include "Renderer/Commands/VulkanCommandQueue.h"
 #include "Renderer/Renderer.h"
-#include "Renderer/CommandQueue.h"
 
 namespace Lucy {
 
@@ -93,7 +93,7 @@ namespace Lucy {
 			}
 		}
 
-		m_SwapChainFrameBufferDesc->ImageViews = m_SwapChainImageViews;
+		m_SwapChainFrameBufferInfo->ImageViews = m_SwapChainImageViews;
 
 		return swapChain;
 	}
@@ -119,10 +119,10 @@ namespace Lucy {
 		}
 	}
 
-	void VulkanSwapChain::EndFrame(const CommandQueue& commandQueue) {
+	void VulkanSwapChain::EndFrame(const Ref<CommandQueue>& commandQueue) {
 		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR)
 			return;
-		SubmitToQueue(commandQueue.GetCurrentCommandBuffer());
+		SubmitToQueue(commandQueue.As<VulkanCommandQueue>()->GetCurrentCommandBuffer());
 	}
 
 	VkResult VulkanSwapChain::AcquireNextImage(VkSemaphore currentFrameImageAvailSemaphore, uint32_t& imageIndex) {

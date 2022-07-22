@@ -68,14 +68,12 @@ namespace Lucy {
 	struct VertexShaderLayout {
 		VertexShaderLayout() = default;
 		VertexShaderLayout(const std::vector<ShaderLayoutElement>& elementList)
-			: ElementList(elementList) {
+			: m_ElementList(elementList) {
 		}
 
-		friend class OpenGLPipeline;
-		friend class VulkanPipeline;
-		friend class Pipeline;
+		inline const std::vector<ShaderLayoutElement>& GetElementList() const { return m_ElementList; }
 	private:
-		std::vector<ShaderLayoutElement> ElementList;
+		std::vector<ShaderLayoutElement> m_ElementList;
 	};
 
 	class ShaderLibrary {

@@ -2,16 +2,12 @@
 
 #include "Renderer/Renderer.h"
 
-#include "OpenGL/OpenGLUniformBuffer.h"
 #include "Vulkan/VulkanUniformBuffer.h"
 
 namespace Lucy {
 
 	Ref<UniformBuffer> UniformBuffer::Create(UniformBufferCreateInfo& createInfo) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
-			case RenderArchitecture::OpenGL: {
-				return Memory::CreateRef<OpenGLUniformBuffer>(createInfo);
-			}
 			case RenderArchitecture::Vulkan: {
 				if (createInfo.Type == DescriptorType::SampledImage ||
 					createInfo.Type == DescriptorType::Sampler ||

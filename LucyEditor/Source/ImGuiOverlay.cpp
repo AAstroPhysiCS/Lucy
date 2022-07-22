@@ -13,7 +13,7 @@
 #include "Core/Input.h"
 
 #include "Renderer/Renderer.h"
-#include "Renderer/VulkanRHI.h"
+#include "Renderer/VulkanRenderDevice.h"
 #include "Renderer/ViewportRenderer.h"
 
 #include "Renderer/Context/VulkanDevice.h"
@@ -49,15 +49,12 @@ namespace Lucy {
 		io.DisplaySize = { (float)width, (float)height };
 
 		auto currentArchitecture = Renderer::GetCurrentRenderArchitecture();
-		if (currentArchitecture == RenderArchitecture::OpenGL) {
-			ImGui_ImplGlfw_InitForOpenGL(window->Raw(), true);
-			ImGui_ImplOpenGL3_Init("#version 460");
-		} else if (currentArchitecture == RenderArchitecture::Vulkan) {
+		if (currentArchitecture == RenderArchitecture::Vulkan) {
 			ImGui_ImplGlfw_InitForVulkan(window->Raw(), true);
 			Renderer::Enqueue([&]() mutable {
 				VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 
-				auto& vulkanContext = Renderer::GetCurrentRenderer()->m_RenderContext.As<VulkanContext>();
+				auto& vulkanContext = Renderer::GetCurrentRenderDevice()->m_RenderContext.As<VulkanContext>();
 				VulkanDevice device = VulkanDevice::Get();
 
 				m_ImGuiPool = Memory::CreateRef<VulkanDescriptorPool>(m_PoolSpecs);
@@ -65,7 +62,7 @@ namespace Lucy {
 				ImGui_ImplVulkan_InitInfo initInfo{};
 				initInfo.Instance = vulkanContext->GetVulkanInstance();
 				initInfo.PhysicalDevice = device.GetPhysicalDevice();
-				initInfo.Device = device.GetLogicalDevice();
+				initInfo.GPUDevice = device.GetLogicalDevice();
 				initInfo.Queue = device.GetGraphicsQueue();
 				initInfo.DescriptorPool = m_ImGuiPool->GetVulkanHandle();
 				initInfo.MinImageCount = swapChain.GetImageCount();
@@ -74,7 +71,7 @@ namespace Lucy {
 				initInfo.CheckVkResultFn = VulkanMessageCallback::ImGui_DebugCallback;
 
 				ImGui_ImplVulkan_Init(&initInfo, ViewportRenderer::GetImGuiPipeline().UIRenderPass.As<VulkanRenderPass>()->GetVulkanHandle());
-				VulkanRHI::RecordSingleTimeCommand(ImGui_ImplVulkan_CreateFontsTexture);
+				VulkanRenderDevice::RecordSingleTimeCommand(ImGui_ImplVulkan_CreateFontsTexture);
 				ImGui_ImplVulkan_DestroyFontUploadObjects();
 			});
 		}
@@ -82,9 +79,7 @@ namespace Lucy {
 
 	void ImGuiOverlay::Begin() {
 		auto currentArchitecture = Renderer::GetCurrentRenderArchitecture();
-		if (currentArchitecture == RenderArchitecture::OpenGL) {
-			ImGui_ImplOpenGL3_NewFrame();
-		} else if (currentArchitecture == RenderArchitecture::Vulkan) {
+		if (currentArchitecture == RenderArchitecture::Vulkan) {
 			ImGui_ImplVulkan_NewFrame();
 		}
 
@@ -140,9 +135,7 @@ namespace Lucy {
 	void ImGuiOverlay::SendImGuiDataToGPU() {
 		auto currentArchitecture = Renderer::GetCurrentRenderArchitecture();
 
-		if (currentArchitecture == RenderArchitecture::OpenGL) {
-			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-		} else if (currentArchitecture == RenderArchitecture::Vulkan) {
+		if (currentArchitecture == RenderArchitecture::Vulkan) {
 			Renderer::SetUIDrawData([](VkCommandBuffer commandBuffer) {
 				ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
 			});
@@ -198,9 +191,7 @@ namespace Lucy {
 			panel->OnDestroy();
 
 		auto currentArchitecture = Renderer::GetCurrentRenderArchitecture();
-		if (currentArchitecture == RenderArchitecture::OpenGL) {
-			ImGui_ImplOpenGL3_Shutdown();
-		} else if (currentArchitecture == RenderArchitecture::Vulkan) {
+		if (currentArchitecture == RenderArchitecture::Vulkan) {
 			ImGui_ImplVulkan_Shutdown();
 			m_ImGuiPool->Destroy();
 		}

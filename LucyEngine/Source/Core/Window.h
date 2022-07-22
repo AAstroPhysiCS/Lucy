@@ -21,7 +21,7 @@ namespace Lucy {
 	struct WindowCreateInfo {
 		mutable int32_t Width = -1, Height = -1;
 		bool VSync = false, Resizable = false;
-		mutable std::string Name = "Window Specification failed!";
+		mutable std::string Title = "Window Specification failed!";
 		Lucy::WindowMode WindowMode = WindowMode::WINDOWED;
 	};
 
@@ -41,7 +41,11 @@ namespace Lucy {
 
 		inline int32_t GetWidth() const { return m_CreateInfo.Width; }
 		inline int32_t GetHeight() const { return m_CreateInfo.Height; }
+		
 		VkSurfaceKHR GetVulkanSurface() const { return m_Surface; }
+
+		void SetTitle(const char* title);
+		inline const std::string& GetTitle() const { return m_CreateInfo.Title; }
 
 		static Ref<Window> Create(const WindowCreateInfo& createInfo);
 	protected:

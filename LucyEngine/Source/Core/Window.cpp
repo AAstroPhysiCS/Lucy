@@ -45,22 +45,17 @@ namespace Lucy {
 		switch (m_CreateInfo.WindowMode) {
 			case WindowMode::FULLSCREEN: {
 				GLFWmonitor* mainMonitor = glfwGetPrimaryMonitor();
-				m_Window = glfwCreateWindow(m_CreateInfo.Width, m_CreateInfo.Height, m_CreateInfo.Name.c_str(), mainMonitor, nullptr);
+				m_Window = glfwCreateWindow(m_CreateInfo.Width, m_CreateInfo.Height, m_CreateInfo.Title.c_str(), mainMonitor, nullptr);
 				break;
 			}
 			case WindowMode::WINDOWED: {
-				m_Window = glfwCreateWindow(m_CreateInfo.Width, m_CreateInfo.Height, m_CreateInfo.Name.c_str(), nullptr, nullptr);
+				m_Window = glfwCreateWindow(m_CreateInfo.Width, m_CreateInfo.Height, m_CreateInfo.Title.c_str(), nullptr, nullptr);
 				break;
 			}
 			default:
 				LUCY_CRITICAL("Should not happen?");
 				LUCY_ASSERT(false);
 				break;
-		}
-
-		if (architecture == RenderArchitecture::OpenGL) {
-			glfwMakeContextCurrent(m_Window);
-			glfwSwapInterval(m_CreateInfo.VSync);
 		}
 	}
 
@@ -74,6 +69,11 @@ namespace Lucy {
 
 	void Window::SetEventCallback(std::function<void(Event*)> func) {
 		s_EventFunc = func;
+	}
+
+	void Window::SetTitle(const char* title) {
+		m_CreateInfo.Title = title;
+		glfwSetWindowTitle(m_Window, title);
 	}
 
 	GLFWwindow* Window::Raw() {

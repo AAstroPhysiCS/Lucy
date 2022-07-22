@@ -9,10 +9,6 @@ namespace Lucy {
 
 	Ref<DescriptorSet> DescriptorSet::Create(const DescriptorSetCreateInfo& createInfo) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
-			case RenderArchitecture::OpenGL:
-				LUCY_ASSERT(false);
-				//return Memory::CreateRef<OpenGLDescriptorSet>(createInfo);
-				break;
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanDescriptorSet>(createInfo);
 				break;

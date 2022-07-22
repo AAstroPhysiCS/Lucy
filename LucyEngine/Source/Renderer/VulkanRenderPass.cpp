@@ -9,9 +9,9 @@ namespace Lucy {
 
 	VulkanRenderPass::VulkanRenderPass(const RenderPassCreateInfo& createInfo)
 		: RenderPass(createInfo) {
-		Ref<VulkanRHIRenderPassDesc> renderPassDesc = m_CreateInfo.InternalInfo.As<VulkanRHIRenderPassDesc>();
+		Ref<VulkanRenderPassInfo> renderPassInfo = m_CreateInfo.InternalInfo.As<VulkanRenderPassInfo>();
 		//we need this in framebuffer, outside the enqueue function, since otherwise there will be a conflict
-		m_DepthBuffered = renderPassDesc->DepthEnable;
+		m_DepthBuffered = renderPassInfo->DepthEnable;
 
 		Renderer::Enqueue([this]() {
 			Create();
@@ -21,17 +21,17 @@ namespace Lucy {
 	void VulkanRenderPass::Create() {
 		const VulkanDevice& device = VulkanDevice::Get();
 
-		Ref<VulkanRHIRenderPassDesc> renderPassDesc = m_CreateInfo.InternalInfo.As<VulkanRHIRenderPassDesc>();
+		Ref<VulkanRenderPassInfo> renderPassInfo = m_CreateInfo.InternalInfo.As<VulkanRenderPassInfo>();
 
 		VkAttachmentDescription colorAttachmentDescription{};
-		colorAttachmentDescription.format = renderPassDesc->ColorDescriptor.Format;
+		colorAttachmentDescription.format = renderPassInfo->ColorDescriptor.Format;
 		colorAttachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT; //MSAA but we dont use it yet
-		colorAttachmentDescription.loadOp = renderPassDesc->ColorDescriptor.LoadOp;
-		colorAttachmentDescription.storeOp = renderPassDesc->ColorDescriptor.StoreOp;
-		colorAttachmentDescription.stencilLoadOp = renderPassDesc->ColorDescriptor.StencilLoadOp;
-		colorAttachmentDescription.stencilStoreOp = renderPassDesc->ColorDescriptor.StencilStoreOp;
-		colorAttachmentDescription.initialLayout = renderPassDesc->ColorDescriptor.InitialLayout;
-		colorAttachmentDescription.finalLayout = renderPassDesc->ColorDescriptor.FinalLayout;
+		colorAttachmentDescription.loadOp = renderPassInfo->ColorDescriptor.LoadOp;
+		colorAttachmentDescription.storeOp = renderPassInfo->ColorDescriptor.StoreOp;
+		colorAttachmentDescription.stencilLoadOp = renderPassInfo->ColorDescriptor.StencilLoadOp;
+		colorAttachmentDescription.stencilStoreOp = renderPassInfo->ColorDescriptor.StencilStoreOp;
+		colorAttachmentDescription.initialLayout = renderPassInfo->ColorDescriptor.InitialLayout;
+		colorAttachmentDescription.finalLayout = renderPassInfo->ColorDescriptor.FinalLayout;
 
 		VkAttachmentDescription depthAttachmentDescription{};
 		depthAttachmentDescription.format = VK_FORMAT_D32_SFLOAT;
@@ -67,8 +67,8 @@ namespace Lucy {
 
 		VkSubpassDescription subpassDescription{};
 		subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpassDescription.colorAttachmentCount = renderPassDesc->ColorAttachments.size();
-		subpassDescription.pColorAttachments = renderPassDesc->ColorAttachments.data();
+		subpassDescription.colorAttachmentCount = renderPassInfo->ColorAttachments.size();
+		subpassDescription.pColorAttachments = renderPassInfo->ColorAttachments.data();
 		subpassDescription.pDepthStencilAttachment = nullptr;
 
 		std::vector<VkAttachmentDescription> attachments = { colorAttachmentDescription };

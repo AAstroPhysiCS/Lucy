@@ -16,6 +16,7 @@ namespace Lucy {
 		virtual void OnRender() = 0;
 		virtual void OnEvent(Event& e) = 0;
 		virtual void Destroy() = 0;
+		virtual void Wait() = 0;
 	protected:
 		Module(Ref<Window> window, Ref<Scene> scene);
 		

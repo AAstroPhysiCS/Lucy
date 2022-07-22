@@ -2,12 +2,9 @@
 
 #include "Core/Base.h"
 
-namespace Lucy {
+#include "../RenderArchitecture.h"
 
-	enum class RenderArchitecture {
-		OpenGL,
-		Vulkan
-	};
+namespace Lucy {
 
 	class RenderContext {
 	public:

@@ -4,7 +4,7 @@
 #include "vulkan/vulkan.h"
 
 #include "Renderer/Renderer.h"
-#include "Renderer/VulkanRHI.h"
+#include "Renderer/VulkanRenderDevice.h"
 #include "Renderer/Memory/VulkanAllocator.h"
 
 namespace Lucy {
@@ -43,7 +43,7 @@ namespace Lucy {
 
 			allocator.CreateVulkanBufferVma(VulkanBufferUsage::GPUOnly, m_Data.size() * sizeof(float),
 											VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, m_BufferHandle, m_BufferVma);
-			Renderer::GetCurrentRenderer().As<VulkanRHI>()->DirectCopyBuffer(m_StagingBufferHandle, m_BufferHandle, m_Data.size() * sizeof(float));
+			Renderer::GetCurrentRenderDevice().As<VulkanRenderDevice>()->DirectCopyBuffer(m_StagingBufferHandle, m_BufferHandle, m_Data.size() * sizeof(float));
 
 			vmaDestroyBuffer(vmaAllocatorHandle, m_StagingBufferHandle, m_StagingBufferVma);
 		});

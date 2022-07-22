@@ -8,19 +8,7 @@ namespace Lucy {
 	class VulkanImage2D;
 	class VulkanImageView;
 
-	class OpenGLRenderBuffer;
-
-	struct OpenGLRHIFrameBufferDesc {
-		bool DisableReadWriteBuffer = false;
-		bool IsStorage = false;
-		
-		std::vector<ImageCreateInfo> TextureCreateInfos;
-		ImageCreateInfo BlittedTextureCreateInfo;
-
-		Ref<OpenGLRenderBuffer> RenderBuffer;
-	};
-
-	struct VulkanRHIFrameBufferDesc {
+	struct VulkanFrameBufferInfo {
 		std::vector<Ref<VulkanImage2D>> ImageBuffers;
 		Ref<RenderPass> RenderPass = nullptr;
 
@@ -33,7 +21,7 @@ namespace Lucy {
 		int32_t	Width = 0, Height = 0;
 		int32_t Level = 1;
 
-		Ref<void> InternalInfo = nullptr; //to be overriden by different rhi's
+		Ref<void> InternalInfo = nullptr; //to be overriden by different api's
 	};
 
 	class FrameBuffer {

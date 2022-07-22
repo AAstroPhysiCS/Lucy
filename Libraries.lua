@@ -2,7 +2,6 @@ LibraryPath = {}
 
 LibraryPath["GLFW"] = "%{wks.location}/LucyEngine/ThirdParty/GLFW"
 LibraryPath["spdlog"] = "%{wks.location}/LucyEngine/ThirdParty/spdlog"
-LibraryPath["Glad"] = "%{wks.location}/LucyEngine/ThirdParty/Glad"
 LibraryPath["entt"] = "%{wks.location}/LucyEngine/ThirdParty/entt"
 LibraryPath["stb"] = "%{wks.location}/LucyEngine/ThirdParty/stb"
 LibraryPath["assimp"] = "%{wks.location}/LucyEngine/ThirdParty/assimp"

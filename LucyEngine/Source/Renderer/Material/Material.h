@@ -56,7 +56,7 @@ namespace Lucy {
 			return !m_Textures.empty() && m_Textures.size() > type.Index 
 				&& m_Textures[type.Index]->GetWidth() > 0 && m_Textures[type.Index]->GetHeight() > 0 && m_Textures[type.Index]->GetImGuiID() != 0;
 		}
-
+		
 		virtual void Update(Ref<Pipeline> pipeline) = 0;
 		void Destroy();
 

@@ -27,7 +27,7 @@ namespace Lucy {
 		virtual ~VulkanDescriptorSet() = default;
 
 		void Bind(const VulkanDescriptorSetBindInfo& bindInfo);
-		void Update();
+		void Update() override;
 	private:
 		void Create();
 

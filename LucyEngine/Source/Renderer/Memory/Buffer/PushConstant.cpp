@@ -15,9 +15,10 @@ namespace Lucy {
 	}
 
 	void PushConstant::Bind(PushConstantBindInfo& info) const {
-		//TODO: make opengl compatible
-		if (Renderer::GetCurrentRenderArchitecture() != RenderArchitecture::Vulkan) 
+		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::Vulkan) {
+			vkCmdPushConstants(info.CommandBuffer, info.PipelineLayout, m_ShaderStage, m_Offset, m_Size, m_Data.data());
 			return;
-		vkCmdPushConstants(info.CommandBuffer, info.PipelineLayout, m_ShaderStage, m_Offset, m_Size, m_Data.data());
+		}
+		LUCY_ASSERT(false);
 	}
 }

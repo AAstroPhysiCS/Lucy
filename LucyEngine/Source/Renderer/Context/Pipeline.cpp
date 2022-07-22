@@ -1,6 +1,5 @@
 #include "lypch.h"
 
-#include "OpenGLPipeline.h"
 #include "VulkanPipeline.h"
 
 #include "Renderer/Renderer.h"
@@ -9,9 +8,6 @@ namespace Lucy {
 
 	Ref<Pipeline> Pipeline::Create(const PipelineCreateInfo& createInfo) {
 		switch (Renderer::GetCurrentRenderArchitecture()) {
-			case RenderArchitecture::OpenGL:
-				return Memory::CreateRef<OpenGLPipeline>(createInfo);
-				break;
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanPipeline>(createInfo);
 				break;
@@ -54,7 +50,7 @@ namespace Lucy {
 
 	uint32_t Pipeline::CalculateStride(VertexShaderLayout vertexLayout) {
 		uint32_t stride = 0;
-		for (auto [name, size] : vertexLayout.ElementList) {
+		for (const auto& [name, size] : vertexLayout.GetElementList()) {
 			stride += GetSizeFromType(size);
 		}
 		return stride;

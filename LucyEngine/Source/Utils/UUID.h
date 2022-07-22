@@ -17,8 +17,7 @@ namespace Lucy {
 
 	typedef uint64_t LucyID;
 
-	struct IDProvider final {
-	private:
+	class IDProvider final {
 		static constexpr size_t s_PoolResizeStep = 100;
 	public:
 		IDProvider() = default;

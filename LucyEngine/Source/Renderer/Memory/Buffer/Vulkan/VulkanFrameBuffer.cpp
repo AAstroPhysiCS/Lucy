@@ -11,12 +11,12 @@ namespace Lucy {
 
 	VulkanFrameBuffer::VulkanFrameBuffer(FrameBufferCreateInfo& createInfo)
 		: FrameBuffer(createInfo) {
-		Ref<VulkanRHIFrameBufferDesc> frameBufferDesc = m_CreateInfo.InternalInfo.As<VulkanRHIFrameBufferDesc>();
+		Ref<VulkanFrameBufferInfo> frameBufferInfo = m_CreateInfo.InternalInfo.As<VulkanFrameBufferInfo>();
 		//this would make problems when we resized the window, since the lifetime of this object is short
-		if (frameBufferDesc) {
-			m_RenderPass = frameBufferDesc->RenderPass.As<VulkanRenderPass>();
-			m_Images = frameBufferDesc->ImageBuffers;
-			m_ImageViews = frameBufferDesc->ImageViews;
+		if (frameBufferInfo) {
+			m_RenderPass = frameBufferInfo->RenderPass.As<VulkanRenderPass>();
+			m_Images = frameBufferInfo->ImageBuffers;
+			m_ImageViews = frameBufferInfo->ImageViews;
 		}
 
 		if (m_RenderPass->IsDepthBuffered())
@@ -68,7 +68,7 @@ namespace Lucy {
 		depthImageCreateInfo.Format = VK_FORMAT_D32_SFLOAT;
 		depthImageCreateInfo.Width = m_CreateInfo.Width;
 		depthImageCreateInfo.Height = m_CreateInfo.Height;
-		depthImageCreateInfo.InternalInfo = Memory::CreateRef<VulkanRHIImageDesc>();
+		depthImageCreateInfo.InternalInfo = Memory::CreateRef<VulkanImageInfo>();
 
 		m_DepthImage = Image2D::Create(depthImageCreateInfo).As<VulkanImage2D>();
 	}
@@ -98,10 +98,10 @@ namespace Lucy {
 		if (internalInfo) {
 			m_CreateInfo.InternalInfo = internalInfo;
 
-			Ref<VulkanRHIFrameBufferDesc> frameBufferDesc = m_CreateInfo.InternalInfo.As<VulkanRHIFrameBufferDesc>();
-			m_RenderPass = frameBufferDesc->RenderPass.As<VulkanRenderPass>();
-			m_Images = frameBufferDesc->ImageBuffers;
-			m_ImageViews = frameBufferDesc->ImageViews;
+			Ref<VulkanFrameBufferInfo> frameBufferInfo = m_CreateInfo.InternalInfo.As<VulkanFrameBufferInfo>();
+			m_RenderPass = frameBufferInfo->RenderPass.As<VulkanRenderPass>();
+			m_Images = frameBufferInfo->ImageBuffers;
+			m_ImageViews = frameBufferInfo->ImageViews;
 		}
 
 		for (uint32_t i = 0; i < m_Images.size(); i++)

@@ -4,11 +4,15 @@
 #include "Events/EventDispatcher.h"
 #include "Events/WindowEvent.h"
 
+#include "Renderer/Renderer.h"
+
 namespace Lucy {
 
-	RendererModule::RendererModule(Ref<Window> window, Ref<Scene> scene)
+	RendererModule::RendererModule(RenderArchitecture arch, Ref<Window> window, Ref<Scene> scene)
 		: Module(window, scene) {
-		m_ViewportRenderer.Init();
+		window->SetTitle(fmt::format("{0} - Windows x64 {1}", m_Window->GetTitle(),
+						 arch == RenderArchitecture::Vulkan ? "Vulkan" : "DirectX12").c_str());
+		m_ViewportRenderer.Init(arch, m_Window);
 	}
 
 	void RendererModule::Begin() {
@@ -22,7 +26,7 @@ namespace Lucy {
 	void RendererModule::End() {
 		m_ViewportRenderer.End();
 	}
-	
+
 	void RendererModule::OnEvent(Event& e) {
 		EventDispatcher& dispatcher = EventDispatcher::GetInstance();
 		dispatcher.Dispatch<WindowResizeEvent>(e, EventType::WindowResizeEvent, [&](const WindowResizeEvent& e) {
@@ -32,5 +36,9 @@ namespace Lucy {
 
 	void RendererModule::Destroy() {
 		m_ViewportRenderer.Destroy();
+	}
+
+	void RendererModule::Wait() {
+		m_ViewportRenderer.WaitForDevice();
 	}
 }

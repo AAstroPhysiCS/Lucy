@@ -1,14 +1,16 @@
 #include "lypch.h"
 #include "VulkanImage.h"
 
-#include "Renderer/VulkanRHI.h"
+#include "Renderer/VulkanRenderDevice.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/Synchronization/VulkanSyncItems.h"
 
 #include "../Memory/VulkanAllocator.h"
 #include "../Context/VulkanDevice.h"
 
+#define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
+
 #include "../ThirdParty/ImGui/imgui_impl_vulkan.h"
 #include "glm/gtc/integer.hpp"
 
@@ -26,7 +28,6 @@ namespace Lucy {
 		: Image2D(createInfo) {
 		if (m_CreateInfo.ImageType != ImageType::Type2D) LUCY_ASSERT(false);
 		Renderer::Enqueue([=]() {
-			Ref<VulkanRHIImageDesc> imageDesc = m_CreateInfo.InternalInfo.As<VulkanRHIImageDesc>();
 			if (m_CreateInfo.Target == ImageTarget::Depth)
 				CreateDepthImage();
 			else
@@ -38,8 +39,10 @@ namespace Lucy {
 		uint8_t* data = nullptr;
 		data = stbi_load(m_Path.c_str(), &m_Width, &m_Height, &m_Channels, STBI_rgb_alpha);
 
-		if (!data)
+		if (!data) {
 			LUCY_CRITICAL(fmt::format("Failed to load a texture. Texture path: {0}", m_Path));
+			LUCY_ASSERT(false);
+		}
 
 		if (m_Width == 0 && m_Height == 0)
 			LUCY_ASSERT(false);
@@ -119,7 +122,7 @@ namespace Lucy {
 	}
 
 	void VulkanImage2D::CreateVulkanImageViewHandle() {
-		Ref<VulkanRHIImageDesc> imageDesc = m_CreateInfo.InternalInfo.As<VulkanRHIImageDesc>();
+		Ref<VulkanImageInfo> imageInfo = m_CreateInfo.InternalInfo.As<VulkanImageInfo>();
 
 		ImageViewCreateInfo imageViewCreateInfo;
 		imageViewCreateInfo.Format = (VkFormat) m_CreateInfo.Format;
@@ -127,7 +130,7 @@ namespace Lucy {
 		imageViewCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_2D;
 		imageViewCreateInfo.MipmapLevel = m_MaxMipLevel;
 		imageViewCreateInfo.GenerateMipmap = m_CreateInfo.GenerateMipmap;
-		imageViewCreateInfo.GenerateSampler = imageDesc->GenerateSampler;
+		imageViewCreateInfo.GenerateSampler = imageInfo->GenerateSampler;
 		imageViewCreateInfo.MagFilter = (VkFilter) m_CreateInfo.Parameter.Mag;
 		imageViewCreateInfo.MinFilter = (VkFilter) m_CreateInfo.Parameter.Min;
 		imageViewCreateInfo.ModeU = (VkSamplerAddressMode) m_CreateInfo.Parameter.U;
@@ -137,7 +140,7 @@ namespace Lucy {
 
 		m_ImageView = VulkanImageView(imageViewCreateInfo);
 
-		if (imageDesc->ImGuiUsage) {
+		if (imageInfo->ImGuiUsage) {
 			if (!m_ImGuiID) {
 				Renderer::Enqueue([&]() {
 					m_ImGuiID = ImGui_ImplVulkan_AddTexture(m_ImageView.GetSampler(), m_ImageView.GetVulkanHandle(), m_CurrentLayout);
@@ -149,7 +152,7 @@ namespace Lucy {
 	}
 
 	void VulkanImage2D::CopyImage(const VkBuffer& imageStagingBuffer) {
-		VulkanRHI::RecordSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+		VulkanRenderDevice::RecordSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
 			VkBufferImageCopy region{};
 			region.bufferOffset = 0;
 			region.bufferRowLength = 0;
@@ -174,7 +177,7 @@ namespace Lucy {
 
 		//Generate the mip chain
 		//Copying down the whole mip chain doing a blit from mip-1 to mip
-		VulkanRHI::RecordSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+		VulkanRenderDevice::RecordSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
 			for (uint32_t i = 1; i < m_MaxMipLevel; i++) {
 				VkImageBlit blit{};
 				blit.srcSubresource.aspectMask = m_CreateInfo.Target == ImageTarget::Depth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
@@ -211,7 +214,7 @@ namespace Lucy {
 	}
 
 	void VulkanImage2D::TransitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t levelCount) {
-		VulkanRHI::RecordSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+		VulkanRenderDevice::RecordSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
 			TransitionImageLayout(commandBuffer, image, oldLayout, newLayout, baseMipLevel, levelCount);
 		});
 	}

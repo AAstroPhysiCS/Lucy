@@ -4,7 +4,7 @@ namespace Lucy {
 
 	enum class EventType {
 		MouseEvent, KeyEvent, CharCallbackEvent, ScrollEvent, CursorPosEvent,
-		WindowResizeEvent, WindowCloseEvent
+		WindowResizeEvent, WindowCloseEvent, CustomEvent
 	};
 
 	class Event {

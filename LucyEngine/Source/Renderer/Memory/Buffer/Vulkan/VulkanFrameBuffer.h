@@ -14,8 +14,9 @@ namespace Lucy {
 
 		inline std::vector<VkFramebuffer>& GetVulkanHandles() { return m_FrameBufferHandles; }
 		inline std::vector<Ref<VulkanImage2D>>& GetImages() { return m_Images; }
-	private:
+
 		void Recreate(uint32_t width, uint32_t height, Ref<void> internalInfo = nullptr);
+	private:
 		void Create();
 		void CreateDepthImage();
 
@@ -26,9 +27,6 @@ namespace Lucy {
 		std::vector<VulkanImageView> m_ImageViews;
 
 		Ref<VulkanImage2D> m_DepthImage = nullptr;
-
-		friend class VulkanRHI; //for OnViewportResize (ImGui)
-		friend class VulkanPipeline; //for Pipeline Recreate
 	};
 }
 

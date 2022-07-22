@@ -1,5 +1,5 @@
 //type vertex
-#version 460 core
+#version 450
 
 layout (location = 0) in vec3 a_Pos;
 layout (location = 2) in vec4 a_ID;
@@ -21,14 +21,13 @@ void main() {
 }
 
 //type fragment
-#version 460 core
+#version 450
 
-layout (location = 0) out vec3 a_IDBuffer;
-layout (location = 1) out vec3 a_Depth;
+layout (location = 0) out vec4 a_IDBuffer;
 
 layout (location = 0) in vec4 o_ID;
 
 void main() {
-	a_IDBuffer = (round(o_ID / 255 * 10e4) / 10e4).xyz;
+	a_IDBuffer = round(o_ID / 255 * 10e4) / 10e4;
 	//we dont need to do anything with the depth
 }

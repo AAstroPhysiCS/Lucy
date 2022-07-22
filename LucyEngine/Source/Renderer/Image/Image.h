@@ -28,41 +28,23 @@ namespace Lucy {
 
 	struct ImageCreateInfo {
 		int32_t Width = 0, Height = 0; //gets replaced if path is available
+		ImageType ImageType;
 		ImageFormat Format;
 		ImageTarget Target;
 		ImageParameter Parameter;
 
 		uint32_t Samples = 1;
-		ImageType ImageType;
 		bool GenerateMipmap = false;
 
 		Ref<void> InternalInfo = nullptr;
 	};
 
-	struct VulkanRHIImageDesc {
+	struct VulkanImageInfo {
 		bool ImGuiUsage = false;
 		bool GenerateSampler = false;
 	};
 
-	struct OpenGLRHIImageDesc {
-
-		enum class PixelType {
-			Byte = 0x1400,
-			UnsignedByte = 0x1401,
-			UnsignedShort565 = 0x8363,
-			Short = 0x1402,
-			Int = 0x1404,
-			Float = 0x1406
-		};
-		
-		PixelType PixelType = PixelType::UnsignedByte;
-		uint32_t AttachmentIndex;
-		ImageFormat InternalFormat;
-		bool DisableReadWriteBuffer = false;
-	};
-
 	//Vulkan: Descriptor Set
-	//OpenGL: ID
 	typedef void* ImageImGuiID;
 
 	class Image2D

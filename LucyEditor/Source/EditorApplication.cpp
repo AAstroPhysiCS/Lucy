@@ -8,7 +8,6 @@
 
 #include "EditorModule.h"
 #include "Renderer/RendererModule.h"
-#include "Renderer/Renderer.h"
 
 namespace Lucy {
 
@@ -20,7 +19,7 @@ namespace Lucy {
 		: Application(args, applicationCreateInfo) {
 		m_Scene = Memory::CreateRef<Scene>();
 
-		Ref<RendererModule> rendererModule = Memory::CreateRef<RendererModule>(m_Window, m_Scene);
+		Ref<RendererModule> rendererModule = Memory::CreateRef<RendererModule>(applicationCreateInfo.RenderArchitecture, m_Window, m_Scene);
 		Ref<EditorModule> editorModule = Memory::CreateRef<EditorModule>(m_Window, m_Scene);
 
 		m_ModuleStack.Push(editorModule);
@@ -28,7 +27,8 @@ namespace Lucy {
 	}
 
 	EditorApplication::~EditorApplication() {
-		Renderer::WaitForDevice();
+		for (Ref<Module> m : m_ModuleStack.GetStack())
+			m->Wait();
 		m_Scene->Destroy();
 	}
 

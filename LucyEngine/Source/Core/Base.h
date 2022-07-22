@@ -34,7 +34,7 @@
 
 namespace Lucy {
 
-	using SubmitFunc = std::function<void()>;
+	using EnqueueFunc = std::function<void()>;
 
 	template <typename ... T>
 	using RecordFunc = std::function<void(T...)>;

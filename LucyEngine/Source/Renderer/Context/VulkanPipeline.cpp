@@ -82,8 +82,23 @@ namespace Lucy {
 				rasterizationCreateInfo.polygonMode = VK_POLYGON_MODE_POINT;
 				break;
 		}
+
+		switch (m_CreateInfo.Rasterization.CullingMode) {
+			case CullingMode::None:
+				rasterizationCreateInfo.cullMode = VK_CULL_MODE_NONE;
+				break;
+			case CullingMode::Front:
+				rasterizationCreateInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
+				break;
+			case CullingMode::Back:
+				rasterizationCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+				break;
+			case CullingMode::FrontAndBack:
+				rasterizationCreateInfo.cullMode = VK_CULL_MODE_FRONT_AND_BACK;
+				break;
+		}
+
 		rasterizationCreateInfo.lineWidth = m_CreateInfo.Rasterization.LineWidth;
-		rasterizationCreateInfo.cullMode = m_CreateInfo.Rasterization.CullingMode;
 		rasterizationCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 		rasterizationCreateInfo.depthBiasEnable = VK_FALSE;
 		rasterizationCreateInfo.depthBiasConstantFactor = 0.0f;
@@ -338,7 +353,7 @@ namespace Lucy {
 		uint32_t bufferIndex = 0;
 		uint32_t offset = 0;
 
-		for (auto [name, size] : m_CreateInfo.VertexShaderLayout.ElementList) {
+		for (const auto& [name, size] : m_CreateInfo.VertexShaderLayout.GetElementList()) {
 			VkVertexInputAttributeDescription attributeDescriptor;
 			attributeDescriptor.binding = binding;
 			attributeDescriptor.location = bufferIndex++;

@@ -11,12 +11,12 @@
 namespace Lucy {
 
 	struct ShaderStageInfo {
-		uint32_t UniformCount = 0;
-		uint32_t SampledImagesCount = 0;
-		uint32_t PushConstantBufferCount = 0;
-		uint32_t StageInputCount = 0;
-		uint32_t StageOutputCount = 0;
-		uint32_t StorageBufferCount = 0;
+		size_t UniformCount = 0;
+		size_t SampledImagesCount = 0;
+		size_t PushConstantBufferCount = 0;
+		size_t StageInputCount = 0;
+		size_t StageOutputCount = 0;
+		size_t StorageBufferCount = 0;
 	};
 
 	enum class ShaderMemberType {

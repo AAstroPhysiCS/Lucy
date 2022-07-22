@@ -9,12 +9,13 @@ int main(int argc, char** argv) {
 	Lucy::WindowCreateInfo windowCreateInfo;
 	windowCreateInfo.Width = 1366;
 	windowCreateInfo.Height = 766;
-	windowCreateInfo.Name = "LucyEditor";
+	windowCreateInfo.Title = "LucyEditor";
 	windowCreateInfo.Resizable = true;
 	windowCreateInfo.VSync = false;
 
 	Lucy::ApplicationCreateInfo applicationCreateInfo;
 	applicationCreateInfo.WindowCreateInfo = windowCreateInfo;
+	//applicationCreateInfo.RenderArchitecture = RenderArchitecture::Vulkan;
 
 	Lucy::Application* lucyApplication = Lucy::CreateEditorApplication({ argc, argv }, applicationCreateInfo);
 	lucyApplication->Run();

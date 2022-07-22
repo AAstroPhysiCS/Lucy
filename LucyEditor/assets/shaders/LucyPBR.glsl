@@ -43,12 +43,6 @@ struct LucyOutput {
 	vec2 TextCoords;
 };
 
-layout (push_constant) uniform LocalPushConstant {
-	layout (offset = 64) float u_MaterialID;
-};
-
-layout (location = 0) in LucyOutput r_Output;
-
 struct MaterialAttributes {
 	float AlbedoSlot;
 	float NormalSlot;
@@ -60,6 +54,12 @@ struct MaterialAttributes {
 	float Roughness;
 	float Reflectivity;
 	float AOSlot;
+};
+
+layout (location = 0) in LucyOutput r_Output;
+
+layout (push_constant) uniform LocalPushConstant {
+	layout (offset = 64) float u_MaterialID;
 };
 
 layout (set = 0, binding = 1) readonly buffer LucyMaterialAttributes {

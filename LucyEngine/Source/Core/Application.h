@@ -5,6 +5,8 @@
 #include "Metrics.h"
 #include "Window.h"
 
+#include "Renderer/RenderArchitecture.h"
+
 namespace Lucy {
 
 	struct ApplicationArgs {
@@ -14,6 +16,7 @@ namespace Lucy {
 
 	struct ApplicationCreateInfo {
 		WindowCreateInfo WindowCreateInfo;
+		RenderArchitecture RenderArchitecture = RenderArchitecture::Vulkan;
 	};
 
 	class Application {
