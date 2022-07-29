@@ -4,7 +4,7 @@
 
 namespace Lucy {
 
-	Entity::Entity(Scene* scene, entt::entity& entity)
+	Entity::Entity(Scene* scene, const entt::entity& entity)
 		: m_Scene(scene), m_Entity(entity) {
 	}
 }

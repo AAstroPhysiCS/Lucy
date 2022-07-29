@@ -14,13 +14,7 @@
 
 namespace Lucy {
 
-	/* --- Individual Passes --- (TODO: abstract this maybe?) */
-	namespace ViewportRenderer {
-		void GeometryPass(void* commandBuffer, Ref<Pipeline> geometryPipeline, RenderCommand* staticMeshRenderCommand);
-		void IDPass(void* commandBuffer, Ref<Pipeline> geometryPipeline, RenderCommand* staticMeshRenderCommand);
-	}
-
-	/* --- Individual Resource Handles --- (TODO: abstract this maybe?) */
+	/* --- Individual Resource Handles --- */
 	static RenderCommandResourceHandle g_GeometryPassHandle;
 	static RenderCommandResourceHandle g_IDPassHandle;
 
@@ -155,17 +149,17 @@ namespace Lucy {
 		m_IDPipeline = Pipeline::Create(idPipelineCreateInfo);
 #pragma endregion IDPipeline
 
-		g_GeometryPassHandle = Renderer::CreateRenderPassResource(ViewportRenderer::GeometryPass, m_GeometryPipeline);
-		g_IDPassHandle = Renderer::CreateRenderPassResource(ViewportRenderer::IDPass, m_IDPipeline);
+		g_GeometryPassHandle = Renderer::CreateRenderPassResource(GeometryPass, m_GeometryPipeline);
+		g_IDPassHandle = Renderer::CreateRenderPassResource(IDPass, m_IDPipeline);
 	}
 
 	void RendererModule::Begin() {
 		Renderer::BeginScene(m_Scene);
 
-		const auto& meshView = m_Scene->View<MeshComponent>();
+		auto& meshView = m_Scene->View<MeshComponent>();
 
-		for (auto entity : meshView) {
-			Entity e{ m_Scene.Get(), entity };
+		for (entt::sparse_set::reverse_iterator it = meshView.rbegin(); it != meshView.rend(); it++) {
+			Entity e{ m_Scene.Get(), *it };
 			MeshComponent meshComponent = e.GetComponent<MeshComponent>();
 			if (!meshComponent.IsValid())
 				continue;
@@ -196,8 +190,6 @@ namespace Lucy {
 		auto& cameraBufferID = m_IDPipeline->GetUniformBuffers<VulkanUniformBuffer>("Camera");
 		cameraBufferID->SetData((uint8_t*)&vp, sizeof(vp));
 
-		//TODO: Refactor descriptor set api, make it decentralized, meaning make it pipeline independent
-		//example: DescriptorSetCache::UpdateAllDescriptorSets();
 		Renderer::UpdateDescriptorSets(m_GeometryPipeline);
 		Renderer::UpdateDescriptorSets(m_IDPipeline);
 
@@ -236,43 +228,5 @@ namespace Lucy {
 		auto& [viewportWidth, viewportHeight] = Renderer::GetViewportArea();
 		m_GeometryPipeline->Recreate(viewportWidth, viewportHeight);
 		m_IDPipeline->Recreate(viewportWidth, viewportHeight);
-	}
-
-	namespace ViewportRenderer {
-
-		void RenderAllMeshes(VkCommandBuffer commandBuffer, const Ref<Pipeline>& pipeline, StaticMeshRenderCommand* staticMeshRenderCommand) {
-			const Ref<Mesh>& staticMesh = staticMeshRenderCommand->Mesh;
-			const glm::mat4& entityTransform = staticMeshRenderCommand->EntityTransform;
-
-			const std::vector<Ref<Material>>& materials = staticMesh->GetMaterials();
-			std::vector<Submesh>& submeshes = staticMesh->GetSubmeshes();
-
-			Renderer::BindPipeline(commandBuffer, pipeline);
-			Renderer::BindAllDescriptorSets(commandBuffer, pipeline);
-			Renderer::BindBuffers(commandBuffer, staticMesh);
-
-			PushConstant& meshPushConstant = pipeline->GetPushConstants("LocalPushConstant");
-
-			for (uint32_t i = 0; i < submeshes.size(); i++) {
-				Submesh& submesh = submeshes[i];
-				const Ref<Material>& material = materials[submesh.MaterialIndex];
-
-				PushConstantData pushConstantData;
-				pushConstantData.FinalTransform = entityTransform * submesh.Transform;
-				pushConstantData.MaterialID = material->GetID();
-				meshPushConstant.SetData((uint8_t*)&pushConstantData, sizeof(pushConstantData));
-
-				Renderer::BindPushConstant(commandBuffer, pipeline, meshPushConstant);
-				Renderer::DrawIndexed(commandBuffer, submesh.IndexCount, 1, submesh.BaseIndexCount, submesh.BaseVertexCount, 0);
-			}
-		}
-
-		void GeometryPass(void* commandBuffer, Ref<Pipeline> geometryPipeline, RenderCommand* staticMeshRenderCommand) {
-			RenderAllMeshes((VkCommandBuffer)commandBuffer, geometryPipeline, (StaticMeshRenderCommand*)staticMeshRenderCommand);
-		}
-
-		void IDPass(void* commandBuffer, Ref<Pipeline> idPipeline, RenderCommand* staticMeshRenderCommand) {
-			RenderAllMeshes((VkCommandBuffer)commandBuffer, idPipeline, (StaticMeshRenderCommand*)staticMeshRenderCommand);
-		}
 	}
 }

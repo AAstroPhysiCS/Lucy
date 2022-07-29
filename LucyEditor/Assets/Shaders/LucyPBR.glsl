@@ -74,5 +74,5 @@ void main() {
 	if (albedo != NULL_TEXTURE_SLOT)
 		a_Color = texture(u_Textures[int(albedo)], r_Output.TextCoords);
 	else
-		a_Color = vec4(albedo);
+		a_Color = b_MaterialAttributes[int(u_MaterialID)].BaseDiffuseColor;
 }

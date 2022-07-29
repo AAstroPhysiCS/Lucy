@@ -24,4 +24,8 @@ namespace Lucy {
 		Ref<Pipeline> m_GeometryPipeline = nullptr;
 		Ref<Pipeline> m_IDPipeline = nullptr;
 	};
+
+	/* --- Individual Passes --- */
+	extern void GeometryPass(void* commandBuffer, Ref<Pipeline> geometryPipeline, RenderCommand* staticMeshRenderCommand);
+	extern void IDPass(void* commandBuffer, Ref<Pipeline> geometryPipeline, RenderCommand* staticMeshRenderCommand);
 }

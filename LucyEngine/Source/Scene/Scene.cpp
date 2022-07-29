@@ -22,7 +22,7 @@ namespace Lucy {
 	}
 
 	Entity Scene::CreateEntity() {
-		entt::entity entity = m_Registry.create();
+		const entt::entity entity = m_Registry.create();
 		Entity e{ this, entity };
 
 		e.AddComponent<UUIDComponent>();

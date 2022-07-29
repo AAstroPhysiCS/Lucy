@@ -69,7 +69,7 @@ namespace Lucy {
 		inline void Append(T* data, size_t size) {
 			m_Data.insert(m_Data.end(), data, data + size);
 		}
-		
+
 		inline void Clear() {
 			m_Data.clear();
 		}

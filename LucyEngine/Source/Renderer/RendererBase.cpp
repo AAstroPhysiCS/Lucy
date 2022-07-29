@@ -2,7 +2,6 @@
 #include "RendererBase.h"
 
 #include "Renderer/VulkanRenderer.h"
-#include "Descriptors/DescriptorSetManager.h"
 
 namespace Lucy {
 
@@ -22,8 +21,6 @@ namespace Lucy {
 	void RendererBase::Init() {
 		m_RenderContext->PrintInfo();
 		m_RenderDevice->Init();
-
-		DescriptorSetManager::Init();
 	}
 
 	void RendererBase::Destroy() {

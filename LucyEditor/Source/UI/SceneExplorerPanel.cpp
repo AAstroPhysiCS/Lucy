@@ -42,7 +42,7 @@ namespace Lucy {
 		const auto& view = m_Scene->View<UUIDComponent, TagComponent>();
 
 		uint32_t id = 0;
-		for (auto entity : view) {
+		for (const auto entity : view) {
 			Entity e = { m_Scene.Get(), entity};
 			TagComponent& tag = e.GetComponent<TagComponent>();
 			std::string& name = tag.GetTag();
