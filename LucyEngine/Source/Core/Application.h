@@ -1,13 +1,14 @@
 #pragma once
 
-#include "Base.h"
+#include "Window.h"
 #include "ModuleStack.h"
 #include "Metrics.h"
-#include "Window.h"
 
 #include "Renderer/RenderArchitecture.h"
 
 namespace Lucy {
+
+	struct Metrics;
 
 	struct ApplicationArgs {
 		int32_t Argc;
@@ -16,7 +17,7 @@ namespace Lucy {
 
 	struct ApplicationCreateInfo {
 		WindowCreateInfo WindowCreateInfo;
-		RenderArchitecture RenderArchitecture = RenderArchitecture::Vulkan;
+		RenderArchitecture RenderArchitecture;
 	};
 
 	class Application {

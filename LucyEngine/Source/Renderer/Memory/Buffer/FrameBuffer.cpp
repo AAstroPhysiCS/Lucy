@@ -1,8 +1,5 @@
 #include "lypch.h"
 #include "FrameBuffer.h"
-
-#include "Core/Base.h"
-
 #include "Vulkan/VulkanFrameBuffer.h"
 
 #include "Renderer/Renderer.h"
@@ -10,7 +7,7 @@
 namespace Lucy {
 
 	Ref<FrameBuffer> FrameBuffer::Create(FrameBufferCreateInfo& createInfo) {
-		switch (Renderer::GetCurrentRenderArchitecture()) {
+		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanFrameBuffer>(createInfo);
 				break;

@@ -72,8 +72,8 @@ namespace Lucy {
 		float m_CameraSpeed = 0.025f;
 		float m_Sensivity = 0.3f;
 
-		void UpdateView() override;
-		void UpdateProjection() override;
+		void UpdateView() final override;
+		void UpdateProjection() final override;
 	};
 }
 

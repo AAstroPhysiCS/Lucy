@@ -9,10 +9,12 @@ namespace Lucy {
 	public:
 		static SceneExplorerPanel& GetInstance();
 
-		void OnEvent(Event& e) override;
+		void OnEvent(Event& e) final override;
 
 		void SetEntityContext(Entity e);
 		inline Entity& GetEntityContext() { return m_EntityContext; }
+
+		void SetIDPipeline(Ref<Pipeline> pipeline);
 
 		void SetScene(Ref<Scene> scene);
 		inline Ref<Scene> GetActiveScene() { return m_Scene; }
@@ -24,5 +26,7 @@ namespace Lucy {
 
 		Entity m_EntityContext;
 		Ref<Scene> m_Scene = nullptr;
+
+		Ref<Pipeline> m_IDPipeline = nullptr;
 	};
 }

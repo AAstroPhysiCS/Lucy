@@ -2,16 +2,14 @@
 #include "VulkanVertexBuffer.h"
 
 #include "Renderer/Renderer.h"
-#include "Renderer/VulkanRenderDevice.h"
-#include "Renderer/Context/VulkanDevice.h"
 #include "Renderer/Memory/VulkanAllocator.h"
 
 namespace Lucy {
 
 	VulkanVertexBuffer::VulkanVertexBuffer(uint32_t size)
 		: VertexBuffer(size) {
-		Renderer::Enqueue([&, size]() {
-			Create(size);
+		Renderer::EnqueueToRenderThread([&, size]() {
+			Create(size); //staging buffer allocation
 		});
 	}
 
@@ -32,7 +30,7 @@ namespace Lucy {
 	}
 
 	void VulkanVertexBuffer::LoadToGPU() {
-		Renderer::Enqueue([&]() {
+		Renderer::EnqueueToRenderThread([&]() {
 			VulkanAllocator& allocator = VulkanAllocator::Get();
 
 			void* data;
@@ -42,7 +40,7 @@ namespace Lucy {
 
 			allocator.CreateVulkanBufferVma(VulkanBufferUsage::GPUOnly, m_Data.size() * sizeof(float),
 											VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, m_BufferHandle, m_BufferVma);
-			Renderer::GetCurrentRenderDevice().As<VulkanRenderDevice>()->DirectCopyBuffer(m_StagingBufferHandle, m_BufferHandle, m_Data.size() * sizeof(float));
+			Renderer::DirectCopyBuffer(m_StagingBufferHandle, m_BufferHandle, m_Data.size() * sizeof(float));
 
 			vmaDestroyBuffer(allocator.GetVmaInstance(), m_StagingBufferHandle, m_StagingBufferVma);
 		});

@@ -13,8 +13,8 @@ namespace Lucy {
 		DetailsPanel();
 		virtual ~DetailsPanel() = default;
 
-		void OnDestroy() override;
-		void Render() override;
+		void OnDestroy() final override;
+		void Render() final override;
 
 		template <typename T>
 		static void DrawComponentPanel(Entity& e, std::function<void(T&)> func) {

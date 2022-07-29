@@ -11,9 +11,9 @@ namespace Lucy {
 		VulkanPipeline(const PipelineCreateInfo& createInfo);
 		virtual ~VulkanPipeline() = default;
 
-		void Bind(PipelineBindInfo bindInfo) override;
-		void Destroy() override;
-		void Recreate(uint32_t width, uint32_t height);
+		void Bind(PipelineBindInfo bindInfo) final override;
+		void Destroy() final override;
+		void Recreate(uint32_t width, uint32_t height) final override;
 
 		inline VkPipeline GetVulkanHandle() { return m_PipelineHandle; }
 		inline VkPipelineLayout GetPipelineLayout() { return m_PipelineLayoutHandle; }

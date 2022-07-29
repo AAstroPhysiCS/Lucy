@@ -1,13 +1,12 @@
 #include "lypch.h"
+#include "Vulkan/VulkanUniformBuffer.h"
 
 #include "Renderer/Renderer.h"
-
-#include "Vulkan/VulkanUniformBuffer.h"
 
 namespace Lucy {
 
 	Ref<UniformBuffer> UniformBuffer::Create(UniformBufferCreateInfo& createInfo) {
-		switch (Renderer::GetCurrentRenderArchitecture()) {
+		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				if (createInfo.Type == DescriptorType::SampledImage ||
 					createInfo.Type == DescriptorType::Sampler ||

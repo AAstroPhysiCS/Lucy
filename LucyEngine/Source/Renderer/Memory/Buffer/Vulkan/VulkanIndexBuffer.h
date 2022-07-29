@@ -10,10 +10,10 @@ namespace Lucy {
 		VulkanIndexBuffer(uint32_t size);
 		virtual ~VulkanIndexBuffer() = default;
 		
-		void Bind(const IndexBindInfo& info) override;
-		void Unbind() override;
-		void LoadToGPU() override;
-		void DestroyHandle() override;
+		void Bind(const IndexBindInfo& info) final override;
+		void Unbind() final override;
+		void LoadToGPU() final override;
+		void DestroyHandle() final override;
 	private:
 		void Create(uint32_t size = 0);
 

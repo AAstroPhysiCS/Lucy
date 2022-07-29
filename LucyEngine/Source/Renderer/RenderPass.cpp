@@ -1,8 +1,8 @@
 #include "lypch.h"
 #include "RenderPass.h"
-
 #include "VulkanRenderPass.h"
-#include "Renderer.h"
+
+#include "Renderer/Renderer.h"
 
 namespace Lucy {
 
@@ -11,7 +11,7 @@ namespace Lucy {
 	}
 
 	Ref<RenderPass> Lucy::RenderPass::Create(const RenderPassCreateInfo& createInfo) {
-		switch (Renderer::GetCurrentRenderArchitecture()) {
+		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanRenderPass>(createInfo);
 				break;

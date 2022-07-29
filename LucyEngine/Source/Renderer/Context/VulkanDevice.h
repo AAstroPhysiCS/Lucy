@@ -28,7 +28,7 @@ namespace Lucy {
 		static VulkanDevice& Get();
 
 		inline VulkanDeviceInfo& GetDeviceInformation() { return m_DeviceInfo; }
-		void Create(VkInstance instance, std::vector<const char*>& enabledValidationLayers);
+		void Create(VkInstance instance, std::vector<const char*>& enabledValidationLayers, VkSurfaceKHR surface);
 		void Destroy();
 
 		inline VkPhysicalDevice GetPhysicalDevice() const { return m_PhysicalDevice; }
@@ -67,5 +67,7 @@ namespace Lucy {
 
 		VulkanDeviceInfo m_DeviceInfo;
 		QueueFamilyIndices m_QueueFamilyIndices;
+
+		VkSurfaceKHR m_Surface;
 	};
 }

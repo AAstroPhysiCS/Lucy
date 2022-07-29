@@ -1,7 +1,7 @@
 #include "lypch.h"
 #include "VulkanRenderPass.h"
 
-#include "Renderer.h"
+#include "Renderer/Renderer.h"
 #include "Context/VulkanDevice.h"
 #include "Context/VulkanSwapChain.h"
 
@@ -9,11 +9,10 @@ namespace Lucy {
 
 	VulkanRenderPass::VulkanRenderPass(const RenderPassCreateInfo& createInfo)
 		: RenderPass(createInfo) {
-		Ref<VulkanRenderPassInfo> renderPassInfo = m_CreateInfo.InternalInfo.As<VulkanRenderPassInfo>();
 		//we need this in framebuffer, outside the enqueue function, since otherwise there will be a conflict
-		m_DepthBuffered = renderPassInfo->DepthEnable;
+		m_DepthBuffered = m_CreateInfo.DepthEnable;
 
-		Renderer::Enqueue([this]() {
+		Renderer::EnqueueToRenderThread([this]() {
 			Create();
 		});
 	}
@@ -107,7 +106,7 @@ namespace Lucy {
 
 		VkClearValue clearColor;
 		clearColor.color = { m_CreateInfo.ClearColor.r, m_CreateInfo.ClearColor.g, m_CreateInfo.ClearColor.b, m_CreateInfo.ClearColor.a };
-		
+
 		VkClearValue clearDepth;
 		clearDepth.depthStencil.depth = 1.0f;
 

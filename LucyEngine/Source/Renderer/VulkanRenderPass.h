@@ -11,10 +11,10 @@ namespace Lucy {
 		VulkanRenderPass(const RenderPassCreateInfo& createInfo);
 		virtual ~VulkanRenderPass() = default;
 
-		void Begin(RenderPassBeginInfo& info) override;
-		void End() override;
-		void Destroy() override;
-		void Recreate() override;
+		void Begin(RenderPassBeginInfo& info) final override;
+		void End() final override;
+		void Destroy() final override;
+		void Recreate() final override;
 
 		inline VkRenderPass GetVulkanHandle() { return m_RenderPass; }
 		inline uint32_t GetAttachmentCount() { return m_AttachmentCount; }

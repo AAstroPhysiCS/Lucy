@@ -1,8 +1,5 @@
 #pragma once
 
-#include "Core/Base.h"
-#include "Core/FileSystem.h"
-
 #include "glm/glm.hpp"
 #include "assimp/scene.h"
 
@@ -50,10 +47,10 @@ namespace Lucy {
 		inline const std::string& GetName() const { return m_MaterialData.Name; }
 		inline LucyID GetID() const { return m_MaterialID; }
 
-		void SetImage(MaterialImageType type, Ref<Image2D> image);
-		inline Ref<Image2D> GetImage(MaterialImageType type) const { return m_Textures[type.Index]; }
-		inline bool HasImage(MaterialImageType type) const {
-			return !m_Textures.empty() && m_Textures.size() > type.Index 
+		void SetImage(const MaterialImageType& type, Ref<Image2D> image);
+		inline const Ref<Image2D>& GetImage(const MaterialImageType& type) const { return m_Textures[type.Index]; }
+		inline bool HasImage(const MaterialImageType& type) const {
+			return !m_Textures.empty() && m_Textures.size() > type.Index
 				&& m_Textures[type.Index]->GetWidth() > 0 && m_Textures[type.Index]->GetHeight() > 0 && m_Textures[type.Index]->GetImGuiID() != 0;
 		}
 		
@@ -66,7 +63,7 @@ namespace Lucy {
 		inline static const MaterialImageType ROUGHNESS_TYPE = { aiTextureType_SPECULAR, "Roughness", 3 };
 		inline static const MaterialImageType AO_TYPE = { aiTextureType_AMBIENT_OCCLUSION, "Ambient Occlusion", 4 };
 	protected:
-		virtual void LoadTexture(aiMaterial* aiMaterial, MaterialImageType type, const std::string& importedFilePath) = 0;
+		virtual void LoadTexture(aiMaterial* aiMaterial, const MaterialImageType& type, const std::string& importedFilePath) = 0;
 
 		MaterialShaderData m_MaterialShaderData;
 		MaterialData m_MaterialData;

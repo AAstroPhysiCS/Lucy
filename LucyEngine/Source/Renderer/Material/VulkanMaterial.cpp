@@ -1,6 +1,8 @@
 #include "lypch.h"
 #include "VulkanMaterial.h"
 
+#include "Core/FileSystem.h"
+
 #include "Renderer/Renderer.h"
 #include "Renderer/Context/Pipeline.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanUniformBuffer.h"
@@ -51,7 +53,7 @@ namespace Lucy {
 		ssboMaterialAttributes->Append((uint8_t*)&m_MaterialShaderData, sizeof(m_MaterialShaderData));
 	}
 
-	void VulkanMaterial::LoadTexture(aiMaterial* aiMaterial, MaterialImageType type, const std::string& importedFilePath) {
+	void VulkanMaterial::LoadTexture(aiMaterial* aiMaterial, const MaterialImageType& type, const std::string& importedFilePath) {
 		aiString path;
 		if (aiMaterial->GetTexture((aiTextureType)type.Type, 0, &path) == aiReturn_SUCCESS) {
 			std::string properTexturePath = FileSystem::GetParentPath(importedFilePath) + "/" + std::string(path.data);
@@ -66,12 +68,8 @@ namespace Lucy {
 			createInfo.Parameter.V = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 			createInfo.Parameter.W = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 			createInfo.GenerateMipmap = true;
-
-			Ref<VulkanImageInfo> imageInfo = Memory::CreateRef<VulkanImageInfo>();
-			imageInfo->ImGuiUsage = true;
-			imageInfo->GenerateSampler = true;
-
-			createInfo.InternalInfo = imageInfo;
+			createInfo.ImGuiUsage = true;
+			createInfo.GenerateSampler = true;
 
 			Ref<Image2D> texture2D = Image2D::Create(properTexturePath, createInfo);
 			m_Textures.push_back(texture2D);

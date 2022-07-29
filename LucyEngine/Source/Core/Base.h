@@ -36,6 +36,8 @@ namespace Lucy {
 
 	using EnqueueFunc = std::function<void()>;
 
-	template <typename ... T>
-	using RecordFunc = std::function<void(T...)>;
+	class Pipeline;
+	class RenderCommand;
+
+	using RenderCommandFunc = std::function<void(void*, Ref<Pipeline>, RenderCommand*)>;
 }

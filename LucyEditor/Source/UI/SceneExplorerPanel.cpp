@@ -1,9 +1,7 @@
 #include "SceneExplorerPanel.h"
-#include "imgui.h"
+#include "ViewportPanel.h"
 
 #include "Renderer/Renderer.h"
-#include "../EditorModule.h"
-#include "ViewportPanel.h"
 
 namespace Lucy {
 
@@ -20,7 +18,7 @@ namespace Lucy {
 			if (viewportPanel.IsOverAnyGizmo() || !viewportPanel.IsViewportActive()) return;
 
 			if (e == MouseCode::Button0) {
-				Entity e = Renderer::OnMousePicking();
+				Entity e = Renderer::OnMousePicking(m_IDPipeline);
 				e.IsValid() ? SetEntityContext(e) : SetEntityContext({});
 			}
 		});
@@ -28,6 +26,10 @@ namespace Lucy {
 
 	void SceneExplorerPanel::SetEntityContext(Entity e) {
 		m_EntityContext = e;
+	}
+
+	void SceneExplorerPanel::SetIDPipeline(Ref<Pipeline> pipeline) {
+		m_IDPipeline = pipeline;
 	}
 
 	void SceneExplorerPanel::SetScene(Ref<Scene> scene) {

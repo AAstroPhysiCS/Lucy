@@ -8,7 +8,7 @@ namespace Lucy {
 
 	VulkanCommandPool::VulkanCommandPool(const CommandPoolCreateInfo& createInfo)
 		: CommandPool(createInfo) {
-		Renderer::Enqueue([this]() {
+		Renderer::EnqueueToRenderThread([this]() {
 			Allocate();
 		});
 	}

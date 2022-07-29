@@ -1,17 +1,14 @@
 #include "lypch.h"
 #include "VulkanContext.h"
 
-#include "GLFW/glfw3.h"
-#include "Renderer/Renderer.h"
 #include "Renderer/Memory/VulkanAllocator.h"
-
 #include "Renderer/Context/VulkanDevice.h"
 #include "Renderer/Context/VulkanSwapChain.h"
 
 namespace Lucy {
 	
-	VulkanContext::VulkanContext()
-		: RenderContext() {
+	VulkanContext::VulkanContext(Ref<Window>& window)
+		: RenderContext(window) {
 		Init();
 	}
 
@@ -19,7 +16,7 @@ namespace Lucy {
 		VulkanAllocator::Get().Destroy();
 		VulkanSwapChain::Get().Destroy();
 		VulkanDevice::Get().Destroy();
-		Renderer::GetWindow()->DestroyVulkanSurface(m_Instance);
+		m_Window->DestroyVulkanSurface(m_Instance);
 
 		DestroyMessageCallback();
 		vkDestroyInstance(m_Instance, nullptr);
@@ -76,9 +73,9 @@ namespace Lucy {
 		SetupMessageCallback();
 #endif
 		
-		Renderer::GetWindow()->InitVulkanSurface(m_Instance);
-		VulkanDevice::Get().Create(m_Instance, m_ValidationLayers);
-		VulkanSwapChain::Get().Create();
+		m_Window->InitVulkanSurface(m_Instance);
+		VulkanDevice::Get().Create(m_Instance, m_ValidationLayers, m_Window->GetVulkanSurface());
+		VulkanSwapChain::Get().Create(m_Window);
 		VulkanAllocator::Get().Init(m_Instance);
 	}
 

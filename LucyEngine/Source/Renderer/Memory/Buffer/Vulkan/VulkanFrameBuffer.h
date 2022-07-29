@@ -1,7 +1,9 @@
 #pragma once
 
 #include "../FrameBuffer.h"
+
 #include "Renderer/VulkanRenderPass.h"
+#include "Renderer/Image/VulkanImage.h"
 
 namespace Lucy {
 
@@ -10,12 +12,12 @@ namespace Lucy {
 		VulkanFrameBuffer(FrameBufferCreateInfo& createInfo);
 		virtual ~VulkanFrameBuffer() = default;
 		
-		void Destroy() override;
+		void Destroy() final override;
 
 		inline std::vector<VkFramebuffer>& GetVulkanHandles() { return m_FrameBufferHandles; }
 		inline std::vector<Ref<VulkanImage2D>>& GetImages() { return m_Images; }
 
-		void Recreate(uint32_t width, uint32_t height, Ref<void> internalInfo = nullptr);
+		void Recreate(uint32_t width, uint32_t height, Ref<void> internalInfo = nullptr) final override;
 	private:
 		void Create();
 		void CreateDepthImage();

@@ -15,14 +15,15 @@ namespace Lucy {
 		//this would make problems when we resized the window, since the lifetime of this object is short
 		if (frameBufferInfo) {
 			m_RenderPass = frameBufferInfo->RenderPass.As<VulkanRenderPass>();
-			m_Images = frameBufferInfo->ImageBuffers;
 			m_ImageViews = frameBufferInfo->ImageViews;
+
+			m_Images = std::vector<Ref<VulkanImage2D>>(m_CreateInfo.ImageBuffers.begin(), m_CreateInfo.ImageBuffers.end());
 		}
 
 		if (m_RenderPass->IsDepthBuffered())
 			CreateDepthImage();
 
-		Renderer::Enqueue([=]() {
+		Renderer::EnqueueToRenderThread([=]() {
 			Create();
 		});
 	}
@@ -68,7 +69,6 @@ namespace Lucy {
 		depthImageCreateInfo.Format = VK_FORMAT_D32_SFLOAT;
 		depthImageCreateInfo.Width = m_CreateInfo.Width;
 		depthImageCreateInfo.Height = m_CreateInfo.Height;
-		depthImageCreateInfo.InternalInfo = Memory::CreateRef<VulkanImageInfo>();
 
 		m_DepthImage = Image2D::Create(depthImageCreateInfo).As<VulkanImage2D>();
 	}
@@ -100,8 +100,9 @@ namespace Lucy {
 
 			Ref<VulkanFrameBufferInfo> frameBufferInfo = m_CreateInfo.InternalInfo.As<VulkanFrameBufferInfo>();
 			m_RenderPass = frameBufferInfo->RenderPass.As<VulkanRenderPass>();
-			m_Images = frameBufferInfo->ImageBuffers;
 			m_ImageViews = frameBufferInfo->ImageViews;
+
+			m_Images = std::vector<Ref<VulkanImage2D>>(m_CreateInfo.ImageBuffers.begin(), m_CreateInfo.ImageBuffers.end());
 		}
 
 		for (uint32_t i = 0; i < m_Images.size(); i++)
@@ -109,7 +110,6 @@ namespace Lucy {
 
 		if (m_DepthImage)
 			m_DepthImage->Recreate(width, height);
-
 		Create();
 	}
 }

@@ -10,8 +10,8 @@ namespace Lucy {
 		VulkanUniformBuffer(UniformBufferCreateInfo& createInfo);
 		virtual ~VulkanUniformBuffer() = default;
 
-		void LoadToGPU() override;
-		void DestroyHandle() override;
+		void LoadToGPU() final override;
+		void DestroyHandle() final override;
 
 		inline VkBuffer GetVulkanBufferHandle(const uint32_t index) { return m_Buffers[index]; }
 	private:
@@ -26,11 +26,11 @@ namespace Lucy {
 
 		inline const std::vector<VkDescriptorImageInfo>& GetImageInfos() const { return m_ImageInfos; }
 		
-		void LoadToGPU() override;
+		void LoadToGPU() final override;
 
 		uint32_t BindImage(Ref<VulkanImage2D> image);
 		void Clear();
-		void DestroyHandle() override;
+		void DestroyHandle() final override;
 	private:
 		std::vector<VkDescriptorImageInfo> m_ImageInfos;
 	};

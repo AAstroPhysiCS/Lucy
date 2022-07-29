@@ -8,6 +8,7 @@
 
 namespace Lucy {
 
+	class Window;
 	class CommandQueue;
 
 	struct SwapChainCapabilities {
@@ -28,7 +29,7 @@ namespace Lucy {
 		~VulkanSwapChain() = default;
 		static VulkanSwapChain& Get();
 
-		void Create();
+		void Create(Ref<Window>& window);
 		void Recreate();
 		void BeginFrame();
 		void EndFrame(const Ref<CommandQueue>& commandQueue);
@@ -75,5 +76,7 @@ namespace Lucy {
 		std::vector<Fence> m_InFlightFences;
 
 		VkResult m_LastSwapChainResult;
+
+		Ref<Window> m_Window = nullptr;
 	};
 }

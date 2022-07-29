@@ -1,18 +1,11 @@
 #pragma once
 
-#include "Core/Base.h"
-
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
 #include "ImGuizmo.h"
 
-#include "GLFW/glfw3.h"
-
 #include "Core/Panel.h"
-#include "Core/Window.h"
-
-#include "Scene/Scene.h"
 
 #include "Renderer/Descriptors/VulkanDescriptorPool.h"
 
@@ -20,16 +13,28 @@ namespace Lucy {
 
 #define IMGUI_MAX_POOL_SIZES 100
 
+	class RendererModule;
 	class VulkanDescriptorPool;
+
+	class FrameBuffer;
+	class RenderPass;
+	
+	class Scene;
+	class Window;
+
+	struct ImGuiPipeline {
+		Ref<RenderPass> UIRenderPass = nullptr;
+		Ref<FrameBuffer> UIFramebuffer = nullptr;
+	};
 
 	class ImGuiOverlay {
 	public:
 		ImGuiOverlay();
 		~ImGuiOverlay() = default;
 
-		void Init(Ref<Window> window, Ref<Scene> scene);
+		void Init(Ref<Window> window, Ref<Scene> scene, const Ref<RendererModule>& rendererModule);
 		void Render();
-		void SendImGuiDataToGPU();
+		void SendImGuiDataToDevice();
 		void OnEvent(Event& e);
 		void Destroy();
 	private:
@@ -41,5 +46,7 @@ namespace Lucy {
 
 		uint32_t m_Time = 0;
 		std::vector<Panel*> m_Panels;
+
+		ImGuiPipeline m_ImGuiPipeline;
 	};
 }

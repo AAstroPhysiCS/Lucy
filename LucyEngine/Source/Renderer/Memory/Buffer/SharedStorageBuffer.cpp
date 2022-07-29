@@ -1,13 +1,13 @@
 #include "lypch.h"
 #include "SharedStorageBuffer.h"
+#include "Vulkan/VulkanSharedStorageBuffer.h"
 
 #include "Renderer/Renderer.h"
-#include "Vulkan/VulkanSharedStorageBuffer.h"
 
 namespace Lucy {
 
 	Ref<SharedStorageBuffer> SharedStorageBuffer::Create(const SharedStorageBufferCreateInfo& createInfo) {
-		switch (Renderer::GetCurrentRenderArchitecture()) {
+		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanSharedStorageBuffer>(createInfo);
 				break;

@@ -20,7 +20,7 @@ namespace Lucy {
 
 		inline EditorCamera& GetEditorCamera() { return m_Camera; }
 
-		void Update();
+		void Update(float viewportWidth, float viewportHeight);
 		void Destroy();
 
 		template <typename ... T>

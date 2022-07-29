@@ -3,12 +3,11 @@
 #include "VulkanCommandQueue.h"
 
 #include "Renderer/Renderer.h"
-#include "Renderer/Context/VulkanSwapChain.h"
 
 namespace Lucy {
 
 	Ref<CommandQueue> CommandQueue::Create() {
-		switch (Renderer::GetCurrentRenderArchitecture()) {
+		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanCommandQueue>();
 				break;
@@ -16,25 +15,20 @@ namespace Lucy {
 		return nullptr;
 	}
 
-	void CommandQueue::Init() {
-		CommandPoolCreateInfo createInfo;
-		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::Vulkan) {
-			const VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-			createInfo.CommandBufferCount = swapChain.GetMaxFramesInFlight();
-			createInfo.Level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-			createInfo.PoolFlags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		}
-
-		m_CommandPool = CommandPool::Create(createInfo);
+	RenderCommandResourceHandle CommandQueue::CreateRenderPassResource(RenderCommandFunc&& func, Ref<Pipeline> pipeline) {
+		RenderCommandResourceHandle uniqueHandle = RenderCommandResource::CreateUniqueHandle();
+		std::pair<RenderCommandResourceHandle, RenderCommandResource> pair{ uniqueHandle, RenderCommandResource(std::move(func), pipeline) };
+		m_BufferMap.insert(pair);
+		return uniqueHandle;
 	}
 
-	void CommandQueue::Enqueue(const CommandElement& element) {
-		m_Buffer.push_back(element);
+	void CommandQueue::EnqueueRenderCommand(RenderCommandResourceHandle resourceHandle, const Ref<RenderCommand>& command) {
+		m_BufferMap[resourceHandle].EnqueueRenderCommand(command);
 	}
 
 	void CommandQueue::Recreate() {
 		m_CommandPool->Recreate();
-		Clear();
+		//Clear();
 	}
 
 	void CommandQueue::Free() {
@@ -43,6 +37,6 @@ namespace Lucy {
 	}
 
 	void CommandQueue::Clear() {
-		m_Buffer.clear();
+		m_BufferMap.clear();
 	}
 }

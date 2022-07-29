@@ -3,7 +3,8 @@
 #include "Shader.h"
 #include "VulkanShader.h"
 
-#include "../Renderer.h"
+#include "Renderer/Renderer.h"
+
 #include "Utils/Utils.h"
 #include "Core/FileSystem.h"
 
@@ -11,13 +12,13 @@ namespace Lucy {
 
 	Shader::Shader(const std::string& name, const std::string& path)
 		: m_Path(path), m_Name(name) {
-		Renderer::Enqueue([=]() {
+		Renderer::EnqueueToRenderThread([=]() {
 			Load();
 		});
 	}
 
 	Ref<Shader> Shader::Create(const std::string& name, const std::string& path) {
-		auto currentRenderArchitecture = Renderer::GetCurrentRenderArchitecture();
+		auto currentRenderArchitecture = Renderer::GetRenderArchitecture();
 		Ref<Shader> instance = nullptr;
 		if (currentRenderArchitecture == RenderArchitecture::Vulkan) {
 			instance = Memory::CreateRef<VulkanShader>(name, path);
@@ -25,29 +26,15 @@ namespace Lucy {
 		return instance;
 	}
 
-	Ref<Shader> ShaderLibrary::GetShader(const std::string& name) {
-		for (auto& shader : m_Shaders) {
-			if (shader->GetName() == name)
-				return shader;
-		}
-
-		LUCY_CRITICAL("Shader not found!");
-		LUCY_ASSERT(false);
-	}
-
-	void ShaderLibrary::PushShader(const Ref<Shader>& instance) {
-		m_Shaders.push_back(instance);
-	}
-
 	void Shader::Load() {
 		shaderc::Compiler compiler;
 		shaderc::CompileOptions options;
+
 		options.SetOptimizationLevel(shaderc_optimization_level::shaderc_optimization_level_performance);
 		options.SetGenerateDebugInfo();
 
-		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::Vulkan) {
+		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan)
 			options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_2);
-		}
 
 		const auto [vertexFileExtension, fragmentFileExtension] = GetCachedFileExtension();
 		const std::string& cacheFileVert = FileSystem::GetParentPath(m_Path) + "/" + FileSystem::GetFileName(m_Path) + vertexFileExtension;
@@ -129,8 +116,37 @@ namespace Lucy {
 	}
 
 	const Shader::Extensions Shader::GetCachedFileExtension() {
-		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::Vulkan) {
+		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan) {
 			return Extensions{ ".cached_vulkan.vert", ".cached_vulkan.frag" };
 		}
+	}
+
+	ShaderLibrary& ShaderLibrary::Get() {
+		static ShaderLibrary s_Instance;
+		return s_Instance;
+	}
+
+	void ShaderLibrary::Init() {
+		PushShader(Shader::Create("LucyPBR", "Assets/Shaders/LucyPBR.glsl"));
+		PushShader(Shader::Create("LucyID", "Assets/Shaders/LucyID.glsl"));
+	}
+
+	void ShaderLibrary::Destroy() {
+		for (const auto& shader : m_Shaders)
+			shader->Destroy();
+	}
+
+	Ref<Shader> ShaderLibrary::GetShader(const std::string& name) {
+		for (auto& shader : m_Shaders) {
+			if (shader->GetName() == name)
+				return shader;
+		}
+
+		LUCY_CRITICAL("Shader not found!");
+		LUCY_ASSERT(false);
+	}
+
+	void ShaderLibrary::PushShader(const Ref<Shader>& instance) {
+		m_Shaders.push_back(instance);
 	}
 }

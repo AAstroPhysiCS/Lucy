@@ -42,32 +42,18 @@ namespace Lucy {
 			Entity e{ this, entity };
 			MeshComponent& meshComponent = e.GetComponent<MeshComponent>();
 			const Ref<Mesh>& mesh = meshComponent.GetMesh();
-			const glm::vec3& meshIDValue = mesh->GetMeshID() / 255.0f;
+			const glm::vec3& meshIDValue = mesh->GetMeshID();
 
-			if (glm::round(meshIDValue * 10e4f) / 10e4f == meshID)
+			if (meshIDValue == meshID)
 				return e;
 		}
 		LUCY_ASSERT(false);
 	}
-	
-	void Scene::Update() {
-		const auto& [sizeX, sizeY] = Renderer::GetViewportSize();
 
+	void Scene::Update(float viewportWidth, float viewportHeight) {
 		EditorCamera& camera = GetEditorCamera();
-		camera.SetViewportSize(sizeX, sizeY);
+		camera.SetViewportSize(viewportWidth, viewportHeight);
 		camera.Update();
-
-		//High priority stuff must be called earlier than mid or low, since those meshes get render first.
-		//I won't be sorting the draw commands accordingly, the sort must happen here (for performance reason)
-
-		const auto& meshView = View<MeshComponent>();
-		for (auto entity : meshView) {
-			Entity e{ this, entity };
-			MeshComponent meshComponent = e.GetComponent<MeshComponent>();
-			if (!meshComponent.IsValid()) continue;
-
-			Renderer::EnqueueStaticMesh(Priority::LOW, meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
-		}
 	}
 
 	void Scene::Destroy() {

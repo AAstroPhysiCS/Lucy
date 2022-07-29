@@ -1,7 +1,5 @@
 #pragma once
 
-#include "../Core/Base.h"
-
 #include "vulkan/vulkan.h"
 
 namespace Lucy {
@@ -23,10 +21,10 @@ namespace Lucy {
 	struct VulkanRenderPassInfo {
 		std::vector<VkAttachmentReference> ColorAttachments;
 		VulkanAttachmentDescriptor ColorDescriptor;
-		bool DepthEnable = false;
 	};
 
 	struct RenderPassCreateInfo {
+		bool DepthEnable = false;
 		ClearColor ClearColor;
 		Ref<void> InternalInfo = nullptr;  //to be overriden by different api's
 	};

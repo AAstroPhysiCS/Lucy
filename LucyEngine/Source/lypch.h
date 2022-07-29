@@ -14,6 +14,7 @@
 #include <utility>
 #include <algorithm>
 #include <functional>
+#include <set>
 
 #include <string>
 #include <sstream>

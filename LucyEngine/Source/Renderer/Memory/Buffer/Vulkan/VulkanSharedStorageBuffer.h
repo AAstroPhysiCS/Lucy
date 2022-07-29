@@ -12,8 +12,8 @@ namespace Lucy {
 		VulkanSharedStorageBuffer(const SharedStorageBufferCreateInfo& createInfo);
 		virtual ~VulkanSharedStorageBuffer() = default;
 
-		void LoadToGPU() override;
-		void DestroyHandle() override;
+		void LoadToGPU() final override;
+		void DestroyHandle() final override;
 
 		inline VkBuffer GetVulkanBufferHandle(const uint32_t index) { return m_Buffers[index]; }
 	private:

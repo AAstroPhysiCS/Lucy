@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Core/Base.h"
-
 namespace Lucy {
 
 	typedef uint32_t ImageFormat;
@@ -33,13 +31,12 @@ namespace Lucy {
 		ImageTarget Target;
 		ImageParameter Parameter;
 
+		//won't have an effect, if the image is being imported from path
+		uint32_t AdditionalUsageFlags = 0;
+
 		uint32_t Samples = 1;
 		bool GenerateMipmap = false;
 
-		Ref<void> InternalInfo = nullptr;
-	};
-
-	struct VulkanImageInfo {
 		bool ImGuiUsage = false;
 		bool GenerateSampler = false;
 	};
@@ -47,8 +44,7 @@ namespace Lucy {
 	//Vulkan: Descriptor Set
 	typedef void* ImageImGuiID;
 
-	class Image2D
-	{
+	class Image2D {
 	public:
 		virtual ~Image2D() = default;
 

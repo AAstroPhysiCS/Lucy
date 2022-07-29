@@ -6,6 +6,8 @@
 
 namespace Lucy {
 
+	class Pipeline;
+
 	class ViewportPanel : public Panel
 	{
 	public:
@@ -21,7 +23,9 @@ namespace Lucy {
 		bool IsViewportActive();
 		bool IsOverAnyGizmo();
 
-		void OnEvent(Event& e) override;
+		void SetViewportOutputPipeline(Ref<Pipeline> pipeline);
+
+		void OnEvent(Event& e) final override;
 	private:
 		void Render();
 
@@ -38,6 +42,8 @@ namespace Lucy {
 		bool IsOverAnyGizmoM();
 
 		ImVec2 m_Size;
+
+		Ref<Pipeline> m_ViewportOutputPipeline = nullptr;
 	};
 }
 

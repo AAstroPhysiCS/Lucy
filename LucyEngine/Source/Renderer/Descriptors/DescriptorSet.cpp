@@ -1,14 +1,13 @@
 #include "lypch.h"
 #include "DescriptorSet.h"
+#include "VulkanDescriptorSet.h"
 
 #include "Renderer/Renderer.h"
-
-#include "VulkanDescriptorSet.h"
 
 namespace Lucy {
 
 	Ref<DescriptorSet> DescriptorSet::Create(const DescriptorSetCreateInfo& createInfo) {
-		switch (Renderer::GetCurrentRenderArchitecture()) {
+		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanDescriptorSet>(createInfo);
 				break;

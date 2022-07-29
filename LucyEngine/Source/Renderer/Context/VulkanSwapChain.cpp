@@ -3,7 +3,6 @@
 #include "VulkanSwapChain.h"
 #include "VulkanDevice.h"
 
-#include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 #include "Renderer/Commands/VulkanCommandQueue.h"
 #include "Renderer/Renderer.h"
 
@@ -20,7 +19,8 @@ namespace Lucy {
 		return s_Instance;
 	}
 
-	void VulkanSwapChain::Create() {
+	void VulkanSwapChain::Create(Ref<Window>& window) {
+		m_Window = window;
 		m_SwapChain = Create(nullptr);
 	}
 
@@ -42,7 +42,7 @@ namespace Lucy {
 
 		VkSwapchainCreateInfoKHR createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-		createInfo.surface = Renderer::GetWindow()->GetVulkanSurface();
+		createInfo.surface = m_Window->GetVulkanSurface();
 		createInfo.minImageCount = imageCount;
 		createInfo.imageFormat = m_SelectedFormat.format;
 		createInfo.imageColorSpace = m_SelectedFormat.colorSpace;
@@ -175,7 +175,7 @@ namespace Lucy {
 
 	SwapChainCapabilities VulkanSwapChain::GetSwapChainCapabilities(VkPhysicalDevice device) {
 		SwapChainCapabilities capabilities;
-		VkSurfaceKHR surface = Renderer::GetWindow()->GetVulkanSurface();
+		VkSurfaceKHR surface = m_Window->GetVulkanSurface();
 
 		LUCY_VK_ASSERT(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &capabilities.surfaceCapabilities));
 
@@ -219,7 +219,7 @@ namespace Lucy {
 			return capabilities.surfaceCapabilities.currentExtent;
 		} else {
 			int32_t width, height;
-			glfwGetFramebufferSize(Renderer::GetWindow()->Raw(), &width, &height);
+			glfwGetFramebufferSize(m_Window->Raw(), &width, &height);
 
 			VkExtent2D actualExtent = { width, height };
 

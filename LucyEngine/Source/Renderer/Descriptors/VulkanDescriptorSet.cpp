@@ -5,7 +5,6 @@
 #include "Renderer/Memory/Buffer/Vulkan/VulkanSharedStorageBuffer.h"
 #include "Renderer/Context/VulkanSwapChain.h"
 #include "Renderer/Context/VulkanDevice.h"
-#include "Renderer/Renderer.h"
 
 namespace Lucy {
 

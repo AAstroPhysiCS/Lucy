@@ -1,7 +1,6 @@
 #include "lypch.h"
 #include "VulkanPipeline.h"
 
-#include "vulkan/vulkan.h"
 #include "../Shader/VulkanShader.h"
 
 #include "../VulkanRenderPass.h"
@@ -18,7 +17,7 @@ namespace Lucy {
 
 	VulkanPipeline::VulkanPipeline(const PipelineCreateInfo& createInfo)
 		: Pipeline(createInfo) {
-		Renderer::Enqueue([&]() {
+		Renderer::EnqueueToRenderThread([&]() {
 			Create();
 		});
 	}

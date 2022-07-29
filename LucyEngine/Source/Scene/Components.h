@@ -59,7 +59,6 @@ namespace Lucy {
 		UUIDComponent(const UUIDComponent& other) = default;
 
 		inline std::string GetUUID() { return m_UUID.m_UUIDAsString; }
-
 	private:
 		UUID m_UUID;
 	};

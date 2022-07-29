@@ -1,6 +1,5 @@
 #include "lypch.h"
 #include "VertexBuffer.h"
-
 #include "Vulkan/VulkanVertexBuffer.h"
 
 #include "Renderer/Renderer.h"
@@ -8,7 +7,7 @@
 namespace Lucy {
 
 	Ref<VertexBuffer> VertexBuffer::Create(uint32_t size) {
-		switch (Renderer::GetCurrentRenderArchitecture()) {
+		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanVertexBuffer>(size);
 				break;

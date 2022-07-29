@@ -2,7 +2,6 @@
 #include "Mesh.h"
 
 #include "../Core/Timer.h"
-#include "Renderer.h"
 
 namespace Lucy {
 
@@ -31,15 +30,10 @@ namespace Lucy {
 				MESH_ID_COUNT_Y = 0;
 				if (MESH_ID_COUNT_Z <= 255) {
 					MESH_ID_COUNT_Z++;
-				} else {
-					MESH_ID_COUNT_Z = 0;
-					if (MESH_ID_COUNT_W <= 255) {
-						MESH_ID_COUNT_W++;
-					}
 				}
 			}
 		}
-		m->m_MeshID = glm::vec4(MESH_ID_COUNT_X, MESH_ID_COUNT_Y, MESH_ID_COUNT_Z, MESH_ID_COUNT_W);
+		m->m_MeshID = glm::vec3(MESH_ID_COUNT_X, MESH_ID_COUNT_Y, MESH_ID_COUNT_Z);
 	}
 	
 	Mesh::Mesh(const std::string& path)
@@ -67,7 +61,7 @@ namespace Lucy {
 		}
 
 		m_IndexBuffer = IndexBuffer::Create(m_MetadataInfo.TotalIndicesSize);
-		m_VertexBuffer = VertexBuffer::Create(m_MetadataInfo.TotalVerticesSize * 18);
+		m_VertexBuffer = VertexBuffer::Create(m_MetadataInfo.TotalVerticesSize * 17);
 		IncreaseMeshCount(this);
 
 		uint32_t from = 0;
@@ -116,7 +110,6 @@ namespace Lucy {
 					(float)MESH_ID_COUNT_X,
 					(float)MESH_ID_COUNT_Y,
 					(float)MESH_ID_COUNT_Z,
-					(float)MESH_ID_COUNT_W,
 
 					normals.x,
 					normals.y,
@@ -215,7 +208,7 @@ namespace Lucy {
 	}
 
 	void Mesh::LoadMaterials(const aiScene* scene, const aiMesh* mesh) {
-		m_Materials[mesh->mMaterialIndex] = Material::Create(Renderer::GetShaderLibrary().GetShader("LucyPBR"), scene->mMaterials[mesh->mMaterialIndex], mesh->mName.data, m_Path);
+		m_Materials[mesh->mMaterialIndex] = Material::Create(ShaderLibrary::Get().GetShader("LucyPBR"), scene->mMaterials[mesh->mMaterialIndex], mesh->mName.data, m_Path);
 	}
 
 	void Mesh::TraverseHierarchy(const aiNode* node, glm::mat4& parentTransform) {

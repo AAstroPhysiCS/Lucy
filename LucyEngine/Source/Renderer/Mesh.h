@@ -52,7 +52,7 @@ namespace Lucy {
 		inline std::vector<Ref<Material>>& GetMaterials() { return m_Materials; }
 		
 		inline std::string& GetName() { return m_Name; }
-		inline const glm::vec4& GetMeshID() const { return m_MeshID; }
+		inline const glm::vec3& GetMeshID() const { return m_MeshID; }
 		inline std::string& GetPath() { return m_Path; }
 
 		inline Ref<VertexBuffer> GetVertexBuffer() { return m_VertexBuffer; }
@@ -73,7 +73,7 @@ namespace Lucy {
 		std::string m_Path;
 		std::string m_Name;
 
-		glm::vec4 m_MeshID;
+		glm::vec3 m_MeshID;
 		MetadataInfo m_MetadataInfo;
 	private:
 		friend static void IncreaseMeshCount(Mesh* m);

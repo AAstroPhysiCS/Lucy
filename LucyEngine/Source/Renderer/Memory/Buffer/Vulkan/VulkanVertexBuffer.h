@@ -12,10 +12,10 @@ namespace Lucy {
 		VulkanVertexBuffer(uint32_t size);
 		virtual ~VulkanVertexBuffer() = default;
 
-		void Bind(const VertexBindInfo& info) override;
-		void Unbind() override;
-		void LoadToGPU() override;
-		void DestroyHandle() override;
+		void Bind(const VertexBindInfo& info) final override;
+		void Unbind() final override;
+		void LoadToGPU() final override;
+		void DestroyHandle() final override;
 	private:
 		void Create(uint32_t size);
 

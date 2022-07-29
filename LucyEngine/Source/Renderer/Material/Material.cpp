@@ -1,5 +1,4 @@
 #include "lypch.h"
-
 #include "Material.h"
 #include "VulkanMaterial.h"
 
@@ -8,7 +7,7 @@
 namespace Lucy {
 
 	Ref<Material> Material::Create(Ref<Shader> shader, aiMaterial* aiMaterial, const char* submeshName, const std::string& importedFilePath) {
-		switch (Renderer::GetCurrentRenderArchitecture()) {
+		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanMaterial>(shader, aiMaterial, submeshName, importedFilePath);
 				break;
@@ -36,7 +35,7 @@ namespace Lucy {
 		m_MaterialData = MaterialData(*(glm::vec3*)&diffuse, std::string(submeshName), shininess, reflectivity, roughness);
 	}
 
-	void Material::SetImage(MaterialImageType type, Ref<Image2D> image) {
+	void Material::SetImage(const MaterialImageType& type, Ref<Image2D> image) {
 		m_Textures.insert(m_Textures.begin() + type.Index, image);
 	}
 

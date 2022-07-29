@@ -1,10 +1,12 @@
 #include "EditorModule.h"
 
+#include "Renderer/RendererModule.h"
+
 namespace Lucy {
 
-	EditorModule::EditorModule(Ref<Window> window, Ref<Scene> scene)
+	EditorModule::EditorModule(Ref<Window> window, Ref<Scene> scene, Ref<RendererModule> rendererModule)
 		: Module(window, scene) {
-		m_ImGuiOverlay.Init(m_Window, m_Scene);
+		m_ImGuiOverlay.Init(m_Window, m_Scene, rendererModule);
 	}
 
 	void EditorModule::Begin() {
@@ -13,7 +15,7 @@ namespace Lucy {
 
 	void EditorModule::OnRender() {
 		m_ImGuiOverlay.Render();
-		m_ImGuiOverlay.SendImGuiDataToGPU();
+		m_ImGuiOverlay.SendImGuiDataToDevice();
 	}
 
 	void EditorModule::End() {

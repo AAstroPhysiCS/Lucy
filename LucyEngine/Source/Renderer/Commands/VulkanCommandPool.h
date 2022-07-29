@@ -13,10 +13,10 @@ namespace Lucy {
 		inline VkCommandBuffer GetCommandBuffer(uint32_t index) { return m_CommandBuffers[index]; }
 		inline size_t GetCommandBufferSize() { return m_CommandBuffers.size(); }
 
-		void Destroy() override;
-		void Recreate() override;
+		void Destroy() final override;
+		void Recreate() final override;
 	private:
-		void Allocate() override;
+		void Allocate() final override;
 
 		VkCommandBuffer BeginSingleTimeCommand();
 		void EndSingleTimeCommand(VkCommandBuffer commandBuffer);

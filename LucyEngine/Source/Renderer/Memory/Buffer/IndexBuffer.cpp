@@ -8,7 +8,7 @@
 namespace Lucy {
 
 	Ref<IndexBuffer> IndexBuffer::Create(uint32_t size) {
-		switch (Renderer::GetCurrentRenderArchitecture()) {
+		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanIndexBuffer>(size);
 				break;

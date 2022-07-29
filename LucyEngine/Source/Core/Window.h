@@ -61,11 +61,11 @@ namespace Lucy {
 	public:
 		virtual ~WinWindow() = default;
 	private:
-		void PollEvents() override;
-		void Init(RenderArchitecture architecture) override;
-		void InitVulkanSurface(VkInstance instance) override;
-		void DestroyVulkanSurface(VkInstance instance) override;
-		void Destroy() override;
-		void WaitEventsIfMinimized() override;
+		void PollEvents() final override;
+		void Init(RenderArchitecture architecture) final override;
+		void InitVulkanSurface(VkInstance instance) final override;
+		void DestroyVulkanSurface(VkInstance instance) final override;
+		void Destroy() final override;
+		void WaitEventsIfMinimized() final override;
 	};
 }

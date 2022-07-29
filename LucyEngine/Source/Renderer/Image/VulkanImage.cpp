@@ -1,7 +1,6 @@
 #include "lypch.h"
 #include "VulkanImage.h"
 
-#include "Renderer/VulkanRenderDevice.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/Synchronization/VulkanSyncItems.h"
 
@@ -18,16 +17,18 @@ namespace Lucy {
 
 	VulkanImage2D::VulkanImage2D(const std::string& path, ImageCreateInfo& createInfo)
 		: Image2D(path, createInfo) {
-		if (m_CreateInfo.ImageType != ImageType::Type2D) LUCY_ASSERT(false);
-		Renderer::Enqueue([=]() {
+		if (m_CreateInfo.ImageType != ImageType::Type2D)
+			LUCY_ASSERT(false);
+		Renderer::EnqueueToRenderThread([=]() {
 			CreateFromPath();
 		});
 	}
 
 	VulkanImage2D::VulkanImage2D(ImageCreateInfo& createInfo)
 		: Image2D(createInfo) {
-		if (m_CreateInfo.ImageType != ImageType::Type2D) LUCY_ASSERT(false);
-		Renderer::Enqueue([=]() {
+		if (m_CreateInfo.ImageType != ImageType::Type2D)
+			LUCY_ASSERT(false);
+		Renderer::EnqueueToRenderThread([=]() {
 			if (m_CreateInfo.Target == ImageTarget::Depth)
 				CreateDepthImage();
 			else
@@ -64,7 +65,7 @@ namespace Lucy {
 
 		if (m_CreateInfo.GenerateMipmap)
 			m_MaxMipLevel = glm::floor(glm::log2(glm::max(m_Width, m_Height))) + 1;
-		
+
 		VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
 		if (m_CreateInfo.GenerateMipmap)
@@ -92,13 +93,13 @@ namespace Lucy {
 		if (m_CreateInfo.GenerateMipmap)
 			m_MaxMipLevel = glm::floor(glm::log2(glm::max(m_Width, m_Height))) + 1;
 
-		VkImageUsageFlags flags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		VkImageUsageFlags flags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | m_CreateInfo.AdditionalUsageFlags;
 
 		if (m_CreateInfo.GenerateMipmap)
 			flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
 		VulkanAllocator& allocator = VulkanAllocator::Get();
-		allocator.CreateVulkanImageVma(m_Width, m_Height, m_MaxMipLevel, (VkFormat) m_CreateInfo.Format, m_CurrentLayout,
+		allocator.CreateVulkanImageVma(m_Width, m_Height, m_MaxMipLevel, (VkFormat)m_CreateInfo.Format, m_CurrentLayout,
 									   flags, VK_IMAGE_TYPE_2D, m_Image, m_ImageVma);
 
 		if (m_CreateInfo.GenerateMipmap)
@@ -110,11 +111,11 @@ namespace Lucy {
 	}
 
 	void VulkanImage2D::CreateDepthImage() {
-		if (m_Width == 0 && m_Height == 0) 
+		if (m_Width == 0 && m_Height == 0)
 			LUCY_ASSERT(false);
 
 		VulkanAllocator& allocator = VulkanAllocator::Get();
-		allocator.CreateVulkanImageVma(m_Width, m_Height, 1, (VkFormat) m_CreateInfo.Format, m_CurrentLayout,
+		allocator.CreateVulkanImageVma(m_Width, m_Height, 1, (VkFormat)m_CreateInfo.Format, m_CurrentLayout,
 									   VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TYPE_2D, m_Image, m_ImageVma);
 
 		m_CurrentLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
@@ -122,27 +123,25 @@ namespace Lucy {
 	}
 
 	void VulkanImage2D::CreateVulkanImageViewHandle() {
-		Ref<VulkanImageInfo> imageInfo = m_CreateInfo.InternalInfo.As<VulkanImageInfo>();
-
 		ImageViewCreateInfo imageViewCreateInfo;
-		imageViewCreateInfo.Format = (VkFormat) m_CreateInfo.Format;
+		imageViewCreateInfo.Format = (VkFormat)m_CreateInfo.Format;
 		imageViewCreateInfo.Image = m_Image;
 		imageViewCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_2D;
 		imageViewCreateInfo.MipmapLevel = m_MaxMipLevel;
 		imageViewCreateInfo.GenerateMipmap = m_CreateInfo.GenerateMipmap;
-		imageViewCreateInfo.GenerateSampler = imageInfo->GenerateSampler;
-		imageViewCreateInfo.MagFilter = (VkFilter) m_CreateInfo.Parameter.Mag;
-		imageViewCreateInfo.MinFilter = (VkFilter) m_CreateInfo.Parameter.Min;
-		imageViewCreateInfo.ModeU = (VkSamplerAddressMode) m_CreateInfo.Parameter.U;
-		imageViewCreateInfo.ModeV = (VkSamplerAddressMode) m_CreateInfo.Parameter.V;
-		imageViewCreateInfo.ModeW = (VkSamplerAddressMode) m_CreateInfo.Parameter.W;
+		imageViewCreateInfo.GenerateSampler = m_CreateInfo.GenerateSampler;
+		imageViewCreateInfo.MagFilter = (VkFilter)m_CreateInfo.Parameter.Mag;
+		imageViewCreateInfo.MinFilter = (VkFilter)m_CreateInfo.Parameter.Min;
+		imageViewCreateInfo.ModeU = (VkSamplerAddressMode)m_CreateInfo.Parameter.U;
+		imageViewCreateInfo.ModeV = (VkSamplerAddressMode)m_CreateInfo.Parameter.V;
+		imageViewCreateInfo.ModeW = (VkSamplerAddressMode)m_CreateInfo.Parameter.W;
 		imageViewCreateInfo.Target = m_CreateInfo.Target;
 
 		m_ImageView = VulkanImageView(imageViewCreateInfo);
 
-		if (imageInfo->ImGuiUsage) {
+		if (m_CreateInfo.ImGuiUsage) {
 			if (!m_ImGuiID) {
-				Renderer::Enqueue([&]() {
+				Renderer::EnqueueToRenderThread([&]() {
 					m_ImGuiID = ImGui_ImplVulkan_AddTexture(m_ImageView.GetSampler(), m_ImageView.GetVulkanHandle(), m_CurrentLayout);
 				});
 			} else {
@@ -152,7 +151,7 @@ namespace Lucy {
 	}
 
 	void VulkanImage2D::CopyImage(const VkBuffer& imageStagingBuffer) {
-		VulkanRenderDevice::RecordSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+		Renderer::ExecuteSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
 			VkBufferImageCopy region{};
 			region.bufferOffset = 0;
 			region.bufferRowLength = 0;
@@ -162,8 +161,8 @@ namespace Lucy {
 			region.imageSubresource.baseArrayLayer = 0;
 			region.imageSubresource.layerCount = 1;
 			region.imageOffset = { 0, 0, 0 };
-			region.imageExtent.width = (uint32_t) m_Width;
-			region.imageExtent.height = (uint32_t) m_Height;
+			region.imageExtent.width = (uint32_t)m_Width;
+			region.imageExtent.height = (uint32_t)m_Height;
 			region.imageExtent.depth = 1;
 
 			vkCmdCopyBufferToImage(commandBuffer, imageStagingBuffer, m_Image, m_CurrentLayout, 1, &region);
@@ -177,7 +176,7 @@ namespace Lucy {
 
 		//Generate the mip chain
 		//Copying down the whole mip chain doing a blit from mip-1 to mip
-		VulkanRenderDevice::RecordSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+		Renderer::ExecuteSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
 			for (uint32_t i = 1; i < m_MaxMipLevel; i++) {
 				VkImageBlit blit{};
 				blit.srcSubresource.aspectMask = m_CreateInfo.Target == ImageTarget::Depth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
@@ -196,7 +195,7 @@ namespace Lucy {
 
 				// Prepare current mip level as image blit destination
 				TransitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, i);
-				
+
 				// Blit from previous level
 				vkCmdBlitImage(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
 
@@ -214,7 +213,7 @@ namespace Lucy {
 	}
 
 	void VulkanImage2D::TransitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t levelCount) {
-		VulkanRenderDevice::RecordSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+		Renderer::ExecuteSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
 			TransitionImageLayout(commandBuffer, image, oldLayout, newLayout, baseMipLevel, levelCount);
 		});
 	}
@@ -242,7 +241,7 @@ namespace Lucy {
 	}
 
 	void VulkanImage2D::Destroy() {
-		if (!m_Image) 
+		if (!m_Image)
 			return;
 		m_ImageView.Destroy();
 

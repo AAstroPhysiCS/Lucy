@@ -51,7 +51,7 @@ namespace Lucy {
 		VulkanImage2D(ImageCreateInfo& createInfo);
 		virtual ~VulkanImage2D() = default;
 
-		void Destroy() override;
+		void Destroy() final override;
 		void Recreate(uint32_t width, uint32_t height);
 
 		inline VulkanImageView& GetImageView() { return m_ImageView; }
@@ -79,6 +79,8 @@ namespace Lucy {
 		VkImageLayout m_CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 		uint32_t m_MaxMipLevel = 1;
+
+		friend class VulkanRenderer; //for TransitionImageLayout
 	};
 }
 

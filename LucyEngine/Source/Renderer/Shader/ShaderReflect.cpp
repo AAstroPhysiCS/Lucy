@@ -12,7 +12,7 @@ namespace Lucy {
 		spirv_cross::CompilerGLSL* compilerFragment = new spirv_cross::CompilerGLSL(dataFragment);
 
 		spirv_cross::CompilerGLSL::Options options;
-		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::Vulkan)
+		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan)
 			options.vulkan_semantics = true; //default is false
 
 		compilerVertex->set_common_options(options);

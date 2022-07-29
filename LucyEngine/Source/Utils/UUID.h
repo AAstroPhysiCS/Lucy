@@ -15,7 +15,7 @@ namespace Lucy {
 		friend struct UUIDComponent;
 	};
 
-	typedef uint64_t LucyID;
+	using LucyID = uint64_t;
 
 	class IDProvider final {
 		static constexpr size_t s_PoolResizeStep = 100;

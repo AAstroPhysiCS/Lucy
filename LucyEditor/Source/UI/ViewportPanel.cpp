@@ -2,11 +2,9 @@
 #include "SceneExplorerPanel.h"
 
 #include "Renderer/Renderer.h"
-#include "Renderer/RenderPass.h"
-#include "Renderer/ViewportRenderer.h"
 
-#include "Renderer/VulkanRenderDevice.h"
 #include "Renderer/Context/VulkanSwapChain.h"
+#include "Renderer/Context/VulkanPipeline.h"
 
 #include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 
@@ -58,10 +56,10 @@ namespace Lucy {
 
 		m_Size = ImGui::GetWindowSize();
 
-		switch (Renderer::GetCurrentRenderArchitecture()) {
+		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-				void* outputTextureID = ViewportRenderer::GetGeometryPipeline()->GetFrameBuffer().As<VulkanFrameBuffer>()->GetImages()[swapChain.GetCurrentFrameIndex()]->GetImGuiID();
+				void* outputTextureID = m_ViewportOutputPipeline->GetFrameBuffer().As<VulkanFrameBuffer>()->GetImages()[swapChain.GetCurrentFrameIndex()]->GetImGuiID();
 				ImGui::Image(outputTextureID, m_Size);
 				break;
 			}
@@ -69,10 +67,12 @@ namespace Lucy {
 				LUCY_ASSERT(false);
 		}
 
-		auto [w, h] = Renderer::GetViewportSize();
+		auto [w, h] = Renderer::GetViewportArea();
 		if (w != m_Size.x || h != m_Size.y) {
-			Renderer::SetViewportSize(m_Size.x, m_Size.y);
+			Renderer::SetViewportArea(m_Size.x, m_Size.y);
 			Renderer::OnViewportResize();
+
+			m_ViewportOutputPipeline.As<VulkanPipeline>()->Recreate(m_Size.x, m_Size.y);
 		}
 
 		const ImVec2& mousePos = ImGui::GetMousePos();
@@ -127,5 +127,9 @@ namespace Lucy {
 
 	bool ViewportPanel::IsOverAnyGizmoM() {
 		return IsOverTranslateGizmo() || IsOverRotateGizmo() || IsOverScaleGizmo();
+	}
+
+	void ViewportPanel::SetViewportOutputPipeline(Ref<Pipeline> pipeline) {
+		m_ViewportOutputPipeline = pipeline;
 	}
 }

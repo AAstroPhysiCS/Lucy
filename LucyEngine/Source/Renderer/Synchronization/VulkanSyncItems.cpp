@@ -65,6 +65,10 @@ namespace Lucy {
 				srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 				sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 				break;
+			case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+				srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				sourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+				break;
 			default:
 				LUCY_ASSERT(false);
 		}

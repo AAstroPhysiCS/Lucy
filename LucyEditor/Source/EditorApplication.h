@@ -9,8 +9,8 @@ namespace Lucy {
 		EditorApplication(const ApplicationArgs& args, const ApplicationCreateInfo& specs);
 		virtual ~EditorApplication();
 
-		void Run() override;
-		void OnEvent(Event* e) override;
+		void Run() final override;
+		void OnEvent(Event* e) final override;
 	private:
 		Ref<Scene> m_Scene = nullptr;
 	};

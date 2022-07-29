@@ -2,12 +2,19 @@
 #include "VulkanCommandQueue.h"
 #include "VulkanCommandPool.h"
 
-#include "Renderer/Renderer.h"
 #include "Renderer/Context/VulkanSwapChain.h"
-#include "Renderer/Context/Pipeline.h"
-#include "Renderer/Descriptors/VulkanDescriptorSet.h"
+#include "Renderer/Renderer.h"
 
 namespace Lucy {
+
+	void VulkanCommandQueue::Init() {
+		CommandPoolCreateInfo createInfo;
+		createInfo.CommandBufferCount = VulkanSwapChain::Get().GetMaxFramesInFlight();
+		createInfo.Level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		createInfo.PoolFlags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
+		m_CommandPool = CommandPool::Create(createInfo);
+	}
 
 	void VulkanCommandQueue::Execute() {
 		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
@@ -15,7 +22,7 @@ namespace Lucy {
 		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
 			return;
 
-		if (m_Buffer.size() == 0)
+		if (m_BufferMap.size() == 0)
 			return;
 
 		VkCommandBuffer commandBuffer = GetCurrentCommandBuffer();
@@ -26,29 +33,15 @@ namespace Lucy {
 		LUCY_VK_ASSERT(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 
 		//TODO: Multithreading here; mutex and locks for multithreading
-		for (uint32_t i = 0; i < m_Buffer.size(); i++) {
-			CommandElement& element = m_Buffer[i];
-			std::vector<Ref<DrawCommand>>& drawCommandArguments = element.Arguments;
-			Ref<Pipeline>& pipeline = element.Pipeline;
+		for (auto& [handle, resource] : m_BufferMap) {
+			const auto& targetPipeline = resource.GetTargetPipeline();
 
-			if (pipeline) {
-				Renderer::UpdateResources(drawCommandArguments, pipeline);
-
-				Renderer::BeginRenderPass(commandBuffer, pipeline);
-
-				Renderer::BindPipeline(commandBuffer, pipeline);
-
-				for (uint32_t i = 0; i < pipeline->GetDescriptorSets().size(); i++) {
-					const Ref<VulkanDescriptorSet>& descriptorSet = pipeline->GetDescriptorSets()[i].As<VulkanDescriptorSet>();
-					Renderer::BindDescriptorSet(commandBuffer, pipeline, descriptorSet);
-				}
-
-				for (Ref<DrawCommand>& drawCommand : drawCommandArguments)
-					element.RecordFunc(commandBuffer, drawCommand);
-
-				Renderer::EndRenderPass(pipeline);
-			} else {
-				element.RecordFunc(commandBuffer, nullptr); //for imgui
+			if (targetPipeline) {
+				Renderer::BeginRenderPass(commandBuffer, targetPipeline);
+				resource.DoPass(commandBuffer);
+				Renderer::EndRenderPass(targetPipeline);
+			} else { //for imgui
+				resource.DoPass(commandBuffer);
 			}
 		}
 

@@ -1,9 +1,5 @@
-#include <functional>
-
 #include "DetailsPanel.h"
 #include "SceneExplorerPanel.h"
-
-#include "Renderer/Renderer.h"
 
 #include "Utils/Utils.h"
 
@@ -26,15 +22,8 @@ namespace Lucy {
 		createInfo.Parameter.U = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 		createInfo.Parameter.V = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 		createInfo.Parameter.W = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-
-		const auto& arch = Renderer::GetCurrentRenderArchitecture();
-		if (arch == RenderArchitecture::Vulkan) {
-			Ref<VulkanImageInfo> vulkanImageInfo = Memory::CreateRef<VulkanImageInfo>();
-			vulkanImageInfo->GenerateSampler = true;
-			vulkanImageInfo->ImGuiUsage = true;
-
-			createInfo.InternalInfo = vulkanImageInfo;
-		}
+		createInfo.GenerateSampler = true;
+		createInfo.ImGuiUsage = true;
 
 		s_CheckerBoardTexture = Image2D::Create("Assets/Textures/Checkerboard.png", createInfo);
 	}

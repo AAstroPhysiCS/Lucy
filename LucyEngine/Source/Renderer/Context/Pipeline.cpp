@@ -1,13 +1,12 @@
 #include "lypch.h"
 
 #include "VulkanPipeline.h"
-
 #include "Renderer/Renderer.h"
 
 namespace Lucy {
 
 	Ref<Pipeline> Pipeline::Create(const PipelineCreateInfo& createInfo) {
-		switch (Renderer::GetCurrentRenderArchitecture()) {
+		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanPipeline>(createInfo);
 				break;

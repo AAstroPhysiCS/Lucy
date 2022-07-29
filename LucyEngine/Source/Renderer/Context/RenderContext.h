@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core/Base.h"
+#include "Core/Window.h"
 
 #include "../RenderArchitecture.h"
 
@@ -9,15 +9,18 @@ namespace Lucy {
 	class RenderContext {
 	public:
 		virtual ~RenderContext() = default;
-		
-		virtual void Destroy() = 0;
-		virtual void PrintInfo() = 0;
 
-		static Ref<RenderContext> Create(RenderArchitecture arch);
+		static Ref<RenderContext> Create(RenderArchitecture arch, Ref<Window>& window);
 	protected:
+		RenderContext(Ref<Window>& window);
+		
+		virtual void PrintInfo() = 0;
+		virtual void Destroy() = 0;
 		virtual void Init() = 0;
 
-		RenderContext() = default;
+		Ref<Window> m_Window = nullptr;
+
+		friend class RendererBase; //for Destroy (safety)
 	};
 }
 

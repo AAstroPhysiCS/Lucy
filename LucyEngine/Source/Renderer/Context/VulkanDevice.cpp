@@ -1,8 +1,6 @@
 #include "lypch.h"
 #include "VulkanDevice.h"
 
-#include "Renderer/Renderer.h"
-
 namespace Lucy {
 
 	VulkanDevice& VulkanDevice::Get() {
@@ -10,7 +8,9 @@ namespace Lucy {
 		return s_Instance;
 	}
 
-	void VulkanDevice::Create(VkInstance instance, std::vector<const char*>& enabledValidationLayers) {
+	void VulkanDevice::Create(VkInstance instance, std::vector<const char*>& enabledValidationLayers, VkSurfaceKHR surface) {
+		m_Surface = surface;
+
 		uint32_t deviceCount = 0;
 		vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
 
@@ -136,7 +136,7 @@ namespace Lucy {
 		uint32_t i = 0;
 		for (const auto& queueFamily : queueFamilies) {
 			VkBool32 presentSupport = false;
-			vkGetPhysicalDeviceSurfaceSupportKHR(device, i, Renderer::GetWindow()->GetVulkanSurface(), &presentSupport);
+			vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_Surface, &presentSupport);
 
 			if (presentSupport) {
 				m_QueueFamilyIndices.PresentFamilyHasValue = true;

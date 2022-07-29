@@ -95,6 +95,7 @@ namespace Lucy {
 		PushConstant& GetPushConstants(const char* name);
 
 		virtual void Bind(PipelineBindInfo bindInfo) = 0;
+		virtual void Recreate(uint32_t width, uint32_t height) = 0;
 		virtual void Destroy() = 0;
 	protected:
 		static uint32_t GetSizeFromType(ShaderDataSize size);

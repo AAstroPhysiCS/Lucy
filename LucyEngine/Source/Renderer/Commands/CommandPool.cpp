@@ -7,7 +7,7 @@
 namespace Lucy {
 
 	Ref<CommandPool> CommandPool::Create(const CommandPoolCreateInfo& createInfo) {
-		switch (Renderer::GetCurrentRenderArchitecture()) {
+		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanCommandPool>(createInfo);
 		}

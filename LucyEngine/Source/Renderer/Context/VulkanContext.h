@@ -16,14 +16,15 @@ namespace Lucy {
 
 	class VulkanContext : public RenderContext {
 	public:
-		VulkanContext();
+		VulkanContext(Ref<Window>& window);
 		virtual ~VulkanContext() = default;
 
-		void Destroy() override;
-		void PrintInfo() override;
 		inline VkInstance GetVulkanInstance() { return m_Instance; };
 	private:
-		void Init() override;
+		void Destroy() final override;
+		void PrintInfo() final override;
+		void Init() final override;
+		
 		void CheckValidationSupport();
 		void SetupMessageCallback();
 		void DestroyMessageCallback();

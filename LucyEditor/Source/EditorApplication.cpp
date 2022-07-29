@@ -20,14 +20,14 @@ namespace Lucy {
 		m_Scene = Memory::CreateRef<Scene>();
 
 		Ref<RendererModule> rendererModule = Memory::CreateRef<RendererModule>(applicationCreateInfo.RenderArchitecture, m_Window, m_Scene);
-		Ref<EditorModule> editorModule = Memory::CreateRef<EditorModule>(m_Window, m_Scene);
+		Ref<EditorModule> editorModule = Memory::CreateRef<EditorModule>(m_Window, m_Scene, rendererModule);
 
 		m_ModuleStack.Push(editorModule);
 		m_ModuleStack.Push(rendererModule);
 	}
 
 	EditorApplication::~EditorApplication() {
-		for (Ref<Module> m : m_ModuleStack.GetStack())
+		for (Ref<Module> m : m_ModuleStack)
 			m->Wait();
 		m_Scene->Destroy();
 	}
@@ -40,11 +40,11 @@ namespace Lucy {
 			* All the modules needs to pass the corresponding module stage in order to switch to the next stage
 			*/
 			//so, all the modules needs to pass the funcs, step by step
-			for (Ref<Module> mod : m_ModuleStack.GetStack())
+			for (Ref<Module> mod : m_ModuleStack)
 				mod->Begin();
-			for (Ref<Module> mod : m_ModuleStack.GetStack())
+			for (Ref<Module> mod : m_ModuleStack)
 				mod->OnRender();
-			for (Ref<Module> mod : m_ModuleStack.GetStack())
+			for (Ref<Module> mod : m_ModuleStack)
 				mod->End();
 			s_Metrics.Update();
 		}
@@ -60,8 +60,7 @@ namespace Lucy {
 			}
 		});
 
-		for (Ref<Module> mod : m_ModuleStack.GetStack()) {
+		for (Ref<Module> mod : m_ModuleStack)
 			mod->OnEvent(*e);
-		}
 	}
 }

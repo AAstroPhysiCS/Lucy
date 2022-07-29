@@ -1,82 +1,82 @@
 #pragma once
 
-#include "Core/Base.h"
-#include "Core/Window.h"
-
-#include "Shader/Shader.h"
-
-#include "RenderDevice.h"
-#include "Renderer/Descriptors/DescriptorSet.h"
-#include "RenderArchitecture.h"
+#include "Renderer/RendererBase.h"
 
 namespace Lucy {
-	
-	class Scene;
-	struct ImGuiPipeline;
 
-	class Renderer {
+	class Entity;
+
+	class Renderer final {
 	public:
-		static void Init(RenderArchitecture arch, Ref<Window> window);
-		static void WaitForDevice();
-		static void Destroy();
-
-		static void BeginScene(Scene& scene);
-		static void RenderScene();
-		static PresentResult EndScene();
-
-		static void Enqueue(EnqueueFunc&& func);
-		static void EnqueueStaticMesh(Priority priority, Ref<Mesh> mesh, const glm::mat4& entityTransform);
-
-		static void RecordStaticMeshToCommandQueue(Ref<Pipeline> pipeline, RecordFunc<VkCommandBuffer, Ref<DrawCommand>>&& func);
-
-		static void OnWindowResize();
-		static void OnViewportResize();
-		static Entity OnMousePicking();
-
-		static void Dispatch();
-		static void ClearQueues();
-
-		static void SetViewportSize(int32_t width, int32_t height);
-		static void SetViewportMouse(float viewportMouseX, float viewportMouseY);
-
-		inline static Ref<Window> GetWindow() { return s_Window; }
-		inline static auto GetWindowSize() {
-			struct Size { int32_t Width, Height; };
-			return Size{ s_Window->GetWidth(), s_Window->GetHeight() };
-		}
-
-		inline static auto GetViewportSize() { return s_RenderDevice->GetViewportSize(); }
-		inline static RenderArchitecture GetCurrentRenderArchitecture() { return s_Arch; }
-		inline static ShaderLibrary& GetShaderLibrary() { return s_ShaderLibrary; }
-		inline static Ref<RenderDevice> GetCurrentRenderDevice() { return s_RenderDevice; }
-	public:
-		static void BindBuffers(VkCommandBuffer commandBuffer, Ref<Mesh> mesh);
-		static void BindPushConstant(VkCommandBuffer commandBuffer, Ref<Pipeline> pipeline, const PushConstant& pushConstant);
-		static void BindDescriptorSet(void* commandBufferHandle, Ref<Pipeline> pipeline, Ref<DescriptorSet> descriptorSet);
-		//for CommandQueue
-		static void BindPipeline(VkCommandBuffer commandBuffer, Ref<Pipeline> pipeline);
-		static void BeginRenderPass(VkCommandBuffer commandBuffer, Ref<Pipeline> pipeline);
-		static void EndRenderPass(Ref<Pipeline> pipeline);
-		static void DrawIndexed(VkCommandBuffer commandBuffer, uint32_t indexCount, uint32_t instanceCount, 
-								uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance);
-		static void UpdateResources(const std::vector<Ref<DrawCommand>>& drawCommands, Ref<Pipeline> pipeline);
-	private:
 		Renderer() = delete;
 		~Renderer() = delete;
 
-		static void SetUIDrawData(std::function<void(VkCommandBuffer commandBuffer)>&& func);
-		static void UIPass(const ImGuiPipeline& imguiPipeline);
+		static void Init(RenderArchitecture arch, Ref<Window>& window);
 
-		static Ref<RenderDevice> s_RenderDevice;
+		static void BeginScene(Ref<Scene>& scene);
+		static void RenderScene();
+		static PresentResult EndScene();
+		static void WaitForDevice();
+		static void Destroy();
 
-		static Ref<Window> s_Window;
-		static RenderArchitecture s_Arch;
+		//commandBufferHandle is the handle of the commandBuffer
+		//Vulkan: VkCommandBuffer
+		static void BindBuffers(void* commandBufferHandle, Ref<Mesh> mesh);
+		static void BindPushConstant(void* commandBufferHandle, Ref<Pipeline> pipeline, const PushConstant& pushConstant);
+		static void BindPipeline(void* commandBufferHandle, Ref<Pipeline> pipeline);
+		static void BindAllDescriptorSets(void* commandBufferHandle, Ref<Pipeline> pipeline);
+		static void UpdateDescriptorSets(Ref<Pipeline> pipeline);
+		static void BindDescriptorSet(void* commandBufferHandle, Ref<Pipeline> pipeline, Ref<DescriptorSet> descriptorSet);
+		static void BindBuffers(void* commandBufferHandle, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer);
+		static void DrawIndexed(void* commandBufferHandle, uint32_t indexCount, uint32_t instanceCount,
+								 uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance);
 
-		static ShaderLibrary s_ShaderLibrary;
+		static void BeginRenderPass(void* commandBufferHandle, Ref<Pipeline> pipeline);
+		static void EndRenderPass(Ref<Pipeline> pipeline);
 
-		static std::function<void(VkCommandBuffer commandBuffer)> s_UIDrawDataFunc;
+		static void DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size);
+		static void ExecuteSingleTimeCommand(std::function<void(VkCommandBuffer)>&& func);
 
-		friend class ImGuiOverlay; //for SetUIDrawData
-		friend class ViewportRenderer; //for s_UIDrawDataFunc
+		static RenderCommandResourceHandle CreateRenderPassResource(RenderCommandFunc&& func, Ref<Pipeline> pipeline);
+
+		template <typename T, typename ... Args>
+		inline static void EnqueueRenderCommand(RenderCommandResourceHandle resourceHandle, Args&&... args) {
+			s_Renderer->GetRenderDevice()->EnqueueRenderCommand<T>(resourceHandle, std::forward<Args>(args)...);
+		}
+
+		static void EnqueueToRenderThread(EnqueueFunc&& func);
+
+		static void OnWindowResize();
+		static void OnViewportResize();
+		static Entity OnMousePicking(const Ref<Pipeline>& idPipeline);
+
+		static void SetViewportArea(int32_t width, int32_t height);
+		static void SetViewportMouse(float viewportMouseX, float viewportMouseY);
+
+		inline static auto GetViewportArea() {
+			struct Size { int32_t Width, Height; };
+			return Size{ s_ViewportWidth, s_ViewportHeight };
+		}
+
+		inline static auto GetViewportMousePos() {
+			struct Size { float Width, Height; };
+			return Size{ s_ViewportMouseX, s_ViewportMouseY };
+		}
+
+		inline static const Ref<RenderContext>& GetRenderContext() { return s_Renderer->GetRenderContext(); }
+
+		inline static RenderArchitecture GetRenderArchitecture() { return s_Architecture; }
+	private:
+		inline static Ref<RendererBase> s_Renderer = nullptr;
+		inline static Ref<Scene> s_Scene = nullptr;
+
+		inline static int32_t s_ViewportWidth = 0, s_ViewportHeight;
+		inline static float s_ViewportMouseX = 0, s_ViewportMouseY;
+		inline static RenderArchitecture s_Architecture;
+
+		static void SetImGuiRenderData(std::function<void(VkCommandBuffer)>&& func);
+		inline static std::function<void(VkCommandBuffer)> s_ImGuiRenderData;
+
+		friend class ImGuiOverlay; //for m_RenderContext and SetImGuiRenderData
 	};
 }

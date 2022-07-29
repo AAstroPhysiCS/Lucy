@@ -9,17 +9,20 @@
 
 namespace Lucy {
 
+	class Window;
+	class RendererModule;
+
 	class EditorModule : public Module {
 	public:
-		EditorModule(Ref<Window> window, Ref<Scene> scene);
+		EditorModule(Ref<Window> window, Ref<Scene> scene, Ref<RendererModule> rendererModule);
 		virtual ~EditorModule() = default;
 		
-		void Begin() override;
-		void End() override;
-		void OnRender() override;
-		void OnEvent(Event& e) override;
-		void Destroy() override;
-		void Wait() override;
+		void Begin() final override;
+		void End() final override;
+		void OnRender() final override;
+		void OnEvent(Event& e) final override;
+		void Destroy() final override;
+		void Wait() final override;
 
 		inline const Ref<Scene>& GetScene() const { return m_Scene; }
 	private:

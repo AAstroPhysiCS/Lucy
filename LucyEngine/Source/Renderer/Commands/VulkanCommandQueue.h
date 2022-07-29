@@ -19,6 +19,7 @@ namespace Lucy {
 		void EndSingleTimeCommand(VkCommandBuffer commandBuffer) const;
 		VkCommandBuffer GetCurrentCommandBuffer() const;
 
-		void Execute() override;
+		void Init() final override;
+		void Execute() final override;
 	};
 }

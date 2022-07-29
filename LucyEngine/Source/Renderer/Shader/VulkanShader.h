@@ -11,7 +11,7 @@ namespace Lucy {
 		VulkanShader(const std::string& path, const std::string& name);
 		virtual ~VulkanShader() = default;
 
-		void Destroy() override;
+		void Destroy() final override;
 
 		inline VkPipelineShaderStageCreateInfo* GetShaderStageInfos() { return m_ShaderStageInfos; }
 	private:

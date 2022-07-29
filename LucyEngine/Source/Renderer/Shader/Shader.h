@@ -78,13 +78,16 @@ namespace Lucy {
 
 	class ShaderLibrary {
 	public:
+		static ShaderLibrary& Get();
+
 		ShaderLibrary() = default;
-		
+
+		void Init();
+		void Destroy();
+
 		Ref<Shader> GetShader(const std::string& name);
 		void PushShader(const Ref<Shader>& instance);
 	private:
 		std::vector<Ref<Shader>> m_Shaders;
-
-		friend class Renderer;
 	};
 }

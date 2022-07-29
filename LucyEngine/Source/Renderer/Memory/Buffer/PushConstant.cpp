@@ -15,7 +15,7 @@ namespace Lucy {
 	}
 
 	void PushConstant::Bind(PushConstantBindInfo& info) const {
-		if (Renderer::GetCurrentRenderArchitecture() == RenderArchitecture::Vulkan) {
+		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan) {
 			vkCmdPushConstants(info.CommandBuffer, info.PipelineLayout, m_ShaderStage, m_Offset, m_Size, m_Data.data());
 			return;
 		}
