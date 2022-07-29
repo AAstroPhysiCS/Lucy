@@ -91,12 +91,12 @@ namespace Lucy {
 		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan) {
 			ImGui_ImplGlfw_InitForVulkan(window->Raw(), true);
 
+			m_ImGuiPool = Memory::CreateRef<VulkanDescriptorPool>(m_PoolSpecs);
+
 			Renderer::EnqueueToRenderThread([&]() mutable {
 				VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 				auto& vulkanContext = Renderer::GetRenderContext().As<VulkanContext>();
 				VulkanDevice device = VulkanDevice::Get();
-
-				m_ImGuiPool = Memory::CreateRef<VulkanDescriptorPool>(m_PoolSpecs);
 
 				ImGui_ImplVulkan_InitInfo initInfo{};
 				initInfo.Instance = vulkanContext->GetVulkanInstance();

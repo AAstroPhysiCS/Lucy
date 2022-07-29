@@ -28,7 +28,7 @@ namespace Lucy {
 		virtual void BindPipeline(void* commandBufferHandle, Ref<Pipeline> pipeline) = 0;
 		virtual void UpdateDescriptorSets(Ref<Pipeline> pipeline) = 0;
 		virtual void BindAllDescriptorSets(void* commandBufferHandle, Ref<Pipeline> pipeline) = 0;
-		virtual void BindDescriptorSet(void* commandBufferHandle, Ref<Pipeline> pipeline, Ref<DescriptorSet> descriptorSet) = 0;
+		virtual void BindDescriptorSet(void* commandBufferHandle, Ref<Pipeline> pipeline, uint32_t setIndex) = 0;
 		virtual void BindBuffers(void* commandBufferHandle, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) = 0;
 		virtual void DrawIndexed(void* commandBufferHandle, uint32_t indexCount, uint32_t instanceCount,
 								 uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) = 0;

@@ -58,17 +58,21 @@ namespace Lucy {
 		}
 	}
 
-	void VulkanRenderDevice::BindDescriptorSet(void* commandBufferHandle, Ref<Pipeline> pipeline, Ref<DescriptorSet> descriptorSet) {
+	void VulkanRenderDevice::BindDescriptorSet(void* commandBufferHandle, Ref<Pipeline> pipeline, uint32_t setIndex) {
 		Ref<VulkanPipeline> vulkanPipeline = pipeline.As<VulkanPipeline>();
-		Ref<VulkanDescriptorSet> vulkanSet = descriptorSet.As<VulkanDescriptorSet>();
-
+		
 		VulkanDescriptorSetBindInfo bindInfo;
 		bindInfo.CommandBuffer = (VkCommandBuffer)commandBufferHandle;
 		bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		bindInfo.PipelineLayout = vulkanPipeline->GetPipelineLayout();
 
-		vulkanSet->Update();
-		vulkanSet->Bind(bindInfo);
+		for (Ref<DescriptorSet> descriptorSet : pipeline->GetDescriptorSets()) {
+			if (descriptorSet->GetSetIndex() == setIndex) {
+				Ref<VulkanDescriptorSet> vulkanSet = descriptorSet.As<VulkanDescriptorSet>();
+				vulkanSet->Bind(bindInfo);
+				break;
+			}
+		}
 	}
 
 	void VulkanRenderDevice::BindBuffers(void* commandBufferHandle, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) {

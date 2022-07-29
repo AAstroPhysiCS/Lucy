@@ -5,6 +5,9 @@
 
 namespace Lucy {
 
+	constexpr uint32_t MAX_DYNAMIC_DESCRIPTOR_COUNT = 1000u;
+	constexpr uint32_t MAX_DYNAMICALLY_ALLOCATED_BUFFER_SIZE = MAX_DYNAMIC_DESCRIPTOR_COUNT * 10u; //10 kilobytes
+
 	struct DescriptorSetCreateInfo {
 		uint32_t SetIndex = 0;
 		bool Bindless = false;
@@ -21,6 +24,8 @@ namespace Lucy {
 		void AddBuffer(const Ref<UniformBuffer>& buffer);
 		void AddBuffer(const Ref<SharedStorageBuffer>& buffer);
 		void Destroy();
+
+		inline uint32_t GetSetIndex() { return m_CreateInfo.SetIndex; }
 
 		inline const std::vector<Ref<UniformBuffer>>& GetAllUniformBuffers() const { return m_UniformBuffers; }
 		inline const std::vector<Ref<SharedStorageBuffer>>& GetAllSharedStorageBuffers() const { return m_SharedStorageBuffers; }

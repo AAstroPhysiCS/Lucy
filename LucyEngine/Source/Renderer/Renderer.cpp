@@ -67,8 +67,8 @@ namespace Lucy {
 		s_Renderer->GetRenderDevice()->UpdateDescriptorSets(pipeline);
 	}
 
-	void Renderer::BindDescriptorSet(void* commandBufferHandle, Ref<Pipeline> pipeline, Ref<DescriptorSet> descriptorSet) {
-		s_Renderer->GetRenderDevice()->BindDescriptorSet(commandBufferHandle, pipeline, descriptorSet);
+	void Renderer::BindDescriptorSet(void* commandBufferHandle, Ref<Pipeline> pipeline, uint32_t setIndex) {
+		s_Renderer->GetRenderDevice()->BindDescriptorSet(commandBufferHandle, pipeline, setIndex);
 	}
 
 	void Renderer::BindBuffers(void* commandBufferHandle, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) {

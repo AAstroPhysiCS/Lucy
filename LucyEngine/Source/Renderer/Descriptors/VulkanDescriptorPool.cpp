@@ -1,6 +1,7 @@
 #include "lypch.h"
 #include "VulkanDescriptorPool.h"
 
+#include "Renderer/Renderer.h"
 #include "Renderer/Context/VulkanDevice.h"
 
 namespace Lucy {
