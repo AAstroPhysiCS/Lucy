@@ -11,7 +11,7 @@ namespace Lucy {
 
 	void VulkanShader::Destroy() {
 		if (!m_VertexShaderModule || !m_FragmentShaderModule) return;
-		const VulkanDevice& device = VulkanDevice::Get();
+		const VulkanContextDevice& device = VulkanContextDevice::Get();
 		vkDestroyShaderModule(device.GetLogicalDevice(), m_VertexShaderModule, nullptr);
 		vkDestroyShaderModule(device.GetLogicalDevice(), m_FragmentShaderModule, nullptr);
 	}
@@ -27,7 +27,7 @@ namespace Lucy {
 		fragmentCreateInfo.codeSize = dataFragment.size() * sizeof(uint32_t);
 		fragmentCreateInfo.pCode = dataFragment.data();
 
-		const VulkanDevice& device = VulkanDevice::Get();
+		const VulkanContextDevice& device = VulkanContextDevice::Get();
 		LUCY_VK_ASSERT(vkCreateShaderModule(device.GetLogicalDevice(), &vertexCreateInfo, nullptr, &m_VertexShaderModule));
 		LUCY_VK_ASSERT(vkCreateShaderModule(device.GetLogicalDevice(), &fragmentCreateInfo, nullptr, &m_FragmentShaderModule));
 

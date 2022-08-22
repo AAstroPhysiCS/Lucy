@@ -42,15 +42,19 @@ namespace Lucy {
 		void CreateVulkanImageVma(uint32_t width, uint32_t height, uint32_t mipLevel, VkFormat format, VkImageLayout currentLayout, VkImageUsageFlags usage, 
 								  VkImageType imageType, VkImage& imageHandle, VmaAllocation& allocationHandle);
 
+		void MapMemory(VmaAllocation allocation, void*& mappedData);
+		void UnmapMemory(VmaAllocation allocation);
+
+		void DestroyBuffer(VkBuffer buffer, VmaAllocation allocation);
+		void DestroyImage(VkImage buffer, VmaAllocation allocation);
+	private:
+		VulkanAllocator() = default;
+		~VulkanAllocator() = default;
+
 		[[deprecated("Old way, prefer vma!")]]
 		void CreateVulkanBuffer(uint32_t size, VkBufferUsageFlags usage, VkSharingMode sharingMode, uint32_t memProperties, VkBuffer& bufferHandle, VkDeviceMemory& memory);
 		[[deprecated("Old way, prefer vma!")]]
 		uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags propertyFlags);
-
-		inline VmaAllocator GetVmaInstance() { return m_Allocator; }
-	private:
-		VulkanAllocator() = default;
-		~VulkanAllocator() = default;
 
 		VmaAllocator m_Allocator;
 	};

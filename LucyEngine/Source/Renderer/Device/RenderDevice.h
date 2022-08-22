@@ -15,6 +15,7 @@ namespace Lucy {
 
 		template <typename Command, typename ... Args>
 		inline void EnqueueRenderCommand(RenderCommandResourceHandle resourceHandle, Args&&... args) {
+			LUCY_PROFILE_NEW_EVENT("RenderDevice::EnqueueRenderCommand");
 			m_RenderDeviceCommandList->EnqueueRenderCommand<Command>(resourceHandle, std::forward<Args>(args)...);
 		}
 

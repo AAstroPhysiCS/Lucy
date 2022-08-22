@@ -16,6 +16,8 @@ namespace Lucy {
 	}
 
 	RenderCommandResourceHandle CommandQueue::CreateRenderPassResource(RenderCommandFunc&& func, Ref<Pipeline> pipeline) {
+		LUCY_PROFILE_NEW_EVENT("CommandQueue::CreateRenderPassResource");
+		
 		RenderCommandResourceHandle uniqueHandle = RenderCommandResource::CreateUniqueHandle();
 		std::pair<RenderCommandResourceHandle, RenderCommandResource> pair{ uniqueHandle, RenderCommandResource(std::move(func), pipeline) };
 		m_BufferMap.insert(pair);
@@ -23,12 +25,12 @@ namespace Lucy {
 	}
 
 	void CommandQueue::EnqueueRenderCommand(RenderCommandResourceHandle resourceHandle, const Ref<RenderCommand>& command) {
+		LUCY_PROFILE_NEW_EVENT("CommandQueue::EnqueueRenderCommand");
 		m_BufferMap[resourceHandle].EnqueueRenderCommand(command);
 	}
 
 	void CommandQueue::Recreate() {
 		m_CommandPool->Recreate();
-		//Clear();
 	}
 
 	void CommandQueue::Free() {

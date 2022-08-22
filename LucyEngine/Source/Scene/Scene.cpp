@@ -51,6 +51,8 @@ namespace Lucy {
 	}
 
 	void Scene::Update(float viewportWidth, float viewportHeight) {
+		LUCY_PROFILE_NEW_EVENT("Scene::Update");
+
 		EditorCamera& camera = GetEditorCamera();
 		camera.SetViewportSize(viewportWidth, viewportHeight);
 		camera.Update();

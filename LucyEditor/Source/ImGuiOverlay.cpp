@@ -12,7 +12,7 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/RendererModule.h"
 
-#include "Renderer/Context/VulkanDevice.h"
+#include "Renderer/Context/VulkanContextDevice.h"
 #include "Renderer/Context/VulkanContext.h"
 #include "Renderer/Context/VulkanSwapChain.h"
 #include "Renderer/VulkanRenderPass.h"
@@ -96,7 +96,7 @@ namespace Lucy {
 			Renderer::EnqueueToRenderThread([&]() mutable {
 				VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 				auto& vulkanContext = Renderer::GetRenderContext().As<VulkanContext>();
-				VulkanDevice device = VulkanDevice::Get();
+				VulkanContextDevice device = VulkanContextDevice::Get();
 
 				ImGui_ImplVulkan_InitInfo initInfo{};
 				initInfo.Instance = vulkanContext->GetVulkanInstance();
@@ -115,11 +115,9 @@ namespace Lucy {
 			});
 
 			g_ImGuiPassHandle = Renderer::CreateRenderPassResource([this](void* commandBuffer, Ref<Pipeline> unused, RenderCommand* unusedC) {
-				VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-
 				auto& renderPass = m_ImGuiPipeline.UIRenderPass.As<VulkanRenderPass>();
 				auto& frameBufferHandle = m_ImGuiPipeline.UIFramebuffer.As<VulkanFrameBuffer>();
-				const auto& targetFrameBuffer = frameBufferHandle->GetVulkanHandles()[swapChain.GetCurrentImageIndex()];
+				const auto& targetFrameBuffer = frameBufferHandle->GetVulkanHandles()[Renderer::GetCurrentImageIndex()];
 
 				RenderPassBeginInfo beginInfo;
 				beginInfo.Width = frameBufferHandle->GetWidth();
@@ -135,6 +133,8 @@ namespace Lucy {
 	}
 
 	void ImGuiOverlay::Begin() {
+		LUCY_PROFILE_NEW_EVENT("ImGuiOverlay::Begin");
+
 		auto currentArchitecture = Renderer::GetRenderArchitecture();
 		if (currentArchitecture == RenderArchitecture::Vulkan) {
 			ImGui_ImplVulkan_NewFrame();
@@ -172,6 +172,8 @@ namespace Lucy {
 	}
 
 	void ImGuiOverlay::End() {
+		LUCY_PROFILE_NEW_EVENT("ImGuiOverlay::End");
+
 		ImGui::End(); //end of dockspace window
 
 		ImGuiIO& io = ImGui::GetIO();
@@ -190,11 +192,15 @@ namespace Lucy {
 	}
 
 	void ImGuiOverlay::SendImGuiDataToDevice() {
+		LUCY_PROFILE_NEW_EVENT("ImGuiOverlay::SendImGuiDataToDevice");
+
 		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan)
 			Renderer::EnqueueRenderCommand<ImGuiRenderCommand>(g_ImGuiPassHandle);
 	}
 
 	void ImGuiOverlay::Render() {
+		LUCY_PROFILE_NEW_EVENT("ImGuiOverlay::Render");
+
 		Begin();
 		for (Panel* panel : m_Panels) {
 			panel->Render();

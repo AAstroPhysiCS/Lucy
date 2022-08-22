@@ -18,6 +18,8 @@ LibraryPath["VulkanSDK"] = os.getenv("VULKAN_SDK")
 LibraryPath["VulkanInclude"] = "%{LibraryPath.VulkanSDK}/Include"
 LibraryPath["VulkanLib"] = "%{LibraryPath.VulkanSDK}/Lib"
 
+LibraryPath["Optick"] = "%{wks.location}/LucyEngine/ThirdParty/Optick"
+
 --For Debug
 LibraryPath["ShaderCDebug"] = "%{LibraryPath.VulkanLib}/shaderc_sharedd.lib"
 LibraryPath["SPIRVDebug"] = "%{LibraryPath.VulkanLib}/spirv-cross-cored.lib"

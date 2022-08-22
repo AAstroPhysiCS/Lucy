@@ -20,6 +20,8 @@ namespace Lucy {
 	}
 
 	void VulkanMaterial::Update(Ref<Pipeline> pipeline) {
+		LUCY_PROFILE_NEW_EVENT("VulkanMaterial::Update");
+
 		auto& uniformImageBuffer = pipeline->GetUniformBuffers<VulkanUniformImageBuffer>("u_Textures");
 		auto& ssboMaterialAttributes = pipeline->GetSharedStorageBuffers<VulkanSharedStorageBuffer>("LucyMaterialAttributes");
 

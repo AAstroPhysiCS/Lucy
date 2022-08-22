@@ -1,18 +1,14 @@
 #include "lypch.h"
 
 #include "VulkanSwapChain.h"
-#include "VulkanDevice.h"
+#include "VulkanContextDevice.h"
+
+#include "Renderer/Synchronization/VulkanSyncItems.h"
 
 #include "Renderer/Commands/VulkanCommandQueue.h"
 #include "Renderer/Renderer.h"
 
 namespace Lucy {
-
-	VulkanSwapChain::VulkanSwapChain() {
-		m_WaitSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-		m_SignalSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-		m_InFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
-	}
 
 	VulkanSwapChain& VulkanSwapChain::Get() {
 		static VulkanSwapChain s_Instance;
@@ -25,7 +21,7 @@ namespace Lucy {
 	}
 
 	VkSwapchainKHR VulkanSwapChain::Create(VkSwapchainKHR oldSwapChain) {
-		const VulkanDevice& device = VulkanDevice::Get();
+		const VulkanContextDevice& device = VulkanContextDevice::Get();
 
 		VkPhysicalDevice physicalDevice = device.GetPhysicalDevice();
 		VkDevice logicalDevice = device.GetLogicalDevice();
@@ -99,78 +95,59 @@ namespace Lucy {
 	}
 
 	void VulkanSwapChain::Recreate() {
-		const VulkanDevice& device = VulkanDevice::Get();
+		const VulkanContextDevice& device = VulkanContextDevice::Get();
 		LUCY_VK_ASSERT(vkDeviceWaitIdle(device.GetLogicalDevice()));
 
 		m_OldSwapChain = m_SwapChain;
 		m_SwapChain = Create(m_OldSwapChain);
 	}
 
-	void VulkanSwapChain::BeginFrame() {
-		const auto& device = VulkanDevice::Get();
-		VkDevice deviceVulkanHandle = device.GetLogicalDevice();
-
-		vkWaitForFences(deviceVulkanHandle, 1, &m_InFlightFences[m_CurrentFrameIndex].GetFence(), VK_TRUE, UINT64_MAX);
-		vkResetFences(deviceVulkanHandle, 1, &m_InFlightFences[m_CurrentFrameIndex].GetFence());
-
-		m_LastSwapChainResult = AcquireNextImage(m_WaitSemaphores[m_CurrentFrameIndex].GetSemaphore(), m_ImageIndex);
-		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR) {
-			return;
-		}
-	}
-
-	void VulkanSwapChain::EndFrame(const Ref<CommandQueue>& commandQueue) {
-		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR)
-			return;
-		SubmitToQueue(commandQueue.As<VulkanCommandQueue>()->GetCurrentCommandBuffer());
-	}
-
 	VkResult VulkanSwapChain::AcquireNextImage(VkSemaphore currentFrameImageAvailSemaphore, uint32_t& imageIndex) {
-		VkDevice deviceVulkanHandle = VulkanDevice::Get().GetLogicalDevice();
+		LUCY_PROFILE_NEW_EVENT("VulkanSwapChain::AcquireNextImage");
+		
+		VkDevice deviceVulkanHandle = VulkanContextDevice::Get().GetLogicalDevice();
 		return vkAcquireNextImageKHR(deviceVulkanHandle, m_SwapChain, UINT64_MAX, currentFrameImageAvailSemaphore, VK_NULL_HANDLE, &imageIndex);
 	}
 
-	void VulkanSwapChain::SubmitToQueue(VkCommandBuffer commandBuffer) {
-		const VulkanDevice& device = VulkanDevice::Get();
+	void VulkanSwapChain::SubmitToQueue(VkCommandBuffer commandBuffer, const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) {
+		LUCY_PROFILE_NEW_EVENT("VulkanSwapChain::SubmitToQueue");
 
-		VkFence currentFrameFence = m_InFlightFences[m_CurrentFrameIndex].GetFence();
-		VkSemaphore currentFrameWaitSemaphore = m_WaitSemaphores[m_CurrentFrameIndex].GetSemaphore(); // image is available, image is renderable
-		VkSemaphore currentFrameSignalSemaphore = m_SignalSemaphores[m_CurrentFrameIndex].GetSemaphore(); // rendering finished, signal it
+		const VulkanContextDevice& device = VulkanContextDevice::Get();
 
 		VkSubmitInfo submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
 		VkPipelineStageFlags imageWaitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 		submitInfo.waitSemaphoreCount = 1;
-		submitInfo.pWaitSemaphores = &currentFrameWaitSemaphore;
+		submitInfo.pWaitSemaphores = &currentFrameWaitSemaphore.GetSemaphore();
 		submitInfo.pWaitDstStageMask = imageWaitStages;
 
 		submitInfo.commandBufferCount = 1;
 		submitInfo.pCommandBuffers = &commandBuffer;
 		submitInfo.signalSemaphoreCount = 1;
-		submitInfo.pSignalSemaphores = &currentFrameSignalSemaphore;
+		submitInfo.pSignalSemaphores = &currentFrameSignalSemaphore.GetSemaphore();
 
-		LUCY_VK_ASSERT(vkQueueSubmit(device.GetGraphicsQueue(), 1, &submitInfo, currentFrameFence));
-		//vkWaitForFences(device.GetLogicalDevice(), 1, &currentFrameFence, VK_TRUE, UINT64_MAX);
+		LUCY_VK_ASSERT(vkQueueSubmit(device.GetGraphicsQueue(), 1, &submitInfo, currentFrameFence.GetFence()));
+		//vkWaitForFences(device.GetLogicalDevice(), 1, &currentFrameFence.GetFence(), VK_TRUE, UINT64_MAX);
 	}
 
-	VkResult VulkanSwapChain::Present() {
+	VkResult VulkanSwapChain::Present(const Semaphore& signalSemaphore, uint32_t& imageIndex) {
+		LUCY_PROFILE_NEW_EVENT("VulkanSwapChain::Present");
+		
 		VkPresentInfoKHR presentInfo{};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 		presentInfo.waitSemaphoreCount = 1;
-		presentInfo.pWaitSemaphores = &m_SignalSemaphores[m_CurrentFrameIndex].GetSemaphore();
+		presentInfo.pWaitSemaphores = &signalSemaphore.GetSemaphore();
 
 		presentInfo.swapchainCount = 1;
 		presentInfo.pSwapchains = &m_SwapChain;
-		presentInfo.pImageIndices = &m_ImageIndex;
+		presentInfo.pImageIndices = &imageIndex;
 		presentInfo.pResults = nullptr;
 
-		const auto& device = VulkanDevice::Get();
-		m_LastSwapChainResult = vkQueuePresentKHR(device.GetPresentQueue(), &presentInfo);
+		const auto& device = VulkanContextDevice::Get();
+		VkResult queuePresentResult = vkQueuePresentKHR(device.GetPresentQueue(), &presentInfo);
 
-		m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
-
-		return m_LastSwapChainResult;
+		return queuePresentResult;
 	}
 
 	SwapChainCapabilities VulkanSwapChain::GetSwapChainCapabilities(VkPhysicalDevice device) {
@@ -231,17 +208,11 @@ namespace Lucy {
 	}
 
 	void VulkanSwapChain::Destroy() {
-		const VulkanDevice& device = VulkanDevice::Get();
+		const VulkanContextDevice& device = VulkanContextDevice::Get();
 
 		for (uint32_t i = 0; i < m_SwapChainImageViews.size(); i++)
 			m_SwapChainImageViews[i].Destroy();
 
 		vkDestroySwapchainKHR(device.GetLogicalDevice(), m_SwapChain, nullptr);
-
-		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-			m_WaitSemaphores[i].Destroy();
-			m_SignalSemaphores[i].Destroy();
-			m_InFlightFences[i].Destroy();
-		}
 	}
 }

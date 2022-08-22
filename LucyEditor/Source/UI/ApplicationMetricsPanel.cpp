@@ -15,6 +15,8 @@ namespace Lucy {
 	}
 
 	void ApplicationMetricsPanel::Render() {
+		LUCY_PROFILE_NEW_EVENT("ApplicationMetricsPanel::Render");
+
 		Metrics& metrics = EditorApplication::GetApplicationMetrics();
 
 		PerformanceMetrics& perfMetrics = metrics.PerfMetrics;

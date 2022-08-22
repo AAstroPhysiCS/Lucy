@@ -1,10 +1,11 @@
 #include "lypch.h"
 #include "VulkanRenderDevice.h"
 
-#include "Renderer/Context/VulkanSwapChain.h"
 #include "Renderer/Context/VulkanPipeline.h"
 #include "Renderer/Descriptors/VulkanDescriptorSet.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
+
+#include "Renderer/Renderer.h"
 
 #include "VulkanRenderDeviceCommandList.h"
 
@@ -13,6 +14,8 @@
 namespace Lucy {
 
 	void VulkanRenderDevice::BindBuffers(void* commandBufferHandle, Ref<Mesh> mesh) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindBuffers");
+		
 		VertexBindInfo vertexInfo;
 		vertexInfo.CommandBuffer = (VkCommandBuffer)commandBufferHandle;
 		mesh->GetVertexBuffer()->Bind(vertexInfo);
@@ -23,6 +26,8 @@ namespace Lucy {
 	}
 
 	void VulkanRenderDevice::BindPushConstant(void* commandBufferHandle, Ref<Pipeline> pipeline, const PushConstant& pushConstant) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindPushConstant");
+		
 		PushConstantBindInfo bindInfo;
 		bindInfo.CommandBuffer = (VkCommandBuffer)commandBufferHandle;
 		bindInfo.PipelineLayout = pipeline.As<VulkanPipeline>()->GetPipelineLayout();
@@ -30,6 +35,8 @@ namespace Lucy {
 	}
 
 	void VulkanRenderDevice::BindPipeline(void* commandBufferHandle, Ref<Pipeline> pipeline) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindPipeline");
+
 		PipelineBindInfo info;
 		info.PipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		info.CommandBuffer = (VkCommandBuffer)commandBufferHandle;
@@ -38,6 +45,8 @@ namespace Lucy {
 	}
 
 	void VulkanRenderDevice::UpdateDescriptorSets(Ref<Pipeline> pipeline) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::UpdateDescriptorSets");
+
 		for (Ref<DescriptorSet> descriptorSet : pipeline->GetDescriptorSets()) {
 			Ref<VulkanDescriptorSet> vulkanSet = descriptorSet.As<VulkanDescriptorSet>();
 			vulkanSet->Update();
@@ -45,6 +54,8 @@ namespace Lucy {
 	}
 
 	void VulkanRenderDevice::BindAllDescriptorSets(void* commandBufferHandle, Ref<Pipeline> pipeline) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindAllDescriptorSets");
+
 		Ref<VulkanPipeline> vulkanPipeline = pipeline.As<VulkanPipeline>();
 
 		VulkanDescriptorSetBindInfo bindInfo;
@@ -59,6 +70,8 @@ namespace Lucy {
 	}
 
 	void VulkanRenderDevice::BindDescriptorSet(void* commandBufferHandle, Ref<Pipeline> pipeline, uint32_t setIndex) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindDescriptorSet");
+
 		Ref<VulkanPipeline> vulkanPipeline = pipeline.As<VulkanPipeline>();
 		
 		VulkanDescriptorSetBindInfo bindInfo;
@@ -76,6 +89,8 @@ namespace Lucy {
 	}
 
 	void VulkanRenderDevice::BindBuffers(void* commandBufferHandle, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindBuffers");
+
 		VertexBindInfo vertexInfo;
 		vertexInfo.CommandBuffer = (VkCommandBuffer)commandBufferHandle;
 		vertexBuffer->Bind(vertexInfo);
@@ -90,6 +105,8 @@ namespace Lucy {
 	}
 
 	void VulkanRenderDevice::BeginRenderPass(void* commandBufferHandle, Ref<Pipeline> pipeline) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BeginRenderPass");
+
 		Ref<RenderPass> renderPass = pipeline->GetRenderPass();
 		Ref<FrameBuffer> frameBuffer = pipeline->GetFrameBuffer();
 
@@ -98,13 +115,14 @@ namespace Lucy {
 		renderPassBeginInfo.Width = frameBuffer->GetWidth();
 		renderPassBeginInfo.Height = frameBuffer->GetHeight();
 
-		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-		renderPassBeginInfo.VulkanFrameBuffer = frameBuffer.As<VulkanFrameBuffer>()->GetVulkanHandles()[swapChain.GetCurrentFrameIndex()];
+		renderPassBeginInfo.VulkanFrameBuffer = frameBuffer.As<VulkanFrameBuffer>()->GetVulkanHandles()[Renderer::GetCurrentFrameIndex()];
 
 		renderPass->Begin(renderPassBeginInfo);
 	}
 
 	void VulkanRenderDevice::EndRenderPass(Ref<Pipeline> pipeline) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::EndRenderPass");
+
 		pipeline->GetRenderPass()->End();
 	}
 

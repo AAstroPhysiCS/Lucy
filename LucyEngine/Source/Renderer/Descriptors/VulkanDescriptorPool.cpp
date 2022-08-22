@@ -2,7 +2,7 @@
 #include "VulkanDescriptorPool.h"
 
 #include "Renderer/Renderer.h"
-#include "Renderer/Context/VulkanDevice.h"
+#include "Renderer/Context/VulkanContextDevice.h"
 
 namespace Lucy {
 
@@ -19,12 +19,12 @@ namespace Lucy {
 		info.maxSets = m_CreateInfo.MaxSet;
 		info.flags = m_CreateInfo.PoolFlags;
 
-		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
 		LUCY_VK_ASSERT(vkCreateDescriptorPool(device, &info, nullptr, &m_DescriptorPool));
 	}
 
 	void VulkanDescriptorPool::Destroy() {
-		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
 		vkDestroyDescriptorPool(device, m_DescriptorPool, nullptr);
 	}
 }

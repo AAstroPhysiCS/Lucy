@@ -20,10 +20,11 @@ project "LucyEngine"
         "%{LibraryPath.spdlog}/include",
         "%{LibraryPath.GLFW}/include",
         "%{LibraryPath.entt}/include",
-        "%{LibraryPath.glm}",
+        "%{LibraryPath.Optick}/include",
         "%{LibraryPath.stb}/include",
         "%{LibraryPath.assimp}/include",
         "%{LibraryPath.nativefiledialog}/include",
+        "%{LibraryPath.glm}",
         "%{LibraryPath.VulkanInclude}",
         "%{LibraryPath.VMA}",
         "Source"
@@ -33,6 +34,7 @@ project "LucyEngine"
         "GLFW",
         "ImGui",
         "glm",
+        "Optick",
         
         "%{LibraryPath.assimp}/assimp.lib",
         "%{LibraryPath.nativefiledialog}/nfd.lib"

@@ -4,10 +4,12 @@
 #include "Renderer/Renderer.h"
 
 namespace Lucy {
-	
+
 	/* --- Individual Passes --- All passes should be in here */
 
-	void ForwardRenderMeshes(VkCommandBuffer commandBuffer, const Ref<Pipeline>& pipeline, StaticMeshRenderCommand* staticMeshRenderCommand) {
+	void ForwardRenderMeshes(VkCommandBuffer commandBuffer, const Ref<Pipeline>& pipeline, StaticMeshRenderCommand* staticMeshRenderCommand, const char* debugEventName) {
+		//LUCY_PROFILE_GPU_EVENT(debugEventName);
+
 		const Ref<Mesh>& staticMesh = staticMeshRenderCommand->Mesh;
 		const glm::mat4& entityTransform = staticMeshRenderCommand->EntityTransform;
 
@@ -35,10 +37,10 @@ namespace Lucy {
 	}
 
 	void GeometryPass(void* commandBuffer, Ref<Pipeline> geometryPipeline, RenderCommand* staticMeshRenderCommand) {
-		ForwardRenderMeshes((VkCommandBuffer)commandBuffer, geometryPipeline, (StaticMeshRenderCommand*)staticMeshRenderCommand);
+		ForwardRenderMeshes((VkCommandBuffer)commandBuffer, geometryPipeline, (StaticMeshRenderCommand*)staticMeshRenderCommand, "Geometry Pass");
 	}
 
 	void IDPass(void* commandBuffer, Ref<Pipeline> idPipeline, RenderCommand* staticMeshRenderCommand) {
-		ForwardRenderMeshes((VkCommandBuffer)commandBuffer, idPipeline, (StaticMeshRenderCommand*)staticMeshRenderCommand);
+		ForwardRenderMeshes((VkCommandBuffer)commandBuffer, idPipeline, (StaticMeshRenderCommand*)staticMeshRenderCommand, "ID Pass");
 	}
 }

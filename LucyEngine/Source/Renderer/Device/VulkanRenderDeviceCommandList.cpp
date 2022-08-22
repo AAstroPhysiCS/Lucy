@@ -11,6 +11,7 @@ namespace Lucy {
 	}
 
 	void VulkanRenderDeviceCommandList::ExecuteCommandQueue() {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDeviceCommandList::ExecuteCommandQueue");
 		m_CommandQueue->Execute();
 	}
 

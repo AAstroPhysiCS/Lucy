@@ -29,6 +29,8 @@ namespace Lucy {
 	}
 
 	void DetailsPanel::Render() {
+		LUCY_PROFILE_NEW_EVENT("DetailsPanel::Render");
+		
 		ImGui::Begin("Details", 0, ImGuiWindowFlags_NoBringToFrontOnFocus);
 
 		Entity& entityContext = SceneExplorerPanel::GetInstance().GetEntityContext();

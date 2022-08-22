@@ -5,7 +5,7 @@
 #include "Renderer/Synchronization/VulkanSyncItems.h"
 
 #include "../Memory/VulkanAllocator.h"
-#include "../Context/VulkanDevice.h"
+#include "../Context/VulkanContextDevice.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
@@ -36,6 +36,10 @@ namespace Lucy {
 		});
 	}
 
+	void VulkanImage2D::SetLayout(VkImageLayout newLayout) {
+		TransitionImageLayout(m_Image, newLayout);
+	}
+
 	void VulkanImage2D::CreateFromPath() {
 		uint8_t* data = nullptr;
 		data = stbi_load(m_Path.c_str(), &m_Width, &m_Height, &m_Channels, STBI_rgb_alpha);
@@ -56,10 +60,10 @@ namespace Lucy {
 		VulkanAllocator& allocator = VulkanAllocator::Get();
 		allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, m_ImageStagingBuffer, m_ImageStagingBufferVma);
 
-		void* pixelData;
-		vmaMapMemory(allocator.GetVmaInstance(), m_ImageStagingBufferVma, &pixelData);
+		void* pixelData = nullptr;
+		allocator.MapMemory(m_ImageStagingBufferVma, pixelData);
 		memcpy(pixelData, data, imageSize);
-		vmaUnmapMemory(allocator.GetVmaInstance(), m_ImageStagingBufferVma);
+		allocator.UnmapMemory(m_ImageStagingBufferVma);
 
 		stbi_image_free(data);
 
@@ -75,14 +79,14 @@ namespace Lucy {
 									   flags, VK_IMAGE_TYPE_2D, m_Image, m_ImageVma);
 
 		TransitionImageLayout(m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-		CopyImage(m_ImageStagingBuffer);
+		CopyBufferToImage(m_ImageStagingBuffer);
 
 		if (m_CreateInfo.GenerateMipmap)
 			GenerateMipmaps(m_Image);
 		else //transitioning only then, when we dont care about mipmapping. Mipmapping already transitions to the right layout
 			TransitionImageLayout(m_Image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-		vmaDestroyBuffer(allocator.GetVmaInstance(), m_ImageStagingBuffer, m_ImageStagingBufferVma);
+		allocator.DestroyBuffer(m_ImageStagingBuffer, m_ImageStagingBufferVma);
 
 		CreateVulkanImageViewHandle();
 	}
@@ -150,7 +154,26 @@ namespace Lucy {
 		}
 	}
 
-	void VulkanImage2D::CopyImage(const VkBuffer& imageStagingBuffer) {
+	void VulkanImage2D::CopyImageToBuffer(const VkBuffer& bufferToCopy) {
+		Renderer::ExecuteSingleTimeCommand([=](VkCommandBuffer commandBuffer) {
+			VkBufferImageCopy region{};
+			region.bufferOffset = 0;
+			region.bufferRowLength = 0;
+			region.bufferImageHeight = 0;
+			region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			region.imageSubresource.mipLevel = 0;
+			region.imageSubresource.baseArrayLayer = 0;
+			region.imageSubresource.layerCount = 1;
+			region.imageOffset = { 0, 0, 0 };
+			region.imageExtent.width = (uint32_t)m_Width;
+			region.imageExtent.height = (uint32_t)m_Height;
+			region.imageExtent.depth = 1;
+
+			vkCmdCopyImageToBuffer(commandBuffer, m_Image, m_CurrentLayout, bufferToCopy, 1, &region);
+		});
+	}
+
+	void VulkanImage2D::CopyBufferToImage(const VkBuffer& bufferToCopy) {
 		Renderer::ExecuteSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
 			VkBufferImageCopy region{};
 			region.bufferOffset = 0;
@@ -165,7 +188,7 @@ namespace Lucy {
 			region.imageExtent.height = (uint32_t)m_Height;
 			region.imageExtent.depth = 1;
 
-			vkCmdCopyBufferToImage(commandBuffer, imageStagingBuffer, m_Image, m_CurrentLayout, 1, &region);
+			vkCmdCopyBufferToImage(commandBuffer, bufferToCopy, m_Image, m_CurrentLayout, 1, &region);
 		});
 	}
 
@@ -245,8 +268,7 @@ namespace Lucy {
 			return;
 		m_ImageView.Destroy();
 
-		VulkanAllocator& allocator = VulkanAllocator::Get();
-		vmaDestroyImage(allocator.GetVmaInstance(), m_Image, m_ImageVma);
+		VulkanAllocator::Get().DestroyImage(m_Image, m_ImageVma);
 		m_Image = VK_NULL_HANDLE;
 	}
 
@@ -274,7 +296,7 @@ namespace Lucy {
 	}
 
 	void VulkanImageView::CreateView() {
-		const VulkanDevice& device = VulkanDevice::Get();
+		const VulkanContextDevice& device = VulkanContextDevice::Get();
 
 		VkImageViewCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -298,7 +320,7 @@ namespace Lucy {
 	}
 
 	void VulkanImageView::CreateSampler() {
-		const VulkanDevice& device = VulkanDevice::Get();
+		const VulkanContextDevice& device = VulkanContextDevice::Get();
 
 		VkSamplerCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -341,8 +363,8 @@ namespace Lucy {
 	}
 
 	void VulkanImageView::Destroy() {
-		vkDestroyImageView(VulkanDevice::Get().GetLogicalDevice(), m_ImageView, nullptr);
+		vkDestroyImageView(VulkanContextDevice::Get().GetLogicalDevice(), m_ImageView, nullptr);
 		if (m_CreateInfo.GenerateSampler)
-			vkDestroySampler(VulkanDevice::Get().GetLogicalDevice(), m_Sampler, nullptr);
+			vkDestroySampler(VulkanContextDevice::Get().GetLogicalDevice(), m_Sampler, nullptr);
 	}
 }

@@ -1,14 +1,14 @@
 #include "lypch.h"
-#include "VulkanDevice.h"
+#include "VulkanContextDevice.h"
 
 namespace Lucy {
 
-	VulkanDevice& VulkanDevice::Get() {
-		static VulkanDevice s_Instance;
+	VulkanContextDevice& VulkanContextDevice::Get() {
+		static VulkanContextDevice s_Instance;
 		return s_Instance;
 	}
 
-	void VulkanDevice::Create(VkInstance instance, std::vector<const char*>& enabledValidationLayers, VkSurfaceKHR surface) {
+	void VulkanContextDevice::Create(VkInstance instance, std::vector<const char*>& enabledValidationLayers, VkSurfaceKHR surface) {
 		m_Surface = surface;
 
 		uint32_t deviceCount = 0;
@@ -30,11 +30,12 @@ namespace Lucy {
 		vkGetDeviceQueue(m_LogicalDevice, m_QueueFamilyIndices.PresentFamily, 0, &m_PresentQueue);
 	}
 
-	void VulkanDevice::Destroy() {
+	void VulkanContextDevice::Destroy() {
+		LUCY_PROFILE_DESTROY();
 		vkDestroyDevice(m_LogicalDevice, nullptr);
 	}
 
-	void VulkanDevice::PickDeviceByRanking(const std::vector<VkPhysicalDevice>& devices) {
+	void VulkanContextDevice::PickDeviceByRanking(const std::vector<VkPhysicalDevice>& devices) {
 
 		LUCY_INFO("----------Available Devices----------");
 
@@ -72,7 +73,7 @@ namespace Lucy {
 		LUCY_ASSERT(false);
 	}
 
-	void VulkanDevice::CreateLogicalDevice(std::vector<const char*>& enabledValidationLayers) {
+	void VulkanContextDevice::CreateLogicalDevice(std::vector<const char*>& enabledValidationLayers) {
 
 		std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 		std::set<uint32_t> uniqueQueueFamilies = { m_QueueFamilyIndices.GraphicsFamily, m_QueueFamilyIndices.PresentFamily };
@@ -126,7 +127,7 @@ namespace Lucy {
 		LUCY_VK_ASSERT(vkCreateDevice(m_PhysicalDevice, &deviceCreateInfo, nullptr, &m_LogicalDevice));
 	}
 
-	void VulkanDevice::FindQueueFamilies(VkPhysicalDevice device) {
+	void VulkanContextDevice::FindQueueFamilies(VkPhysicalDevice device) {
 		uint32_t queueFamilyCount = 0;
 		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
 
@@ -152,7 +153,7 @@ namespace Lucy {
 		}
 	}
 
-	bool VulkanDevice::CheckDeviceExtensionSupport(VkPhysicalDevice device) {
+	bool VulkanContextDevice::CheckDeviceExtensionSupport(VkPhysicalDevice device) {
 		uint32_t extensionCount = 0;
 		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
 
@@ -177,7 +178,7 @@ namespace Lucy {
 		return requiredExtensions.empty();
 	}
 
-	bool VulkanDevice::CheckDeviceFormatSupport(VkPhysicalDevice device) {
+	bool VulkanContextDevice::CheckDeviceFormatSupport(VkPhysicalDevice device) {
 		bool allFormatIsSupported = true;
 		for (VkFormat formatToCheck : m_DeviceFormatSupportToCheck) {
 			VkFormatProperties properties;
@@ -192,7 +193,7 @@ namespace Lucy {
 		return allFormatIsSupported;
 	}
 
-	void VulkanDevice::PrintDeviceInfo() {
+	void VulkanContextDevice::PrintDeviceInfo() {
 		LUCY_INFO(fmt::format("Selected Device: {0}", m_DeviceInfo.Name));
 	}
 }

@@ -4,7 +4,7 @@
 #include "vulkan/vulkan.h"
 
 #include "Renderer/Renderer.h"
-#include "Renderer/Context/VulkanDevice.h"
+#include "Renderer/Context/VulkanContextDevice.h"
 #include "Renderer/Context/VulkanSwapChain.h"
 
 namespace Lucy {
@@ -33,10 +33,10 @@ namespace Lucy {
 		if (!m_ImageViews.empty()) { //if the framebuffer is being used for swapchain
 			m_FrameBufferHandles.resize(swapChainInstance.GetImageCount(), VK_NULL_HANDLE);
 		} else {
-			m_FrameBufferHandles.resize(swapChainInstance.GetMaxFramesInFlight(), VK_NULL_HANDLE);
+			m_FrameBufferHandles.resize(Renderer::GetMaxFramesInFlight(), VK_NULL_HANDLE);
 		}
 
-		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
 
 		for (uint32_t i = 0; i < m_FrameBufferHandles.size(); i++) {
 			VkImageView imageViewHandle[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
@@ -74,7 +74,7 @@ namespace Lucy {
 	}
 
 	void VulkanFrameBuffer::Destroy() {
-		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
 
 		for (uint32_t i = 0; i < m_FrameBufferHandles.size(); i++) {
 			vkDestroyFramebuffer(device, m_FrameBufferHandles[i], nullptr);

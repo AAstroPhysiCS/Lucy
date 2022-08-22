@@ -40,9 +40,7 @@ namespace Lucy {
 				{ "a_BiTangents", ShaderDataSize::Float3 }
 		};
 
-		uint32_t maxFramesInFlight = 1;
-		if (arch == RenderArchitecture::Vulkan)
-			maxFramesInFlight = VulkanSwapChain::Get().GetMaxFramesInFlight();
+		uint32_t maxFramesInFlight = Renderer::GetMaxFramesInFlight();
 
 #pragma region GeometryPipeline
 
@@ -154,6 +152,8 @@ namespace Lucy {
 	}
 
 	void RendererModule::Begin() {
+		LUCY_PROFILE_NEW_EVENT("RendererModule::Begin");
+
 		Renderer::BeginScene(m_Scene);
 
 		auto& meshView = m_Scene->View<MeshComponent>();
@@ -181,6 +181,8 @@ namespace Lucy {
 	}
 
 	void RendererModule::OnRender() {
+		LUCY_PROFILE_NEW_EVENT("RendererModule::OnRender");
+
 		EditorCamera& camera = m_Scene->GetEditorCamera();
 		auto vp = camera.GetVP();
 
@@ -197,8 +199,10 @@ namespace Lucy {
 	}
 
 	void RendererModule::End() {
-		PresentResult result = Renderer::EndScene();
-		if (result == PresentResult::ERROR_OUT_OF_DATE_KHR || result == PresentResult::SUBOPTIMAL_KHR)
+		LUCY_PROFILE_NEW_EVENT("RendererModule::End");
+
+		RenderContextResultCodes result = Renderer::EndScene();
+		if (result == RenderContextResultCodes::ERROR_OUT_OF_DATE_KHR || result == RenderContextResultCodes::SUBOPTIMAL_KHR)
 			OnWindowResize();
 	}
 
@@ -219,10 +223,14 @@ namespace Lucy {
 	}
 
 	void RendererModule::Wait() {
+		LUCY_PROFILE_NEW_EVENT("RendererModule::Wait");
+
 		Renderer::WaitForDevice();
 	}
 
 	void RendererModule::OnWindowResize() {
+		LUCY_PROFILE_NEW_EVENT("RendererModule::OnWindowResize");
+
 		Renderer::OnWindowResize();
 
 		auto& [viewportWidth, viewportHeight] = Renderer::GetViewportArea();

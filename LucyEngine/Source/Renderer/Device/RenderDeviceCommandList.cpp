@@ -16,14 +16,18 @@ namespace Lucy {
 	}
 
 	void RenderDeviceCommandList::EnqueueToRenderThread(EnqueueFunc&& func) {
+		LUCY_PROFILE_NEW_EVENT("RenderDeviceCommandList::EnqueueToRenderThread");
 		m_RenderFunctionQueue.push_back(std::move(func));
 	}
 
 	RenderCommandResourceHandle RenderDeviceCommandList::CreateRenderPassResource(RenderCommandFunc&& func, Ref<Pipeline> pipeline) {
+		LUCY_PROFILE_NEW_EVENT("RenderDeviceCommandList::CreateRenderPassResource");
 		return m_CommandQueue->CreateRenderPassResource(std::move(func), pipeline);
 	}
 
 	void RenderDeviceCommandList::DispatchCommands() {
+		LUCY_PROFILE_NEW_EVENT("RenderDeviceCommandList::DispatchCommands");
+		
 		uint32_t oldSize = m_RenderFunctionQueue.size();
 		for (uint32_t i = 0; i < oldSize; i++) {
 			m_RenderFunctionQueue[i](); //functions can contain nested functions

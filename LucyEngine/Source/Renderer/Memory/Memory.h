@@ -6,7 +6,7 @@ namespace Lucy {
 
 	//Lucy wrapper class for std::shared_ptr
 	template <typename T>
-	class Ref {
+	class Ref final {
 	public:
 		Ref() = default;
 
@@ -186,7 +186,7 @@ namespace Lucy {
 
 	//Lucy wrapper class for std::unique_ptr
 	template <typename T>
-	class Unique {
+	class Unique final {
 	public:
 		Unique() = default;
 

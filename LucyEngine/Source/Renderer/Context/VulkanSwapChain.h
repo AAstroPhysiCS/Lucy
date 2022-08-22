@@ -2,7 +2,6 @@
 
 #include "vulkan/vulkan.h"
 
-#include "Renderer/Synchronization/VulkanSyncItems.h"
 #include "Renderer/Image/VulkanImage.h"
 #include "Renderer/Memory/Buffer/FrameBuffer.h"
 
@@ -11,6 +10,9 @@ namespace Lucy {
 	class Window;
 	class CommandQueue;
 
+	class Semaphore;
+	class Fence;
+
 	struct SwapChainCapabilities {
 		VkSurfaceCapabilitiesKHR surfaceCapabilities{};
 		std::vector<VkSurfaceFormatKHR> formats;
@@ -18,42 +20,30 @@ namespace Lucy {
 	};
 
 	class VulkanSwapChain {
-	private:
-		const uint32_t MAX_FRAMES_IN_FLIGHT = 3;
-
-		uint32_t m_ImageIndex = 0;
-		uint32_t m_CurrentFrameIndex = 0;
-
-		VulkanSwapChain();
 	public:
 		~VulkanSwapChain() = default;
 		static VulkanSwapChain& Get();
 
 		void Create(Ref<Window>& window);
 		void Recreate();
-		void BeginFrame();
-		void EndFrame(const Ref<CommandQueue>& commandQueue);
-		VkResult Present();
+		VkResult AcquireNextImage(VkSemaphore currentFrameImageAvailSemaphore, uint32_t& imageIndex);
+		VkResult Present(const Semaphore& signalSemaphore, uint32_t& imageIndex);
+
+		/// <param name="currentFrameWaitSemaphore: image is available, image is renderable"></param>
+		/// <param name="currentFrameSignalSemaphore: rendering finished, signal it"></param>
+		void SubmitToQueue(VkCommandBuffer commandBuffer, const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore);
 		void Destroy();
 
 		inline VkExtent2D GetExtent() { return m_SelectedSwapExtent; }
 		inline VkSurfaceFormatKHR& GetSurfaceFormat() { return m_SelectedFormat; }
 		inline VkSwapchainKHR GetVulkanHandle() { return m_SwapChain; }
-		inline VkResult GetLastSwapChainResult() { return m_LastSwapChainResult; }
 
 		inline size_t GetImageCount() { return m_SwapChainImages.size(); }
 		inline std::vector<VulkanImageView>& GetImageViews() { return m_SwapChainImageViews; }
 		
-		inline const uint32_t GetCurrentImageIndex() const { return m_ImageIndex; }
-		inline const uint32_t GetCurrentFrameIndex() const { return m_CurrentFrameIndex; }
-		inline const uint32_t GetMaxFramesInFlight() const { return MAX_FRAMES_IN_FLIGHT; }
-
 		inline Ref<VulkanFrameBufferInfo> GetSwapChainFrameBufferInfo() const { return m_SwapChainFrameBufferInfo; }
 	private:
-		void SubmitToQueue(VkCommandBuffer commandBuffer);
-
 		VkSwapchainKHR Create(VkSwapchainKHR oldSwapChain);
-		VkResult AcquireNextImage(VkSemaphore currentFrameImageAvailSemaphore, uint32_t& imageIndex);
 
 		SwapChainCapabilities GetSwapChainCapabilities(VkPhysicalDevice device);
 		VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const SwapChainCapabilities& capabilities);
@@ -70,12 +60,6 @@ namespace Lucy {
 		VkSurfaceFormatKHR m_SelectedFormat;
 		VkPresentModeKHR m_SelectedPresentMode;
 		VkExtent2D m_SelectedSwapExtent;
-
-		std::vector<Semaphore> m_WaitSemaphores;
-		std::vector<Semaphore> m_SignalSemaphores;
-		std::vector<Fence> m_InFlightFences;
-
-		VkResult m_LastSwapChainResult;
 
 		Ref<Window> m_Window = nullptr;
 	};

@@ -2,7 +2,7 @@
 
 #include "Shader.h"
 
-#include "../Context/VulkanDevice.h"
+#include "../Context/VulkanContextDevice.h"
 
 namespace Lucy {
 

@@ -7,26 +7,26 @@ namespace Lucy {
 	class VulkanImage2D;
 
 	//TODO: VK Synchronization2
-	class Semaphore {
+	class Semaphore final {
 	public:
 		Semaphore();
 		~Semaphore() = default;
 
 		void Destroy();
 
-		inline VkSemaphore& GetSemaphore() { return m_Handle; }
+		inline const VkSemaphore& GetSemaphore() const { return m_Handle; }
 	private:
 		VkSemaphore m_Handle;
 	};
 
-	class Fence {
+	class Fence final {
 	public:
 		Fence();
 		~Fence() = default;
 
 		void Destroy();
 
-		inline VkFence& GetFence() { return m_Handle; }
+		inline const VkFence& GetFence() const { return m_Handle; }
 	private:
 		VkFence m_Handle;
 	};
@@ -42,7 +42,7 @@ namespace Lucy {
 	};
 
 	//for image layout transitions
-	class ImageMemoryBarrier {
+	class ImageMemoryBarrier final {
 	public:
 		ImageMemoryBarrier(const ImageMemoryBarrierCreateInfo& createInfo);
 		~ImageMemoryBarrier() = default;

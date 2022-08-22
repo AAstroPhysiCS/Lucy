@@ -37,6 +37,8 @@ namespace Lucy {
 	}
 
 	void SceneExplorerPanel::Render() {
+		LUCY_PROFILE_NEW_EVENT("SceneExplorerPanel::Render");
+		
 		ImGui::Begin("Scene Explorer", 0, ImGuiWindowFlags_NoBringToFrontOnFocus);
 
 		const auto& view = m_Scene->View<UUIDComponent, TagComponent>();

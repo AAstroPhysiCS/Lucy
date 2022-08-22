@@ -155,7 +155,7 @@ namespace Lucy {
 		pipelineLayoutInfo.pushConstantRangeCount = pushConstantRanges.size();
 		pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.data();
 
-		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
 		LUCY_VK_ASSERT(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_PipelineLayoutHandle));
 
 		VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo{};
@@ -201,7 +201,7 @@ namespace Lucy {
 		if (m_DescriptorSetLayouts.size() != 0) //if the application has been resized
 			return;
 
-		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
 
 		for (auto& [set, info] : m_CreateInfo.Shader->GetShaderUniformBlockMap()) {
 			std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
@@ -366,7 +366,7 @@ namespace Lucy {
 	}
 
 	void VulkanPipeline::Destroy() {
-		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
 
 		m_CreateInfo.FrameBuffer->Destroy();
 		m_CreateInfo.RenderPass.As<VulkanRenderPass>()->Destroy();

@@ -1,7 +1,7 @@
 #include "lypch.h"
 
 #include "VulkanSyncItems.h"
-#include "Renderer/Context/VulkanDevice.h"
+#include "Renderer/Context/VulkanContextDevice.h"
 
 #include "Renderer/Image/VulkanImage.h"
 
@@ -11,11 +11,11 @@ namespace Lucy {
 		VkSemaphoreCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-		LUCY_VK_ASSERT(vkCreateSemaphore(VulkanDevice::Get().GetLogicalDevice(), &createInfo, nullptr, &m_Handle));
+		LUCY_VK_ASSERT(vkCreateSemaphore(VulkanContextDevice::Get().GetLogicalDevice(), &createInfo, nullptr, &m_Handle));
 	}
 
 	void Semaphore::Destroy() {
-		vkDestroySemaphore(VulkanDevice::Get().GetLogicalDevice(), m_Handle, nullptr);
+		vkDestroySemaphore(VulkanContextDevice::Get().GetLogicalDevice(), m_Handle, nullptr);
 	}
 
 	Fence::Fence() {
@@ -23,11 +23,11 @@ namespace Lucy {
 		createInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 		createInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-		LUCY_VK_ASSERT(vkCreateFence(VulkanDevice::Get().GetLogicalDevice(), &createInfo, nullptr, &m_Handle));
+		LUCY_VK_ASSERT(vkCreateFence(VulkanContextDevice::Get().GetLogicalDevice(), &createInfo, nullptr, &m_Handle));
 	}
 
 	void Fence::Destroy() {
-		vkDestroyFence(VulkanDevice::Get().GetLogicalDevice(), m_Handle, nullptr);
+		vkDestroyFence(VulkanContextDevice::Get().GetLogicalDevice(), m_Handle, nullptr);
 	}
 
 	ImageMemoryBarrier::ImageMemoryBarrier(const ImageMemoryBarrierCreateInfo& createInfo)

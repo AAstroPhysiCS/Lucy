@@ -2,7 +2,7 @@
 #include "VulkanContext.h"
 
 #include "Renderer/Memory/VulkanAllocator.h"
-#include "Renderer/Context/VulkanDevice.h"
+#include "Renderer/Context/VulkanContextDevice.h"
 #include "Renderer/Context/VulkanSwapChain.h"
 
 namespace Lucy {
@@ -15,7 +15,7 @@ namespace Lucy {
 	void VulkanContext::Destroy() {
 		VulkanAllocator::Get().Destroy();
 		VulkanSwapChain::Get().Destroy();
-		VulkanDevice::Get().Destroy();
+		VulkanContextDevice::Get().Destroy();
 		m_Window->DestroyVulkanSurface(m_Instance);
 
 		DestroyMessageCallback();
@@ -74,7 +74,7 @@ namespace Lucy {
 #endif
 		
 		m_Window->InitVulkanSurface(m_Instance);
-		VulkanDevice::Get().Create(m_Instance, m_ValidationLayers, m_Window->GetVulkanSurface());
+		VulkanContextDevice::Get().Create(m_Instance, m_ValidationLayers, m_Window->GetVulkanSurface());
 		VulkanSwapChain::Get().Create(m_Window);
 		VulkanAllocator::Get().Init(m_Instance);
 	}

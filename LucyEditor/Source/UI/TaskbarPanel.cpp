@@ -5,14 +5,14 @@
 
 namespace Lucy {
 
-	TaskbarPanel& TaskbarPanel::GetInstance()
-	{
+	TaskbarPanel& TaskbarPanel::GetInstance() {
 		static TaskbarPanel s_Instance;
 		return s_Instance;
 	}
 
-	void TaskbarPanel::Render()
-	{
+	void TaskbarPanel::Render() {
+		LUCY_PROFILE_NEW_EVENT("TaskbarPanel::Render");
+
 		if (ImGui::BeginMenuBar()) {
 			if (ImGui::BeginMenu("File")) {
 				if (ImGui::MenuItem("New Scene")) {

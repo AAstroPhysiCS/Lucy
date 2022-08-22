@@ -8,10 +8,10 @@ namespace Lucy {
 	public:
 		static TaskbarPanel& GetInstance();
 	private:
-		void Render();
-
 		TaskbarPanel() = default;
 		virtual ~TaskbarPanel() = default;
+
+		void Render();
 	};
 }
 

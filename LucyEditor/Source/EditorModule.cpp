@@ -10,16 +10,18 @@ namespace Lucy {
 	}
 
 	void EditorModule::Begin() {
-
+		LUCY_PROFILE_NEW_EVENT("EditorModule::Begin");
 	}
 
 	void EditorModule::OnRender() {
+		LUCY_PROFILE_NEW_EVENT("EditorModule::OnRender");
+
 		m_ImGuiOverlay.Render();
 		m_ImGuiOverlay.SendImGuiDataToDevice();
 	}
 
 	void EditorModule::End() {
-
+		LUCY_PROFILE_NEW_EVENT("EditorModule::End");
 	}
 
 	void EditorModule::OnEvent(Event& e) {
@@ -31,6 +33,7 @@ namespace Lucy {
 	}
 
 	void EditorModule::Wait() {
+		LUCY_PROFILE_NEW_EVENT("EditorModule::Wait");
 		//Empty
 	}
 }

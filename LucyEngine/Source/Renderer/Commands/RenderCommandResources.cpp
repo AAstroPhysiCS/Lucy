@@ -38,7 +38,7 @@ namespace Lucy {
 	StaticMeshRenderCommand::StaticMeshRenderCommand(Priority priority, Ref<Lucy::Mesh> mesh, const glm::mat4& entityTransform)
 		: RenderCommand(priority), Mesh(mesh), EntityTransform(entityTransform) {
 #ifdef LUCY_DEBUG
-		m_Name = "MeshRenderCommand";
+		m_Name = "StaticMeshRenderCommand";
 #endif
 	}
 

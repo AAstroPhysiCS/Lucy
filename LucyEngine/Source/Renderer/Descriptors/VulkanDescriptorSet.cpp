@@ -3,8 +3,9 @@
 
 #include "Renderer/Memory/Buffer/Vulkan/VulkanUniformBuffer.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanSharedStorageBuffer.h"
-#include "Renderer/Context/VulkanSwapChain.h"
-#include "Renderer/Context/VulkanDevice.h"
+#include "Renderer/Context/VulkanContextDevice.h"
+
+#include "Renderer/Renderer.h"
 
 namespace Lucy {
 
@@ -16,9 +17,8 @@ namespace Lucy {
 	void VulkanDescriptorSet::Create() {
 		auto& internalInfo = m_CreateInfo.InternalInfo.As<VulkanDescriptorSetCreateInfo>();
 
-		const VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-		const uint32_t maxFramesInFlight = swapChain.GetMaxFramesInFlight();
-		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+		const uint32_t maxFramesInFlight = Renderer::GetMaxFramesInFlight();
+		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
 
 		std::vector<VkDescriptorSetLayout> layouts(maxFramesInFlight, internalInfo->Layout);
 
@@ -50,20 +50,21 @@ namespace Lucy {
 	}
 
 	void VulkanDescriptorSet::Bind(const VulkanDescriptorSetBindInfo& bindInfo) {
-		vkCmdBindDescriptorSets(bindInfo.CommandBuffer, bindInfo.PipelineBindPoint, bindInfo.PipelineLayout, m_CreateInfo.SetIndex, 1, &m_DescriptorSets[VulkanSwapChain::Get().GetCurrentFrameIndex()], 0, nullptr);
+		vkCmdBindDescriptorSets(bindInfo.CommandBuffer, bindInfo.PipelineBindPoint, bindInfo.PipelineLayout, m_CreateInfo.SetIndex, 1, &m_DescriptorSets[Renderer::GetCurrentFrameIndex()], 0, nullptr);
 	}
 
 	void VulkanDescriptorSet::Update() {
+		LUCY_PROFILE_NEW_EVENT("VulkanDescriptorSet::Update");
+
 		for (Ref<UniformBuffer>& buffer : m_UniformBuffers)
 			buffer->LoadToGPU();
 
 		for (Ref<SharedStorageBuffer>& buffer : m_SharedStorageBuffers)
 			buffer->LoadToGPU();
 
-		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-		const uint32_t index = swapChain.GetCurrentFrameIndex();
+		const uint32_t index = Renderer::GetCurrentFrameIndex();
 
-		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
 
 		VkWriteDescriptorSet setWrite{};
 		setWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

@@ -2,7 +2,7 @@
 #include "VulkanRenderPass.h"
 
 #include "Renderer/Renderer.h"
-#include "Context/VulkanDevice.h"
+#include "Context/VulkanContextDevice.h"
 #include "Context/VulkanSwapChain.h"
 
 namespace Lucy {
@@ -18,7 +18,7 @@ namespace Lucy {
 	}
 
 	void VulkanRenderPass::Create() {
-		const VulkanDevice& device = VulkanDevice::Get();
+		const VulkanContextDevice& device = VulkanContextDevice::Get();
 
 		Ref<VulkanRenderPassInfo> renderPassInfo = m_CreateInfo.InternalInfo.As<VulkanRenderPassInfo>();
 
@@ -146,7 +146,7 @@ namespace Lucy {
 	}
 
 	void VulkanRenderPass::Destroy() {
-		const VulkanDevice& device = VulkanDevice::Get();
+		const VulkanContextDevice& device = VulkanContextDevice::Get();
 		vkDestroyRenderPass(device.GetLogicalDevice(), m_RenderPass, nullptr);
 	}
 }

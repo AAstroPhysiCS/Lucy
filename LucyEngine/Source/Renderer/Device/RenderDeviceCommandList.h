@@ -24,6 +24,7 @@ namespace Lucy {
 
 		template <typename Command, typename ... Args>
 		inline void EnqueueRenderCommand(RenderCommandResourceHandle resourceHandle, Args&&... args) {
+			LUCY_PROFILE_NEW_EVENT("RenderDeviceCommandList::EnqueueRenderCommand");
 			m_CommandQueue->EnqueueRenderCommand(resourceHandle, Memory::CreateRef<Command>(args...));
 		}
 		

@@ -2,9 +2,10 @@
 #include "VulkanSharedStorageBuffer.h"
 
 #include "Renderer/Shader/ShaderReflect.h" //for ShaderMemberVariable
-#include "Renderer/Context/VulkanSwapChain.h"
-#include "Renderer/Context/VulkanDevice.h"
+#include "Renderer/Context/VulkanContextDevice.h"
 #include "Renderer/Memory/VulkanAllocator.h"
+
+#include "Renderer/Renderer.h"
 
 namespace Lucy {
 
@@ -15,32 +16,28 @@ namespace Lucy {
 			LUCY_ASSERT(false);
 		}
 
-		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-
-		const uint32_t maxFramesInFlight = swapChain.GetMaxFramesInFlight();
+		const uint32_t maxFramesInFlight = Renderer::GetMaxFramesInFlight();
 		m_Buffers.resize(maxFramesInFlight, VK_NULL_HANDLE);
 		m_BufferVma.resize(maxFramesInFlight, VK_NULL_HANDLE);
 
 		VulkanAllocator& allocator = VulkanAllocator::Get();
-		for (uint32_t i = 0; i < swapChain.GetMaxFramesInFlight(); i++)
+		for (uint32_t i = 0; i < maxFramesInFlight; i++)
 			allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, m_CreateInfo.BufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, m_Buffers[i], m_BufferVma[i]);
 	}
 
 	void VulkanSharedStorageBuffer::LoadToGPU() {
-		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 		VulkanAllocator& allocator = VulkanAllocator::Get();
-		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
 
 		void* dataLocal;
-		vmaMapMemory(allocator.GetVmaInstance(), m_BufferVma[swapChain.GetCurrentFrameIndex()], &dataLocal);
+		allocator.MapMemory(m_BufferVma[Renderer::GetCurrentFrameIndex()], dataLocal);
 		memcpy(dataLocal, m_Data.data(), m_Data.size());
-		vmaUnmapMemory(allocator.GetVmaInstance(), m_BufferVma[swapChain.GetCurrentFrameIndex()]);
+		allocator.UnmapMemory(m_BufferVma[Renderer::GetCurrentFrameIndex()]);
 	}
 
 	void VulkanSharedStorageBuffer::DestroyHandle() {
-		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 		VulkanAllocator& allocator = VulkanAllocator::Get();
-		for (uint32_t i = 0; i < swapChain.GetMaxFramesInFlight(); i++)
-			vmaDestroyBuffer(allocator.GetVmaInstance(), m_Buffers[i], m_BufferVma[i]);
+		for (uint32_t i = 0; i < Renderer::GetMaxFramesInFlight(); i++)
+			allocator.DestroyBuffer(m_Buffers[i], m_BufferVma[i]);
 	}
 }

@@ -57,6 +57,9 @@ namespace Lucy {
 		inline VulkanImageView& GetImageView() { return m_ImageView; }
 		inline VkImage GetVulkanHandle() const { return m_Image; }
 		inline VkImageLayout GetCurrentLayout() const { return m_CurrentLayout; }
+
+		void SetLayout(VkImageLayout newLayout);
+		void CopyImageToBuffer(const VkBuffer& bufferToCopy);
 	private:
 		void CreateFromPath();
 		void CreateEmptyImage();
@@ -64,9 +67,9 @@ namespace Lucy {
 
 		void CreateVulkanImageViewHandle();
 
-		//helper functions
-		void CopyImage(const VkBuffer& imageStagingBuffer); //should maybe be public?
+		//helper function
 		void GenerateMipmaps(VkImage image);
+		void CopyBufferToImage(const VkBuffer& bufferToCopy);
 
 		void TransitionImageLayout(VkImage image, VkImageLayout newLayout, uint32_t baseMipLevel = 0, uint32_t levelCount = 1);
 		void TransitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel = 0, uint32_t levelCount = 1);
@@ -79,8 +82,6 @@ namespace Lucy {
 		VkImageLayout m_CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 		uint32_t m_MaxMipLevel = 1;
-
-		friend class VulkanRenderer; //for TransitionImageLayout
 	};
 }
 

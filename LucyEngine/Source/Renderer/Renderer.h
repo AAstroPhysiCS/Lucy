@@ -15,7 +15,7 @@ namespace Lucy {
 
 		static void BeginScene(Ref<Scene>& scene);
 		static void RenderScene();
-		static PresentResult EndScene();
+		static RenderContextResultCodes EndScene();
 		static void WaitForDevice();
 		static void Destroy();
 
@@ -41,6 +41,7 @@ namespace Lucy {
 
 		template <typename T, typename ... Args>
 		inline static void EnqueueRenderCommand(RenderCommandResourceHandle resourceHandle, Args&&... args) {
+			LUCY_PROFILE_NEW_EVENT("Renderer::EnqueueRenderCommand");
 			s_Renderer->GetRenderDevice()->EnqueueRenderCommand<T>(resourceHandle, std::forward<Args>(args)...);
 		}
 
@@ -62,6 +63,10 @@ namespace Lucy {
 			struct Size { float Width, Height; };
 			return Size{ s_ViewportMouseX, s_ViewportMouseY };
 		}
+
+		inline static const uint32_t GetCurrentImageIndex() { return s_Renderer->GetCurrentImageIndex(); }
+		inline static const uint32_t GetCurrentFrameIndex() { return s_Renderer->GetCurrentFrameIndex(); }
+		inline static const uint32_t GetMaxFramesInFlight() { return s_Renderer->GetMaxFramesInFlight(); }
 
 		inline static const Ref<RenderContext>& GetRenderContext() { return s_Renderer->GetRenderContext(); }
 

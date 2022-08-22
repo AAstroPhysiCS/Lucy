@@ -1,7 +1,7 @@
 #include "lypch.h"
 #include "VulkanCommandPool.h"
 
-#include "Renderer/Context/VulkanDevice.h"
+#include "Renderer/Context/VulkanContextDevice.h"
 #include "Renderer/Renderer.h"
 
 namespace Lucy {
@@ -14,7 +14,7 @@ namespace Lucy {
 	}
 
 	void VulkanCommandPool::Allocate() {
-		const VulkanDevice& device = VulkanDevice::Get();
+		const VulkanContextDevice& device = VulkanContextDevice::Get();
 
 		VkCommandPoolCreateInfo createCommandPoolInfo{};
 		createCommandPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -34,11 +34,11 @@ namespace Lucy {
 	}
 
 	void VulkanCommandPool::Destroy() {
-		vkDestroyCommandPool(VulkanDevice::Get().GetLogicalDevice(), m_CommandPool, nullptr);
+		vkDestroyCommandPool(VulkanContextDevice::Get().GetLogicalDevice(), m_CommandPool, nullptr);
 	}
 
 	void VulkanCommandPool::Recreate() {
-		vkFreeCommandBuffers(VulkanDevice::Get().GetLogicalDevice(), m_CommandPool, m_CreateInfo.CommandBufferCount, m_CommandBuffers.data());
+		vkFreeCommandBuffers(VulkanContextDevice::Get().GetLogicalDevice(), m_CommandPool, m_CreateInfo.CommandBufferCount, m_CommandBuffers.data());
 
 		VkCommandBufferAllocateInfo createAllocInfo{};
 		createAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -46,7 +46,7 @@ namespace Lucy {
 		createAllocInfo.level = (VkCommandBufferLevel) m_CreateInfo.Level;
 		createAllocInfo.commandBufferCount = m_CreateInfo.CommandBufferCount;
 
-		LUCY_VK_ASSERT(vkAllocateCommandBuffers(VulkanDevice::Get().GetLogicalDevice(), &createAllocInfo, m_CommandBuffers.data()));
+		LUCY_VK_ASSERT(vkAllocateCommandBuffers(VulkanContextDevice::Get().GetLogicalDevice(), &createAllocInfo, m_CommandBuffers.data()));
 	}
 
 	VkCommandBuffer VulkanCommandPool::BeginSingleTimeCommand() {
@@ -56,7 +56,7 @@ namespace Lucy {
 		allocInfo.commandPool = m_CommandPool;
 		allocInfo.commandBufferCount = 1;
 
-		const VulkanDevice& vulkanDevice = VulkanDevice::Get();
+		const VulkanContextDevice& vulkanDevice = VulkanContextDevice::Get();
 
 		VkCommandBuffer commandBuffer;
 		vkAllocateCommandBuffers(vulkanDevice.GetLogicalDevice(), &allocInfo, &commandBuffer);
@@ -71,7 +71,7 @@ namespace Lucy {
 	}
 
 	void VulkanCommandPool::EndSingleTimeCommand(VkCommandBuffer commandBuffer) {
-		const VulkanDevice& vulkanDevice = VulkanDevice::Get();
+		const VulkanContextDevice& vulkanDevice = VulkanContextDevice::Get();
 
 		vkEndCommandBuffer(commandBuffer);
 

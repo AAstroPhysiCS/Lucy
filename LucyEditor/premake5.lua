@@ -18,6 +18,7 @@ project "LucyEditor"
         "%{LibraryPath.GLFW}/include",
         "%{LibraryPath.Glad}/include",
         "%{LibraryPath.entt}/include",
+        "%{LibraryPath.Optick}/include",
         "%{LibraryPath.ImGui}",
         "%{LibraryPath.glm}",
         "%{LibraryPath.assimp}/include",

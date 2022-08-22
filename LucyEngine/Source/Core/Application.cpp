@@ -15,7 +15,6 @@ namespace Lucy {
 		m_Window->SetEventCallback(LUCY_BIND_FUNC(&Application::OnEvent));
 
 		Input::Init(m_Window->Raw());
-
 		FileSystem::Init();
 	}
 

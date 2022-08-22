@@ -1,7 +1,7 @@
 #include "lypch.h"
 #include "VulkanAllocator.h"
 
-#include "Renderer/Context/VulkanDevice.h"
+#include "Renderer/Context/VulkanContextDevice.h"
 
 #define VMA_IMPLEMENTATION
 
@@ -13,7 +13,7 @@ namespace Lucy {
 	}
 
 	void VulkanAllocator::Init(VkInstance instance) {
-		VulkanDevice& device = VulkanDevice::Get();
+		VulkanContextDevice& device = VulkanContextDevice::Get();
 
 		VmaAllocatorCreateInfo createInfo{};
 		createInfo.vulkanApiVersion = VK_API_VERSION_1_3;
@@ -22,6 +22,22 @@ namespace Lucy {
 		createInfo.instance = instance;
 
 		LUCY_VK_ASSERT(vmaCreateAllocator(&createInfo, &m_Allocator));
+	}
+
+	void VulkanAllocator::MapMemory(VmaAllocation allocation, void*& mappedData) {
+		vmaMapMemory(m_Allocator, allocation, &mappedData);
+	}
+
+	void VulkanAllocator::UnmapMemory(VmaAllocation allocation) {
+		vmaUnmapMemory(m_Allocator, allocation);
+	}
+
+	void VulkanAllocator::DestroyBuffer(VkBuffer buffer, VmaAllocation allocation) {
+		vmaDestroyBuffer(m_Allocator, buffer, allocation);
+	}
+
+	void VulkanAllocator::DestroyImage(VkImage image, VmaAllocation allocation) {
+		vmaDestroyImage(m_Allocator, image, allocation);
 	}
 
 	void VulkanAllocator::Destroy() {
@@ -36,7 +52,7 @@ namespace Lucy {
 		bufferInfo.usage = usage;
 		bufferInfo.sharingMode = sharingMode;
 
-		VkDevice device = VulkanDevice::Get().GetLogicalDevice();
+		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
 
 		LUCY_VK_ASSERT(vkCreateBuffer(device, &bufferInfo, nullptr, &bufferHandle));
 
@@ -54,7 +70,7 @@ namespace Lucy {
 	}
 
 	uint32_t VulkanAllocator::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags propertyFlags) {
-		VkPhysicalDevice physicalDevice = VulkanDevice::Get().GetPhysicalDevice();
+		VkPhysicalDevice physicalDevice = VulkanContextDevice::Get().GetPhysicalDevice();
 
 		VkPhysicalDeviceMemoryProperties memProperties;
 		vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);

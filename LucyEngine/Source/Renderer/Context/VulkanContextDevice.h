@@ -20,12 +20,12 @@ namespace Lucy {
 		bool IsComplete() { return GraphicsFamilyHasValue && PresentFamilyHasValue; }
 	};
 
-	class VulkanDevice {
+	class VulkanContextDevice {
 	private:
-		VulkanDevice() = default;
+		VulkanContextDevice() = default;
 	public:
-		~VulkanDevice() = default;
-		static VulkanDevice& Get();
+		~VulkanContextDevice() = default;
+		static VulkanContextDevice& Get();
 
 		inline VulkanDeviceInfo& GetDeviceInformation() { return m_DeviceInfo; }
 		void Create(VkInstance instance, std::vector<const char*>& enabledValidationLayers, VkSurfaceKHR surface);

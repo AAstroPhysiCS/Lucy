@@ -2,10 +2,7 @@
 #include "SceneExplorerPanel.h"
 
 #include "Renderer/Renderer.h"
-
-#include "Renderer/Context/VulkanSwapChain.h"
 #include "Renderer/Context/VulkanPipeline.h"
-
 #include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 
 #include "imgui_impl_vulkan.h"
@@ -41,6 +38,8 @@ namespace Lucy {
 	}
 
 	void ViewportPanel::Render() {
+		LUCY_PROFILE_NEW_EVENT("ViewportPanel::Render");
+		
 		ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBringToFrontOnFocus |
 			ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDecoration;
 		static bool pOpen = true;
@@ -58,8 +57,7 @@ namespace Lucy {
 
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
-				VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-				void* outputTextureID = m_ViewportOutputPipeline->GetFrameBuffer().As<VulkanFrameBuffer>()->GetImages()[swapChain.GetCurrentFrameIndex()]->GetImGuiID();
+				void* outputTextureID = m_ViewportOutputPipeline->GetFrameBuffer().As<VulkanFrameBuffer>()->GetImages()[Renderer::GetCurrentFrameIndex()]->GetImGuiID();
 				ImGui::Image(outputTextureID, m_Size);
 				break;
 			}

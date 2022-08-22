@@ -31,23 +31,21 @@ namespace Lucy {
 	void VulkanIndexBuffer::LoadToGPU() {
 		Renderer::EnqueueToRenderThread([&]() {
 			VulkanAllocator& allocator = VulkanAllocator::Get();
-			VmaAllocator vmaAllocatorHandle = allocator.GetVmaInstance();
 
 			void* data;
-			vmaMapMemory(vmaAllocatorHandle, m_StagingBufferVma, &data);
+			allocator.MapMemory(m_StagingBufferVma, data);
 			memcpy(data, m_Data.data(), m_Data.size() * sizeof(float));
-			vmaUnmapMemory(vmaAllocatorHandle, m_StagingBufferVma);
+			allocator.UnmapMemory(m_StagingBufferVma);
 
 			allocator.CreateVulkanBufferVma(VulkanBufferUsage::GPUOnly, m_Data.size() * sizeof(float),
 											VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, m_BufferHandle, m_BufferVma);
 			Renderer::DirectCopyBuffer(m_StagingBufferHandle, m_BufferHandle, m_Data.size() * sizeof(float));
 
-			vmaDestroyBuffer(vmaAllocatorHandle, m_StagingBufferHandle, m_StagingBufferVma);
+			allocator.DestroyBuffer(m_StagingBufferHandle, m_StagingBufferVma);
 		});
 	}
 
 	void VulkanIndexBuffer::DestroyHandle() {
-		VmaAllocator vmaAllocator = VulkanAllocator::Get().GetVmaInstance();
-		vmaDestroyBuffer(vmaAllocator, m_BufferHandle, m_BufferVma);
+		VulkanAllocator::Get().DestroyBuffer(m_BufferHandle, m_BufferVma);
 	}
 }

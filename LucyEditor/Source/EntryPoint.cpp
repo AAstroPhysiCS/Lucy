@@ -4,8 +4,7 @@
 #ifdef LUCY_WINDOWS
 
 int main(int argc, char** argv) {
-	Lucy::Logger::Init();
-
+	
 	Lucy::WindowCreateInfo windowCreateInfo;
 	windowCreateInfo.Width = 1366;
 	windowCreateInfo.Height = 766;

@@ -9,7 +9,7 @@ namespace Lucy {
 
 	void VulkanCommandQueue::Init() {
 		CommandPoolCreateInfo createInfo;
-		createInfo.CommandBufferCount = VulkanSwapChain::Get().GetMaxFramesInFlight();
+		createInfo.CommandBufferCount = Renderer::GetMaxFramesInFlight();
 		createInfo.Level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 		createInfo.PoolFlags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
@@ -17,11 +17,7 @@ namespace Lucy {
 	}
 
 	void VulkanCommandQueue::Execute() {
-		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-		VkResult result = swapChain.GetLastSwapChainResult();
-		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
-			return;
-
+		LUCY_PROFILE_NEW_EVENT("VulkanCommandQueue::Execute");
 		if (m_BufferMap.size() == 0)
 			return;
 
@@ -57,7 +53,6 @@ namespace Lucy {
 	}
 
 	VkCommandBuffer VulkanCommandQueue::GetCurrentCommandBuffer() const {
-		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-		return m_CommandPool.As<VulkanCommandPool>()->GetCommandBuffer(swapChain.GetCurrentFrameIndex());
+		return m_CommandPool.As<VulkanCommandPool>()->GetCommandBuffer(Renderer::GetCurrentFrameIndex());
 	}
 }
