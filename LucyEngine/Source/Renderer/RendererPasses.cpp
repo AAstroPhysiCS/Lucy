@@ -8,8 +8,6 @@ namespace Lucy {
 	/* --- Individual Passes --- All passes should be in here */
 
 	void ForwardRenderMeshes(VkCommandBuffer commandBuffer, const Ref<Pipeline>& pipeline, StaticMeshRenderCommand* staticMeshRenderCommand, const char* debugEventName) {
-		//LUCY_PROFILE_GPU_EVENT(debugEventName);
-
 		const Ref<Mesh>& staticMesh = staticMeshRenderCommand->Mesh;
 		const glm::mat4& entityTransform = staticMeshRenderCommand->EntityTransform;
 

@@ -70,7 +70,7 @@ namespace Lucy {
 		inline ShaderStageInfo GetFragmentInfo() const { return m_ShaderInfoFragment; }
 
 		inline std::vector<ShaderUniformBlock>& GetShaderPushConstants() { return m_ShaderPushConstants; }
-		inline std::multimap<uint32_t, std::vector<ShaderUniformBlock>>& GetShaderUniformBlockMap() { return m_ShaderUniformBlockMap; }
+		inline std::unordered_multimap<uint32_t, std::vector<ShaderUniformBlock>>& GetShaderUniformBlockMap() { return m_ShaderUniformBlockMap; }
 
 		void Info(std::string& path, std::vector<uint32_t>& dataVertex, std::vector<uint32_t>& dataFragment);
 	private:
@@ -88,7 +88,7 @@ namespace Lucy {
 		//key = individual set
 		//value = uniform blocks
 		std::vector<ShaderUniformBlock> m_ShaderPushConstants;
-		std::multimap<uint32_t, std::vector<ShaderUniformBlock>> m_ShaderUniformBlockMap;
+		std::unordered_multimap<uint32_t, std::vector<ShaderUniformBlock>> m_ShaderUniformBlockMap;
 
 		ShaderStageInfo m_ShaderInfoVertex;
 		ShaderStageInfo m_ShaderInfoFragment;

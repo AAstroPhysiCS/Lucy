@@ -32,7 +32,7 @@ namespace Lucy {
 
 		inline size_t GetQueueSize() const { return m_BufferMap.size(); }
 	protected:
-		std::map<RenderCommandResourceHandle, RenderCommandResource> m_BufferMap;
+		std::unordered_map<RenderCommandResourceHandle, RenderCommandResource> m_BufferMap;
 		Ref<CommandPool> m_CommandPool = nullptr;
 	};
 }

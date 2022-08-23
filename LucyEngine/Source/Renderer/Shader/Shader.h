@@ -31,7 +31,7 @@ namespace Lucy {
 #endif
 
 		inline std::vector<ShaderUniformBlock>& GetPushConstants() { return m_Reflect.GetShaderPushConstants(); }
-		inline std::multimap<uint32_t, std::vector<ShaderUniformBlock>>& GetShaderUniformBlockMap() { return m_Reflect.GetShaderUniformBlockMap(); }
+		inline std::unordered_multimap<uint32_t, std::vector<ShaderUniformBlock>>& GetShaderUniformBlockMap() { return m_Reflect.GetShaderUniformBlockMap(); }
 
 		uint32_t m_Program = 0;
 		std::string m_Path = "";

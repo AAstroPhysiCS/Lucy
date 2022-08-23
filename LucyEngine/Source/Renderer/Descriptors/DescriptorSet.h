@@ -5,7 +5,7 @@
 
 namespace Lucy {
 
-	constexpr uint32_t MAX_DYNAMIC_DESCRIPTOR_COUNT = 1000u;
+	constexpr uint32_t MAX_DYNAMIC_DESCRIPTOR_COUNT = 1024u;
 	constexpr uint32_t MAX_DYNAMICALLY_ALLOCATED_BUFFER_SIZE = MAX_DYNAMIC_DESCRIPTOR_COUNT * 10u; //10 kilobytes
 
 	struct DescriptorSetCreateInfo {
