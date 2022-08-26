@@ -2,19 +2,58 @@
 
 namespace Lucy {
 
-	typedef uint32_t ImageFormat;
-
 	enum class ImageType {
-		Type2D, Type3D
+		Type2D, 
+		Type3D
 	};
 
 	enum class ImageTarget {
-		Color, Depth
+		Color, 
+		Depth
 	};
 
+	enum class ImageAddressMode {
+		REPEAT, 
+		CLAMP_TO_EDGE, 
+		CLAMP_TO_BORDER
+	};
+
+	enum class ImageFilterMode {
+		NEAREST, 
+		LINEAR
+	};
+
+	enum class ImageFormat {
+		R8G8B8A8_UNORM,
+		R8G8B8A8_UINT,
+
+		B8G8R8A8_UNORM,
+		B8G8R8A8_UINT,
+		B8G8R8A8_SRGB,
+
+		D32_SFLOAT,
+
+		R16G16B16A16_SFLOAT,
+		R16G16B16A16_UINT,
+		R16G16B16A16_UNORM,
+
+		R32G32B32A32_SFLOAT,
+		R32G32B32A32_UINT,
+
+		R32_SFLOAT,
+		R32_UINT
+	};
+
+	//to be implemented by CLIENT
+	extern uint32_t GetAPIImageFormat(ImageFormat format);
+	extern ImageFormat GetLucyImageFormat(uint32_t format);
+
 	struct ImageParameter {
-		uint32_t U = 0, V = 0, W = 0;
-		uint32_t Min = 0, Mag = 0;
+		ImageAddressMode U = ImageAddressMode::REPEAT;
+		ImageAddressMode V = ImageAddressMode::REPEAT;
+		ImageAddressMode W = ImageAddressMode::REPEAT;
+		ImageFilterMode Min = ImageFilterMode::LINEAR;
+		ImageFilterMode Mag = ImageFilterMode::LINEAR;
 	};
 
 	//Helper struct for materials

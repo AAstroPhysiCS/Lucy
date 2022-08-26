@@ -77,6 +77,7 @@ namespace Lucy {
 			}
 			LUCY_CRITICAL(fmt::format("Could not find a suitable Uniform Buffer for the given name: {0}", name));
 			LUCY_ASSERT(false);
+			return nullptr;
 		}
 		template <class T>
 		inline Ref<T> GetSharedStorageBuffers(const char* name) {
@@ -90,6 +91,7 @@ namespace Lucy {
 			}
 			LUCY_CRITICAL(fmt::format("Could not find a suitable Uniform Buffer for the given name: {0}", name));
 			LUCY_ASSERT(false);
+			return nullptr;
 		}
 
 		PushConstant& GetPushConstants(const char* name);

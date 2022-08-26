@@ -4,12 +4,14 @@
 
 namespace Lucy {
 
+	enum class ImageFormat;
+
 	struct ClearColor {
 		float r = 0.0f, g = 0.0f, b = 0.0f, a = 0.0f;
 	};
 
 	struct VulkanAttachmentDescriptor {
-		VkFormat Format;
+		ImageFormat Format;
 		VkAttachmentLoadOp LoadOp;
 		VkAttachmentStoreOp StoreOp;
 		VkAttachmentLoadOp StencilLoadOp;
@@ -45,11 +47,15 @@ namespace Lucy {
 		virtual void Recreate() = 0;
 		virtual void Destroy() = 0;
 
+		inline bool IsDepthBuffered() { return m_DepthBuffered; }
+
 		RenderPass(const RenderPassCreateInfo& createInfo);
 		virtual ~RenderPass() = default;
 
 		inline ClearColor GetClearColor() { return m_CreateInfo.ClearColor; }
 	protected:
 		RenderPassCreateInfo m_CreateInfo;
+
+		bool m_DepthBuffered = false;
 	};
 }

@@ -19,6 +19,8 @@
 	#define LUCY_DEBUG_BREAK __debugbreak();
 #endif
 
+#define LUCY_BIND_FUNC(func) std::bind(func, this, std::placeholders::_1)
+
 #define LUCY_ASSERT(arg)											if(!arg) {																							\
 																		LUCY_CRITICAL("Assert failed!");																\
 																		LUCY_DEBUG_BREAK }
@@ -46,7 +48,7 @@
 #define LUCY_PROFILE_DESTROY()										OPTICK_SHUTDOWN()
 
 //not using it, since i will create my own
-#ifdef LUCY_PROFILE_GPU && LUCY_DEBUG
+#if defined (LUCY_PROFILE_GPU) && defined (LUCY_DEBUG)
 	#define LUCY_PROFILE_GPU_INIT(...)								Optick::InitGpuVulkan(__VA_ARGS__)
 	#define LUCY_PROFILE_GPU_EVENT(Name)							OPTICK_GPU_EVENT(Name)
 	#define LUCY_PROFILE_GPU_FLIP(SwapChainHandle)					OPTICK_GPU_FLIP(SwapChainHandle)

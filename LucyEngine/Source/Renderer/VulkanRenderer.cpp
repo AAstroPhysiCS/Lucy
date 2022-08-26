@@ -51,7 +51,6 @@ namespace Lucy {
 	RenderContextResultCodes VulkanRenderer::EndScene() {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::EndScene");
 
-		//TODO: profiling with optick
 		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR)
 			return (RenderContextResultCodes) m_LastSwapChainResult;
 
@@ -111,20 +110,31 @@ namespace Lucy {
 		swapChain.Recreate();
 
 		m_RenderDevice->Recreate();
+
+		auto& allocator = VulkanAllocator::Get();
+		allocator.DestroyBuffer(m_IDBuffer, m_IDBufferVma);
+
+		m_IDBuffer = VK_NULL_HANDLE;
+		m_IDBufferVma = VK_NULL_HANDLE;
 	}
 
 	void VulkanRenderer::OnViewportResize() {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::OnViewportResize");
 
 		WaitForDevice();
+
+		auto& allocator = VulkanAllocator::Get();
+		allocator.DestroyBuffer(m_IDBuffer, m_IDBufferVma);
+
+		m_IDBuffer = VK_NULL_HANDLE;
+		m_IDBufferVma = VK_NULL_HANDLE;
 	}
 	
 	Entity VulkanRenderer::OnMousePicking(Ref<Scene>& scene, const Ref<Pipeline>& idPipeline) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::OnMousePicking");
 
 		auto& image = idPipeline->GetFrameBuffer().As<VulkanFrameBuffer>()->GetImages()[m_CurrentFrameIndex];
-		uint32_t imageWidth = image->GetWidth();
-		uint32_t imageHeight = image->GetHeight();
+		auto [imageWidth, imageHeight] = Renderer::GetViewportArea();
 		uint64_t imageSize = (uint64_t)imageWidth * imageHeight * 4;
 
 		if (!m_IDBuffer)

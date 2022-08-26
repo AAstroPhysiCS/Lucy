@@ -74,7 +74,7 @@ namespace Lucy {
 		void TransitionImageLayout(VkImage image, VkImageLayout newLayout, uint32_t baseMipLevel = 0, uint32_t levelCount = 1);
 		void TransitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel = 0, uint32_t levelCount = 1);
 		void TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel = 0, uint32_t levelCount = 1);
-		
+
 		VkImage m_Image = VK_NULL_HANDLE;
 		VmaAllocation m_ImageVma = VK_NULL_HANDLE;
 		VulkanImageView m_ImageView;

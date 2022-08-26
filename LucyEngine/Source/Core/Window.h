@@ -10,8 +10,6 @@
 
 namespace Lucy {
 
-#define LUCY_BIND_FUNC(func) std::bind(func, this, std::placeholders::_1)
-
 	enum class RenderArchitecture;
 
 	enum class WindowMode {

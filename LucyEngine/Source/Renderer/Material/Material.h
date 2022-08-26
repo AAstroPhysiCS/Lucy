@@ -15,10 +15,10 @@ namespace Lucy {
 	struct MaterialData {
 		glm::vec3 Diffuse = glm::vec3();
 		std::string Name = "Unknown Material Data";
-		float Shininess = 0.0f, Reflectivity = 0.0f, Roughness = 0.0f;
+		float Metallic = 0.0f, Roughness = 0.0f, AOContribution = 0.0f;
 
-		MaterialData(glm::vec3& diffuse, std::string& name, float shininess, float reflectivity, float roughness)
-			: Diffuse(diffuse), Name(name), Shininess(shininess), Reflectivity(reflectivity), Roughness(roughness) {
+		MaterialData(glm::vec3& diffuse, std::string& name, float metallic, float roughness, float aoContribution)
+			: Diffuse(diffuse), Name(name), Metallic(metallic), Roughness(roughness), AOContribution(aoContribution) {
 		}
 		MaterialData() = default;
 	};
@@ -30,9 +30,9 @@ namespace Lucy {
 		float MetallicSlot = -1.0f;
 
 		glm::vec4 BaseDiffuseColor = glm::vec4(0.0f);
-		float Shininess = 0.0f;
-		float Roughness = 0.0f;
-		float Reflectivity = 0.0f;
+		float BaseRoughnessValue = 0.0f;
+		float BaseMetallicValue = 0.0f;
+		float BaseAOValue = 0.0f;
 		float AOSlot = -1.0f;
 	};
 
@@ -44,8 +44,12 @@ namespace Lucy {
 		virtual ~Material() = default;
 
 		inline Ref<Shader> GetShader() { return m_Shader; }
-		inline const std::string& GetName() const { return m_MaterialData.Name; }
 		inline LucyID GetID() const { return m_MaterialID; }
+		inline const std::string& GetName() const { return m_MaterialData.Name; }
+
+		inline float& GetRoughnessValue() { return m_MaterialData.Roughness; }
+		inline float& GetMetallicValue() { return m_MaterialData.Metallic; }
+		inline float& GetAOContribution() { return m_MaterialData.AOContribution; }
 
 		void SetImage(const MaterialImageType& type, Ref<Image2D> image);
 		inline const Ref<Image2D>& GetImage(const MaterialImageType& type) const { return m_Textures[type.Index]; }

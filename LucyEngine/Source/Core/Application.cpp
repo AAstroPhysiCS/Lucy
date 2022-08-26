@@ -10,6 +10,8 @@ namespace Lucy {
 
 	Application::Application(const ApplicationArgs& args, const ApplicationCreateInfo& createInfo)
 		: m_Args(args), m_CreateInfo(createInfo) {
+		Logger::Init();
+
 		m_Window = Window::Create(m_CreateInfo.WindowCreateInfo);
 		m_Window->Init(m_CreateInfo.RenderArchitecture);
 		m_Window->SetEventCallback(LUCY_BIND_FUNC(&Application::OnEvent));

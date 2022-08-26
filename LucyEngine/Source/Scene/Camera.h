@@ -8,8 +8,9 @@
 namespace Lucy {
 
 	struct VP {
-		glm::mat4 view;
-		glm::mat4 proj;
+		glm::mat4 View;
+		glm::mat4 Proj;
+		alignas(4) glm::vec3 CamPos;
 	};
 
 	class Camera {
@@ -47,9 +48,10 @@ namespace Lucy {
 
 		inline VP GetVP() {
 			VP mvp;
-			mvp.view = GetViewMatrix();
-			mvp.proj = GetProjectionMatrix();
-			mvp.proj[1][1] *= -1;
+			mvp.View = GetViewMatrix();
+			mvp.Proj = GetProjectionMatrix();
+			mvp.Proj[1][1] *= -1;
+			mvp.CamPos = m_Position * -1.0f;
 
 			return mvp;
 		}

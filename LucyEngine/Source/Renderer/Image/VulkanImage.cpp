@@ -75,7 +75,7 @@ namespace Lucy {
 		if (m_CreateInfo.GenerateMipmap)
 			flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
-		allocator.CreateVulkanImageVma(m_Width, m_Height, m_MaxMipLevel, (VkFormat)m_CreateInfo.Format, m_CurrentLayout,
+		allocator.CreateVulkanImageVma(m_Width, m_Height, m_MaxMipLevel, (VkFormat)GetAPIImageFormat(m_CreateInfo.Format), m_CurrentLayout,
 									   flags, VK_IMAGE_TYPE_2D, m_Image, m_ImageVma);
 
 		TransitionImageLayout(m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -103,7 +103,7 @@ namespace Lucy {
 			flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
 		VulkanAllocator& allocator = VulkanAllocator::Get();
-		allocator.CreateVulkanImageVma(m_Width, m_Height, m_MaxMipLevel, (VkFormat)m_CreateInfo.Format, m_CurrentLayout,
+		allocator.CreateVulkanImageVma(m_Width, m_Height, m_MaxMipLevel, (VkFormat)GetAPIImageFormat(m_CreateInfo.Format), m_CurrentLayout,
 									   flags, VK_IMAGE_TYPE_2D, m_Image, m_ImageVma);
 
 		if (m_CreateInfo.GenerateMipmap)
@@ -119,7 +119,7 @@ namespace Lucy {
 			LUCY_ASSERT(false);
 
 		VulkanAllocator& allocator = VulkanAllocator::Get();
-		allocator.CreateVulkanImageVma(m_Width, m_Height, 1, (VkFormat)m_CreateInfo.Format, m_CurrentLayout,
+		allocator.CreateVulkanImageVma(m_Width, m_Height, 1, (VkFormat)GetAPIImageFormat(m_CreateInfo.Format), m_CurrentLayout,
 									   VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TYPE_2D, m_Image, m_ImageVma);
 
 		m_CurrentLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
@@ -127,18 +127,42 @@ namespace Lucy {
 	}
 
 	void VulkanImage2D::CreateVulkanImageViewHandle() {
+		auto GetImageFilter = [](ImageFilterMode mode) {
+			switch (mode) {
+				case ImageFilterMode::LINEAR:
+					return VK_FILTER_LINEAR;
+				case ImageFilterMode::NEAREST:
+					return VK_FILTER_NEAREST;
+				default:
+					return VK_FILTER_LINEAR;
+			}
+		};
+
+		auto GetImageAddressMode = [](ImageAddressMode mode) {
+			switch (mode) {
+				case ImageAddressMode::REPEAT:
+					return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+				case ImageAddressMode::CLAMP_TO_BORDER:
+					return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+				case ImageAddressMode::CLAMP_TO_EDGE:
+					return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+				default:
+					return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			}
+		};
+
 		ImageViewCreateInfo imageViewCreateInfo;
-		imageViewCreateInfo.Format = (VkFormat)m_CreateInfo.Format;
+		imageViewCreateInfo.Format = (VkFormat)GetAPIImageFormat(m_CreateInfo.Format);
 		imageViewCreateInfo.Image = m_Image;
 		imageViewCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_2D;
 		imageViewCreateInfo.MipmapLevel = m_MaxMipLevel;
 		imageViewCreateInfo.GenerateMipmap = m_CreateInfo.GenerateMipmap;
 		imageViewCreateInfo.GenerateSampler = m_CreateInfo.GenerateSampler;
-		imageViewCreateInfo.MagFilter = (VkFilter)m_CreateInfo.Parameter.Mag;
-		imageViewCreateInfo.MinFilter = (VkFilter)m_CreateInfo.Parameter.Min;
-		imageViewCreateInfo.ModeU = (VkSamplerAddressMode)m_CreateInfo.Parameter.U;
-		imageViewCreateInfo.ModeV = (VkSamplerAddressMode)m_CreateInfo.Parameter.V;
-		imageViewCreateInfo.ModeW = (VkSamplerAddressMode)m_CreateInfo.Parameter.W;
+		imageViewCreateInfo.MagFilter = GetImageFilter(m_CreateInfo.Parameter.Mag);
+		imageViewCreateInfo.MinFilter = GetImageFilter(m_CreateInfo.Parameter.Min);
+		imageViewCreateInfo.ModeU = GetImageAddressMode(m_CreateInfo.Parameter.U);
+		imageViewCreateInfo.ModeV = GetImageAddressMode(m_CreateInfo.Parameter.V);
+		imageViewCreateInfo.ModeW = GetImageAddressMode(m_CreateInfo.Parameter.W);
 		imageViewCreateInfo.Target = m_CreateInfo.Target;
 
 		m_ImageView = VulkanImageView(imageViewCreateInfo);
@@ -366,5 +390,67 @@ namespace Lucy {
 		vkDestroyImageView(VulkanContextDevice::Get().GetLogicalDevice(), m_ImageView, nullptr);
 		if (m_CreateInfo.GenerateSampler)
 			vkDestroySampler(VulkanContextDevice::Get().GetLogicalDevice(), m_Sampler, nullptr);
+	}
+
+	uint32_t GetAPIImageFormat(ImageFormat format) {
+		switch (format) {
+			case ImageFormat::R8G8B8A8_UNORM:
+				return VK_FORMAT_R8G8B8A8_UNORM;
+			case ImageFormat::R8G8B8A8_UINT:
+				return VK_FORMAT_R8G8B8A8_UINT;
+			case ImageFormat::B8G8R8A8_SRGB:
+				return VK_FORMAT_B8G8R8A8_SRGB;
+			case ImageFormat::B8G8R8A8_UINT:
+				return VK_FORMAT_B8G8R8A8_UINT;
+			case ImageFormat::B8G8R8A8_UNORM:
+				return VK_FORMAT_B8G8R8A8_UNORM;
+			case ImageFormat::D32_SFLOAT:
+				return VK_FORMAT_D32_SFLOAT;
+			case ImageFormat::R16G16B16A16_SFLOAT:
+				return VK_FORMAT_R16G16B16A16_SFLOAT;
+			case ImageFormat::R16G16B16A16_UINT:
+				return VK_FORMAT_R16G16B16A16_UINT;
+			case ImageFormat::R16G16B16A16_UNORM:
+				return VK_FORMAT_R16G16B16A16_UNORM;
+			case ImageFormat::R32G32B32A32_SFLOAT:
+				return VK_FORMAT_R32G32B32A32_SFLOAT;
+			case ImageFormat::R32G32B32A32_UINT:
+				return VK_FORMAT_R32G32B32A32_UINT;
+			case ImageFormat::R32_SFLOAT:
+				return VK_FORMAT_R32_SFLOAT;
+			case ImageFormat::R32_UINT:
+				return VK_FORMAT_R32_UINT;
+		}
+	}
+
+	ImageFormat GetLucyImageFormat(uint32_t format) {
+		switch (format) {
+			case VK_FORMAT_R8G8B8A8_UNORM:
+				return ImageFormat::R8G8B8A8_UNORM;
+			case VK_FORMAT_R8G8B8A8_UINT:
+				return ImageFormat::R8G8B8A8_UINT;
+			case VK_FORMAT_B8G8R8A8_SRGB:
+				return ImageFormat::B8G8R8A8_SRGB;
+			case VK_FORMAT_B8G8R8A8_UINT:
+				return ImageFormat::B8G8R8A8_UINT;
+			case VK_FORMAT_B8G8R8A8_UNORM:
+				return ImageFormat::B8G8R8A8_UNORM;
+			case VK_FORMAT_D32_SFLOAT:
+				return ImageFormat::D32_SFLOAT;
+			case VK_FORMAT_R16G16B16A16_SFLOAT:
+				return ImageFormat::R16G16B16A16_SFLOAT;
+			case VK_FORMAT_R16G16B16A16_UINT:
+				return ImageFormat::R16G16B16A16_UINT;
+			case VK_FORMAT_R16G16B16A16_UNORM:
+				return ImageFormat::R16G16B16A16_UNORM;
+			case VK_FORMAT_R32G32B32A32_SFLOAT:
+				return ImageFormat::R32G32B32A32_SFLOAT;
+			case VK_FORMAT_R32G32B32A32_UINT:
+				return ImageFormat::R32G32B32A32_UINT;
+			case VK_FORMAT_R32_SFLOAT:
+				return ImageFormat::R32_SFLOAT;
+			case VK_FORMAT_R32_UINT:
+				return ImageFormat::R32_UINT;
+		}
 	}
 }

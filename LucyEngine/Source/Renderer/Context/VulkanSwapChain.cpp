@@ -89,8 +89,6 @@ namespace Lucy {
 			}
 		}
 
-		m_SwapChainFrameBufferInfo->ImageViews = m_SwapChainImageViews;
-
 		return swapChain;
 	}
 

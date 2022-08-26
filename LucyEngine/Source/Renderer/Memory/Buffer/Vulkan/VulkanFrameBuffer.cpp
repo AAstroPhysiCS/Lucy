@@ -11,16 +11,11 @@ namespace Lucy {
 
 	VulkanFrameBuffer::VulkanFrameBuffer(FrameBufferCreateInfo& createInfo)
 		: FrameBuffer(createInfo) {
-		Ref<VulkanFrameBufferInfo> frameBufferInfo = m_CreateInfo.InternalInfo.As<VulkanFrameBufferInfo>();
-		//this would make problems when we resized the window, since the lifetime of this object is short
-		if (frameBufferInfo) {
-			m_RenderPass = frameBufferInfo->RenderPass.As<VulkanRenderPass>();
-			m_ImageViews = frameBufferInfo->ImageViews;
 
-			m_Images = std::vector<Ref<VulkanImage2D>>(m_CreateInfo.ImageBuffers.begin(), m_CreateInfo.ImageBuffers.end());
-		}
-
-		if (m_RenderPass->IsDepthBuffered())
+		m_RenderPass = m_CreateInfo.RenderPass.As<VulkanRenderPass>();
+		m_Images = std::vector<Ref<VulkanImage2D>>(m_CreateInfo.ImageBuffers.begin(), m_CreateInfo.ImageBuffers.end());
+		
+		if (m_CreateInfo.RenderPass->IsDepthBuffered())
 			CreateDepthImage();
 
 		Renderer::EnqueueToRenderThread([=]() {
@@ -30,7 +25,7 @@ namespace Lucy {
 
 	void VulkanFrameBuffer::Create() {
 		auto& swapChainInstance = VulkanSwapChain::Get();
-		if (!m_ImageViews.empty()) { //if the framebuffer is being used for swapchain
+		if (!m_CreateInfo.ImageViews.empty()) { //if the framebuffer is being used for swapchain
 			m_FrameBufferHandles.resize(swapChainInstance.GetImageCount(), VK_NULL_HANDLE);
 		} else {
 			m_FrameBufferHandles.resize(Renderer::GetMaxFramesInFlight(), VK_NULL_HANDLE);
@@ -40,10 +35,10 @@ namespace Lucy {
 
 		for (uint32_t i = 0; i < m_FrameBufferHandles.size(); i++) {
 			VkImageView imageViewHandle[2] = { VK_NULL_HANDLE, VK_NULL_HANDLE };
-			if (m_ImageViews.empty())
+			if (m_CreateInfo.ImageViews.empty())
 				imageViewHandle[0] = m_Images[i]->GetImageView().GetVulkanHandle();
 			else
-				imageViewHandle[0] = m_ImageViews[i].GetVulkanHandle();
+				imageViewHandle[0] = m_CreateInfo.ImageViews[i].GetVulkanHandle();
 
 			//we dont need to create 3 depth buffers, we can create 1 and reuse it.
 			if (m_RenderPass->IsDepthBuffered())
@@ -66,7 +61,7 @@ namespace Lucy {
 		ImageCreateInfo depthImageCreateInfo;
 		depthImageCreateInfo.ImageType = ImageType::Type2D;
 		depthImageCreateInfo.Target = ImageTarget::Depth;
-		depthImageCreateInfo.Format = VK_FORMAT_D32_SFLOAT;
+		depthImageCreateInfo.Format = ImageFormat::D32_SFLOAT;
 		depthImageCreateInfo.Width = m_CreateInfo.Width;
 		depthImageCreateInfo.Height = m_CreateInfo.Height;
 
@@ -86,23 +81,24 @@ namespace Lucy {
 
 		if (m_DepthImage)
 			m_DepthImage->Destroy();
-
-		m_CreateInfo.InternalInfo = nullptr;
 	}
 
-	void VulkanFrameBuffer::Recreate(uint32_t width, uint32_t height, Ref<void> internalInfo) {
+	void VulkanFrameBuffer::Recreate(uint32_t width, uint32_t height) {
+		Recreate(width, height, {});
+	}
+
+	void VulkanFrameBuffer::Recreate(uint32_t width, uint32_t height, const std::vector<VulkanImageView>& swapChainImageViews) {
 		m_CreateInfo.Width = width;
 		m_CreateInfo.Height = height;
+		m_CreateInfo.ImageViews = swapChainImageViews;
 
 		Destroy();
-		if (internalInfo) {
-			m_CreateInfo.InternalInfo = internalInfo;
-
-			Ref<VulkanFrameBufferInfo> frameBufferInfo = m_CreateInfo.InternalInfo.As<VulkanFrameBufferInfo>();
-			m_RenderPass = frameBufferInfo->RenderPass.As<VulkanRenderPass>();
-			m_ImageViews = frameBufferInfo->ImageViews;
-
-			m_Images = std::vector<Ref<VulkanImage2D>>(m_CreateInfo.ImageBuffers.begin(), m_CreateInfo.ImageBuffers.end());
+		
+		//replacing the newly created image views from the swapchain
+		//disclaimer: it is only for swapchain purposes only
+		if (m_CreateInfo.ImageViews.size() != 0) {
+			//normally, recreating renderpass here shouldn't be allowed. But swapchain is an exception
+			m_RenderPass->Recreate();
 		}
 
 		for (uint32_t i = 0; i < m_Images.size(); i++)

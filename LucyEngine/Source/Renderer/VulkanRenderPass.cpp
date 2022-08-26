@@ -9,9 +9,6 @@ namespace Lucy {
 
 	VulkanRenderPass::VulkanRenderPass(const RenderPassCreateInfo& createInfo)
 		: RenderPass(createInfo) {
-		//we need this in framebuffer, outside the enqueue function, since otherwise there will be a conflict
-		m_DepthBuffered = m_CreateInfo.DepthEnable;
-
 		Renderer::EnqueueToRenderThread([this]() {
 			Create();
 		});
@@ -23,7 +20,7 @@ namespace Lucy {
 		Ref<VulkanRenderPassInfo> renderPassInfo = m_CreateInfo.InternalInfo.As<VulkanRenderPassInfo>();
 
 		VkAttachmentDescription colorAttachmentDescription{};
-		colorAttachmentDescription.format = renderPassInfo->ColorDescriptor.Format;
+		colorAttachmentDescription.format = (VkFormat)GetAPIImageFormat(renderPassInfo->ColorDescriptor.Format);
 		colorAttachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT; //MSAA but we dont use it yet
 		colorAttachmentDescription.loadOp = renderPassInfo->ColorDescriptor.LoadOp;
 		colorAttachmentDescription.storeOp = renderPassInfo->ColorDescriptor.StoreOp;

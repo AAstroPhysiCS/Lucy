@@ -26,7 +26,6 @@ namespace Lucy {
 				* glm::toMat4(glm::quat(glm::radians(m_Rotation)))
 				* glm::scale(glm::mat4(1.0f), m_Scale);
 		}
-
 	private:
 		glm::mat4 m_Mat = glm::mat4(1.0f);
 		glm::vec3 m_Position = glm::vec3();
@@ -76,8 +75,23 @@ namespace Lucy {
 		inline std::string GetTag() { return m_Tag; }
 		inline void SetTag(const std::string& tag) { m_Tag = tag; }
 		inline void SetTag(char* tag) { m_Tag = tag; }
-
 	private:
 		std::string m_Tag = "Empty Entity";
+	};
+
+	struct DirectionalLightComponent {
+		DirectionalLightComponent() = default;
+		DirectionalLightComponent(const glm::vec3& direction, const glm::vec3 color)
+			: m_Direction(direction), m_Color(color) {
+		}
+		DirectionalLightComponent(const DirectionalLightComponent& other) = default;
+
+		inline glm::vec3& GetDirection() { return m_Direction; }
+		inline glm::vec3& GetColor() { return m_Color; }
+	private:
+		glm::vec3 m_Direction = glm::vec3(0.0f);
+		[[maybe_unused]] float _padding0 = 0.0f;
+		glm::vec3 m_Color = glm::vec3(0.0f);
+		[[maybe_unused]] float _padding1 = 0.0f;
 	};
 }

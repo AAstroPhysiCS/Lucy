@@ -369,7 +369,7 @@ namespace Lucy {
 		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
 
 		m_CreateInfo.FrameBuffer->Destroy();
-		m_CreateInfo.RenderPass.As<VulkanRenderPass>()->Destroy();
+		m_CreateInfo.RenderPass->Destroy();
 
 		for (const auto& set : m_DescriptorSets)
 			set->Destroy();
@@ -389,7 +389,7 @@ namespace Lucy {
 		//vkDestroyPipeline(device, m_Pipeline, nullptr);
 
 		//Create();
-		m_CreateInfo.RenderPass.As<VulkanRenderPass>()->Recreate();
-		m_CreateInfo.FrameBuffer.As<VulkanFrameBuffer>()->Recreate(width, height, nullptr);
+		m_CreateInfo.RenderPass->Recreate();
+		m_CreateInfo.FrameBuffer->Recreate(width, height);
 	}
 }

@@ -58,7 +58,7 @@ namespace Lucy {
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 		};
 
-		std::vector<VkFormat> m_DeviceFormatSupportToCheck{
+		std::vector<VkFormat> m_DeviceFormatSupportToCheck = {
 			VK_FORMAT_R8G8B8A8_SRGB,
 			VK_FORMAT_R8G8B8A8_SNORM,
 			VK_FORMAT_B8G8R8A8_SRGB,

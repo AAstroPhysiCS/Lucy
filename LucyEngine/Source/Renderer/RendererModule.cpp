@@ -40,7 +40,7 @@ namespace Lucy {
 				{ "a_BiTangents", ShaderDataSize::Float3 }
 		};
 
-		uint32_t maxFramesInFlight = Renderer::GetMaxFramesInFlight();
+		const uint32_t maxFramesInFlight = Renderer::GetMaxFramesInFlight();
 
 #pragma region GeometryPipeline
 
@@ -51,20 +51,24 @@ namespace Lucy {
 		ImageCreateInfo geometryTextureCreateInfo;
 		geometryTextureCreateInfo.Width = viewportWidth;
 		geometryTextureCreateInfo.Height = viewportHeight;
-		geometryTextureCreateInfo.Format = VK_FORMAT_R8G8B8A8_UNORM;
+		geometryTextureCreateInfo.Format = ImageFormat::R8G8B8A8_UNORM;
 		geometryTextureCreateInfo.ImageType = ImageType::Type2D;
 		geometryTextureCreateInfo.Target = ImageTarget::Color;
-		geometryTextureCreateInfo.Parameter.Mag = VK_FILTER_LINEAR;
-		geometryTextureCreateInfo.Parameter.Min = VK_FILTER_LINEAR;
-		geometryTextureCreateInfo.Parameter.U = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		geometryTextureCreateInfo.Parameter.V = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		geometryTextureCreateInfo.Parameter.W = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		geometryTextureCreateInfo.Parameter.Mag = ImageFilterMode::LINEAR;
+		geometryTextureCreateInfo.Parameter.Min = ImageFilterMode::LINEAR;
+		geometryTextureCreateInfo.Parameter.U = ImageAddressMode::REPEAT;
+		geometryTextureCreateInfo.Parameter.V = ImageAddressMode::REPEAT;
+		geometryTextureCreateInfo.Parameter.W = ImageAddressMode::REPEAT;
 		geometryTextureCreateInfo.GenerateSampler = true;
 		geometryTextureCreateInfo.ImGuiUsage = true;
 
 		FrameBufferCreateInfo geometryFrameBufferCreateInfo;
 		geometryFrameBufferCreateInfo.Width = viewportWidth;
 		geometryFrameBufferCreateInfo.Height = viewportHeight;
+
+		geometryFrameBufferCreateInfo.ImageBuffers.reserve(maxFramesInFlight);
+		for (uint32_t i = 0; i < maxFramesInFlight; i++)
+			geometryFrameBufferCreateInfo.ImageBuffers.emplace_back(Image2D::Create(geometryTextureCreateInfo));
 
 		PipelineCreateInfo geometryPipelineCreateInfo;
 		geometryPipelineCreateInfo.VertexShaderLayout = VertexShaderLayout(vertexLayout);
@@ -79,27 +83,24 @@ namespace Lucy {
 			vulkanRenderPassInfo->ColorAttachments.push_back(
 				{ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL }
 			);
-			vulkanRenderPassInfo->ColorDescriptor.Format = (VkFormat)geometryTextureCreateInfo.Format;
+			vulkanRenderPassInfo->ColorDescriptor.Format = geometryTextureCreateInfo.Format;
 			vulkanRenderPassInfo->ColorDescriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			vulkanRenderPassInfo->ColorDescriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
 			vulkanRenderPassInfo->ColorDescriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 			vulkanRenderPassInfo->ColorDescriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			vulkanRenderPassInfo->ColorDescriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			vulkanRenderPassInfo->ColorDescriptor.FinalLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR;
+
 			geometryPassCreateInfo.InternalInfo = vulkanRenderPassInfo;
-
-			Ref<VulkanFrameBufferInfo> vulkanFrameBufferInfo = Memory::CreateRef<VulkanFrameBufferInfo>();
-			vulkanFrameBufferInfo->RenderPass = RenderPass::Create(geometryPassCreateInfo);
-
-			geometryFrameBufferCreateInfo.InternalInfo = vulkanFrameBufferInfo;
-			geometryPipelineCreateInfo.RenderPass = vulkanFrameBufferInfo->RenderPass;
 		}
 
-		geometryFrameBufferCreateInfo.ImageBuffers.reserve(maxFramesInFlight);
-		for (uint32_t i = 0; i < maxFramesInFlight; i++)
-			geometryFrameBufferCreateInfo.ImageBuffers.emplace_back(Image2D::Create(geometryTextureCreateInfo));
+		Ref<RenderPass> geometryRenderPass = RenderPass::Create(geometryPassCreateInfo);
+		geometryPipelineCreateInfo.RenderPass = geometryRenderPass;
+		geometryFrameBufferCreateInfo.RenderPass = geometryRenderPass;
 
-		geometryPipelineCreateInfo.FrameBuffer = FrameBuffer::Create(geometryFrameBufferCreateInfo);
+		Ref<FrameBuffer> geometryFrameBuffer = FrameBuffer::Create(geometryFrameBufferCreateInfo);
+		geometryPipelineCreateInfo.FrameBuffer = geometryFrameBuffer;
+
 		m_GeometryPipeline = Pipeline::Create(geometryPipelineCreateInfo);
 #pragma endregion GeometryPipeline
 
@@ -112,6 +113,9 @@ namespace Lucy {
 
 		FrameBufferCreateInfo idFrameBufferCreateInfo = geometryFrameBufferCreateInfo;
 		idFrameBufferCreateInfo.ImageBuffers.clear();
+		idFrameBufferCreateInfo.ImageBuffers.reserve(maxFramesInFlight);
+		for (uint32_t i = 0; i < maxFramesInFlight; i++)
+			idFrameBufferCreateInfo.ImageBuffers.emplace_back(Image2D::Create(idTextureCreateInfo));
 
 		PipelineCreateInfo idPipelineCreateInfo = geometryPipelineCreateInfo;
 		idPipelineCreateInfo.Shader = idShader;
@@ -123,27 +127,24 @@ namespace Lucy {
 			idVulkanRenderPassInfo->ColorAttachments.push_back(
 				{ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL }
 			);
-			idVulkanRenderPassInfo->ColorDescriptor.Format = (VkFormat)idTextureCreateInfo.Format;
+			idVulkanRenderPassInfo->ColorDescriptor.Format = idTextureCreateInfo.Format;
 			idVulkanRenderPassInfo->ColorDescriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 			idVulkanRenderPassInfo->ColorDescriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
 			idVulkanRenderPassInfo->ColorDescriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 			idVulkanRenderPassInfo->ColorDescriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 			idVulkanRenderPassInfo->ColorDescriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			idVulkanRenderPassInfo->ColorDescriptor.FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
 			idPassCreateInfo.InternalInfo = idVulkanRenderPassInfo;
-
-			Ref<VulkanFrameBufferInfo> idVulkanFrameBufferInfo = Memory::CreateRef<VulkanFrameBufferInfo>();
-			idVulkanFrameBufferInfo->RenderPass = RenderPass::Create(idPassCreateInfo);
-
-			idFrameBufferCreateInfo.InternalInfo = idVulkanFrameBufferInfo;
-			idPipelineCreateInfo.RenderPass = idVulkanFrameBufferInfo->RenderPass;
 		}
 
-		idFrameBufferCreateInfo.ImageBuffers.reserve(maxFramesInFlight);
-		for (uint32_t i = 0; i < maxFramesInFlight; i++)
-			idFrameBufferCreateInfo.ImageBuffers.emplace_back(Image2D::Create(idTextureCreateInfo));
+		Ref<RenderPass> idRenderPass = RenderPass::Create(idPassCreateInfo);
+		idPipelineCreateInfo.RenderPass = idRenderPass;
+		idFrameBufferCreateInfo.RenderPass = idRenderPass;
 
-		idPipelineCreateInfo.FrameBuffer = FrameBuffer::Create(idFrameBufferCreateInfo);
+		Ref<FrameBuffer> idFrameBuffer = FrameBuffer::Create(idFrameBufferCreateInfo);
+		idPipelineCreateInfo.FrameBuffer = idFrameBuffer;
+
 		m_IDPipeline = Pipeline::Create(idPipelineCreateInfo);
 #pragma endregion IDPipeline
 
@@ -156,11 +157,19 @@ namespace Lucy {
 
 		Renderer::BeginScene(m_Scene);
 
-		auto& meshView = m_Scene->View<MeshComponent>();
+		auto& directionalLightView = m_Scene->View<DirectionalLightComponent>();
+		for (auto& entity : directionalLightView) {
+			Entity e{ m_Scene.Get(), entity };
+			DirectionalLightComponent& lightComponent = e.GetComponent<DirectionalLightComponent>();
 
+			auto& lightningAttributes = m_GeometryPipeline->GetUniformBuffers<VulkanUniformBuffer>("LucyLightningValues");
+			lightningAttributes->SetData((uint8_t*)&lightComponent, sizeof(DirectionalLightComponent));
+		}
+
+		auto& meshView = m_Scene->View<MeshComponent>();
 		for (entt::sparse_set::reverse_iterator it = meshView.rbegin(); it != meshView.rend(); it++) {
 			Entity e{ m_Scene.Get(), *it };
-			MeshComponent meshComponent = e.GetComponent<MeshComponent>();
+			MeshComponent& meshComponent = e.GetComponent<MeshComponent>();
 			if (!meshComponent.IsValid())
 				continue;
 
@@ -174,7 +183,6 @@ namespace Lucy {
 
 			//High priority stuff must be called earlier than low, since those meshes get render first.
 			//I won't be sorting the render commands accordingly, the sort must happen here (for performance reason)
-
 			Renderer::EnqueueRenderCommand<StaticMeshRenderCommand>(g_GeometryPassHandle, Priority::LOW, meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
 			Renderer::EnqueueRenderCommand<StaticMeshRenderCommand>(g_IDPassHandle, Priority::LOW, meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
 		}
@@ -186,10 +194,10 @@ namespace Lucy {
 		EditorCamera& camera = m_Scene->GetEditorCamera();
 		auto vp = camera.GetVP();
 
-		auto& cameraBuffer = m_GeometryPipeline->GetUniformBuffers<VulkanUniformBuffer>("Camera");
+		auto& cameraBuffer = m_GeometryPipeline->GetUniformBuffers<VulkanUniformBuffer>("LucyCamera");
 		cameraBuffer->SetData((uint8_t*)&vp, sizeof(vp));
 
-		auto& cameraBufferID = m_IDPipeline->GetUniformBuffers<VulkanUniformBuffer>("Camera");
+		auto& cameraBufferID = m_IDPipeline->GetUniformBuffers<VulkanUniformBuffer>("LucyCamera");
 		cameraBufferID->SetData((uint8_t*)&vp, sizeof(vp));
 
 		Renderer::UpdateDescriptorSets(m_GeometryPipeline);
@@ -232,7 +240,10 @@ namespace Lucy {
 		LUCY_PROFILE_NEW_EVENT("RendererModule::OnWindowResize");
 
 		Renderer::OnWindowResize();
+		OnViewportResize();
+	}
 
+	void RendererModule::OnViewportResize() {
 		auto& [viewportWidth, viewportHeight] = Renderer::GetViewportArea();
 		m_GeometryPipeline->Recreate(viewportWidth, viewportHeight);
 		m_IDPipeline->Recreate(viewportWidth, viewportHeight);

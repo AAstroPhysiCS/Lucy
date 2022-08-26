@@ -8,7 +8,7 @@ layout (location = 3) in vec3 a_Normals;
 layout (location = 4) in vec3 a_Tangents;
 layout (location = 5) in vec3 a_BiTangents;
 
-layout(set = 0, binding = 0) uniform Camera {
+layout(set = 0, binding = 0) uniform LucyCamera {
 	mat4 u_ViewMatrix;
 	mat4 u_ProjMatrix;
 };

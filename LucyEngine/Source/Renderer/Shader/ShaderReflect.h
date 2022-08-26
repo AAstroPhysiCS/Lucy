@@ -83,7 +83,7 @@ namespace Lucy {
 		//Push constants get their own function, since their implementation is a bit different than other uniform buffer types
 		void SearchForPushConstants(spirv_cross::CompilerGLSL* compiler, const spirv_cross::ShaderResources& resource, VkShaderStageFlags stageFlag);
 
-		bool CheckIfAlreadyPresent(const std::string_view& uniformBlockName);
+		bool CheckIfAlreadyPresent(std::string_view uniformBlockName, std::vector<ShaderUniformBlock>& buffer);
 
 		//key = individual set
 		//value = uniform blocks

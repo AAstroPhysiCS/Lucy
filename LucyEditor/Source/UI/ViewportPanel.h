@@ -23,6 +23,7 @@ namespace Lucy {
 		bool IsViewportActive();
 		bool IsOverAnyGizmo();
 
+		void SetOnViewportResizeCallback(std::function<void()>&& callback);
 		void SetViewportOutputPipeline(Ref<Pipeline> pipeline);
 
 		void OnEvent(Event& e) final override;
@@ -44,6 +45,7 @@ namespace Lucy {
 		ImVec2 m_Size;
 
 		Ref<Pipeline> m_ViewportOutputPipeline = nullptr;
+		std::function<void()> m_RendererModuleOnViewportResize;
 	};
 }
 

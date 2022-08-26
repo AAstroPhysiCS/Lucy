@@ -21,7 +21,7 @@ namespace Lucy {
 		spirv_cross::ShaderResources& resourcesVertex = compilerVertex->get_shader_resources();
 		spirv_cross::ShaderResources& resourcesFragment = compilerFragment->get_shader_resources();
 
-		auto reflect = [this, path](spirv_cross::CompilerGLSL* compiler, spirv_cross::ShaderResources resource,
+		auto Reflect = [this, path](spirv_cross::CompilerGLSL* compiler, spirv_cross::ShaderResources resource,
 									ShaderStageInfo& stageInfo, VkShaderStageFlags stageFlag) {
 			stageInfo.UniformCount = resource.uniform_buffers.size();
 			stageInfo.SampledImagesCount = resource.sampled_images.size();
@@ -45,8 +45,8 @@ namespace Lucy {
 			SearchForPushConstants(compiler, resource, stageFlag);
 		};
 
-		reflect(compilerVertex, resourcesVertex, m_ShaderInfoVertex, VK_SHADER_STAGE_VERTEX_BIT);
-		reflect(compilerFragment, resourcesFragment, m_ShaderInfoFragment, VK_SHADER_STAGE_FRAGMENT_BIT);
+		Reflect(compilerVertex, resourcesVertex, m_ShaderInfoVertex, VK_SHADER_STAGE_VERTEX_BIT);
+		Reflect(compilerFragment, resourcesFragment, m_ShaderInfoFragment, VK_SHADER_STAGE_FRAGMENT_BIT);
 
 		delete compilerVertex;
 		delete compilerFragment;
@@ -94,9 +94,6 @@ namespace Lucy {
 			if (uniformBlock.Name.empty())
 				uniformBlock.Name = ub.name;
 
-			if (CheckIfAlreadyPresent(uniformBlock.Name))
-				return;
-
 			if (type.basetype == SPIRType::Struct)
 				ParseStructMemberRecursive(compiler, type, uniformBlock.Members);
 
@@ -106,17 +103,11 @@ namespace Lucy {
 			uint32_t dimension = arr.size();
 			int32_t memberCount = type.member_types.size();
 
-			LUCY_INFO(fmt::format("Name = '{0}'", uniformBlock.Name));
-			LUCY_INFO(fmt::format("Set = {0}", set));
-			LUCY_INFO(fmt::format("IsArray = {0}", (bool) dimension));
-
 			if (dimension) {
-				LUCY_INFO(fmt::format("Array Size = {0}", arr[0]));
 				uniformBlock.ArraySize = arr[0];
 
 				if (uniformBlock.ArraySize == 0) //meaning it is a dynamically allocated ubo/ssbo
 					uniformBlock.DynamicallyAllocated = true;
-				LUCY_INFO(fmt::format("Is Dynamically Allocated = {0}", uniformBlock.DynamicallyAllocated));
 			}
 
 			//excluding samplers, since they dont support "get_declared_struct_size", because they don't have a block of member variables for example
@@ -129,12 +120,7 @@ namespace Lucy {
 
 				//if (bufferSize == 0 && descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) //means we are dealing with a dynamic ubo
 					//descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-
-				LUCY_INFO(fmt::format("Size = {0}", bufferSize));
 			}
-
-			LUCY_INFO(fmt::format("Binding = {0}", binding));
-			LUCY_INFO(fmt::format("Members = {0}", memberCount));
 
 			uniformBlock.Binding = binding;
 			uniformBlock.BufferSize = bufferSize;
@@ -147,8 +133,23 @@ namespace Lucy {
 				m_ShaderUniformBlockMap.emplace(set, buffer);
 			} else {
 				const auto& it = m_ShaderUniformBlockMap.find(set);
+				if (CheckIfAlreadyPresent(uniformBlock.Name, it->second))
+					continue;
 				it->second.push_back(uniformBlock);
 			}
+
+			LUCY_INFO(fmt::format("Name = '{0}'", uniformBlock.Name));
+			LUCY_INFO(fmt::format("Set = {0}", set));
+			LUCY_INFO(fmt::format("IsArray = {0}", (bool)dimension));
+
+			if (dimension) {
+				LUCY_INFO(fmt::format("Array Size = {0}", arr[0]));
+				LUCY_INFO(fmt::format("Is Dynamically Allocated = {0}", uniformBlock.DynamicallyAllocated));
+			}
+
+			LUCY_INFO(fmt::format("Size = {0}", bufferSize));
+			LUCY_INFO(fmt::format("Binding = {0}", binding));
+			LUCY_INFO(fmt::format("Members = {0}", memberCount));
 		}
 	}
 
@@ -164,7 +165,7 @@ namespace Lucy {
 			if (uniformBlock.Name.empty())
 				uniformBlock.Name = ub.name;
 
-			if (CheckIfAlreadyPresent(uniformBlock.Name))
+			if (CheckIfAlreadyPresent(uniformBlock.Name, m_ShaderPushConstants))
 				return;
 
 			const auto& type = compiler->get_type(ub.base_type_id);
@@ -184,14 +185,14 @@ namespace Lucy {
 	}
 
 	//if there are multiple occurences between the 2 shader stages (vertex and fragment), dont add a another one but combine them together
-	bool ShaderReflect::CheckIfAlreadyPresent(const std::string_view& uniformBlockName) {
-		auto result = std::find_if(m_ShaderPushConstants.begin(), m_ShaderPushConstants.end(), [uniformBlockName](const ShaderUniformBlock& uniformBlock) {
+	bool ShaderReflect::CheckIfAlreadyPresent(std::string_view uniformBlockName, std::vector<ShaderUniformBlock>& buffer) {
+		auto result = std::find_if(buffer.begin(), buffer.end(), [uniformBlockName](const ShaderUniformBlock& uniformBlock) {
 			return uniformBlockName == uniformBlock.Name;
 		});
-
-		if (result != m_ShaderPushConstants.end()) {
-			uint32_t index = result - m_ShaderPushConstants.begin();
-			m_ShaderPushConstants[index].StageFlag |= VK_SHADER_STAGE_ALL;
+		
+		if (result != buffer.end()) {
+			uint32_t index = result - buffer.begin();
+			buffer[index].StageFlag = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 			return true;
 		}
 		return false;

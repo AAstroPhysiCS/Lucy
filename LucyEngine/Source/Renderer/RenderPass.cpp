@@ -7,7 +7,7 @@
 namespace Lucy {
 
 	RenderPass::RenderPass(const RenderPassCreateInfo& createInfo)
-		: m_CreateInfo(createInfo) {
+		: m_CreateInfo(createInfo), m_DepthBuffered(createInfo.DepthEnable) {
 	}
 
 	Ref<RenderPass> Lucy::RenderPass::Create(const RenderPassCreateInfo& createInfo) {

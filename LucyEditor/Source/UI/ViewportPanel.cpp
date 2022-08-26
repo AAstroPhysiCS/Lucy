@@ -70,7 +70,7 @@ namespace Lucy {
 			Renderer::SetViewportArea(m_Size.x, m_Size.y);
 			Renderer::OnViewportResize();
 
-			m_ViewportOutputPipeline.As<VulkanPipeline>()->Recreate(m_Size.x, m_Size.y);
+			m_RendererModuleOnViewportResize();
 		}
 
 		const ImVec2& mousePos = ImGui::GetMousePos();
@@ -125,6 +125,10 @@ namespace Lucy {
 
 	bool ViewportPanel::IsOverAnyGizmoM() {
 		return IsOverTranslateGizmo() || IsOverRotateGizmo() || IsOverScaleGizmo();
+	}
+
+	void ViewportPanel::SetOnViewportResizeCallback(std::function<void()>&& callback) {
+		m_RendererModuleOnViewportResize = callback;
 	}
 
 	void ViewportPanel::SetViewportOutputPipeline(Ref<Pipeline> pipeline) {

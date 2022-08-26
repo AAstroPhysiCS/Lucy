@@ -48,9 +48,9 @@ namespace Lucy {
 
 		//TODO: Change diffuse color to vec4
 		m_MaterialShaderData.BaseDiffuseColor = glm::vec4(m_MaterialData.Diffuse, 1.0f);
-		m_MaterialShaderData.Reflectivity = m_MaterialData.Reflectivity;
-		m_MaterialShaderData.Roughness = m_MaterialData.Roughness;
-		m_MaterialShaderData.Shininess = m_MaterialData.Shininess;
+		m_MaterialShaderData.BaseMetallicValue = m_MaterialData.Metallic;
+		m_MaterialShaderData.BaseRoughnessValue = m_MaterialData.Roughness;
+		m_MaterialShaderData.BaseAOValue = m_MaterialData.AOContribution;
 
 		ssboMaterialAttributes->Append((uint8_t*)&m_MaterialShaderData, sizeof(m_MaterialShaderData));
 	}
@@ -61,14 +61,14 @@ namespace Lucy {
 			std::string properTexturePath = FileSystem::GetParentPath(importedFilePath) + "/" + std::string(path.data);
 
 			ImageCreateInfo createInfo;
-			createInfo.Format = VK_FORMAT_R8G8B8A8_UNORM;
+			createInfo.Format = ImageFormat::R8G8B8A8_UNORM;
 			createInfo.Target = ImageTarget::Color;
 			createInfo.ImageType = ImageType::Type2D;
-			createInfo.Parameter.Mag = VK_FILTER_LINEAR;
-			createInfo.Parameter.Min = VK_FILTER_LINEAR;
-			createInfo.Parameter.U = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			createInfo.Parameter.V = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-			createInfo.Parameter.W = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			createInfo.Parameter.Mag = ImageFilterMode::LINEAR;
+			createInfo.Parameter.Min = ImageFilterMode::LINEAR;
+			createInfo.Parameter.U = ImageAddressMode::REPEAT;
+			createInfo.Parameter.V = ImageAddressMode::REPEAT;
+			createInfo.Parameter.W = ImageAddressMode::REPEAT;
 			createInfo.GenerateMipmap = true;
 			createInfo.ImGuiUsage = true;
 			createInfo.GenerateSampler = true;

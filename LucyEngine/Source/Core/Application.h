@@ -39,5 +39,5 @@ namespace Lucy {
 		static Metrics s_Metrics;
 	};
 
-	extern Application* CreateEditorApplication(const ApplicationArgs& args, const ApplicationCreateInfo& createInfo);
+	extern Application* CreateApplication(const ApplicationArgs& args, const ApplicationCreateInfo& createInfo);
 }

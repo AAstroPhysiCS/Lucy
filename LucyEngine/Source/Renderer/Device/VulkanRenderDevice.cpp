@@ -25,6 +25,18 @@ namespace Lucy {
 		mesh->GetIndexBuffer()->Bind(indexInfo);
 	}
 
+	void VulkanRenderDevice::BindBuffers(void* commandBufferHandle, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindBuffers");
+
+		VertexBindInfo vertexInfo;
+		vertexInfo.CommandBuffer = (VkCommandBuffer)commandBufferHandle;
+		vertexBuffer->Bind(vertexInfo);
+
+		IndexBindInfo indexInfo;
+		indexInfo.CommandBuffer = vertexInfo.CommandBuffer;
+		indexBuffer->Bind(indexInfo);
+	}
+
 	void VulkanRenderDevice::BindPushConstant(void* commandBufferHandle, Ref<Pipeline> pipeline, const PushConstant& pushConstant) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindPushConstant");
 		
@@ -86,18 +98,6 @@ namespace Lucy {
 				break;
 			}
 		}
-	}
-
-	void VulkanRenderDevice::BindBuffers(void* commandBufferHandle, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) {
-		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindBuffers");
-
-		VertexBindInfo vertexInfo;
-		vertexInfo.CommandBuffer = (VkCommandBuffer)commandBufferHandle;
-		vertexBuffer->Bind(vertexInfo);
-
-		IndexBindInfo indexInfo;
-		indexInfo.CommandBuffer = vertexInfo.CommandBuffer;
-		indexBuffer->Bind(indexInfo);
 	}
 
 	void VulkanRenderDevice::DrawIndexed(void* commandBufferHandle, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {

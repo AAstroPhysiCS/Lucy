@@ -17,6 +17,7 @@ namespace Lucy {
 		void Wait() final override;
 
 		void OnWindowResize();
+		void OnViewportResize();
 
 		inline const Ref<Pipeline>& GetGeometryPipeline() { return m_GeometryPipeline; }
 		inline const Ref<Pipeline>& GetIDPipeline() { return m_IDPipeline; }

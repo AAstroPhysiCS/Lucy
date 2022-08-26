@@ -16,7 +16,7 @@ int main(int argc, char** argv) {
 	applicationCreateInfo.WindowCreateInfo = windowCreateInfo;
 	applicationCreateInfo.RenderArchitecture = Lucy::RenderArchitecture::Vulkan;
 
-	Lucy::Application* lucyApplication = Lucy::CreateEditorApplication({ argc, argv }, applicationCreateInfo);
+	Lucy::Application* lucyApplication = Lucy::CreateApplication({ argc, argv }, applicationCreateInfo);
 	lucyApplication->Run();
 	delete lucyApplication;
 	

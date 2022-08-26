@@ -14,14 +14,14 @@ namespace Lucy {
 
 	DetailsPanel::DetailsPanel() {
 		ImageCreateInfo createInfo;
-		createInfo.Format = VK_FORMAT_R8G8B8A8_UNORM;
+		createInfo.Format = ImageFormat::R8G8B8A8_UNORM;
 		createInfo.Target = ImageTarget::Color;
 		createInfo.ImageType = ImageType::Type2D;
-		createInfo.Parameter.Mag = VK_FILTER_LINEAR;
-		createInfo.Parameter.Min = VK_FILTER_LINEAR;
-		createInfo.Parameter.U = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		createInfo.Parameter.V = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		createInfo.Parameter.W = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		createInfo.Parameter.Mag = ImageFilterMode::LINEAR;
+		createInfo.Parameter.Min = ImageFilterMode::LINEAR;
+		createInfo.Parameter.U = ImageAddressMode::REPEAT;
+		createInfo.Parameter.V = ImageAddressMode::REPEAT;
+		createInfo.Parameter.W = ImageAddressMode::REPEAT;
 		createInfo.GenerateSampler = true;
 		createInfo.ImGuiUsage = true;
 
@@ -66,6 +66,9 @@ namespace Lucy {
 			}
 
 			if (ImGui::BeginMenu("Light")) {
+				if (ImGui::MenuItem("Directional Light")) {
+					entityContext.AddComponent<DirectionalLightComponent>();
+				}
 				ImGui::EndMenu();
 			}
 
@@ -131,6 +134,20 @@ namespace Lucy {
 			}
 		});
 
+		DrawComponentPanel<DirectionalLightComponent>(entityContext, [&](DirectionalLightComponent& lightComponent) {
+			if (ImGui::CollapsingHeader("Directional Light", ImGuiTreeNodeFlags_DefaultOpen)) {
+				auto& direction = lightComponent.GetDirection();
+				auto& color = lightComponent.GetColor();
+
+				ImGui::Text("Direction");
+				ImGui::SameLine();
+				ImGui::DragFloat3("##hidelabel direction", (float*)&direction, 0.01f, -10.0f, 10.0f, nullptr, 1.0f);
+				ImGui::Text("Color");
+				ImGui::SameLine();
+				ImGui::DragFloat3("##hidelabel color", (float*)&color, 0.01f, 0.0f, 100.0f, nullptr, 1.0f);
+			}
+		});
+
 		DrawComponentPanel<MeshComponent>(entityContext, [&](MeshComponent& c) {
 			const Ref<Mesh> mesh = c.GetMesh();
 
@@ -169,6 +186,8 @@ namespace Lucy {
 					static int32_t selectedMaterial = -1;
 
 					for (uint32_t i = 0; i < mesh->GetSubmeshes().size(); i++) {
+						ImGui::PushID(i);
+
 						Submesh& submesh = mesh->GetSubmeshes()[i];
 						Ref<Material> m = mesh->GetMaterials()[submesh.MaterialIndex];
 
@@ -182,8 +201,9 @@ namespace Lucy {
 						ImGui::ImageButton((ImTextureID)textureID, { 64, 64 }, { 0, 0 }, { 1, 1 }, 0.0f);
 						ImGui::SameLine();
 
-						if (ImGui::BeginCombo(fmt::format("##hideLabel {0}", i).c_str(), m->GetName().c_str())) {
+						if (ImGui::BeginCombo("##hideLabel combo", m->GetName().c_str())) {
 							for (uint32_t j = 0; j < mesh->GetSubmeshes().size(); j++) {
+								ImGui::PushID(j);
 								Ref<Material> comboMaterial = mesh->GetMaterials()[j];
 								if (ImGui::Selectable(comboMaterial->GetName().c_str())) {
 									selectedMaterial = j;
@@ -191,9 +211,26 @@ namespace Lucy {
 								}
 								if (selectedMaterial == j)
 									ImGui::SetItemDefaultFocus();
+								ImGui::PopID();
 							}
 							ImGui::EndCombo();
 						}
+
+						float& roughness = m->GetRoughnessValue();
+						float& metallic = m->GetMetallicValue();
+						float& ao = m->GetAOContribution();
+
+						ImGui::Text("Roughness");
+						ImGui::SameLine();
+						ImGui::DragFloat("##hidelabel roughness", &roughness, 0.001f, 0.0f, 1.0f, nullptr, 1.0f);
+						ImGui::Text("Metallic");
+						ImGui::SameLine();
+						ImGui::DragFloat("##hidelabel metallic", &metallic, 0.001f, 0.0f, 1.0f, nullptr, 1.0f);
+						ImGui::Text("AO");
+						ImGui::SameLine();
+						ImGui::DragFloat("##hidelabel ao", &ao, 0.001f, 0.0f, 1.0f, nullptr, 1.0f);
+
+						ImGui::PopID();
 					}
 				}
 				ImGui::Unindent();

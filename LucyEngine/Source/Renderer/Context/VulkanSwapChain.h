@@ -1,9 +1,7 @@
 #pragma once
 
 #include "vulkan/vulkan.h"
-
 #include "Renderer/Image/VulkanImage.h"
-#include "Renderer/Memory/Buffer/FrameBuffer.h"
 
 namespace Lucy {
 
@@ -39,9 +37,7 @@ namespace Lucy {
 		inline VkSwapchainKHR GetVulkanHandle() { return m_SwapChain; }
 
 		inline size_t GetImageCount() { return m_SwapChainImages.size(); }
-		inline std::vector<VulkanImageView>& GetImageViews() { return m_SwapChainImageViews; }
-		
-		inline Ref<VulkanFrameBufferInfo> GetSwapChainFrameBufferInfo() const { return m_SwapChainFrameBufferInfo; }
+		inline const std::vector<VulkanImageView>& GetImageViews() const { return m_SwapChainImageViews; }
 	private:
 		VkSwapchainKHR Create(VkSwapchainKHR oldSwapChain);
 
@@ -55,7 +51,6 @@ namespace Lucy {
 
 		std::vector<VkImage> m_SwapChainImages;
 		std::vector<VulkanImageView> m_SwapChainImageViews;
-		Ref<VulkanFrameBufferInfo> m_SwapChainFrameBufferInfo = Memory::CreateRef<VulkanFrameBufferInfo>();
 
 		VkSurfaceFormatKHR m_SelectedFormat;
 		VkPresentModeKHR m_SelectedPresentMode;
