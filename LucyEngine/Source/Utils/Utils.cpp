@@ -6,7 +6,7 @@
 
 namespace Utils {
 
-	std::vector<std::string> Split(std::string& s, const std::string& delimiter) {
+	std::vector<std::string> Split(const std::string& s, const std::string& delimiter) {
 		size_t start = 0;
 		size_t end = 0;
 		std::string token;
@@ -35,7 +35,7 @@ namespace Utils {
 		std::size_t endOfChar = buffer.find("\n", attribIndex);
 
 		std::string attrib = buffer.substr(attribIndex, endOfChar - attribIndex);
-		std::vector<std::string>& vec = Split(Split(attrib, "=")[1], ",");
+		const std::vector<std::string>& vec = Split(Split(attrib, "=")[1], ",");
 
 		Attribute sizeObject{ std::atoi(vec[0].c_str()), std::atoi(vec[1].c_str()) };
 		return sizeObject;

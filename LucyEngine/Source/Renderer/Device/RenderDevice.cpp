@@ -16,35 +16,59 @@ namespace Lucy {
 	}
 
 	void RenderDevice::Init() {
-		m_RenderDeviceCommandList = RenderDeviceCommandList::Create();
-		m_RenderDeviceCommandList->Init();
+		m_CommandQueue = CommandQueue::Create();
+		m_CommandQueue->Init();
 	}
 
 	void RenderDevice::Recreate() {
-		m_RenderDeviceCommandList->Recreate();
+		m_CommandQueue->Recreate();
 	}
 
 	void RenderDevice::EnqueueToRenderThread(EnqueueFunc&& func) {
 		LUCY_PROFILE_NEW_EVENT("RenderDevice::EnqueueToRenderThread");
-		m_RenderDeviceCommandList->EnqueueToRenderThread(std::forward<EnqueueFunc>(func));
+		m_RenderFunctionQueue.push_back(std::move(func));
 	}
 
-	RenderCommandResourceHandle RenderDevice::CreateRenderPassResource(RenderCommandFunc&& func, Ref<Pipeline> pipeline) {
-		LUCY_PROFILE_NEW_EVENT("RenderDevice::CreateRenderPassResource");
-		return m_RenderDeviceCommandList->CreateRenderPassResource(std::move(func), pipeline);
+	CommandResourceHandle RenderDevice::CreateCommandResource(CommandFunc&& func, Ref<GraphicsPipeline> pipeline) {
+		LUCY_PROFILE_NEW_EVENT("RenderDevice::CreateCommandResource");
+		return m_CommandQueue->CreateCommandResource(std::move(func), pipeline);
+	}
+
+	void RenderDevice::EnqueueResourceFree(CommandResourceHandle resourceHandle) {
+		LUCY_PROFILE_NEW_EVENT("RenderDevice::EnqueueResourceFree");
+		m_DeletionQueue.push_back([=]() {
+			m_CommandQueue->DeleteCommandResource(resourceHandle);
+		});
+	}
+
+	void RenderDevice::EnqueueResourceFree(EnqueueFunc&& func) {
+		LUCY_PROFILE_NEW_EVENT("RenderDevice::EnqueueResourceFree");
+		m_DeletionQueue.push_back(std::move(func));
 	}
 
 	void RenderDevice::DispatchCommands() {
 		LUCY_PROFILE_NEW_EVENT("RenderDevice::DispatchCommands");
-		m_RenderDeviceCommandList->DispatchCommands();
+
+		uint32_t oldSize = m_RenderFunctionQueue.size();
+		for (uint32_t i = 0; i < oldSize; i++) {
+			m_RenderFunctionQueue[i](); //functions can contain nested functions
+		}
+		//meaing that nested lambda functions are being run in the second iteration.
+		m_RenderFunctionQueue.erase(m_RenderFunctionQueue.begin(), m_RenderFunctionQueue.begin() + oldSize);
 	}
 
 	void RenderDevice::ExecuteCommandQueue() {
 		LUCY_PROFILE_NEW_EVENT("RenderDevice::ExecuteCommandQueue");
-		m_RenderDeviceCommandList->ExecuteCommandQueue();
+		m_CommandQueue->Execute();
+
+		uint32_t oldSizeDeletionQueue = m_DeletionQueue.size();
+		for (uint32_t i = 0; i < oldSizeDeletionQueue; i++) {
+			m_DeletionQueue[i]();
+		}
+		m_DeletionQueue.erase(m_DeletionQueue.begin(), m_DeletionQueue.begin() + oldSizeDeletionQueue);
 	}
 
 	void RenderDevice::Destroy() {
-		m_RenderDeviceCommandList->Free();
+		m_CommandQueue->Free();
 	}
 }

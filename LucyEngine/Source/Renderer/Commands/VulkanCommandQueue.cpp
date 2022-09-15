@@ -2,7 +2,6 @@
 #include "VulkanCommandQueue.h"
 #include "VulkanCommandPool.h"
 
-#include "Renderer/Context/VulkanSwapChain.h"
 #include "Renderer/Renderer.h"
 
 namespace Lucy {
@@ -18,7 +17,7 @@ namespace Lucy {
 
 	void VulkanCommandQueue::Execute() {
 		LUCY_PROFILE_NEW_EVENT("VulkanCommandQueue::Execute");
-		if (m_BufferMap.size() == 0)
+		if (m_RenderResourceMap.size() == 0)
 			return;
 
 		VkCommandBuffer commandBuffer = GetCurrentCommandBuffer();
@@ -29,9 +28,9 @@ namespace Lucy {
 		LUCY_VK_ASSERT(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 
 		//TODO: Multithreading here; mutex and locks for multithreading
-		for (auto& [handle, resource] : m_BufferMap) {
+		for (auto& [handle, resource] : m_RenderResourceMap) {
 			const auto& targetPipeline = resource.GetTargetPipeline();
-
+			
 			if (targetPipeline) {
 				Renderer::BeginRenderPass(commandBuffer, targetPipeline);
 				resource.DoPass(commandBuffer);

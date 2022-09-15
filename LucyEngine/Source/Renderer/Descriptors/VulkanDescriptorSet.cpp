@@ -15,7 +15,7 @@ namespace Lucy {
 	}
 
 	void VulkanDescriptorSet::Create() {
-		auto& internalInfo = m_CreateInfo.InternalInfo.As<VulkanDescriptorSetCreateInfo>();
+		const auto& internalInfo = m_CreateInfo.InternalInfo.As<VulkanDescriptorSetCreateInfo>();
 
 		const uint32_t maxFramesInFlight = Renderer::GetMaxFramesInFlight();
 		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
@@ -75,9 +75,11 @@ namespace Lucy {
 		for (Ref<UniformBuffer> buffer : m_UniformBuffers) {
 			setWrite.dstBinding = buffer->GetBinding();
 
-			switch (buffer->GetDescriptorType()) {
+			DescriptorType descriptorType = buffer->GetDescriptorType();
+			switch (descriptorType) {
+				case DescriptorType::DynamicBuffer:
 				case DescriptorType::Buffer: {
-					auto& uniformBuffer = buffer.As<VulkanUniformBuffer>();
+					const auto& uniformBuffer = buffer.As<VulkanUniformBuffer>();
 					const uint32_t arraySize = buffer->GetArraySize();
 
 					VkDescriptorBufferInfo bufferInfo{};
@@ -86,7 +88,7 @@ namespace Lucy {
 					bufferInfo.range = VK_WHOLE_SIZE;
 
 					setWrite.pBufferInfo = &bufferInfo;
-					setWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+					setWrite.descriptorType = (VkDescriptorType)ConvertDescriptorType(descriptorType);
 					setWrite.descriptorCount = arraySize == 0 ? 1 : arraySize;
 
 					vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr);
@@ -94,10 +96,11 @@ namespace Lucy {
 					uniformBuffer->Clear();
 					break;
 				}
-				case DescriptorType::Sampler: //TODO: Do these stuff, if needed obv
+				case DescriptorType::StorageImage:
+				case DescriptorType::Sampler:
 				case DescriptorType::SampledImage:
 				case DescriptorType::CombinedImageSampler: {
-					auto& uniformImageBuffer = buffer.As<VulkanUniformImageBuffer>();
+					const auto& uniformImageBuffer = buffer.As<VulkanUniformImageBuffer>();
 					auto& imageInfos = uniformImageBuffer->GetImageInfos();
 
 					if (imageInfos.size() == 0)
@@ -105,17 +108,13 @@ namespace Lucy {
 
 					setWrite.pImageInfo = imageInfos.data();
 					setWrite.descriptorCount = imageInfos.size();
-					setWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+					setWrite.descriptorType = (VkDescriptorType)ConvertDescriptorType(descriptorType);
 
 					vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr);
 					//cant summarize buffer and combinedimagesampler together since i need to clear the cache
 					uniformImageBuffer->Clear();
 					break;
 				}
-				case DescriptorType::DynamicBuffer:
-					LUCY_CRITICAL("Not implemented yet!");
-					LUCY_ASSERT(false);
-					break;
 				case DescriptorType::Undefined:
 					LUCY_CRITICAL("Descriptor type is undefined!");
 					LUCY_ASSERT(false);
@@ -124,7 +123,7 @@ namespace Lucy {
 		}
 
 		for (Ref<SharedStorageBuffer> buffer : m_SharedStorageBuffers) {
-			auto& ssbo = buffer.As<VulkanSharedStorageBuffer>();
+			const auto& ssbo = buffer.As<VulkanSharedStorageBuffer>();
 			const uint32_t arraySize = buffer->GetArraySize();
 
 			VkDescriptorBufferInfo bufferInfo{};

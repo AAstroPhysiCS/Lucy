@@ -121,7 +121,7 @@ namespace Lucy {
 	}
 
 	void VulkanAllocator::CreateVulkanImageVma(uint32_t width, uint32_t height, uint32_t mipLevel, VkFormat format, VkImageLayout currentLayout, VkImageUsageFlags usage,
-											   VkImageType imageType, VkImage& imageHandle, VmaAllocation& allocationHandle) {
+											   VkImageType imageType, VkImage& imageHandle, VmaAllocation& allocationHandle, VkImageCreateFlags flags, uint32_t arrayLayers) {
 		VkImageCreateInfo imageCreateInfo{};
 		imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		imageCreateInfo.imageType = imageType;
@@ -129,11 +129,12 @@ namespace Lucy {
 		imageCreateInfo.extent.height = height;
 		imageCreateInfo.extent.depth = 1;
 		imageCreateInfo.mipLevels = mipLevel;
-		imageCreateInfo.arrayLayers = 1;
+		imageCreateInfo.arrayLayers = arrayLayers;
 		imageCreateInfo.format = format;
 		imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imageCreateInfo.initialLayout = currentLayout;
 		imageCreateInfo.usage = usage;
+		imageCreateInfo.flags = flags;
 		imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT; //no multisampling
 

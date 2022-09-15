@@ -14,10 +14,12 @@ namespace Lucy {
 	struct QueueFamilyIndices {
 		uint32_t GraphicsFamily;
 		uint32_t PresentFamily;
+		uint32_t ComputeFamily;
 		bool GraphicsFamilyHasValue = false;
 		bool PresentFamilyHasValue = false;
+		bool ComputeFamilyHasValue = false;
 
-		bool IsComplete() { return GraphicsFamilyHasValue && PresentFamilyHasValue; }
+		bool IsComplete() { return GraphicsFamilyHasValue && PresentFamilyHasValue && ComputeFamilyHasValue; }
 	};
 
 	class VulkanContextDevice {
@@ -37,6 +39,7 @@ namespace Lucy {
 		
 		inline VkQueue GetGraphicsQueue() const { return m_GraphicsQueue; }
 		inline VkQueue GetPresentQueue() const { return m_PresentQueue; }
+		inline VkQueue GetComputeQueue() const { return m_ComputeQueue; }
 		
 		inline uint32_t GetMinUniformBufferOffsetAlignment() const { return m_DeviceInfo.MinUniformBufferAlignment; }
 	private:
@@ -51,8 +54,10 @@ namespace Lucy {
 
 		VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
 		VkDevice m_LogicalDevice = VK_NULL_HANDLE;
+
 		VkQueue m_GraphicsQueue = VK_NULL_HANDLE;
 		VkQueue m_PresentQueue = VK_NULL_HANDLE;
+		VkQueue m_ComputeQueue = VK_NULL_HANDLE;
 
 		std::vector<const char*> m_DeviceExtensions = {
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME,

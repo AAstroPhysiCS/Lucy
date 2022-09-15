@@ -1,6 +1,8 @@
 #include "lypch.h"
 #include "Mesh.h"
 
+#include "Shader/ShaderLibrary.h"
+
 #include "../Core/Timer.h"
 
 namespace Lucy {
@@ -35,7 +37,26 @@ namespace Lucy {
 		}
 		m->m_MeshID = glm::vec3(MESH_ID_COUNT_X, MESH_ID_COUNT_Y, MESH_ID_COUNT_Z);
 	}
-	
+
+	Ref<Mesh> Mesh::Create(const std::vector<float>& vertices, const std::vector<uint32_t>& indices) {
+		return Memory::CreateRef<Mesh>(vertices, indices);
+	}
+
+	Ref<Mesh> Mesh::Create(const std::string& path) {
+		return Memory::CreateRef<Mesh>(path);
+	}
+
+	Mesh::Mesh(const std::vector<float>& vertices, const std::vector<uint32_t>& indices) {
+		m_VertexBuffer = VertexBuffer::Create(vertices.size());
+		m_IndexBuffer = IndexBuffer::Create(indices.size());
+
+		m_VertexBuffer->SetData(vertices);
+		m_IndexBuffer->SetData(indices);
+
+		m_VertexBuffer->LoadToGPU();
+		m_IndexBuffer->LoadToGPU();
+	}
+
 	Mesh::Mesh(const std::string& path)
 		: m_Path(path) {
 		ScopedTimer scopedTimer;
@@ -79,7 +100,7 @@ namespace Lucy {
 			auto& submeshTextureCoords = submesh.TextureCoords;
 			auto& submeshNormals = submesh.Normals;
 			auto& submeshTangents = submesh.Tangents;
-			auto& submeshBiTangents = submesh.BiTangents; 
+			auto& submeshBiTangents = submesh.BiTangents;
 
 			for (uint32_t i = 0; i < submesh.VertexCount; i++) {
 
@@ -130,10 +151,6 @@ namespace Lucy {
 
 		m_VertexBuffer->LoadToGPU();
 		m_IndexBuffer->LoadToGPU();
-	}
-
-	Ref<Mesh> Mesh::Create(const std::string& path) {
-		return Memory::CreateRef<Mesh>(path);
 	}
 
 	void Mesh::LoadData(const aiScene* scene) {
@@ -211,13 +228,13 @@ namespace Lucy {
 		m_Materials[mesh->mMaterialIndex] = Material::Create(ShaderLibrary::Get().GetShader("LucyPBR"), scene->mMaterials[mesh->mMaterialIndex], mesh->mName.data, m_Path);
 	}
 
-	void Mesh::TraverseHierarchy(const aiNode* node, glm::mat4& parentTransform) {
-		glm::mat4 localTransform = *(glm::mat4*) &node->mTransformation;
+	void Mesh::TraverseHierarchy(const aiNode* node, const glm::mat4& parentTransform) {
+		glm::mat4 localTransform = *(glm::mat4*)&node->mTransformation;
 		glm::mat4 transformed = parentTransform * localTransform;
 
 		for (uint32_t i = 0; i < node->mNumMeshes; i++) {
 			Submesh& submesh = m_Submeshes[node->mMeshes[i]];
-			submesh.Transform = *(glm::mat4*) &transformed;
+			submesh.Transform = *(glm::mat4*)&transformed;
 		}
 
 		for (uint32_t i = 0; i < node->mNumChildren; i++) {

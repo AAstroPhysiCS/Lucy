@@ -1,15 +1,17 @@
 #pragma once
 
+#include "glm/gtc/integer.hpp"
+
 namespace Lucy {
 
 	enum class ImageType {
-		Type2D, 
-		Type3D
-	};
+		Type2DDepth,
+		Type2DColor,
+		Type2DArrayColor,
 
-	enum class ImageTarget {
-		Color, 
-		Depth
+		Type3DColor,
+
+		TypeCubeColor
 	};
 
 	enum class ImageAddressMode {
@@ -26,6 +28,7 @@ namespace Lucy {
 	enum class ImageFormat {
 		R8G8B8A8_UNORM,
 		R8G8B8A8_UINT,
+		R8G8B8A8_SRGB,
 
 		B8G8R8A8_UNORM,
 		B8G8R8A8_UINT,
@@ -40,13 +43,17 @@ namespace Lucy {
 		R32G32B32A32_SFLOAT,
 		R32G32B32A32_UINT,
 
+		R32G32B32_SFLOAT,
+
 		R32_SFLOAT,
-		R32_UINT
+		R32_UINT,
+
+		Unknown
 	};
 
 	//to be implemented by CLIENT
-	extern uint32_t GetAPIImageFormat(ImageFormat format);
-	extern ImageFormat GetLucyImageFormat(uint32_t format);
+	uint32_t GetAPIImageFormat(ImageFormat format);
+	ImageFormat GetLucyImageFormat(uint32_t format);
 
 	struct ImageParameter {
 		ImageAddressMode U = ImageAddressMode::REPEAT;
@@ -55,6 +62,8 @@ namespace Lucy {
 		ImageFilterMode Min = ImageFilterMode::LINEAR;
 		ImageFilterMode Mag = ImageFilterMode::LINEAR;
 	};
+
+	using ImageFlags = uint32_t;
 
 	//Helper struct for materials
 	struct MaterialImageType {
@@ -67,31 +76,36 @@ namespace Lucy {
 		int32_t Width = 0, Height = 0; //gets replaced if path is available
 		ImageType ImageType;
 		ImageFormat Format;
-		ImageTarget Target;
 		ImageParameter Parameter;
-
-		//won't have an effect, if the image is being imported from path
-		uint32_t AdditionalUsageFlags = 0;
+		ImageFlags Flags = 0;
 
 		uint32_t Samples = 1;
-		bool GenerateMipmap = false;
-
+		uint32_t Layers = 1;
+		
 		bool ImGuiUsage = false;
 		bool GenerateSampler = false;
+		bool GenerateMipmap = false;
 	};
 
 	//Vulkan: Descriptor Set
-	typedef void* ImageImGuiID;
+	using ImageImGuiID = void*;
 
-	class Image2D {
+	class VulkanImage2D; //for copy constructor
+
+	class Image {
 	public:
-		virtual ~Image2D() = default;
+		virtual ~Image() = default;
 
-		static Ref<Image2D> Create(const std::string& path, ImageCreateInfo& createInfo);
-		static Ref<Image2D> Create(ImageCreateInfo& createInfo);
+		static Ref<Image> Create(const std::string& path, ImageCreateInfo& createInfo);
+		static Ref<Image> Create(const Ref<VulkanImage2D>& other);
+		static Ref<Image> Create(ImageCreateInfo& createInfo);
+
+		static Ref<Image> CreateCube(const std::string& path, ImageCreateInfo& createInfo);
+		static Ref<Image> CreateCube(ImageCreateInfo& createInfo);
 
 		virtual void Destroy() = 0;
 
+		const std::string& GetPath() const { return m_Path; }
 		const int32_t& GetChannels() const { return m_Channels; }
 		const int32_t& GetWidth() const { return m_Width; }
 		const int32_t& GetHeight() const { return m_Height; }
@@ -99,9 +113,9 @@ namespace Lucy {
 		ImageImGuiID GetImGuiID() const { return m_ImGuiID; }
 	protected:
 		//Loads an asset
-		Image2D(const std::string& path, ImageCreateInfo& createInfo);
+		Image(const std::string& path, ImageCreateInfo& createInfo);
 		//Creates an empty image
-		Image2D(ImageCreateInfo& createInfo);
+		Image(ImageCreateInfo& createInfo);
 
 		ImageCreateInfo m_CreateInfo;
 		int32_t m_Channels = 0;
@@ -110,6 +124,8 @@ namespace Lucy {
 
 		ImageImGuiID m_ImGuiID = 0;
 
-		const std::string m_Path;
+		uint32_t m_MaxMipLevel = 1;
+
+		std::string m_Path;
 	};
 }

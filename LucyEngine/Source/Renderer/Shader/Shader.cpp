@@ -1,152 +1,97 @@
 #include "lypch.h"
 
 #include "Shader.h"
-#include "VulkanShader.h"
+#include "VulkanGraphicsShader.h"
+#include "VulkanComputeShader.h"
+
+#include "Core/FileSystem.h"
+
+#include "shaderc/shaderc.hpp"
 
 #include "Renderer/Renderer.h"
 
-#include "Utils/Utils.h"
-#include "Core/FileSystem.h"
-
 namespace Lucy {
 
-	Shader::Shader(const std::string& name, const std::string& path)
-		: m_Path(path), m_Name(name) {
-		Renderer::EnqueueToRenderThread([=]() {
-			Load();
-		});
-	}
-
 	Ref<Shader> Shader::Create(const std::string& name, const std::string& path) {
-		auto currentRenderArchitecture = Renderer::GetRenderArchitecture();
 		Ref<Shader> instance = nullptr;
-		if (currentRenderArchitecture == RenderArchitecture::Vulkan) {
-			instance = Memory::CreateRef<VulkanShader>(name, path);
+		auto extension = FileSystem::GetFileExtension(path);
+
+		if (extension == ".comp") {
+			if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan)
+				instance = Memory::CreateRef<VulkanComputeShader>(name, path);
+
+			return instance;
+		} else if (extension == ".glsl") {
+			if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan)
+				instance = Memory::CreateRef<VulkanGraphicsShader>(name, path);
+
+			return instance;
 		}
+
+		LUCY_CRITICAL("Shader extension not supported!");
+		LUCY_ASSERT(false);
 		return instance;
 	}
 
-	void Shader::Load() {
-		shaderc::Compiler compiler;
-		shaderc::CompileOptions options;
-
-		options.SetOptimizationLevel(shaderc_optimization_level::shaderc_optimization_level_performance);
-		options.SetGenerateDebugInfo();
-
-		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan)
-			options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_2);
-
-		const auto [vertexFileExtension, fragmentFileExtension] = GetCachedFileExtension();
-		const std::string& cacheFileVert = FileSystem::GetParentPath(m_Path) + "/" + FileSystem::GetFileName(m_Path) + vertexFileExtension;
-		const std::string& cacheFileFrag = FileSystem::GetParentPath(m_Path) + "/" + FileSystem::GetFileName(m_Path) + fragmentFileExtension;
-
-		if (!FileSystem::FileExists(cacheFileVert) || !FileSystem::FileExists(cacheFileFrag))
-			LoadAndRedoCache(compiler, options, cacheFileVert, cacheFileFrag);
-		else
-			LoadFromCache(cacheFileVert, cacheFileFrag);
+	Shader::Shader(const std::string& name, const std::string& path)
+		: m_Path(path), m_Name(name) {
 	}
 
-	void Shader::LoadAndRedoCache(shaderc::Compiler& compiler, shaderc::CompileOptions& options, const std::string& cacheFileVert, const std::string& cacheFileFrag) {
+	std::vector<uint32_t> Shader::LoadSPIRVData(const std::string& path, shaderc::Compiler& compiler, shaderc::CompileOptions& options,
+							   shaderc_shader_kind kind, const std::string& cachedData) {
+		using Iter = std::vector<std::string>::iterator;
+
+		auto LoadData = [](std::vector<std::string>& lines, Iter& from, Iter& to) {
+			std::string buffer;
+			if (lines.end() != from) {
+				for (auto i = from; i != to; i++) {
+					buffer += *i + "\n";
+				}
+			}
+
+			return buffer;
+		};
+
 		std::vector<std::string> lines;
-		FileSystem::ReadFileLine<std::string>(m_Path, lines);
+		FileSystem::ReadFileLine<std::string>(path, lines);
 
-		std::string& vertex = LoadVertexData(lines);
-		std::string& fragment = LoadFragmentData(lines);
+		std::string shaderType = "";
+		Iter from, to;
+		switch (kind) {
+			case shaderc_shader_kind::shaderc_vertex_shader:
+				shaderType = "Vertex";
+				from = std::find(lines.begin(), lines.end(), "//type vertex");
+				to = std::find(lines.begin(), lines.end(), "//type fragment");
+				break;
+			case shaderc_shader_kind::shaderc_fragment_shader:
+				shaderType = "Fragment";
+				from = std::find(lines.begin(), lines.end(), "//type fragment");
+				to = lines.end();
+				break;
+			case shaderc_shader_kind::shaderc_compute_shader:
+				shaderType = "Compute";
+				from = lines.begin();
+				to = lines.end();
+				break;
+		}
 
-		shaderc::SpvCompilationResult resultVertex = compiler.CompileGlslToSpv(vertex, shaderc_shader_kind::shaderc_glsl_vertex_shader, FileSystem::GetFileName(m_Path).c_str(), options);
-		uint32_t status = resultVertex.GetCompilationStatus();
+		std::string data = LoadData(lines, from, to);
+
+		shaderc::SpvCompilationResult result = compiler.CompileGlslToSpv(data, kind, FileSystem::GetFileName(path).c_str(), options);
+		uint32_t status = result.GetCompilationStatus();
 		if (status != shaderc_compilation_status_success) {
-			LUCY_CRITICAL(fmt::format("Vertex Shader; Status: {0}, Message: {1}", status, resultVertex.GetErrorMessage()));
+			LUCY_CRITICAL(fmt::format("{0} Shader; Status: {1}, Message: {2}", shaderType, status, result.GetErrorMessage()));
 			LUCY_ASSERT(false);
 		}
-		std::vector<uint32_t> dataVert(resultVertex.cbegin(), resultVertex.cend());
-		FileSystem::WriteToFile<uint32_t>(cacheFileVert, dataVert, OpenMode::Binary);
+		std::vector<uint32_t> dataAsSPIRV(result.cbegin(), result.cend());
+		FileSystem::WriteToFile<uint32_t>(cachedData, dataAsSPIRV, OpenMode::Binary);
 
-		shaderc::SpvCompilationResult resultFrag = compiler.CompileGlslToSpv(fragment, shaderc_shader_kind::shaderc_glsl_fragment_shader, FileSystem::GetFileName(m_Path).c_str(), options);
-		status = resultFrag.GetCompilationStatus();
-		if (status != shaderc_compilation_status_success) {
-			LUCY_CRITICAL(fmt::format("Fragment Shader; Status: {0}, Message: {1}", status, resultFrag.GetErrorMessage()));
-			LUCY_ASSERT(false);
-		}
-
-		std::vector<uint32_t> dataFrag(resultFrag.cbegin(), resultFrag.cend());
-		FileSystem::WriteToFile<uint32_t>(cacheFileFrag, dataFrag, OpenMode::Binary);
-
-		m_Reflect.Info(m_Path, dataVert, dataFrag);
-		LoadInternal(dataVert, dataFrag);
+		return dataAsSPIRV;
 	}
 
-	void Shader::LoadFromCache(const std::string& cacheFileVert, const std::string& cacheFileFrag) {
-		std::vector<uint32_t> dataVert;
-		std::vector<uint32_t> dataFrag;
-
-		FileSystem::ReadFile<uint32_t>(cacheFileVert, dataVert, OpenMode::Binary);
-		FileSystem::ReadFile<uint32_t>(cacheFileFrag, dataFrag, OpenMode::Binary);
-
-		m_Reflect.Info(m_Path, dataVert, dataFrag);
-		LoadInternal(dataVert, dataFrag);
-	}
-
-	std::string Shader::LoadVertexData(std::vector<std::string>& lines) {
-		const auto& from = std::find(lines.begin(), lines.end(), "//type vertex");
-		const auto& to = std::find(lines.begin(), lines.end(), "//type fragment");
-
-		std::string buffer;
-		if (lines.end() != from) {
-			for (auto i = from; i != to; i++) {
-				buffer += *i + "\n";
-			}
-		}
-
-		return buffer;
-	}
-
-	std::string Shader::LoadFragmentData(std::vector<std::string>& lines) {
-		const auto& from = std::find(lines.begin(), lines.end(), "//type fragment");
-		const auto& to = lines.end();
-
-		std::string buffer;
-		if (lines.end() != from) {
-			for (auto i = from; i != to; i++) {
-				buffer += *i + "\n";
-			}
-		}
-
-		return buffer;
-	}
-
-	const Shader::Extensions Shader::GetCachedFileExtension() {
-		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan) {
-			return Extensions{ ".cached_vulkan.vert", ".cached_vulkan.frag" };
-		}
-	}
-
-	ShaderLibrary& ShaderLibrary::Get() {
-		static ShaderLibrary s_Instance;
-		return s_Instance;
-	}
-
-	void ShaderLibrary::Init() {
-		PushShader(Shader::Create("LucyPBR", "Assets/Shaders/LucyPBR.glsl"));
-		PushShader(Shader::Create("LucyID", "Assets/Shaders/LucyID.glsl"));
-	}
-
-	void ShaderLibrary::Destroy() {
-		for (const auto& shader : m_Shaders)
-			shader->Destroy();
-	}
-
-	Ref<Shader> ShaderLibrary::GetShader(const std::string& name) {
-		for (auto& shader : m_Shaders) {
-			if (shader->GetName() == name)
-				return shader;
-		}
-
-		LUCY_CRITICAL("Shader not found!");
-		LUCY_ASSERT(false);
-	}
-
-	void ShaderLibrary::PushShader(const Ref<Shader>& instance) {
-		m_Shaders.push_back(instance);
+	std::vector<uint32_t> Shader::LoadSPIRVDataFromCache(const std::string& cachedFile) {
+		std::vector<uint32_t> data;
+		FileSystem::ReadFile<uint32_t>(cachedFile, data, OpenMode::Binary);
+		return data;
 	}
 }

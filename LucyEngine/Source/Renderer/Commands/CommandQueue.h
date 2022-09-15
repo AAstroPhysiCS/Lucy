@@ -1,12 +1,12 @@
 #pragma once
 
-#include "RenderCommandResources.h"
+#include "CommandResources.h"
 
 #include "CommandPool.h"
 
 namespace Lucy {
 
-	class Pipeline;
+	class GraphicsPipeline;
 
 	class CommandQueue {
 	public:
@@ -24,15 +24,16 @@ namespace Lucy {
 		virtual void Init() = 0;
 		virtual void Execute() = 0;
 
-		RenderCommandResourceHandle CreateRenderPassResource(RenderCommandFunc&& func, Ref<Pipeline> pipeline);
-		void EnqueueRenderCommand(RenderCommandResourceHandle resourceHandle, const Ref<RenderCommand>& command);
+		CommandResourceHandle CreateCommandResource(CommandFunc&& func, Ref<GraphicsPipeline> pipeline);
+		void DeleteCommandResource(CommandResourceHandle commandHandle);
+		void EnqueueCommand(CommandResourceHandle resourceHandle, const Ref<RenderCommand>& command);
 		void Recreate();
 		void Clear();
 		void Free();
 
-		inline size_t GetQueueSize() const { return m_BufferMap.size(); }
+		inline size_t GetQueueSize() const { return m_RenderResourceMap.size(); }
 	protected:
-		std::unordered_map<RenderCommandResourceHandle, RenderCommandResource> m_BufferMap;
+		std::unordered_map<CommandResourceHandle, RenderCommandResource> m_RenderResourceMap;
 		Ref<CommandPool> m_CommandPool = nullptr;
 	};
 }

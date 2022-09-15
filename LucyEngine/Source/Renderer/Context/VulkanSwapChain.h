@@ -1,7 +1,7 @@
 #pragma once
 
 #include "vulkan/vulkan.h"
-#include "Renderer/Image/VulkanImage.h"
+#include "Renderer/Image/VulkanImage2D.h"
 
 namespace Lucy {
 
@@ -29,14 +29,13 @@ namespace Lucy {
 
 		/// <param name="currentFrameWaitSemaphore: image is available, image is renderable"></param>
 		/// <param name="currentFrameSignalSemaphore: rendering finished, signal it"></param>
-		void SubmitToQueue(VkCommandBuffer commandBuffer, const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore);
+		void SubmitToQueue(VkQueue queue, VkCommandBuffer commandBuffer, const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore);
 		void Destroy();
 
 		inline VkExtent2D GetExtent() { return m_SelectedSwapExtent; }
 		inline VkSurfaceFormatKHR& GetSurfaceFormat() { return m_SelectedFormat; }
 		inline VkSwapchainKHR GetVulkanHandle() { return m_SwapChain; }
 
-		inline size_t GetImageCount() { return m_SwapChainImages.size(); }
 		inline const std::vector<VulkanImageView>& GetImageViews() const { return m_SwapChainImageViews; }
 	private:
 		VkSwapchainKHR Create(VkSwapchainKHR oldSwapChain);
@@ -57,5 +56,7 @@ namespace Lucy {
 		VkExtent2D m_SelectedSwapExtent;
 
 		Ref<Window> m_Window = nullptr;
+
+		friend class RendererBase; //for swapchain image count
 	};
 }

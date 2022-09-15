@@ -6,7 +6,7 @@
 namespace Lucy {
 
 	class Window;
-	class PushConstant;
+	class VulkanPushConstant;
 	class DescriptorSet;
 
 	class Scene;
@@ -14,8 +14,7 @@ namespace Lucy {
 
 	class RendererBase {
 	protected:
-		const uint32_t m_MaxFramesInFlight = 3;
-
+		uint32_t m_MaxFramesInFlight = 0;
 		uint32_t m_ImageIndex = 0;
 		uint32_t m_CurrentFrameIndex = 0;
 	public:
@@ -40,7 +39,7 @@ namespace Lucy {
 
 		virtual void OnWindowResize() = 0;
 		virtual void OnViewportResize() = 0;
-		virtual Entity OnMousePicking(Ref<Scene>& scene, const Ref<Pipeline>& idPipeline) = 0;
+		virtual Entity OnMousePicking(Ref<Scene>& scene, const Ref<GraphicsPipeline>& idPipeline) = 0;
 	protected:
 		RendererBase(RenderArchitecture arch, Ref<Window>& window);
 

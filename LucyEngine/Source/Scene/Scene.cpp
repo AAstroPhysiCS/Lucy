@@ -48,14 +48,14 @@ namespace Lucy {
 				return e;
 		}
 		LUCY_ASSERT(false);
+		return {};
 	}
 
 	void Scene::Update(float viewportWidth, float viewportHeight) {
 		LUCY_PROFILE_NEW_EVENT("Scene::Update");
 
-		EditorCamera& camera = GetEditorCamera();
-		camera.SetViewportSize(viewportWidth, viewportHeight);
-		camera.Update();
+		m_Camera.SetViewportSize(viewportWidth, viewportHeight);
+		m_Camera.Update();
 	}
 
 	void Scene::Destroy() {
@@ -63,9 +63,20 @@ namespace Lucy {
 		for (auto entity : meshView) {
 			Entity e{ this, entity };
 			MeshComponent meshComponent = e.GetComponent<MeshComponent>();
-			if (!meshComponent.IsValid()) continue;
+			if (!meshComponent.IsValid()) 
+				continue;
 
 			meshComponent.GetMesh()->Destroy();
+		}
+
+		const auto& cubemapView = View<HDRCubemapComponent>();
+		for (auto entity : cubemapView) {
+			Entity e{ this, entity };
+			HDRCubemapComponent cubemapComponent = e.GetComponent<HDRCubemapComponent>();
+			if (!cubemapComponent.IsValid()) 
+				continue;
+
+			cubemapComponent.GetCubemapImage()->Destroy();
 		}
 	}
 }

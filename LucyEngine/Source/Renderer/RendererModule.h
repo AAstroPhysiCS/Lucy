@@ -19,14 +19,14 @@ namespace Lucy {
 		void OnWindowResize();
 		void OnViewportResize();
 
-		inline const Ref<Pipeline>& GetGeometryPipeline() { return m_GeometryPipeline; }
-		inline const Ref<Pipeline>& GetIDPipeline() { return m_IDPipeline; }
+		inline const Ref<GraphicsPipeline>& GetGeometryPipeline() { return m_GeometryPipeline; }
+		inline const Ref<GraphicsPipeline>& GetIDPipeline() { return m_IDPipeline; }
 	private:
-		Ref<Pipeline> m_GeometryPipeline = nullptr;
-		Ref<Pipeline> m_IDPipeline = nullptr;
+		Ref<GraphicsPipeline> m_GeometryPipeline = nullptr;
+		Ref<GraphicsPipeline> m_IDPipeline = nullptr;
 	};
 
 	/* --- Individual Passes --- */
-	extern void GeometryPass(void* commandBuffer, Ref<Pipeline> geometryPipeline, RenderCommand* staticMeshRenderCommand);
-	extern void IDPass(void* commandBuffer, Ref<Pipeline> geometryPipeline, RenderCommand* staticMeshRenderCommand);
+	extern void GeometryPass(void* commandBuffer, Ref<GraphicsPipeline> geometryPipeline, RenderCommand* staticMeshRenderCommand);
+	extern void IDPass(void* commandBuffer, Ref<GraphicsPipeline> geometryPipeline, RenderCommand* staticMeshRenderCommand);
 }

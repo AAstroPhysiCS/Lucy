@@ -19,14 +19,10 @@ namespace Lucy {
 										m_StagingBufferHandle, m_StagingBufferVma);
 	}
 
-	void VulkanVertexBuffer::Bind(const VertexBindInfo& info) {
+	void VulkanVertexBuffer::Bind(const VulkanVertexBindInfo& info) {
 		LUCY_ASSERT(m_BufferHandle);
 		VkDeviceSize offset[] = { 0 };
 		vkCmdBindVertexBuffers(info.CommandBuffer, 0, 1, &m_BufferHandle, offset);
-	}
-
-	void VulkanVertexBuffer::Unbind() {
-		//Empty
 	}
 
 	void VulkanVertexBuffer::LoadToGPU() {

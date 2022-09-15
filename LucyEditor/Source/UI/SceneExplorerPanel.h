@@ -14,7 +14,7 @@ namespace Lucy {
 		void SetEntityContext(Entity e);
 		inline Entity& GetEntityContext() { return m_EntityContext; }
 
-		void SetIDPipeline(Ref<Pipeline> pipeline);
+		void SetIDPipeline(Ref<GraphicsPipeline> pipeline);
 
 		void SetScene(Ref<Scene> scene);
 		inline Ref<Scene> GetActiveScene() { return m_Scene; }
@@ -27,6 +27,6 @@ namespace Lucy {
 		Entity m_EntityContext;
 		Ref<Scene> m_Scene = nullptr;
 
-		Ref<Pipeline> m_IDPipeline = nullptr;
+		Ref<GraphicsPipeline> m_IDPipeline = nullptr;
 	};
 }

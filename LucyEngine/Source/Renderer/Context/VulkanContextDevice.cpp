@@ -28,6 +28,7 @@ namespace Lucy {
 
 		vkGetDeviceQueue(m_LogicalDevice, m_QueueFamilyIndices.GraphicsFamily, 0, &m_GraphicsQueue);
 		vkGetDeviceQueue(m_LogicalDevice, m_QueueFamilyIndices.PresentFamily, 0, &m_PresentQueue);
+		vkGetDeviceQueue(m_LogicalDevice, m_QueueFamilyIndices.ComputeFamily, 0, &m_ComputeQueue);
 	}
 
 	void VulkanContextDevice::Destroy() {
@@ -88,23 +89,34 @@ namespace Lucy {
 			queueCreateInfos.push_back(queueCreateInfo);
 		}
 
+		//For layered rendering (cubemaps for example)
+		VkPhysicalDeviceMultiviewFeatures multiViewFeatures{};
+		multiViewFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES;
+		multiViewFeatures.multiview = VK_TRUE;
+
+		VkPhysicalDeviceVulkan12Features vulkan12Features{};
+		vulkan12Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+		//For layered rendering (cubemaps for example)
+		vulkan12Features.shaderOutputLayer = VK_TRUE;
+		//For bindless descriptor sets
+		vulkan12Features.descriptorBindingPartiallyBound = VK_TRUE;
+		vulkan12Features.descriptorBindingVariableDescriptorCount = VK_TRUE;
+		vulkan12Features.runtimeDescriptorArray = VK_TRUE;
+		vulkan12Features.pNext = &multiViewFeatures;
+
+		//For compute shaders/pipeline
+		VkPhysicalDeviceVulkan13Features vulkan13Features{};
+		vulkan13Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+		vulkan13Features.maintenance4 = VK_TRUE;
+		vulkan13Features.pNext = &vulkan12Features;
+
 		VkPhysicalDeviceFeatures2 features{};
 		features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 		vkGetPhysicalDeviceFeatures2(m_PhysicalDevice, &features);
-
-		// This should be already set to VK_TRUE, as we queried before.
 		features.features.samplerAnisotropy = VK_TRUE;
-
-		//for bindless descriptor sets
-		VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures{};
-		indexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
-
-		// This should be already set to VK_TRUE, as we queried before.
-		indexingFeatures.descriptorBindingPartiallyBound = VK_TRUE;
-		indexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
-		indexingFeatures.runtimeDescriptorArray = VK_TRUE;
-
-		features.pNext = &indexingFeatures; //extending this structure
+		features.features.geometryShader = VK_TRUE;
+		features.features.multiViewport = VK_TRUE;
+		features.pNext = &vulkan13Features; //extending this structure
 
 		VkDeviceCreateInfo deviceCreateInfo{};
 		deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -144,12 +156,19 @@ namespace Lucy {
 				m_QueueFamilyIndices.PresentFamily = i;
 			}
 
+			if (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT && !(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
+				m_QueueFamilyIndices.ComputeFamilyHasValue = true;
+				m_QueueFamilyIndices.ComputeFamily = i;
+			}
+
 			if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT && queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) {
 				m_QueueFamilyIndices.GraphicsFamilyHasValue = true;
 				m_QueueFamilyIndices.GraphicsFamily = i;
-				break;
 			}
 			i++;
+
+			if (m_QueueFamilyIndices.GraphicsFamilyHasValue && m_QueueFamilyIndices.ComputeFamilyHasValue && m_QueueFamilyIndices.PresentFamilyHasValue)
+				break;
 		}
 	}
 

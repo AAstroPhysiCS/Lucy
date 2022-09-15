@@ -5,13 +5,16 @@
 
 namespace Lucy {
 
+	struct VulkanIndexBindInfo {
+		VkCommandBuffer CommandBuffer;
+	};
+
 	class VulkanIndexBuffer : public IndexBuffer {
 	public:
 		VulkanIndexBuffer(uint32_t size);
 		virtual ~VulkanIndexBuffer() = default;
 		
-		void Bind(const IndexBindInfo& info) final override;
-		void Unbind() final override;
+		void Bind(const VulkanIndexBindInfo& info);
 		void LoadToGPU() final override;
 		void DestroyHandle() final override;
 	private:

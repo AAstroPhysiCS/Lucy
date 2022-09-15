@@ -28,11 +28,11 @@ void main() {
 //type fragment
 #version 450
 
-layout (location = 0) out vec4 idColor;
+layout (location = 0) out vec4 a_Color;
 
 layout (location = 0) in vec3 o_ID;
 
 void main() {
-	idColor = vec4(round(o_ID / 255 * 10e4) / 10e4, 1.0f);
+	a_Color = vec4(round(o_ID / 255 * 10e4) / 10e4, 1.0f);
 	//we dont need to do anything with the depth
 }

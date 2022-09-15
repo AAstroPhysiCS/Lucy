@@ -12,7 +12,7 @@ namespace Lucy {
 		: m_ViewportWidth(viewportWidth), m_ViewportHeight(viewportHeight), m_FarPlane(farPlane), m_NearPlane(nearPlane), m_Fov(fov) {
 	}
 
-	Camera::Camera(glm::vec3& position, float farPlane, float nearPlane, float fov)
+	Camera::Camera(const glm::vec3& position, float farPlane, float nearPlane, float fov)
 		: m_Position(position), m_FarPlane(farPlane), m_NearPlane(nearPlane), m_Fov(fov) {
 	}
 

@@ -9,13 +9,14 @@ namespace Lucy {
 		SampledImage,
 		Sampler,
 		CombinedImageSampler,
+		StorageImage,
 		Buffer,
 		DynamicBuffer,
 		SSBO,
 		SSBODynamic
 	};
 
-	extern DescriptorType ConvertVulkanTypeToLucyType(VkDescriptorType type);
-	extern VkDescriptorType ConvertLucyTypeToVulkanType(DescriptorType type);
+	DescriptorType ConvertDescriptorType(uint32_t type);
+	uint32_t ConvertDescriptorType(DescriptorType type);
 }
 

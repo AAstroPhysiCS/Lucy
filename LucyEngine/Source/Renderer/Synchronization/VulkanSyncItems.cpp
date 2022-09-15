@@ -3,7 +3,7 @@
 #include "VulkanSyncItems.h"
 #include "Renderer/Context/VulkanContextDevice.h"
 
-#include "Renderer/Image/VulkanImage.h"
+#include "Renderer/Image/VulkanImage2D.h"
 
 namespace Lucy {
 
@@ -57,6 +57,10 @@ namespace Lucy {
 				srcAccessMask = 0;
 				sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 				break;
+			case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+				srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				sourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+				break;
 			case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
 				srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 				sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
@@ -64,10 +68,6 @@ namespace Lucy {
 			case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
 				srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 				sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-				break;
-			case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-				srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-				sourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 				break;
 			default:
 				LUCY_ASSERT(false);

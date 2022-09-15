@@ -4,7 +4,7 @@
 #include "Core/FileSystem.h"
 
 #include "Renderer/Renderer.h"
-#include "Renderer/Context/Pipeline.h"
+#include "Renderer/Context/GraphicsPipeline.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanUniformBuffer.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanSharedStorageBuffer.h"
 
@@ -19,11 +19,11 @@ namespace Lucy {
 		LoadTexture(aiMaterial, AO_TYPE, importedFilePath);
 	}
 
-	void VulkanMaterial::Update(Ref<Pipeline> pipeline) {
+	void VulkanMaterial::Update(Ref<GraphicsPipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("VulkanMaterial::Update");
 
-		auto& uniformImageBuffer = pipeline->GetUniformBuffers<VulkanUniformImageBuffer>("u_Textures");
-		auto& ssboMaterialAttributes = pipeline->GetSharedStorageBuffers<VulkanSharedStorageBuffer>("LucyMaterialAttributes");
+		auto uniformImageBuffer = pipeline->GetUniformBuffers<VulkanUniformImageBuffer>("u_Textures");
+		auto ssboMaterialAttributes = pipeline->GetSharedStorageBuffers<VulkanSharedStorageBuffer>("LucyMaterialAttributes");
 
 		if (HasImage(Material::ALBEDO_TYPE)) {
 			uint32_t pos = uniformImageBuffer->BindImage(GetImage(Material::ALBEDO_TYPE));
@@ -62,8 +62,7 @@ namespace Lucy {
 
 			ImageCreateInfo createInfo;
 			createInfo.Format = ImageFormat::R8G8B8A8_UNORM;
-			createInfo.Target = ImageTarget::Color;
-			createInfo.ImageType = ImageType::Type2D;
+			createInfo.ImageType = ImageType::Type2DColor;
 			createInfo.Parameter.Mag = ImageFilterMode::LINEAR;
 			createInfo.Parameter.Min = ImageFilterMode::LINEAR;
 			createInfo.Parameter.U = ImageAddressMode::REPEAT;
@@ -73,7 +72,7 @@ namespace Lucy {
 			createInfo.ImGuiUsage = true;
 			createInfo.GenerateSampler = true;
 
-			Ref<Image2D> texture2D = Image2D::Create(properTexturePath, createInfo);
+			Ref<Image> texture2D = Image::Create(properTexturePath, createInfo);
 			m_Textures.push_back(texture2D);
 		} else {
 			LUCY_WARN(fmt::format("Texture {0} could not be loaded: {1}", type.Name, path.data));

@@ -12,7 +12,7 @@ namespace Utils {
 		int32_t Height;
 	};
 
-	std::vector<std::string> Split(std::string& s, const std::string& delimiter);
+	std::vector<std::string> Split(const std::string& s, const std::string& delimiter);
 	Attribute ReadAttributeFromIni(const char* windowName, const char* attributeName);
 
 	struct DialogFilter {
@@ -22,6 +22,10 @@ namespace Utils {
 
 	static DialogFilter MeshFilterList[1] = {
 		{"Mesh Files", "fbx,obj,gltf"}
+	};
+
+	static DialogFilter CubemapFilterList[1] = {
+		{"HDR Files", "hdr"}
 	};
 
 	void OpenDialog(std::string& outString, const DialogFilter filterList[], size_t count, const char* defaultPath);

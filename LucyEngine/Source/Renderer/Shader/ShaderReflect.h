@@ -13,6 +13,7 @@ namespace Lucy {
 	struct ShaderStageInfo {
 		size_t UniformCount = 0;
 		size_t SampledImagesCount = 0;
+		size_t StorageImageCount = 0;
 		size_t PushConstantBufferCount = 0;
 		size_t StageInputCount = 0;
 		size_t StageOutputCount = 0;
@@ -66,12 +67,12 @@ namespace Lucy {
 	public:
 		~ShaderReflect() = default;
 
-		inline ShaderStageInfo GetVertexInfo() const { return m_ShaderInfoVertex; }
-		inline ShaderStageInfo GetFragmentInfo() const { return m_ShaderInfoFragment; }
+		inline ShaderStageInfo GetShaderStageInfo() const { return m_ShaderStageInfo; }
 
 		inline std::vector<ShaderUniformBlock>& GetShaderPushConstants() { return m_ShaderPushConstants; }
 		inline std::unordered_multimap<uint32_t, std::vector<ShaderUniformBlock>>& GetShaderUniformBlockMap() { return m_ShaderUniformBlockMap; }
 
+		void Info(std::string& path, std::vector<uint32_t>& data, VkShaderStageFlags stageFlag);
 		void Info(std::string& path, std::vector<uint32_t>& dataVertex, std::vector<uint32_t>& dataFragment);
 	private:
 		ShaderReflect() = default;
@@ -90,9 +91,9 @@ namespace Lucy {
 		std::vector<ShaderUniformBlock> m_ShaderPushConstants;
 		std::unordered_multimap<uint32_t, std::vector<ShaderUniformBlock>> m_ShaderUniformBlockMap;
 
-		ShaderStageInfo m_ShaderInfoVertex;
-		ShaderStageInfo m_ShaderInfoFragment;
+		ShaderStageInfo m_ShaderStageInfo;
 
 		friend class Shader;
+		friend class ComputeShader;
 	};
 }

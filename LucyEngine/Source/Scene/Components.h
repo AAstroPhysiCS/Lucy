@@ -72,7 +72,7 @@ namespace Lucy {
 		}
 		TagComponent(const TagComponent& other) = default;
 
-		inline std::string GetTag() { return m_Tag; }
+		inline const std::string& GetTag() { return m_Tag; }
 		inline void SetTag(const std::string& tag) { m_Tag = tag; }
 		inline void SetTag(char* tag) { m_Tag = tag; }
 	private:
@@ -93,5 +93,35 @@ namespace Lucy {
 		[[maybe_unused]] float _padding0 = 0.0f;
 		glm::vec3 m_Color = glm::vec3(0.0f);
 		[[maybe_unused]] float _padding1 = 0.0f;
+	};
+
+	struct HDRCubemapComponent {
+		HDRCubemapComponent() = default;
+		HDRCubemapComponent(Ref<Image> cubemapImage)
+			: m_CubemapImage(cubemapImage) {
+		}
+		HDRCubemapComponent(const HDRCubemapComponent& other) = default;
+
+		void LoadCubemap(const std::string& path) {
+			ImageCreateInfo hdrCreateInfo;
+			hdrCreateInfo.Format = ImageFormat::R32G32B32A32_SFLOAT;
+			hdrCreateInfo.ImageType = ImageType::TypeCubeColor;
+			hdrCreateInfo.Parameter.U = ImageAddressMode::REPEAT;
+			hdrCreateInfo.Parameter.V = ImageAddressMode::REPEAT;
+			hdrCreateInfo.Parameter.W = ImageAddressMode::REPEAT;
+			hdrCreateInfo.Parameter.Mag = ImageFilterMode::LINEAR;
+			hdrCreateInfo.Parameter.Min = ImageFilterMode::LINEAR;
+			hdrCreateInfo.GenerateSampler = true;
+			hdrCreateInfo.GenerateMipmap = true;
+
+			if (m_CubemapImage)
+				m_CubemapImage->Destroy();
+			m_CubemapImage = Image::CreateCube(path, hdrCreateInfo);
+		}
+
+		inline bool IsValid() { return m_CubemapImage.Get() != nullptr && m_CubemapImage->GetWidth() > 0 && m_CubemapImage->GetHeight() > 0; }
+		inline const Ref<Image>& GetCubemapImage() { return m_CubemapImage; }
+	private:
+		Ref<Image> m_CubemapImage = nullptr;
 	};
 }

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../UniformBuffer.h"
-#include "Renderer/Image/VulkanImage.h"
+#include "Renderer/Image/VulkanImage2D.h"
 
 namespace Lucy {
 
@@ -29,6 +29,7 @@ namespace Lucy {
 		void LoadToGPU() final override;
 
 		uint32_t BindImage(Ref<VulkanImage2D> image);
+		uint32_t BindImage(VkImageView imageView, VkImageLayout layout, VkSampler sampler);
 		void Clear();
 		void DestroyHandle() final override;
 	private:

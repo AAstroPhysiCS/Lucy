@@ -21,7 +21,7 @@
 namespace Lucy {
 
 	/* --- Individual Resource Handles --- (TODO: abstract this maybe?) */
-	static RenderCommandResourceHandle g_ImGuiPassHandle;
+	static CommandResourceHandle g_ImGuiPassHandle;
 
 	ImGuiOverlay::ImGuiOverlay() {
 		m_Panels.push_back(&SceneExplorerPanel::GetInstance());
@@ -37,29 +37,32 @@ namespace Lucy {
 		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan) {
 			VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 
-			FrameBufferCreateInfo uiFrameBufferCreateInfo;
-			uiFrameBufferCreateInfo.Width = swapChain.GetExtent().width;
-			uiFrameBufferCreateInfo.Height = swapChain.GetExtent().height;
-			uiFrameBufferCreateInfo.ImageViews = swapChain.GetImageViews();
+			FrameBufferCreateInfo uiFrameBufferCreateInfo{
+				.Width = (int32_t)swapChain.GetExtent().width,
+				.Height = (int32_t)swapChain.GetExtent().height,
+				.ImageViews = swapChain.GetImageViews()
+			};
 
 			RenderPassCreateInfo uiRenderPassCreateInfo;
 			uiRenderPassCreateInfo.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
-
-			Ref<VulkanRenderPassInfo> vulkanRenderPassInfo = Memory::CreateRef<VulkanRenderPassInfo>();
-			vulkanRenderPassInfo->ColorAttachments.push_back({ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
-			vulkanRenderPassInfo->ColorDescriptor.Format = GetLucyImageFormat(swapChain.GetSurfaceFormat().format);
-			vulkanRenderPassInfo->ColorDescriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			vulkanRenderPassInfo->ColorDescriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-			vulkanRenderPassInfo->ColorDescriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-			vulkanRenderPassInfo->ColorDescriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-			vulkanRenderPassInfo->ColorDescriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			vulkanRenderPassInfo->ColorDescriptor.FinalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-			uiRenderPassCreateInfo.InternalInfo = vulkanRenderPassInfo;
+			uiRenderPassCreateInfo.Layout.ColorAttachments = {
+				RenderPassLayout::Attachment {
+					.Format = GetLucyImageFormat(swapChain.GetSurfaceFormat().format),
+					.LoadOp = RenderPassLoadOp::Clear,
+					.StoreOp = RenderPassStoreOp::Store,
+					.StencilLoadOp = RenderPassLoadOp::DontCare,
+					.StencilStoreOp = RenderPassStoreOp::DontCare,
+					.Initial = VK_IMAGE_LAYOUT_UNDEFINED,
+					.Final = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+					.Reference {
+						.Layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+					},
+				}
+			};
 
 			Ref<RenderPass> uiRenderPass = RenderPass::Create(uiRenderPassCreateInfo);
 			uiFrameBufferCreateInfo.RenderPass = uiRenderPass;
-			
+
 			m_ImGuiPipeline.UIRenderPass = uiRenderPass;
 			m_ImGuiPipeline.UIFramebuffer = FrameBuffer::Create(uiFrameBufferCreateInfo);
 		}
@@ -94,7 +97,7 @@ namespace Lucy {
 
 			Renderer::EnqueueToRenderThread([&]() mutable {
 				VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-				auto& vulkanContext = Renderer::GetRenderContext().As<VulkanContext>();
+				const auto& vulkanContext = Renderer::GetRenderContext().As<VulkanContext>();
 				VulkanContextDevice device = VulkanContextDevice::Get();
 
 				ImGui_ImplVulkan_InitInfo initInfo{};
@@ -103,8 +106,8 @@ namespace Lucy {
 				initInfo.GPUDevice = device.GetLogicalDevice();
 				initInfo.Queue = device.GetGraphicsQueue();
 				initInfo.DescriptorPool = m_ImGuiPool->GetVulkanHandle();
-				initInfo.MinImageCount = swapChain.GetImageCount();
-				initInfo.ImageCount = swapChain.GetImageCount();
+				initInfo.MinImageCount = Renderer::GetMaxFramesInFlight();
+				initInfo.ImageCount = initInfo.MinImageCount;
 				initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 				initInfo.CheckVkResultFn = VulkanMessageCallback::ImGui_DebugCallback;
 
@@ -113,12 +116,12 @@ namespace Lucy {
 				ImGui_ImplVulkan_DestroyFontUploadObjects();
 			});
 
-			g_ImGuiPassHandle = Renderer::CreateRenderPassResource([this](void* commandBuffer, Ref<Pipeline> unused, RenderCommand* unusedC) {
-				auto& renderPass = m_ImGuiPipeline.UIRenderPass.As<VulkanRenderPass>();
-				auto& frameBufferHandle = m_ImGuiPipeline.UIFramebuffer.As<VulkanFrameBuffer>();
+			g_ImGuiPassHandle = Renderer::CreateCommandResource([this](void* commandBuffer, Ref<GraphicsPipeline> unused, RenderCommand* unusedC) {
+				const auto& renderPass = m_ImGuiPipeline.UIRenderPass.As<VulkanRenderPass>();
+				const auto& frameBufferHandle = m_ImGuiPipeline.UIFramebuffer.As<VulkanFrameBuffer>();
 				const auto& targetFrameBuffer = frameBufferHandle->GetVulkanHandles()[Renderer::GetCurrentImageIndex()];
 
-				RenderPassBeginInfo beginInfo;
+				VulkanRenderPassBeginInfo beginInfo;
 				beginInfo.Width = frameBufferHandle->GetWidth();
 				beginInfo.Height = frameBufferHandle->GetHeight();
 				beginInfo.CommandBuffer = (VkCommandBuffer)commandBuffer;
@@ -190,13 +193,6 @@ namespace Lucy {
 		}
 	}
 
-	void ImGuiOverlay::SendImGuiDataToDevice() {
-		LUCY_PROFILE_NEW_EVENT("ImGuiOverlay::SendImGuiDataToDevice");
-
-		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan)
-			Renderer::EnqueueRenderCommand<ImGuiRenderCommand>(g_ImGuiPassHandle);
-	}
-
 	void ImGuiOverlay::Render() {
 		LUCY_PROFILE_NEW_EVENT("ImGuiOverlay::Render");
 
@@ -205,6 +201,13 @@ namespace Lucy {
 			panel->Render();
 		}
 		End();
+	}
+
+	void ImGuiOverlay::SendImGuiDataToDevice() {
+		LUCY_PROFILE_NEW_EVENT("ImGuiOverlay::SendImGuiDataToDevice");
+
+		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan)
+			Renderer::EnqueueCommand<ImGuiRenderCommand>(g_ImGuiPassHandle);
 	}
 
 	void ImGuiOverlay::OnEvent(Event& e) {
@@ -241,7 +244,7 @@ namespace Lucy {
 				if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan) {
 					VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 
-					auto& extent = swapChain.GetExtent();
+					const auto& extent = swapChain.GetExtent();
 					//m_ImGuiPipeline.UIRenderPass->Recreate(); being done on framebuffer recreate (swapchain ONLY)
 					m_ImGuiPipeline.UIFramebuffer.As<VulkanFrameBuffer>()->Recreate(extent.width, extent.height, swapChain.GetImageViews());
 				}

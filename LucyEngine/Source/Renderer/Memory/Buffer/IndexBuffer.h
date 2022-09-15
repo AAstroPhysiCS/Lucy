@@ -7,21 +7,14 @@
 
 namespace Lucy {
 
-	//Vulkan only
-	struct IndexBindInfo {
-		VkCommandBuffer CommandBuffer;
-	};
-
 	class IndexBuffer : public Buffer<uint32_t> {
 	public:
+		static Ref<IndexBuffer> Create(uint32_t size);
+
 		virtual ~IndexBuffer() = default;
 
-		virtual void Bind(const IndexBindInfo& info) = 0;
-		virtual void Unbind() = 0;
 		virtual void LoadToGPU() = 0;
 		virtual void DestroyHandle() = 0;
-
-		static Ref<IndexBuffer> Create(uint32_t size);
 	protected:
 		IndexBuffer(uint32_t size);
 	};

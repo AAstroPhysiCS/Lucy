@@ -6,7 +6,7 @@
 
 namespace Lucy {
 
-	class Pipeline;
+	class GraphicsPipeline;
 
 	class ViewportPanel : public Panel
 	{
@@ -24,7 +24,7 @@ namespace Lucy {
 		bool IsOverAnyGizmo();
 
 		void SetOnViewportResizeCallback(std::function<void()>&& callback);
-		void SetViewportOutputPipeline(Ref<Pipeline> pipeline);
+		void SetViewportOutputPipeline(Ref<GraphicsPipeline> pipeline);
 
 		void OnEvent(Event& e) final override;
 	private:
@@ -44,7 +44,7 @@ namespace Lucy {
 
 		ImVec2 m_Size;
 
-		Ref<Pipeline> m_ViewportOutputPipeline = nullptr;
+		Ref<GraphicsPipeline> m_ViewportOutputPipeline = nullptr;
 		std::function<void()> m_RendererModuleOnViewportResize;
 	};
 }

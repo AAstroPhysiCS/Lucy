@@ -7,23 +7,13 @@
 
 namespace Lucy {
 
-	struct PushConstantBindInfo {
-		VkCommandBuffer CommandBuffer;
-		VkPipelineLayout PipelineLayout;
-	};
-
-	struct PushConstantData {
-		glm::mat4 FinalTransform;
-		float MaterialID;
-	};
-
-	class PushConstant : public Buffer<uint8_t> {
+	class VulkanPushConstant : public Buffer<uint8_t> {
 	public:
-		PushConstant() = default;
-		PushConstant(const std::string& name, uint32_t size, uint32_t offset, VkShaderStageFlags shaderStage);
-		virtual ~PushConstant() = default;
+		VulkanPushConstant() = default;
+		VulkanPushConstant(const std::string& name, uint32_t size, uint32_t offset, VkShaderStageFlags shaderStage);
+		virtual ~VulkanPushConstant() = default;
 
-		void Bind(PushConstantBindInfo& info) const;
+		void Bind(VkCommandBuffer commandBuffer, VkPipelineLayout layout) const;
 
 		inline std::string GetName() const { return m_Name; }
 		inline VkPushConstantRange GetHandle() const { return m_Handle; }

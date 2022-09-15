@@ -40,7 +40,7 @@ namespace Lucy {
 								   VkBufferUsageFlags usage, VkBuffer& bufferHandle, VmaAllocation& vmaAllocation);
 
 		void CreateVulkanImageVma(uint32_t width, uint32_t height, uint32_t mipLevel, VkFormat format, VkImageLayout currentLayout, VkImageUsageFlags usage, 
-								  VkImageType imageType, VkImage& imageHandle, VmaAllocation& allocationHandle);
+								  VkImageType imageType, VkImage& imageHandle, VmaAllocation& allocationHandle, VkImageCreateFlags flags = 0, uint32_t arrayLayer = 1);
 
 		void MapMemory(VmaAllocation allocation, void*& mappedData);
 		void UnmapMemory(VmaAllocation allocation);

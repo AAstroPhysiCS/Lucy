@@ -19,13 +19,9 @@ namespace Lucy {
 										m_StagingBufferHandle, m_StagingBufferVma);
 	}
 
-	void VulkanIndexBuffer::Bind(const IndexBindInfo& info) {
+	void VulkanIndexBuffer::Bind(const VulkanIndexBindInfo& info) {
 		LUCY_ASSERT(m_BufferHandle);
 		vkCmdBindIndexBuffer(info.CommandBuffer, m_BufferHandle, 0, VK_INDEX_TYPE_UINT32);
-	}
-
-	void VulkanIndexBuffer::Unbind() {
-		//Empty
 	}
 
 	void VulkanIndexBuffer::LoadToGPU() {

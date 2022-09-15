@@ -24,7 +24,7 @@ namespace Lucy {
 
 		void OnWindowResize() final override;
 		void OnViewportResize() final override;
-		Entity OnMousePicking(Ref<Scene>& scene, const Ref<Pipeline>& idPipeline) final override;
+		Entity OnMousePicking(Ref<Scene>& scene, const Ref<GraphicsPipeline>& idPipeline) final override;
 	private:
 		std::vector<Semaphore> m_WaitSemaphores;
 		std::vector<Semaphore> m_SignalSemaphores;

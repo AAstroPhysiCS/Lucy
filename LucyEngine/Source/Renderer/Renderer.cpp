@@ -2,7 +2,7 @@
 #include "Renderer.h"
 #include "Renderer/VulkanRenderer.h"
 
-#include "Shader/Shader.h"
+#include "Shader/ShaderLibrary.h"
 
 #include "Scene/Entity.h"
 
@@ -25,7 +25,7 @@ namespace Lucy {
 	void Renderer::BeginScene(Ref<Scene>& scene) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::BeginScene");
 
-		auto& [viewportWidth, viewportHeight] = Renderer::GetViewportArea();
+		const auto& [viewportWidth, viewportHeight] = Renderer::GetViewportArea();
 		scene->Update(viewportWidth, viewportHeight);
 
 		s_Renderer->BeginScene(scene);
@@ -57,27 +57,27 @@ namespace Lucy {
 		s_Renderer->GetRenderDevice()->BindBuffers(commandBufferHandle, mesh);
 	}
 
-	void Renderer::BindPushConstant(void* commandBufferHandle, Ref<Pipeline> pipeline, const PushConstant& pushConstant) {
+	void Renderer::BindPushConstant(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline, const VulkanPushConstant& pushConstant) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::BindPushConstant");
 		s_Renderer->GetRenderDevice()->BindPushConstant(commandBufferHandle, pipeline, pushConstant);
 	}
 
-	void Renderer::BindPipeline(void* commandBufferHandle, Ref<Pipeline> pipeline) {
+	void Renderer::BindPipeline(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::BindPipeline");
 		s_Renderer->GetRenderDevice()->BindPipeline(commandBufferHandle, pipeline);
 	}
 
-	void Renderer::BindAllDescriptorSets(void* commandBufferHandle, Ref<Pipeline> pipeline) {
+	void Renderer::BindAllDescriptorSets(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::BindAllDescriptorSets");
 		s_Renderer->GetRenderDevice()->BindAllDescriptorSets(commandBufferHandle, pipeline);
 	}
 
-	void Renderer::UpdateDescriptorSets(Ref<Pipeline> pipeline) {
+	void Renderer::UpdateDescriptorSets(Ref<GraphicsPipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::UpdateDescriptorSets");
 		s_Renderer->GetRenderDevice()->UpdateDescriptorSets(pipeline);
 	}
 
-	void Renderer::BindDescriptorSet(void* commandBufferHandle, Ref<Pipeline> pipeline, uint32_t setIndex) {
+	void Renderer::BindDescriptorSet(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline, uint32_t setIndex) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::BindDescriptorSet");
 		s_Renderer->GetRenderDevice()->BindDescriptorSet(commandBufferHandle, pipeline, setIndex);
 	}
@@ -92,12 +92,12 @@ namespace Lucy {
 		s_Renderer->GetRenderDevice()->DrawIndexed(commandBufferHandle, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 	}
 
-	void Renderer::BeginRenderPass(void* commandBufferHandle, Ref<Pipeline> pipeline) {
+	void Renderer::BeginRenderPass(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::BeginRenderPass");
 		s_Renderer->GetRenderDevice()->BeginRenderPass(commandBufferHandle, pipeline);
 	}
 
-	void Renderer::EndRenderPass(Ref<Pipeline> pipeline) {
+	void Renderer::EndRenderPass(Ref<GraphicsPipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::EndRenderPass");
 		s_Renderer->GetRenderDevice()->EndRenderPass(pipeline);
 	}
@@ -110,9 +110,19 @@ namespace Lucy {
 		s_Renderer.As<VulkanRenderer>()->ExecuteSingleTimeCommand(std::move(func));
 	}
 
-	RenderCommandResourceHandle Renderer::CreateRenderPassResource(RenderCommandFunc&& func, Ref<Pipeline> pipeline) {
-		LUCY_PROFILE_NEW_EVENT("Renderer::CreateRenderPassResource");
-		return s_Renderer->GetRenderDevice()->CreateRenderPassResource(std::move(func), pipeline);
+	CommandResourceHandle Renderer::CreateCommandResource(CommandFunc&& func, Ref<GraphicsPipeline> pipeline) {
+		LUCY_PROFILE_NEW_EVENT("Renderer::CreateCommandResource");
+		return s_Renderer->GetRenderDevice()->CreateCommandResource(std::move(func), pipeline);
+	}
+
+	void Renderer::EnqueueResourceFree(CommandResourceHandle resourceHandle) {
+		LUCY_PROFILE_NEW_EVENT("Renderer::EnqueueResourceFree");
+		return s_Renderer->GetRenderDevice()->EnqueueResourceFree(resourceHandle);
+	}
+	
+	void Renderer::EnqueueResourceFree(EnqueueFunc&& func) {
+		LUCY_PROFILE_NEW_EVENT("Renderer::EnqueueResourceFree");
+		return s_Renderer->GetRenderDevice()->EnqueueResourceFree(std::move(func));
 	}
 
 	void Renderer::EnqueueToRenderThread(EnqueueFunc&& func) {
@@ -130,7 +140,7 @@ namespace Lucy {
 		s_Renderer->OnViewportResize();
 	}
 
-	Entity Renderer::OnMousePicking(const Ref<Pipeline>& idPipeline) {
+	Entity Renderer::OnMousePicking(const Ref<GraphicsPipeline>& idPipeline) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::OnMousePicking");
 		return s_Renderer->OnMousePicking(s_Scene, idPipeline);
 	}

@@ -15,18 +15,27 @@ namespace Lucy {
 		return nullptr;
 	}
 
-	RenderCommandResourceHandle CommandQueue::CreateRenderPassResource(RenderCommandFunc&& func, Ref<Pipeline> pipeline) {
-		LUCY_PROFILE_NEW_EVENT("CommandQueue::CreateRenderPassResource");
+	CommandResourceHandle CommandQueue::CreateCommandResource(CommandFunc&& func, Ref<GraphicsPipeline> pipeline) {
+		LUCY_PROFILE_NEW_EVENT("CommandQueue::CreateCommandResource");
 		
-		RenderCommandResourceHandle uniqueHandle = RenderCommandResource::CreateUniqueHandle();
-		std::pair<RenderCommandResourceHandle, RenderCommandResource> pair{ uniqueHandle, RenderCommandResource(std::move(func), pipeline) };
-		m_BufferMap.insert(pair);
+		CommandResourceHandle uniqueHandle = RenderCommandResource::CreateUniqueHandle();
+		std::pair<CommandResourceHandle, RenderCommandResource> pair{ uniqueHandle, RenderCommandResource(std::move(func), pipeline) };
+		m_RenderResourceMap.insert(pair);
 		return uniqueHandle;
 	}
 
-	void CommandQueue::EnqueueRenderCommand(RenderCommandResourceHandle resourceHandle, const Ref<RenderCommand>& command) {
-		LUCY_PROFILE_NEW_EVENT("CommandQueue::EnqueueRenderCommand");
-		m_BufferMap[resourceHandle].EnqueueRenderCommand(command);
+	void CommandQueue::DeleteCommandResource(CommandResourceHandle commandHandle) {
+		if (m_RenderResourceMap.find(commandHandle) == m_RenderResourceMap.end()) {
+			LUCY_CRITICAL("Could not find a handle for a given command resource");
+			LUCY_ASSERT(false);
+			return;
+		}
+		m_RenderResourceMap.erase(commandHandle);
+	}
+
+	void CommandQueue::EnqueueCommand(CommandResourceHandle resourceHandle, const Ref<RenderCommand>& command) {
+		LUCY_PROFILE_NEW_EVENT("CommandQueue::EnqueueCommand");
+		m_RenderResourceMap[resourceHandle].EnqueueCommand(command);
 	}
 
 	void CommandQueue::Recreate() {
@@ -39,6 +48,6 @@ namespace Lucy {
 	}
 
 	void CommandQueue::Clear() {
-		m_BufferMap.clear();
+		m_RenderResourceMap.clear();
 	}
 }

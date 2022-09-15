@@ -23,7 +23,7 @@ namespace Lucy {
 		}
 
 		//relevant for DetailsPanel, since I cant render a nullptr vulkan descriptor set.
-		inline static Ref<Image2D> s_CheckerBoardTexture = nullptr;
+		inline static Ref<Image> s_CheckerBoardTexture = nullptr;
 	};
 }
 

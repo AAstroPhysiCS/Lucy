@@ -2,37 +2,49 @@
 #include "ShaderReflect.h"
 
 #include "Renderer/Renderer.h"
+#include "Core/FileSystem.h"
 
 namespace Lucy {
 
-	//TODO: Dynamic UBO and SSBO won't work, yet!
-	void ShaderReflect::Info(std::string& path, std::vector<uint32_t>& dataVertex, std::vector<uint32_t>& dataFragment) {
+	void ShaderReflect::Info(std::string& path, std::vector<uint32_t>& data, VkShaderStageFlags stageFlag) {
 		//heap allocating it because of the compiler warning/stack size: "function uses X bytes of stack consider moving some data to heap"
-		spirv_cross::CompilerGLSL* compilerVertex = new spirv_cross::CompilerGLSL(dataVertex);
-		spirv_cross::CompilerGLSL* compilerFragment = new spirv_cross::CompilerGLSL(dataFragment);
+		spirv_cross::CompilerGLSL* compiler = new spirv_cross::CompilerGLSL(data);
 
 		spirv_cross::CompilerGLSL::Options options;
 		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan)
 			options.vulkan_semantics = true; //default is false
 
-		compilerVertex->set_common_options(options);
-		compilerFragment->set_common_options(options);
+		compiler->set_common_options(options);
 
-		spirv_cross::ShaderResources& resourcesVertex = compilerVertex->get_shader_resources();
-		spirv_cross::ShaderResources& resourcesFragment = compilerFragment->get_shader_resources();
+		const spirv_cross::ShaderResources& resourcesShaderStage = compiler->get_shader_resources();
 
 		auto Reflect = [this, path](spirv_cross::CompilerGLSL* compiler, spirv_cross::ShaderResources resource,
 									ShaderStageInfo& stageInfo, VkShaderStageFlags stageFlag) {
 			stageInfo.UniformCount = resource.uniform_buffers.size();
 			stageInfo.SampledImagesCount = resource.sampled_images.size();
+			stageInfo.StorageImageCount = resource.storage_images.size();
 			stageInfo.PushConstantBufferCount = resource.push_constant_buffers.size();
 			stageInfo.StageInputCount = resource.stage_inputs.size();
 			stageInfo.StageOutputCount = resource.stage_outputs.size();
 			stageInfo.StorageBufferCount = resource.storage_buffers.size();
 
-			LUCY_INFO(fmt::format("------{0} Shader {1}------", stageFlag == VK_SHADER_STAGE_VERTEX_BIT ? "Vertex" : "Fragment", path));
+			std::string shaderType = "Unknown";
+			switch (stageFlag) {
+				case VK_SHADER_STAGE_VERTEX_BIT:
+					shaderType = "Vertex";
+					break;
+				case VK_SHADER_STAGE_FRAGMENT_BIT:
+					shaderType = "Fragment";
+					break;
+				case VK_SHADER_STAGE_COMPUTE_BIT:
+					shaderType = "Compute";
+					break;
+			}
+
+			LUCY_INFO(fmt::format("------{0} Shader {1}------", shaderType, path));
 			LUCY_INFO(fmt::format("{0} uniform buffers", stageInfo.UniformCount));
 			LUCY_INFO(fmt::format("{0} sampled images", stageInfo.SampledImagesCount));
+			LUCY_INFO(fmt::format("{0} storage images", stageInfo.StorageImageCount));
 			LUCY_INFO(fmt::format("{0} storage buffers", stageInfo.StorageBufferCount));
 			LUCY_INFO(fmt::format("{0} push constant buffers", stageInfo.PushConstantBufferCount));
 			LUCY_INFO(fmt::format("{0} stage inputs", stageInfo.StageInputCount));
@@ -41,15 +53,20 @@ namespace Lucy {
 			SearchFor(compiler, resource.uniform_buffers, stageFlag, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 			SearchFor(compiler, resource.sampled_images, stageFlag, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 			SearchFor(compiler, resource.storage_buffers, stageFlag, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+			SearchFor(compiler, resource.storage_images, stageFlag, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 
 			SearchForPushConstants(compiler, resource, stageFlag);
 		};
 
-		Reflect(compilerVertex, resourcesVertex, m_ShaderInfoVertex, VK_SHADER_STAGE_VERTEX_BIT);
-		Reflect(compilerFragment, resourcesFragment, m_ShaderInfoFragment, VK_SHADER_STAGE_FRAGMENT_BIT);
+		Reflect(compiler, resourcesShaderStage, m_ShaderStageInfo, stageFlag);
+		
+		delete compiler;
+	}
 
-		delete compilerVertex;
-		delete compilerFragment;
+	//TODO: Dynamic UBO and SSBO won't work, yet!
+	void ShaderReflect::Info(std::string& path, std::vector<uint32_t>& dataVertex, std::vector<uint32_t>& dataFragment) {
+		Info(path, dataVertex, VK_SHADER_STAGE_VERTEX_BIT);
+		Info(path, dataFragment, VK_SHADER_STAGE_FRAGMENT_BIT);
 	}
 
 	void ShaderReflect::ParseStructMemberRecursive(spirv_cross::CompilerGLSL* compiler, spirv_cross::SPIRType parentType, std::vector<ShaderMemberVariable>& out) {
@@ -124,7 +141,7 @@ namespace Lucy {
 
 			uniformBlock.Binding = binding;
 			uniformBlock.BufferSize = bufferSize;
-			uniformBlock.Type = ConvertVulkanTypeToLucyType(descriptorType);
+			uniformBlock.Type = ConvertDescriptorType(descriptorType);
 			uniformBlock.StageFlag = stageFlag;
 
 			if (!m_ShaderUniformBlockMap.count(set)) {

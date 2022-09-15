@@ -2,10 +2,11 @@
 #include "SceneExplorerPanel.h"
 
 #include "Renderer/Renderer.h"
-#include "Renderer/Context/VulkanPipeline.h"
+#include "Renderer/Context/VulkanGraphicsPipeline.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 
 #include "imgui_impl_vulkan.h"
+#include "glm/gtc/type_ptr.hpp"
 
 namespace Lucy {
 
@@ -131,7 +132,7 @@ namespace Lucy {
 		m_RendererModuleOnViewportResize = callback;
 	}
 
-	void ViewportPanel::SetViewportOutputPipeline(Ref<Pipeline> pipeline) {
+	void ViewportPanel::SetViewportOutputPipeline(Ref<GraphicsPipeline> pipeline) {
 		m_ViewportOutputPipeline = pipeline;
 	}
 }

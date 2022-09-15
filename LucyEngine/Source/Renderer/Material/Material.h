@@ -10,14 +10,14 @@
 
 namespace Lucy {
 
-	class Pipeline;
+	class GraphicsPipeline;
 
 	struct MaterialData {
 		glm::vec3 Diffuse = glm::vec3();
 		std::string Name = "Unknown Material Data";
 		float Metallic = 0.0f, Roughness = 0.0f, AOContribution = 0.0f;
 
-		MaterialData(glm::vec3& diffuse, std::string& name, float metallic, float roughness, float aoContribution)
+		MaterialData(glm::vec3& diffuse, const std::string& name, float metallic, float roughness, float aoContribution)
 			: Diffuse(diffuse), Name(name), Metallic(metallic), Roughness(roughness), AOContribution(aoContribution) {
 		}
 		MaterialData() = default;
@@ -51,14 +51,14 @@ namespace Lucy {
 		inline float& GetMetallicValue() { return m_MaterialData.Metallic; }
 		inline float& GetAOContribution() { return m_MaterialData.AOContribution; }
 
-		void SetImage(const MaterialImageType& type, Ref<Image2D> image);
-		inline const Ref<Image2D>& GetImage(const MaterialImageType& type) const { return m_Textures[type.Index]; }
+		void SetImage(const MaterialImageType& type, Ref<Image> image);
+		inline const Ref<Image>& GetImage(const MaterialImageType& type) const { return m_Textures[type.Index]; }
 		inline bool HasImage(const MaterialImageType& type) const {
 			return !m_Textures.empty() && m_Textures.size() > type.Index
 				&& m_Textures[type.Index]->GetWidth() > 0 && m_Textures[type.Index]->GetHeight() > 0 && m_Textures[type.Index]->GetImGuiID() != 0;
 		}
 		
-		virtual void Update(Ref<Pipeline> pipeline) = 0;
+		virtual void Update(Ref<GraphicsPipeline> pipeline) = 0;
 		void Destroy();
 
 		inline static const MaterialImageType ALBEDO_TYPE = { aiTextureType_DIFFUSE, "Albedo", 0 };
@@ -72,7 +72,7 @@ namespace Lucy {
 		MaterialShaderData m_MaterialShaderData;
 		MaterialData m_MaterialData;
 		Ref<Shader> m_Shader;
-		std::vector<Ref<Image2D>> m_Textures;
+		std::vector<Ref<Image>> m_Textures;
 	private:
 		inline static IDProvider s_MaterialIDProvider;
 		LucyID m_MaterialID = s_MaterialIDProvider.RequestID();

@@ -10,7 +10,8 @@ namespace Lucy {
 			case RenderArchitecture::Vulkan: {
 				if (createInfo.Type == DescriptorType::SampledImage ||
 					createInfo.Type == DescriptorType::Sampler ||
-					createInfo.Type == DescriptorType::CombinedImageSampler) {
+					createInfo.Type == DescriptorType::CombinedImageSampler ||
+					createInfo.Type == DescriptorType::StorageImage) {
 					return Memory::CreateRef<VulkanUniformImageBuffer>(createInfo);
 				} else {
 					return Memory::CreateRef<VulkanUniformBuffer>(createInfo);

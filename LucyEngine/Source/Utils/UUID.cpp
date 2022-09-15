@@ -46,7 +46,7 @@ namespace Lucy {
 		if (s_IDCount.size() == 0)
 			IncreasePool(s_PoolResizeStep);
 
-		auto& result = std::find(s_IDCount.begin(), s_IDCount.end(), 0);
+		const auto& result = std::find(s_IDCount.begin(), s_IDCount.end(), 0);
 
 		if (result == s_IDCount.end()) {
 			IncreasePool(s_PoolResizeStep);
@@ -60,7 +60,7 @@ namespace Lucy {
 	}
 
 	void IDProvider::ReturnID(LucyID id) {
-		auto& result = std::find(s_IDCount.begin(), s_IDCount.end(), id);
+		const auto& result = std::find(s_IDCount.begin(), s_IDCount.end(), id);
 
 		if (result != s_IDCount.end()) {
 			s_IDCount.erase(result);

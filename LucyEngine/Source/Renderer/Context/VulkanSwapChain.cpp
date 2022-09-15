@@ -71,8 +71,8 @@ namespace Lucy {
 			for (uint32_t i = 0; i < swapChainImageCount; i++) {
 				ImageViewCreateInfo imageViewCreateInfo;
 				imageViewCreateInfo.Image = m_SwapChainImages[i];
+				imageViewCreateInfo.ImageType = ImageType::Type2DColor;
 				imageViewCreateInfo.Format = m_SelectedFormat.format;
-				imageViewCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_2D;
 
 				m_SwapChainImageViews[i].Recreate(imageViewCreateInfo);
 			}
@@ -82,8 +82,8 @@ namespace Lucy {
 			for (uint32_t i = 0; i < swapChainImageCount; i++) {
 				ImageViewCreateInfo imageViewCreateInfo;
 				imageViewCreateInfo.Image = m_SwapChainImages[i];
+				imageViewCreateInfo.ImageType = ImageType::Type2DColor;
 				imageViewCreateInfo.Format = m_SelectedFormat.format;
-				imageViewCreateInfo.ViewType = VK_IMAGE_VIEW_TYPE_2D;
 
 				m_SwapChainImageViews.emplace_back(imageViewCreateInfo);
 			}
@@ -107,7 +107,7 @@ namespace Lucy {
 		return vkAcquireNextImageKHR(deviceVulkanHandle, m_SwapChain, UINT64_MAX, currentFrameImageAvailSemaphore, VK_NULL_HANDLE, &imageIndex);
 	}
 
-	void VulkanSwapChain::SubmitToQueue(VkCommandBuffer commandBuffer, const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) {
+	void VulkanSwapChain::SubmitToQueue(VkQueue queue, VkCommandBuffer commandBuffer, const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) {
 		LUCY_PROFILE_NEW_EVENT("VulkanSwapChain::SubmitToQueue");
 
 		const VulkanContextDevice& device = VulkanContextDevice::Get();
@@ -125,8 +125,7 @@ namespace Lucy {
 		submitInfo.signalSemaphoreCount = 1;
 		submitInfo.pSignalSemaphores = &currentFrameSignalSemaphore.GetSemaphore();
 
-		LUCY_VK_ASSERT(vkQueueSubmit(device.GetGraphicsQueue(), 1, &submitInfo, currentFrameFence.GetFence()));
-		//vkWaitForFences(device.GetLogicalDevice(), 1, &currentFrameFence.GetFence(), VK_TRUE, UINT64_MAX);
+		LUCY_VK_ASSERT(vkQueueSubmit(queue, 1, &submitInfo, currentFrameFence.GetFence()));
 	}
 
 	VkResult VulkanSwapChain::Present(const Semaphore& signalSemaphore, uint32_t& imageIndex) {

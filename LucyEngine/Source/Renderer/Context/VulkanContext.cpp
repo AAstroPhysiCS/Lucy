@@ -139,6 +139,6 @@ namespace Lucy {
 
 	void VulkanMessageCallback::ImGui_DebugCallback(VkResult result) {
 		if (result != VK_SUCCESS) 
-			LUCY_CRITICAL(fmt::format("Vulkan ImGui error {0}", result));
+			LUCY_CRITICAL(fmt::format("Vulkan ImGui error {0}", RendererAPICodesToString(result)));
 	}
 }

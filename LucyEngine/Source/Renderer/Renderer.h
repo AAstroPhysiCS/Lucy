@@ -22,34 +22,37 @@ namespace Lucy {
 		//commandBufferHandle is the handle of the commandBuffer
 		//Vulkan: VkCommandBuffer
 		static void BindBuffers(void* commandBufferHandle, Ref<Mesh> mesh);
-		static void BindPushConstant(void* commandBufferHandle, Ref<Pipeline> pipeline, const PushConstant& pushConstant);
-		static void BindPipeline(void* commandBufferHandle, Ref<Pipeline> pipeline);
-		static void BindAllDescriptorSets(void* commandBufferHandle, Ref<Pipeline> pipeline);
-		static void UpdateDescriptorSets(Ref<Pipeline> pipeline);
-		static void BindDescriptorSet(void* commandBufferHandle, Ref<Pipeline> pipeline, uint32_t setIndex);
+		static void BindPushConstant(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline, const VulkanPushConstant& pushConstant);
+		static void BindPipeline(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline);
+		static void BindAllDescriptorSets(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline);
+		static void UpdateDescriptorSets(Ref<GraphicsPipeline> pipeline);
+		static void BindDescriptorSet(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline, uint32_t setIndex);
 		static void BindBuffers(void* commandBufferHandle, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer);
 		static void DrawIndexed(void* commandBufferHandle, uint32_t indexCount, uint32_t instanceCount,
 								 uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance);
 
-		static void BeginRenderPass(void* commandBufferHandle, Ref<Pipeline> pipeline);
-		static void EndRenderPass(Ref<Pipeline> pipeline);
+		static void BeginRenderPass(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline);
+		static void EndRenderPass(Ref<GraphicsPipeline> pipeline);
 
 		static void DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size);
 		static void ExecuteSingleTimeCommand(std::function<void(VkCommandBuffer)>&& func);
 
-		static RenderCommandResourceHandle CreateRenderPassResource(RenderCommandFunc&& func, Ref<Pipeline> pipeline);
+		static CommandResourceHandle CreateCommandResource(CommandFunc&& func, Ref<GraphicsPipeline> pipeline);
 
 		template <typename T, typename ... Args>
-		inline static void EnqueueRenderCommand(RenderCommandResourceHandle resourceHandle, Args&&... args) {
-			LUCY_PROFILE_NEW_EVENT("Renderer::EnqueueRenderCommand");
-			s_Renderer->GetRenderDevice()->EnqueueRenderCommand<T>(resourceHandle, std::forward<Args>(args)...);
+		inline static void EnqueueCommand(CommandResourceHandle resourceHandle, Args&&... args) {
+			LUCY_PROFILE_NEW_EVENT("Renderer::EnqueueCommand");
+			s_Renderer->GetRenderDevice()->EnqueueCommand<T>(resourceHandle, std::forward<Args>(args)...);
 		}
+
+		static void EnqueueResourceFree(CommandResourceHandle resourceHandle);
+		static void EnqueueResourceFree(EnqueueFunc&& func);
 
 		static void EnqueueToRenderThread(EnqueueFunc&& func);
 
 		static void OnWindowResize();
 		static void OnViewportResize();
-		static Entity OnMousePicking(const Ref<Pipeline>& idPipeline);
+		static Entity OnMousePicking(const Ref<GraphicsPipeline>& idPipeline);
 
 		static void SetViewportArea(int32_t width, int32_t height);
 		static void SetViewportMouse(float viewportMouseX, float viewportMouseY);

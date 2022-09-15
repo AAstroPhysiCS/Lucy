@@ -28,7 +28,7 @@ namespace Lucy {
 		m_EntityContext = e;
 	}
 
-	void SceneExplorerPanel::SetIDPipeline(Ref<Pipeline> pipeline) {
+	void SceneExplorerPanel::SetIDPipeline(Ref<GraphicsPipeline> pipeline) {
 		m_IDPipeline = pipeline;
 	}
 
@@ -47,7 +47,7 @@ namespace Lucy {
 		for (const auto entity : view) {
 			Entity e = { m_Scene.Get(), entity};
 			TagComponent& tag = e.GetComponent<TagComponent>();
-			std::string& name = tag.GetTag();
+			const std::string& name = tag.GetTag();
 
 			ImGui::PushID(id);
 			if (ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_OpenOnArrow)) {

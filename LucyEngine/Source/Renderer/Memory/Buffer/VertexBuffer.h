@@ -7,21 +7,14 @@
 
 namespace Lucy {
 
-	//Vulkan only
-	struct VertexBindInfo {
-		VkCommandBuffer CommandBuffer;
-	};
-
 	class VertexBuffer : public Buffer<float> {
 	public:
-		virtual ~VertexBuffer() = default;
+		static Ref<VertexBuffer> Create(uint32_t size);
 		
-		virtual void Bind(const VertexBindInfo& info) = 0;
-		virtual void Unbind() = 0;
+		virtual ~VertexBuffer() = default;
+
 		virtual void LoadToGPU() = 0;
 		virtual void DestroyHandle() = 0;
-
-		static Ref<VertexBuffer> Create(uint32_t size);
 	protected:
 		VertexBuffer(uint32_t size);
 	};

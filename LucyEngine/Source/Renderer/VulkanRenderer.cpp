@@ -58,8 +58,10 @@ namespace Lucy {
 		Semaphore currentFrameWaitSemaphore = m_WaitSemaphores[m_CurrentFrameIndex];
 		Semaphore currentFrameSignalSemaphore = m_SignalSemaphores[m_CurrentFrameIndex];
 
+		VulkanContextDevice& contextDevice = VulkanContextDevice::Get();
 		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-		swapChain.SubmitToQueue(m_RenderDevice->m_RenderDeviceCommandList->GetCommandQueue().As<VulkanCommandQueue>()->GetCurrentCommandBuffer(), 
+
+		swapChain.SubmitToQueue(contextDevice.GetGraphicsQueue(), m_RenderDevice->m_CommandQueue.As<VulkanCommandQueue>()->GetCurrentCommandBuffer(),
 								currentFrameFence, currentFrameWaitSemaphore, currentFrameSignalSemaphore);
 
 		RenderContextResultCodes result = (RenderContextResultCodes) swapChain.Present(m_SignalSemaphores[m_CurrentFrameIndex], m_ImageIndex);
@@ -130,11 +132,12 @@ namespace Lucy {
 		m_IDBufferVma = VK_NULL_HANDLE;
 	}
 	
-	Entity VulkanRenderer::OnMousePicking(Ref<Scene>& scene, const Ref<Pipeline>& idPipeline) {
+	Entity VulkanRenderer::OnMousePicking(Ref<Scene>& scene, const Ref<GraphicsPipeline>& idPipeline) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::OnMousePicking");
 
 		auto& image = idPipeline->GetFrameBuffer().As<VulkanFrameBuffer>()->GetImages()[m_CurrentFrameIndex];
-		auto [imageWidth, imageHeight] = Renderer::GetViewportArea();
+		uint32_t imageWidth = image->GetWidth();
+		uint32_t imageHeight = image->GetHeight();
 		uint64_t imageSize = (uint64_t)imageWidth * imageHeight * 4;
 
 		if (!m_IDBuffer)

@@ -7,13 +7,16 @@
 
 namespace Lucy {
 
+	struct VulkanVertexBindInfo {
+		VkCommandBuffer CommandBuffer;
+	};
+
 	class VulkanVertexBuffer : public VertexBuffer {
 	public:
 		VulkanVertexBuffer(uint32_t size);
 		virtual ~VulkanVertexBuffer() = default;
 
-		void Bind(const VertexBindInfo& info) final override;
-		void Unbind() final override;
+		void Bind(const VulkanVertexBindInfo& info);
 		void LoadToGPU() final override;
 		void DestroyHandle() final override;
 	private:

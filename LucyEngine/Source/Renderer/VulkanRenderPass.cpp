@@ -9,6 +9,8 @@ namespace Lucy {
 
 	VulkanRenderPass::VulkanRenderPass(const RenderPassCreateInfo& createInfo)
 		: RenderPass(createInfo) {
+		m_DepthBuffered = m_CreateInfo.Layout.DepthAttachment.IsValid();
+
 		Renderer::EnqueueToRenderThread([this]() {
 			Create();
 		});
@@ -17,31 +19,53 @@ namespace Lucy {
 	void VulkanRenderPass::Create() {
 		const VulkanContextDevice& device = VulkanContextDevice::Get();
 
-		Ref<VulkanRenderPassInfo> renderPassInfo = m_CreateInfo.InternalInfo.As<VulkanRenderPassInfo>();
+		const std::vector<RenderPassLayout::Attachment>& colorAttachments = m_CreateInfo.Layout.ColorAttachments;
+		const RenderPassLayout::Attachment& depthAttachment = m_CreateInfo.Layout.DepthAttachment;
 
-		VkAttachmentDescription colorAttachmentDescription{};
-		colorAttachmentDescription.format = (VkFormat)GetAPIImageFormat(renderPassInfo->ColorDescriptor.Format);
-		colorAttachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT; //MSAA but we dont use it yet
-		colorAttachmentDescription.loadOp = renderPassInfo->ColorDescriptor.LoadOp;
-		colorAttachmentDescription.storeOp = renderPassInfo->ColorDescriptor.StoreOp;
-		colorAttachmentDescription.stencilLoadOp = renderPassInfo->ColorDescriptor.StencilLoadOp;
-		colorAttachmentDescription.stencilStoreOp = renderPassInfo->ColorDescriptor.StencilStoreOp;
-		colorAttachmentDescription.initialLayout = renderPassInfo->ColorDescriptor.InitialLayout;
-		colorAttachmentDescription.finalLayout = renderPassInfo->ColorDescriptor.FinalLayout;
+		std::vector<VkAttachmentDescription> attachmentDescription;
+		std::vector<VkAttachmentReference> attachmentReferences;
+		attachmentDescription.resize(colorAttachments.size());
+		attachmentReferences.resize(colorAttachments.size());
 
-		VkAttachmentDescription depthAttachmentDescription{};
-		depthAttachmentDescription.format = VK_FORMAT_D32_SFLOAT;
-		depthAttachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
-		depthAttachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		depthAttachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		depthAttachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		depthAttachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		depthAttachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		depthAttachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		for (uint32_t i = 0; i < colorAttachments.size(); i++) {
+			const RenderPassLayout::Attachment& attachment = colorAttachments[i];
 
-		VkAttachmentReference depthAttachmentReference{};
-		depthAttachmentReference.attachment = 1;
-		depthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			VkAttachmentDescription colorAttachment{};
+			colorAttachment.format = (VkFormat)GetAPIImageFormat(attachment.Format);
+			colorAttachment.loadOp = (VkAttachmentLoadOp)GetAPILoadOp(attachment.LoadOp);
+			colorAttachment.storeOp = (VkAttachmentStoreOp)GetAPIStoreOp(attachment.StoreOp);
+			colorAttachment.stencilLoadOp = (VkAttachmentLoadOp)GetAPILoadOp(attachment.StencilLoadOp);
+			colorAttachment.stencilStoreOp = (VkAttachmentStoreOp)GetAPIStoreOp(attachment.StencilStoreOp);
+			colorAttachment.samples = (VkSampleCountFlagBits)attachment.Samples;
+			colorAttachment.initialLayout = (VkImageLayout)attachment.Initial;
+			colorAttachment.finalLayout = (VkImageLayout)attachment.Final;
+
+			VkAttachmentReference colorAttachmentReference{};
+			colorAttachmentReference.attachment = i;
+			colorAttachmentReference.layout = (VkImageLayout)attachment.Reference.Layout;
+
+			attachmentDescription[i] = colorAttachment;
+			attachmentReferences[i] = colorAttachmentReference;
+		}
+
+		if (m_DepthBuffered) {
+			VkAttachmentDescription depthAttachmentDescription{};
+			depthAttachmentDescription.format = (VkFormat)GetAPIImageFormat(depthAttachment.Format);
+			depthAttachmentDescription.loadOp = (VkAttachmentLoadOp)GetAPILoadOp(depthAttachment.LoadOp);
+			depthAttachmentDescription.storeOp = (VkAttachmentStoreOp)GetAPIStoreOp(depthAttachment.StoreOp);
+			depthAttachmentDescription.stencilLoadOp = (VkAttachmentLoadOp)GetAPILoadOp(depthAttachment.StencilLoadOp);
+			depthAttachmentDescription.stencilStoreOp = (VkAttachmentStoreOp)GetAPIStoreOp(depthAttachment.StencilStoreOp);
+			depthAttachmentDescription.samples = (VkSampleCountFlagBits)depthAttachment.Samples;
+			depthAttachmentDescription.initialLayout = (VkImageLayout)depthAttachment.Initial;
+			depthAttachmentDescription.finalLayout = (VkImageLayout)depthAttachment.Final;
+
+			VkAttachmentReference depthAttachmentReference{};
+			depthAttachmentReference.attachment = colorAttachments.size(); //last element will always be the depth attachment
+			depthAttachmentReference.layout = (VkImageLayout)depthAttachment.Reference.Layout;
+
+			attachmentDescription.push_back(depthAttachmentDescription);
+			attachmentReferences.push_back(depthAttachmentReference);
+		}
 
 		VkSubpassDependency subpassColorDependency{};
 		subpassColorDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -61,37 +85,47 @@ namespace Lucy {
 		subpassDepthDependency.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 		subpassDepthDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
+		std::vector<VkSubpassDependency> subpassDependencies = { subpassColorDependency };
+
 		VkSubpassDescription subpassDescription{};
 		subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpassDescription.colorAttachmentCount = renderPassInfo->ColorAttachments.size();
-		subpassDescription.pColorAttachments = renderPassInfo->ColorAttachments.data();
+		subpassDescription.colorAttachmentCount = colorAttachments.size();
+		subpassDescription.pColorAttachments = attachmentReferences.data();
 		subpassDescription.pDepthStencilAttachment = nullptr;
-
-		std::vector<VkAttachmentDescription> attachments = { colorAttachmentDescription };
-		std::vector<VkSubpassDependency> dependencies = { subpassColorDependency };
-
+		
 		if (m_DepthBuffered) {
-			attachments.push_back(depthAttachmentDescription);
-			dependencies.push_back(subpassDepthDependency);
+			subpassDependencies.push_back(subpassDepthDependency);
 
-			subpassDescription.pDepthStencilAttachment = &depthAttachmentReference;
+			subpassDescription.pDepthStencilAttachment = &attachmentReferences[attachmentReferences.size() - 1]; //depth will always be the last one
 		}
 
 		VkRenderPassCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-		createInfo.attachmentCount = attachments.size();
-		createInfo.pAttachments = attachments.data();
+		createInfo.attachmentCount = attachmentDescription.size();
+		createInfo.pAttachments = attachmentDescription.data();
 		createInfo.subpassCount = 1;
 		createInfo.pSubpasses = &subpassDescription;
-		createInfo.dependencyCount = dependencies.size();
-		createInfo.pDependencies = dependencies.data();
+		createInfo.dependencyCount = subpassDependencies.size();
+		createInfo.pDependencies = subpassDependencies.data();
 
 		m_AttachmentCount = createInfo.attachmentCount;
+		m_ColorAttachmentCount = colorAttachments.size();
+
+		VkRenderPassMultiviewCreateInfo renderPassMultiview{};
+		if (m_CreateInfo.Multiview.IsValid()) {
+			renderPassMultiview.sType = VK_STRUCTURE_TYPE_RENDER_PASS_MULTIVIEW_CREATE_INFO;
+			renderPassMultiview.subpassCount = createInfo.subpassCount;
+			renderPassMultiview.pViewMasks = &m_CreateInfo.Multiview.ViewMask;
+			renderPassMultiview.correlationMaskCount = 1;
+			renderPassMultiview.pCorrelationMasks = &m_CreateInfo.Multiview.CorrelationMask;
+
+			createInfo.pNext = &renderPassMultiview;
+		}
 
 		LUCY_VK_ASSERT(vkCreateRenderPass(device.GetLogicalDevice(), &createInfo, nullptr, &m_RenderPass));
 	}
 
-	void VulkanRenderPass::Begin(RenderPassBeginInfo& info) {
+	void VulkanRenderPass::Begin(VulkanRenderPassBeginInfo& info) {
 		const VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 
 		VkRenderPassBeginInfo beginInfo{};
@@ -107,9 +141,12 @@ namespace Lucy {
 		VkClearValue clearDepth;
 		clearDepth.depthStencil.depth = 1.0f;
 
-		VkClearValue clearValues[2] = { clearColor, clearDepth };
-		beginInfo.clearValueCount = 2;
-		beginInfo.pClearValues = clearValues;
+		std::vector<VkClearValue> clearValues(m_ColorAttachmentCount, clearColor);
+		if (m_DepthBuffered)
+			clearValues.push_back(clearDepth);
+
+		beginInfo.clearValueCount = clearValues.size();
+		beginInfo.pClearValues = clearValues.data();
 
 		m_BoundedCommandBuffer = info.CommandBuffer;
 		vkCmdBeginRenderPass(m_BoundedCommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);

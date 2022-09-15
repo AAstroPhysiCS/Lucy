@@ -16,8 +16,7 @@ namespace Lucy {
 	class Camera {
 	protected:
 		Camera(int32_t m_ViewportWidth, int32_t m_ViewportHeight, float farPlane, float nearPlane, float fov);
-		Camera() = default;
-		Camera(glm::vec3& position, float farPlane, float nearPlane, float fov);
+		Camera(const glm::vec3& position, float farPlane, float nearPlane, float fov);
 		virtual ~Camera() = default;
 
 		glm::mat4 m_ViewMatrix = glm::mat4(1.0f);
@@ -48,10 +47,10 @@ namespace Lucy {
 
 		inline VP GetVP() {
 			VP mvp;
-			mvp.View = GetViewMatrix();
-			mvp.Proj = GetProjectionMatrix();
+			mvp.View = m_ViewMatrix;
+			mvp.Proj = m_Projection;
 			mvp.Proj[1][1] *= -1;
-			mvp.CamPos = m_Position * -1.0f;
+			mvp.CamPos = m_Position;
 
 			return mvp;
 		}
@@ -62,9 +61,9 @@ namespace Lucy {
 
 	class EditorCamera : public Camera {
 	public:
-		EditorCamera(int32_t m_ViewportWidth, int32_t m_ViewportHeight, float farPlane = 1000.0f, float nearPlane = 0.1f, float fov = 90.0f);
-		EditorCamera(float farPlane = 1000.0f, float nearPlane = 0.1f, float fov = 90.0f);
-		EditorCamera(glm::vec3& position, float farPlane = 1000.0f, float nearPlane = 0.1f, float fov = 90.0f);
+		EditorCamera(float farPlane = 10000.0f, float nearPlane = 0.01f, float fov = 90.0f);
+		EditorCamera(int32_t m_ViewportWidth, int32_t m_ViewportHeight, float farPlane = 10000.0f, float nearPlane = 0.01f, float fov = 90.0f);
+		EditorCamera(glm::vec3& position, float farPlane = 10000.0f, float nearPlane = 0.01f, float fov = 90.0f);
 		virtual ~EditorCamera() = default;
 
 		void Update();

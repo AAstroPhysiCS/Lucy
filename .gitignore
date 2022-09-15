@@ -3,6 +3,7 @@ bin-obj/
 
 *.frag
 *.vert
+*.cached_vulkan.comp
 
 .vs/
 **.sln

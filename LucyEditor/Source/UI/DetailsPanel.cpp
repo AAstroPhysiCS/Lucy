@@ -15,8 +15,7 @@ namespace Lucy {
 	DetailsPanel::DetailsPanel() {
 		ImageCreateInfo createInfo;
 		createInfo.Format = ImageFormat::R8G8B8A8_UNORM;
-		createInfo.Target = ImageTarget::Color;
-		createInfo.ImageType = ImageType::Type2D;
+		createInfo.ImageType = ImageType::Type2DColor;
 		createInfo.Parameter.Mag = ImageFilterMode::LINEAR;
 		createInfo.Parameter.Min = ImageFilterMode::LINEAR;
 		createInfo.Parameter.U = ImageAddressMode::REPEAT;
@@ -25,7 +24,7 @@ namespace Lucy {
 		createInfo.GenerateSampler = true;
 		createInfo.ImGuiUsage = true;
 
-		s_CheckerBoardTexture = Image2D::Create("Assets/Textures/Checkerboard.png", createInfo);
+		s_CheckerBoardTexture = Image::Create("Assets/Textures/Checkerboard.png", createInfo);
 	}
 
 	void DetailsPanel::Render() {
@@ -68,6 +67,9 @@ namespace Lucy {
 			if (ImGui::BeginMenu("Light")) {
 				if (ImGui::MenuItem("Directional Light")) {
 					entityContext.AddComponent<DirectionalLightComponent>();
+				}
+				if (ImGui::MenuItem("Cubemap")) {
+					entityContext.AddComponent<HDRCubemapComponent>();
 				}
 				ImGui::EndMenu();
 			}
@@ -136,15 +138,14 @@ namespace Lucy {
 
 		DrawComponentPanel<DirectionalLightComponent>(entityContext, [&](DirectionalLightComponent& lightComponent) {
 			if (ImGui::CollapsingHeader("Directional Light", ImGuiTreeNodeFlags_DefaultOpen)) {
-				auto& direction = lightComponent.GetDirection();
+				auto& dir = entityContext.GetComponent<TransformComponent>().GetRotation();
 				auto& color = lightComponent.GetColor();
-
-				ImGui::Text("Direction");
-				ImGui::SameLine();
-				ImGui::DragFloat3("##hidelabel direction", (float*)&direction, 0.01f, -10.0f, 10.0f, nullptr, 1.0f);
+				//TODO: the color should be the material color
 				ImGui::Text("Color");
 				ImGui::SameLine();
 				ImGui::DragFloat3("##hidelabel color", (float*)&color, 0.01f, 0.0f, 100.0f, nullptr, 1.0f);
+
+				lightComponent.GetDirection() = dir;
 			}
 		});
 
@@ -234,6 +235,34 @@ namespace Lucy {
 					}
 				}
 				ImGui::Unindent();
+			}
+		});
+
+		DrawComponentPanel<HDRCubemapComponent>(entityContext, [](HDRCubemapComponent& component) {
+			Ref<Image> cubemap = component.GetCubemapImage();
+			if (ImGui::CollapsingHeader("Cubemap", ImGuiTreeNodeFlags_DefaultOpen)) {
+				char buf[1024];
+				memset(buf, 0, sizeof(buf));
+
+				if (cubemap) {
+					const std::string& path = cubemap->GetPath();
+					std::strncpy(buf, path.c_str(), sizeof(buf));
+				}
+
+				ImGui::Text("Path");
+				ImGui::SameLine();
+				if (ImGui::InputText("##hideLabel CubemapPath", buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
+					component.LoadCubemap(buf);
+				}
+				ImGui::SameLine(0, 20);
+
+				if (ImGui::Button("L")) {
+					std::string outPath;
+					Utils::OpenDialog(outPath, Utils::CubemapFilterList, 1, "Assets/");
+					if (!outPath.empty()) {
+						component.LoadCubemap(outPath);
+					}
+				}
 			}
 		});
 

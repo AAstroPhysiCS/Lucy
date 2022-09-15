@@ -12,87 +12,119 @@
 
 #include "Scene/Entity.h"
 
+#include "Shader/ShaderLibrary.h"
+
 namespace Lucy {
 
 	/* --- Individual Resource Handles --- */
-	static RenderCommandResourceHandle g_GeometryPassHandle;
-	static RenderCommandResourceHandle g_IDPassHandle;
+	static CommandResourceHandle g_GeometryPassHandle;
+	static CommandResourceHandle g_IDPassHandle;
 
 	RendererModule::RendererModule(RenderArchitecture arch, Ref<Window> window, Ref<Scene> scene)
 		: Module(window, scene) {
 		Renderer::Init(arch, window);
 
-		window->SetTitle(fmt::format("{0} - Windows x64 {1}", m_Window->GetTitle(),
+#ifdef LUCY_DEBUG
+		window->SetTitle(fmt::format("{0} - Windows x64 Debug {1}", m_Window->GetTitle(),
 						 arch == RenderArchitecture::Vulkan ? "Vulkan" : "DirectX12").c_str());
+#else
+		window->SetTitle(fmt::format("{0} - Windows x64 Release {1}", m_Window->GetTitle(),
+						 arch == RenderArchitecture::Vulkan ? "Vulkan" : "DirectX12").c_str());
+#endif
 
-		auto& [viewportWidth, viewportHeight] = Renderer::GetViewportArea();
+		const auto& [viewportWidth, viewportHeight] = Renderer::GetViewportArea();
 
-		ShaderLibrary& shaderLibrary = ShaderLibrary::Get();
-		auto& pbrShader = shaderLibrary.GetShader("LucyPBR");
-		auto& idShader = shaderLibrary.GetShader("LucyID");
+		const ShaderLibrary& shaderLibrary = ShaderLibrary::Get();
+		const auto& pbrShader = shaderLibrary.GetShader("LucyPBR");
+		const auto& idShader = shaderLibrary.GetShader("LucyID");
 
-		std::vector<ShaderLayoutElement> vertexLayout = {
+		const uint32_t maxFramesInFlight = Renderer::GetMaxFramesInFlight();
+
+#pragma region GeometryPipeline
+
+		ImageCreateInfo geometryTextureCreateInfo = {
+			.Width = viewportWidth,
+			.Height = viewportHeight,
+			.ImageType = ImageType::Type2DColor,
+			.Format = ImageFormat::R8G8B8A8_UNORM,
+			.Parameter {
+				.U = ImageAddressMode::REPEAT,
+				.V = ImageAddressMode::REPEAT,
+				.W = ImageAddressMode::REPEAT,
+				.Min = ImageFilterMode::LINEAR,
+				.Mag = ImageFilterMode::LINEAR,
+			},
+			.ImGuiUsage = true,
+			.GenerateSampler = true
+		};
+
+		ImageCreateInfo depthImageCreateInfo {
+			.Width = geometryTextureCreateInfo.Width,
+			.Height = geometryTextureCreateInfo.Height,
+			.ImageType = ImageType::Type2DDepth,
+			.Format = ImageFormat::D32_SFLOAT,
+		};
+
+		RenderPassLayout geometryPassLayout{
+			.ColorAttachments = {
+				RenderPassLayout::Attachment {
+					.Format = geometryTextureCreateInfo.Format,
+					.Samples = 1,
+					.LoadOp = RenderPassLoadOp::Clear,
+					.StoreOp = RenderPassStoreOp::Store,
+					.StencilLoadOp = RenderPassLoadOp::DontCare,
+					.StencilStoreOp = RenderPassStoreOp::DontCare,
+					.Initial = VK_IMAGE_LAYOUT_UNDEFINED,
+					.Final = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR,
+					.Reference = { VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL }
+				},
+			},
+			.DepthAttachment = RenderPassLayout::Attachment {
+				.Format = depthImageCreateInfo.Format,
+				.Samples = 1,
+				.LoadOp = RenderPassLoadOp::Clear,
+				.StoreOp = RenderPassStoreOp::Store,
+				.StencilLoadOp = RenderPassLoadOp::DontCare,
+				.StencilStoreOp = RenderPassStoreOp::DontCare,
+				.Initial = VK_IMAGE_LAYOUT_UNDEFINED,
+				.Final = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				.Reference = { VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL }
+			}
+		};
+
+		RenderPassCreateInfo geometryPassCreateInfo {
+			.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f },
+			.Layout = geometryPassLayout,
+		};
+
+		FrameBufferCreateInfo geometryFrameBufferCreateInfo {
+			.Width = viewportWidth,
+			.Height = viewportHeight,
+			.IsInFlight = true,
+			.ImageBuffers {
+				Image::Create(geometryTextureCreateInfo)
+			},
+			.DepthImage = Image::Create(depthImageCreateInfo)
+		};
+
+		GraphicsPipelineCreateInfo geometryPipelineCreateInfo {
+			.Topology = Topology::TRIANGLES,
+			.Rasterization = {
+				.DisableBackCulling = true,
+				.CullingMode = CullingMode::None,
+				.LineWidth = 1.0f,
+				.PolygonMode = PolygonMode::FILL
+			},
+			.VertexShaderLayout {
 				{ "a_Pos", ShaderDataSize::Float3 },
 				{ "a_TextureCoords", ShaderDataSize::Float2 },
 				{ "a_ID", ShaderDataSize::Float3 },
 				{ "a_Normals", ShaderDataSize::Float3 },
 				{ "a_Tangents", ShaderDataSize::Float3 },
 				{ "a_BiTangents", ShaderDataSize::Float3 }
+			},
+			.Shader = pbrShader
 		};
-
-		const uint32_t maxFramesInFlight = Renderer::GetMaxFramesInFlight();
-
-#pragma region GeometryPipeline
-
-		RenderPassCreateInfo geometryPassCreateInfo;
-		geometryPassCreateInfo.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
-		geometryPassCreateInfo.DepthEnable = true; //enables the support for depth buffer
-
-		ImageCreateInfo geometryTextureCreateInfo;
-		geometryTextureCreateInfo.Width = viewportWidth;
-		geometryTextureCreateInfo.Height = viewportHeight;
-		geometryTextureCreateInfo.Format = ImageFormat::R8G8B8A8_UNORM;
-		geometryTextureCreateInfo.ImageType = ImageType::Type2D;
-		geometryTextureCreateInfo.Target = ImageTarget::Color;
-		geometryTextureCreateInfo.Parameter.Mag = ImageFilterMode::LINEAR;
-		geometryTextureCreateInfo.Parameter.Min = ImageFilterMode::LINEAR;
-		geometryTextureCreateInfo.Parameter.U = ImageAddressMode::REPEAT;
-		geometryTextureCreateInfo.Parameter.V = ImageAddressMode::REPEAT;
-		geometryTextureCreateInfo.Parameter.W = ImageAddressMode::REPEAT;
-		geometryTextureCreateInfo.GenerateSampler = true;
-		geometryTextureCreateInfo.ImGuiUsage = true;
-
-		FrameBufferCreateInfo geometryFrameBufferCreateInfo;
-		geometryFrameBufferCreateInfo.Width = viewportWidth;
-		geometryFrameBufferCreateInfo.Height = viewportHeight;
-
-		geometryFrameBufferCreateInfo.ImageBuffers.reserve(maxFramesInFlight);
-		for (uint32_t i = 0; i < maxFramesInFlight; i++)
-			geometryFrameBufferCreateInfo.ImageBuffers.emplace_back(Image2D::Create(geometryTextureCreateInfo));
-
-		PipelineCreateInfo geometryPipelineCreateInfo;
-		geometryPipelineCreateInfo.VertexShaderLayout = VertexShaderLayout(vertexLayout);
-		geometryPipelineCreateInfo.Topology = Topology::TRIANGLES;
-		geometryPipelineCreateInfo.Rasterization = { true, CullingMode::None, 1.0f, PolygonMode::FILL };
-		geometryPipelineCreateInfo.Shader = pbrShader;
-
-		if (arch == RenderArchitecture::Vulkan) {
-			VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-
-			Ref<VulkanRenderPassInfo> vulkanRenderPassInfo = Memory::CreateRef<VulkanRenderPassInfo>();
-			vulkanRenderPassInfo->ColorAttachments.push_back(
-				{ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL }
-			);
-			vulkanRenderPassInfo->ColorDescriptor.Format = geometryTextureCreateInfo.Format;
-			vulkanRenderPassInfo->ColorDescriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			vulkanRenderPassInfo->ColorDescriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-			vulkanRenderPassInfo->ColorDescriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-			vulkanRenderPassInfo->ColorDescriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-			vulkanRenderPassInfo->ColorDescriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			vulkanRenderPassInfo->ColorDescriptor.FinalLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR;
-
-			geometryPassCreateInfo.InternalInfo = vulkanRenderPassInfo;
-		}
 
 		Ref<RenderPass> geometryRenderPass = RenderPass::Create(geometryPassCreateInfo);
 		geometryPipelineCreateInfo.RenderPass = geometryRenderPass;
@@ -101,79 +133,64 @@ namespace Lucy {
 		Ref<FrameBuffer> geometryFrameBuffer = FrameBuffer::Create(geometryFrameBufferCreateInfo);
 		geometryPipelineCreateInfo.FrameBuffer = geometryFrameBuffer;
 
-		m_GeometryPipeline = Pipeline::Create(geometryPipelineCreateInfo);
+		m_GeometryPipeline = GraphicsPipeline::Create(geometryPipelineCreateInfo);
 #pragma endregion GeometryPipeline
 
 #pragma region IDPipeline
 
-		RenderPassCreateInfo idPassCreateInfo = geometryPassCreateInfo;
 		ImageCreateInfo idTextureCreateInfo = geometryTextureCreateInfo;
-		idTextureCreateInfo.AdditionalUsageFlags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		idTextureCreateInfo.Flags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 		idTextureCreateInfo.ImGuiUsage = false;
 
-		FrameBufferCreateInfo idFrameBufferCreateInfo = geometryFrameBufferCreateInfo;
-		idFrameBufferCreateInfo.ImageBuffers.clear();
-		idFrameBufferCreateInfo.ImageBuffers.reserve(maxFramesInFlight);
-		for (uint32_t i = 0; i < maxFramesInFlight; i++)
-			idFrameBufferCreateInfo.ImageBuffers.emplace_back(Image2D::Create(idTextureCreateInfo));
-
-		PipelineCreateInfo idPipelineCreateInfo = geometryPipelineCreateInfo;
-		idPipelineCreateInfo.Shader = idShader;
-
-		if (arch == RenderArchitecture::Vulkan) {
-			VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-
-			Ref<VulkanRenderPassInfo> idVulkanRenderPassInfo = Memory::CreateRef<VulkanRenderPassInfo>();
-			idVulkanRenderPassInfo->ColorAttachments.push_back(
-				{ 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL }
-			);
-			idVulkanRenderPassInfo->ColorDescriptor.Format = idTextureCreateInfo.Format;
-			idVulkanRenderPassInfo->ColorDescriptor.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			idVulkanRenderPassInfo->ColorDescriptor.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-			idVulkanRenderPassInfo->ColorDescriptor.StencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-			idVulkanRenderPassInfo->ColorDescriptor.StencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-			idVulkanRenderPassInfo->ColorDescriptor.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-			idVulkanRenderPassInfo->ColorDescriptor.FinalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-			idPassCreateInfo.InternalInfo = idVulkanRenderPassInfo;
-		}
-
+		RenderPassLayout idPassLayout = geometryPassLayout;
+		idPassLayout.ColorAttachments[0].Format = idTextureCreateInfo.Format;
+		idPassLayout.ColorAttachments[0].Final = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		
+		RenderPassCreateInfo idPassCreateInfo = geometryPassCreateInfo;
+		idPassCreateInfo.Layout = idPassLayout;
 		Ref<RenderPass> idRenderPass = RenderPass::Create(idPassCreateInfo);
-		idPipelineCreateInfo.RenderPass = idRenderPass;
+
+		FrameBufferCreateInfo idFrameBufferCreateInfo = geometryFrameBufferCreateInfo;
 		idFrameBufferCreateInfo.RenderPass = idRenderPass;
+		idFrameBufferCreateInfo.ImageBuffers = {
+			Image::Create(idTextureCreateInfo)
+		};
+		idFrameBufferCreateInfo.DepthImage = Image::Create(depthImageCreateInfo);
 
 		Ref<FrameBuffer> idFrameBuffer = FrameBuffer::Create(idFrameBufferCreateInfo);
+
+		GraphicsPipelineCreateInfo idPipelineCreateInfo = geometryPipelineCreateInfo;
+		idPipelineCreateInfo.Shader = idShader;
+		idPipelineCreateInfo.RenderPass = idRenderPass;
 		idPipelineCreateInfo.FrameBuffer = idFrameBuffer;
 
-		m_IDPipeline = Pipeline::Create(idPipelineCreateInfo);
+		m_IDPipeline = GraphicsPipeline::Create(idPipelineCreateInfo);
 #pragma endregion IDPipeline
 
-		g_GeometryPassHandle = Renderer::CreateRenderPassResource(GeometryPass, m_GeometryPipeline);
-		g_IDPassHandle = Renderer::CreateRenderPassResource(IDPass, m_IDPipeline);
+		g_GeometryPassHandle = Renderer::CreateCommandResource(GeometryPass, m_GeometryPipeline);
+		g_IDPassHandle = Renderer::CreateCommandResource(IDPass, m_IDPipeline);
 	}
 
 	void RendererModule::Begin() {
 		LUCY_PROFILE_NEW_EVENT("RendererModule::Begin");
 
-		Renderer::BeginScene(m_Scene);
-
-		auto& directionalLightView = m_Scene->View<DirectionalLightComponent>();
+		const auto& directionalLightView = m_Scene->View<DirectionalLightComponent>();
 		for (auto& entity : directionalLightView) {
 			Entity e{ m_Scene.Get(), entity };
 			DirectionalLightComponent& lightComponent = e.GetComponent<DirectionalLightComponent>();
 
-			auto& lightningAttributes = m_GeometryPipeline->GetUniformBuffers<VulkanUniformBuffer>("LucyLightningValues");
+			const auto& lightningAttributes = m_GeometryPipeline->GetUniformBuffers<VulkanUniformBuffer>("LucyLightningValues");
 			lightningAttributes->SetData((uint8_t*)&lightComponent, sizeof(DirectionalLightComponent));
 		}
 
-		auto& meshView = m_Scene->View<MeshComponent>();
+		const auto& meshView = m_Scene->View<MeshComponent>();
 		for (entt::sparse_set::reverse_iterator it = meshView.rbegin(); it != meshView.rend(); it++) {
 			Entity e{ m_Scene.Get(), *it };
 			MeshComponent& meshComponent = e.GetComponent<MeshComponent>();
 			if (!meshComponent.IsValid())
 				continue;
 
-			Ref<Mesh>& mesh = meshComponent.GetMesh();
+			const Ref<Mesh>& mesh = meshComponent.GetMesh();
 
 			auto& materials = mesh->GetMaterials();
 			for (Submesh& submesh : mesh->GetSubmeshes()) {
@@ -183,9 +200,11 @@ namespace Lucy {
 
 			//High priority stuff must be called earlier than low, since those meshes get render first.
 			//I won't be sorting the render commands accordingly, the sort must happen here (for performance reason)
-			Renderer::EnqueueRenderCommand<StaticMeshRenderCommand>(g_GeometryPassHandle, Priority::LOW, meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
-			Renderer::EnqueueRenderCommand<StaticMeshRenderCommand>(g_IDPassHandle, Priority::LOW, meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
+			Renderer::EnqueueCommand<StaticMeshRenderCommand>(g_GeometryPassHandle, Priority::LOW, meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
+			Renderer::EnqueueCommand<StaticMeshRenderCommand>(g_IDPassHandle, Priority::LOW, meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
 		}
+
+		Renderer::BeginScene(m_Scene);
 	}
 
 	void RendererModule::OnRender() {
@@ -194,10 +213,10 @@ namespace Lucy {
 		EditorCamera& camera = m_Scene->GetEditorCamera();
 		auto vp = camera.GetVP();
 
-		auto& cameraBuffer = m_GeometryPipeline->GetUniformBuffers<VulkanUniformBuffer>("LucyCamera");
+		auto cameraBuffer = m_GeometryPipeline->GetUniformBuffers<VulkanUniformBuffer>("LucyCamera");
 		cameraBuffer->SetData((uint8_t*)&vp, sizeof(vp));
 
-		auto& cameraBufferID = m_IDPipeline->GetUniformBuffers<VulkanUniformBuffer>("LucyCamera");
+		auto cameraBufferID = m_IDPipeline->GetUniformBuffers<VulkanUniformBuffer>("LucyCamera");
 		cameraBufferID->SetData((uint8_t*)&vp, sizeof(vp));
 
 		Renderer::UpdateDescriptorSets(m_GeometryPipeline);
@@ -244,7 +263,7 @@ namespace Lucy {
 	}
 
 	void RendererModule::OnViewportResize() {
-		auto& [viewportWidth, viewportHeight] = Renderer::GetViewportArea();
+		const auto& [viewportWidth, viewportHeight] = Renderer::GetViewportArea();
 		m_GeometryPipeline->Recreate(viewportWidth, viewportHeight);
 		m_IDPipeline->Recreate(viewportWidth, viewportHeight);
 	}

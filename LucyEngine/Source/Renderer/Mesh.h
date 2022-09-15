@@ -36,17 +36,19 @@ namespace Lucy {
 		uint32_t TotalVerticesSize = 0;
 	};
 
-	static int MESH_ID_COUNT_X = 0;
-	static int MESH_ID_COUNT_Y = 0;
-	static int MESH_ID_COUNT_Z = 0;
-	static int MESH_ID_COUNT_W = 0;
+	static int32_t MESH_ID_COUNT_X = 0;
+	static int32_t MESH_ID_COUNT_Y = 0;
+	static int32_t MESH_ID_COUNT_Z = 0;
+	static int32_t MESH_ID_COUNT_W = 0;
 
 	class Mesh {
 	public:
+		static Ref<Mesh> Create(const std::vector<float>& vertices, const std::vector<uint32_t>& indices);
+		static Ref<Mesh> Create(const std::string& path);
+
+		Mesh(const std::vector<float>& vertices, const std::vector<uint32_t>& indices);
 		Mesh(const std::string& path);
 		~Mesh() = default;
-
-		static Ref<Mesh> Create(const std::string& path);
 
 		inline std::vector<Submesh>& GetSubmeshes() { return m_Submeshes; }
 		inline std::vector<Ref<Material>>& GetMaterials() { return m_Materials; }
@@ -60,10 +62,11 @@ namespace Lucy {
 
 		inline MetadataInfo GetMetadataInfo() { return m_MetadataInfo; }
 
+		void Destroy();
+	private:
 		void LoadData(const aiScene* scene);
 		void LoadMaterials(const aiScene* scene, const aiMesh* mesh);
-		void TraverseHierarchy(const aiNode* node, glm::mat4& parentTransform);
-		void Destroy();
+		void TraverseHierarchy(const aiNode* node, const glm::mat4& parentTransform);
 
 		Ref<VertexBuffer> m_VertexBuffer;
 		Ref<IndexBuffer> m_IndexBuffer;

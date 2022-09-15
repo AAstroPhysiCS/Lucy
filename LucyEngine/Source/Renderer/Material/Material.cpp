@@ -35,12 +35,12 @@ namespace Lucy {
 		m_MaterialData = MaterialData(*(glm::vec3*)&diffuse, std::string(submeshName), metallic, roughness, aoContribution);
 	}
 
-	void Material::SetImage(const MaterialImageType& type, Ref<Image2D> image) {
+	void Material::SetImage(const MaterialImageType& type, Ref<Image> image) {
 		m_Textures.insert(m_Textures.begin() + type.Index, image);
 	}
 
 	void Material::Destroy() {
-		for (Ref<Image2D> image : m_Textures) {
+		for (Ref<Image> image : m_Textures) {
 			image->Destroy();
 		}
 		s_MaterialIDProvider.ReturnID(m_MaterialID);

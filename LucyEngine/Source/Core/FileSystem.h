@@ -26,6 +26,9 @@ namespace Lucy {
 		static std::string GetFileName(std::string& file);
 		static std::string GetFileName(const std::string& file);
 
+		static std::string GetFileExtension(std::string& file);
+		static std::string GetFileExtension(const std::string& file);
+
 		template <typename T>
 		inline static void WriteToFile(const std::string& path, const std::vector<T>& data, OpenMode mode) {
 			uint16_t flags = 0x02 | mode; //see std::ios::out

@@ -4,14 +4,18 @@ namespace Lucy {
 
 	class RenderPass;
 	class VulkanImageView;
-	class Image2D;
+	class Image;
 
 	struct FrameBufferCreateInfo {
-		bool MultiSampled = false;
-		int32_t	Width = 0, Height = 0;
 		
-		std::vector<Ref<Image2D>> ImageBuffers;
+		int32_t	Width = 0, Height = 0;
+		bool MultiSampled = false;
+		bool IsInFlight = false;
+		
 		Ref<RenderPass> RenderPass = nullptr;
+		std::vector<Ref<Image>> ImageBuffers;
+
+		Ref<Image> DepthImage = nullptr;
 
 		//Vulkan only: only for swapchain (use ImageBuffer)
 		std::vector<VulkanImageView> ImageViews;
