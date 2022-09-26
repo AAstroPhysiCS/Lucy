@@ -28,7 +28,7 @@ namespace Lucy {
 		
 		void LoadToGPU() final override;
 
-		uint32_t BindImage(Ref<VulkanImage2D> image);
+		uint32_t BindImage(Ref<VulkanImage> image);
 		uint32_t BindImage(VkImageView imageView, VkImageLayout layout, VkSampler sampler);
 		void Clear();
 		void DestroyHandle() final override;

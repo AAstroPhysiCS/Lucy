@@ -27,9 +27,6 @@ namespace Lucy {
 		VkResult AcquireNextImage(VkSemaphore currentFrameImageAvailSemaphore, uint32_t& imageIndex);
 		VkResult Present(const Semaphore& signalSemaphore, uint32_t& imageIndex);
 
-		/// <param name="currentFrameWaitSemaphore: image is available, image is renderable"></param>
-		/// <param name="currentFrameSignalSemaphore: rendering finished, signal it"></param>
-		void SubmitToQueue(VkQueue queue, VkCommandBuffer commandBuffer, const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore);
 		void Destroy();
 
 		inline VkExtent2D GetExtent() { return m_SelectedSwapExtent; }

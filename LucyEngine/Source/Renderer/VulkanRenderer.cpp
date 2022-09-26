@@ -35,9 +35,8 @@ namespace Lucy {
 		vkResetFences(deviceVulkanHandle, 1, &m_InFlightFences[m_CurrentFrameIndex].GetFence());
 
 		m_LastSwapChainResult = VulkanSwapChain::Get().AcquireNextImage(m_WaitSemaphores[m_CurrentFrameIndex].GetSemaphore(), m_ImageIndex);
-		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR) {
+		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR)
 			return;
-		}
 	}
 
 	void VulkanRenderer::RenderScene() {
@@ -52,18 +51,16 @@ namespace Lucy {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::EndScene");
 
 		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR)
-			return (RenderContextResultCodes) m_LastSwapChainResult;
+			return (RenderContextResultCodes)m_LastSwapChainResult;
 
 		Fence currentFrameFence = m_InFlightFences[m_CurrentFrameIndex];
 		Semaphore currentFrameWaitSemaphore = m_WaitSemaphores[m_CurrentFrameIndex];
 		Semaphore currentFrameSignalSemaphore = m_SignalSemaphores[m_CurrentFrameIndex];
 
 		VulkanContextDevice& contextDevice = VulkanContextDevice::Get();
+		m_RenderDevice->SubmitWorkToGPU(contextDevice.GetGraphicsQueue(), currentFrameFence, currentFrameWaitSemaphore, currentFrameSignalSemaphore);
+		
 		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-
-		swapChain.SubmitToQueue(contextDevice.GetGraphicsQueue(), m_RenderDevice->m_CommandQueue.As<VulkanCommandQueue>()->GetCurrentCommandBuffer(),
-								currentFrameFence, currentFrameWaitSemaphore, currentFrameSignalSemaphore);
-
 		RenderContextResultCodes result = (RenderContextResultCodes) swapChain.Present(m_SignalSemaphores[m_CurrentFrameIndex], m_ImageIndex);
 		m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % m_MaxFramesInFlight;
 
@@ -91,7 +88,7 @@ namespace Lucy {
 
 	// Should not be used in a loop 
 	void VulkanRenderer::DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size) {
-		m_RenderDevice.As<VulkanRenderDevice>()->ExecuteSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+		m_RenderDevice.As<VulkanRenderDevice>()->SubmitImmediateCommand([&](VkCommandBuffer commandBuffer) {
 			VkBufferCopy copyRegion{};
 			copyRegion.srcOffset = 0;
 			copyRegion.dstOffset = 0;
@@ -101,8 +98,8 @@ namespace Lucy {
 	}
 
 	// Should not be used in a loop 
-	void VulkanRenderer::ExecuteSingleTimeCommand(std::function<void(VkCommandBuffer)>&& func) {
-		m_RenderDevice.As<VulkanRenderDevice>()->ExecuteSingleTimeCommand(std::move(func));
+	void VulkanRenderer::SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func) {
+		m_RenderDevice.As<VulkanRenderDevice>()->SubmitImmediateCommand(std::move(func));
 	}
 
 	void VulkanRenderer::OnWindowResize() {

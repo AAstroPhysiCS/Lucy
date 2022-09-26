@@ -106,25 +106,25 @@ namespace Lucy {
 		s_Renderer.As<VulkanRenderer>()->DirectCopyBuffer(stagingBuffer, buffer, size);
 	}
 
-	void Renderer::ExecuteSingleTimeCommand(std::function<void(VkCommandBuffer)>&& func) {
-		s_Renderer.As<VulkanRenderer>()->ExecuteSingleTimeCommand(std::move(func));
+	void Renderer::SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func) {
+		s_Renderer.As<VulkanRenderer>()->SubmitImmediateCommand(std::move(func));
 	}
 
-	CommandResourceHandle Renderer::CreateCommandResource(CommandFunc&& func, Ref<GraphicsPipeline> pipeline) {
+	CommandResourceHandle Renderer::CreateCommandResource(Ref<GraphicsPipeline> pipeline, CommandFunc&& func) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::CreateCommandResource");
-		return s_Renderer->GetRenderDevice()->CreateCommandResource(std::move(func), pipeline);
+		return s_Renderer->GetRenderDevice()->CreateCommandResource(pipeline, std::move(func));
 	}
 
-	void Renderer::EnqueueResourceFree(CommandResourceHandle resourceHandle) {
-		LUCY_PROFILE_NEW_EVENT("Renderer::EnqueueResourceFree");
-		return s_Renderer->GetRenderDevice()->EnqueueResourceFree(resourceHandle);
+	CommandResourceHandle Renderer::CreateChildCommandResource(CommandResourceHandle parentResourceHandle, Ref<GraphicsPipeline> childPipeline, CommandFunc&& func) {
+		LUCY_PROFILE_NEW_EVENT("Renderer::CreateChildCommandResource");
+		return s_Renderer->GetRenderDevice()->CreateChildCommandResource(parentResourceHandle, childPipeline, std::move(func));
+	}
+
+	void Renderer::EnqueueCommandResourceFree(CommandResourceHandle resourceHandle) {
+		LUCY_PROFILE_NEW_EVENT("Renderer::EnqueueCommandResourceFree");
+		return s_Renderer->GetRenderDevice()->EnqueueCommandResourceFree(resourceHandle);
 	}
 	
-	void Renderer::EnqueueResourceFree(EnqueueFunc&& func) {
-		LUCY_PROFILE_NEW_EVENT("Renderer::EnqueueResourceFree");
-		return s_Renderer->GetRenderDevice()->EnqueueResourceFree(std::move(func));
-	}
-
 	void Renderer::EnqueueToRenderThread(EnqueueFunc&& func) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::EnqueueToRenderThread");
 		s_Renderer->GetRenderDevice()->EnqueueToRenderThread(std::forward<EnqueueFunc>(func));

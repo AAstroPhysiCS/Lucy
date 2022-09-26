@@ -17,9 +17,10 @@ namespace Lucy {
 		void Recreate() final override;
 	private:
 		void Allocate() final override;
+		void FreeCommandBuffers(uint32_t commandBufferCount, uint32_t commandBufferStartIndex);
 
 		VkCommandBuffer BeginSingleTimeCommand();
-		void EndSingleTimeCommand(VkCommandBuffer commandBuffer);
+		void EndSingleTimeCommand();
 
 		VkCommandPool m_CommandPool = VK_NULL_HANDLE;
 		std::vector<VkCommandBuffer> m_CommandBuffers;

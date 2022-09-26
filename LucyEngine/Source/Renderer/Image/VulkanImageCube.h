@@ -19,8 +19,10 @@ namespace Lucy {
 
 		void Destroy() final override;
 		void Recreate(uint32_t width, uint32_t height);
+
+		Ref<Mesh> GetCubeMesh() const { return m_CubeMesh; }
 	private:
-		void RenderSingleTime();
+		void PrepareForRendering();
 
 		void CreateFromPath();
 		void CreateEmptyImage();

@@ -21,6 +21,6 @@ namespace Lucy {
 		void BeginRenderPass(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline) final override;
 		void EndRenderPass(Ref<GraphicsPipeline> pipeline) final override;
 
-		void ExecuteSingleTimeCommand(std::function<void(VkCommandBuffer)>&& func);
+		void SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func);
 	};
 }

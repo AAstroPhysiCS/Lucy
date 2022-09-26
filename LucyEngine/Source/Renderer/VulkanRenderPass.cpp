@@ -182,5 +182,6 @@ namespace Lucy {
 	void VulkanRenderPass::Destroy() {
 		const VulkanContextDevice& device = VulkanContextDevice::Get();
 		vkDestroyRenderPass(device.GetLogicalDevice(), m_RenderPass, nullptr);
+		m_RenderPass = VK_NULL_HANDLE;
 	}
 }

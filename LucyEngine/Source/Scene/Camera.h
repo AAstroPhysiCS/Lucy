@@ -51,7 +51,7 @@ namespace Lucy {
 			mvp.Proj = m_Projection;
 			mvp.Proj[1][1] *= -1;
 			mvp.CamPos = m_Position;
-
+			
 			return mvp;
 		}
 
@@ -61,7 +61,7 @@ namespace Lucy {
 
 	class EditorCamera : public Camera {
 	public:
-		EditorCamera(float farPlane = 10000.0f, float nearPlane = 0.01f, float fov = 90.0f);
+		EditorCamera(float farPlane = 1000.0f, float nearPlane = 0.001f, float fov = 90.0f);
 		EditorCamera(int32_t m_ViewportWidth, int32_t m_ViewportHeight, float farPlane = 10000.0f, float nearPlane = 0.01f, float fov = 90.0f);
 		EditorCamera(glm::vec3& position, float farPlane = 10000.0f, float nearPlane = 0.01f, float fov = 90.0f);
 		virtual ~EditorCamera() = default;

@@ -6,6 +6,8 @@
 
 namespace Lucy {
 
+	class Fence;
+	class Semaphore;
 	class GraphicsPipeline;
 
 	class CommandQueue {
@@ -24,16 +26,20 @@ namespace Lucy {
 		virtual void Init() = 0;
 		virtual void Execute() = 0;
 
-		CommandResourceHandle CreateCommandResource(CommandFunc&& func, Ref<GraphicsPipeline> pipeline);
+		virtual void SubmitWorkToGPU(void* queueHandle, const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) const = 0;
+		virtual void SubmitWorkToGPU(void* queueHandle, uint32_t commandBufferCount, void* commandBufferHandles) const = 0;
+
+		CommandResourceHandle CreateCommandResource(Ref<GraphicsPipeline> pipeline, CommandFunc&& func);
+		CommandResourceHandle CreateChildCommandResource(CommandResourceHandle parentResourceHandle, Ref<GraphicsPipeline> childPipeline, CommandFunc&& func);
 		void DeleteCommandResource(CommandResourceHandle commandHandle);
 		void EnqueueCommand(CommandResourceHandle resourceHandle, const Ref<RenderCommand>& command);
 		void Recreate();
 		void Clear();
 		void Free();
 
-		inline size_t GetQueueSize() const { return m_RenderResourceMap.size(); }
+		inline size_t GetQueueSize() const { return m_CommandResourceMap.size(); }
 	protected:
-		std::unordered_map<CommandResourceHandle, RenderCommandResource> m_RenderResourceMap;
+		std::map<CommandResourceHandle, CommandResource> m_CommandResourceMap;
 		Ref<CommandPool> m_CommandPool = nullptr;
 	};
 }

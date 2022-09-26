@@ -34,10 +34,31 @@ namespace Lucy {
 		PolygonMode PolygonMode = PolygonMode::FILL;
 	};
 
+	enum class DepthCompareOp {
+		Never,
+		Less,
+		Equal,
+		LessOrEqual,
+		Greater,
+		NotEqual,
+		GreaterOrEqual,
+		Always,
+	};
+
+	struct DepthConfiguration {
+		bool DepthWriteEnable = true;
+		bool DepthTestEnable = true;
+		DepthCompareOp DepthCompareOp = DepthCompareOp::Less;
+		float MinDepth = 0.0f;
+		float MaxDepth = 1.0f;
+		bool StencilTestEnable = false;
+	};
+
 	struct GraphicsPipelineCreateInfo {
 		Topology Topology = Topology::TRIANGLES;
 		Rasterization Rasterization;
 		VertexShaderLayout VertexShaderLayout;
+		DepthConfiguration DepthConfiguration;
 
 		Ref<RenderPass> RenderPass;
 		Ref<FrameBuffer> FrameBuffer;

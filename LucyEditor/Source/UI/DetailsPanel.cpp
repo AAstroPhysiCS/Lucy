@@ -263,6 +263,9 @@ namespace Lucy {
 						component.LoadCubemap(outPath);
 					}
 				}
+
+				if (ImGui::RadioButton("Primary", component.IsPrimary))
+					component.IsPrimary = !component.IsPrimary;
 			}
 		});
 

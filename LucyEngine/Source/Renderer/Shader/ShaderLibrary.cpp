@@ -15,8 +15,10 @@ namespace Lucy {
 	void ShaderLibrary::Init() {
 		PushShader(Shader::Create("LucyPBR", "Assets/Shaders/LucyPBR.glsl"));
 		PushShader(Shader::Create("LucyID", "Assets/Shaders/LucyID.glsl"));
-		PushShader(Shader::Create("LucyHDR", "Assets/Shaders/LucyHDR.glsl"));
+		PushShader(Shader::Create("LucyHDRSkybox", "Assets/Shaders/LucyHDRSkybox.glsl"));
+		PushShader(Shader::Create("LucyImageToHDRConverter", "Assets/Shaders/LucyImageToHDRConverter.glsl"));
 
+		PushShader(Shader::Create("LucyIrradiance", "Assets/Shaders/LucyIrradiance.comp"));
 		PushShader(Shader::Create("LucyComputeTest", "Assets/Shaders/LucyComputeTest.comp"));
 	}
 

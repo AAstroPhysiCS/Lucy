@@ -29,21 +29,26 @@ namespace Lucy {
 		m_RenderFunctionQueue.push_back(std::move(func));
 	}
 
-	CommandResourceHandle RenderDevice::CreateCommandResource(CommandFunc&& func, Ref<GraphicsPipeline> pipeline) {
-		LUCY_PROFILE_NEW_EVENT("RenderDevice::CreateCommandResource");
-		return m_CommandQueue->CreateCommandResource(std::move(func), pipeline);
+	void RenderDevice::SubmitWorkToGPU(void* queueHandle, const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) {
+		LUCY_PROFILE_NEW_EVENT("RenderDevice::SubmitToQueue");
+		m_CommandQueue->SubmitWorkToGPU(queueHandle, currentFrameFence, currentFrameWaitSemaphore, currentFrameSignalSemaphore);
 	}
 
-	void RenderDevice::EnqueueResourceFree(CommandResourceHandle resourceHandle) {
-		LUCY_PROFILE_NEW_EVENT("RenderDevice::EnqueueResourceFree");
+	CommandResourceHandle RenderDevice::CreateCommandResource(Ref<GraphicsPipeline> pipeline, CommandFunc&& func) {
+		LUCY_PROFILE_NEW_EVENT("RenderDevice::CreateCommandResource");
+		return m_CommandQueue->CreateCommandResource(pipeline, std::move(func));
+	}
+
+	CommandResourceHandle RenderDevice::CreateChildCommandResource(CommandResourceHandle parentResourceHandle, Ref<GraphicsPipeline> childPipeline, CommandFunc&& func) {
+		LUCY_PROFILE_NEW_EVENT("RenderDevice::CreateChildCommandResource");
+		return m_CommandQueue->CreateChildCommandResource(parentResourceHandle, childPipeline, std::move(func));
+	}
+
+	void RenderDevice::EnqueueCommandResourceFree(CommandResourceHandle resourceHandle) {
+		LUCY_PROFILE_NEW_EVENT("RenderDevice::EnqueueCommandResourceFree");
 		m_DeletionQueue.push_back([=]() {
 			m_CommandQueue->DeleteCommandResource(resourceHandle);
 		});
-	}
-
-	void RenderDevice::EnqueueResourceFree(EnqueueFunc&& func) {
-		LUCY_PROFILE_NEW_EVENT("RenderDevice::EnqueueResourceFree");
-		m_DeletionQueue.push_back(std::move(func));
 	}
 
 	void RenderDevice::DispatchCommands() {

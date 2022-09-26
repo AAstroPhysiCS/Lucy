@@ -58,32 +58,25 @@ namespace Lucy {
 
 		const VulkanContextDevice& vulkanDevice = VulkanContextDevice::Get();
 
-		VkCommandBuffer commandBuffer;
-		vkAllocateCommandBuffers(vulkanDevice.GetLogicalDevice(), &allocInfo, &commandBuffer);
+		VkCommandBuffer immediateCommandBuffer;
+		vkAllocateCommandBuffers(vulkanDevice.GetLogicalDevice(), &allocInfo, &immediateCommandBuffer);
+		m_CommandBuffers.push_back(immediateCommandBuffer);
 
 		VkCommandBufferBeginInfo beginInfo{};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-		vkBeginCommandBuffer(commandBuffer, &beginInfo);
+		vkBeginCommandBuffer(immediateCommandBuffer, &beginInfo);
 
-		return commandBuffer;
+		return immediateCommandBuffer;
 	}
 
-	void VulkanCommandPool::EndSingleTimeCommand(VkCommandBuffer commandBuffer) {
-		const VulkanContextDevice& vulkanDevice = VulkanContextDevice::Get();
+	void VulkanCommandPool::EndSingleTimeCommand() {
+		vkEndCommandBuffer(m_CommandBuffers[m_CommandBuffers.size() - 1]);
+	}
 
-		vkEndCommandBuffer(commandBuffer);
-
-		VkSubmitInfo submitInfo{};
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &commandBuffer;
-
-		const VkQueue& graphicsQueue = vulkanDevice.GetGraphicsQueue();
-		vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-		vkQueueWaitIdle(graphicsQueue);
-
-		vkFreeCommandBuffers(vulkanDevice.GetLogicalDevice(), m_CommandPool, 1, &commandBuffer);
+	void VulkanCommandPool::FreeCommandBuffers(uint32_t commandBufferCount, uint32_t commandBufferStartIndex) {
+		vkFreeCommandBuffers(VulkanContextDevice::Get().GetLogicalDevice(), m_CommandPool, commandBufferCount, &m_CommandBuffers[commandBufferStartIndex]);
+		m_CommandBuffers.erase(m_CommandBuffers.begin() + commandBufferStartIndex, m_CommandBuffers.begin() + commandBufferStartIndex + commandBufferCount);
 	}
 }

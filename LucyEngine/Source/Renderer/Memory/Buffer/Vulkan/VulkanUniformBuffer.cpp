@@ -49,7 +49,7 @@ namespace Lucy {
 		//empty, since we really dont "upload" it to the gpu with a given buffer
 	}
 
-	uint32_t VulkanUniformImageBuffer::BindImage(Ref<VulkanImage2D> image) {
+	uint32_t VulkanUniformImageBuffer::BindImage(Ref<VulkanImage> image) {
 		VkDescriptorImageInfo imageInfo{};
 		imageInfo.imageLayout = image->GetCurrentLayout();
 		imageInfo.imageView = image->GetImageView().GetVulkanHandle();

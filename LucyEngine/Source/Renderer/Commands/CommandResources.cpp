@@ -5,16 +5,16 @@
 
 namespace Lucy {
 
-	CommandResourceHandle RenderCommandResource::CreateUniqueHandle() {
+	CommandResourceHandle CommandResource::CreateUniqueHandle() {
 		static IDProvider m_IDProvider;
 		return m_IDProvider.RequestID();
 	}
 
-	RenderCommandResource::RenderCommandResource(CommandFunc&& CommandFunc, Ref<GraphicsPipeline> pipeline)
-		: m_Pipeline(pipeline), m_CommandFunc(CommandFunc) {
+	CommandResource::CommandResource(Ref<GraphicsPipeline> pipeline, CommandFunc&& CommandFunc, bool isChild)
+		: m_Pipeline(pipeline), m_CommandFunc(CommandFunc), m_IsChild(isChild) {
 	}
 
-	void RenderCommandResource::EnqueueCommand(Ref<RenderCommand> renderCommand) {
+	void CommandResource::EnqueueCommand(Ref<RenderCommand> renderCommand) {
 		switch (renderCommand->GetPriority()) {
 			case Priority::HIGH:
 				m_RenderCommandList.insert(m_RenderCommandList.begin(), renderCommand);
@@ -25,7 +25,7 @@ namespace Lucy {
 		}
 	}
 
-	void RenderCommandResource::DoPass(void* commandBuffer) {
+	void CommandResource::DoPass(void* commandBuffer) {
 		for (Ref<RenderCommand> renderCommand : m_RenderCommandList)
 			renderCommand->DoPass(commandBuffer, this);
 		m_RenderCommandList.clear();
@@ -42,7 +42,7 @@ namespace Lucy {
 #endif
 	}
 
-	void StaticMeshRenderCommand::DoPass(void* commandBuffer, RenderCommandResource* component) {
+	void StaticMeshRenderCommand::DoPass(void* commandBuffer, CommandResource* component) {
 		if (!Mesh)
 			return;
 		component->GetCommandFunc()(commandBuffer, component->GetTargetPipeline(), this);
@@ -55,18 +55,18 @@ namespace Lucy {
 #endif
 	}
 
-	void ImGuiRenderCommand::DoPass(void* commandBuffer, Lucy::RenderCommandResource* component) {
+	void ImGuiRenderCommand::DoPass(void* commandBuffer, Lucy::CommandResource* component) {
 		component->GetCommandFunc()(commandBuffer, nullptr, this);
 	}
 
-	InternalRenderCommand::InternalRenderCommand(VkImageView imageView, VkImageLayout layout, VkSampler sampler, Ref<Mesh> cubeMesh)
+	CubeRenderCommand::CubeRenderCommand(VkImageView imageView, VkImageLayout layout, VkSampler sampler, Ref<Mesh> cubeMesh)
 		: RenderCommand(Priority::HIGH), ImageView(imageView), Layout(layout), Sampler(sampler), CubeMesh(cubeMesh) {
 #ifdef LUCY_DEBUG
-		m_Name = "InternalRenderCommand";
+		m_Name = "CubeRenderCommand";
 #endif
 	}
 
-	void InternalRenderCommand::DoPass(void* commandBuffer, RenderCommandResource* component) {
+	void CubeRenderCommand::DoPass(void* commandBuffer, CommandResource* component) {
 		component->GetCommandFunc()(commandBuffer, component->GetTargetPipeline(), this);
 	}
 }

@@ -16,6 +16,8 @@ namespace Lucy {
 
 	class DescriptorSet {
 	public:
+		static Ref<DescriptorSet> Create(const DescriptorSetCreateInfo& createInfo);
+
 		DescriptorSet(const DescriptorSetCreateInfo& createInfo);
 		virtual ~DescriptorSet() = default;
 		
@@ -29,8 +31,6 @@ namespace Lucy {
 
 		inline const std::vector<Ref<UniformBuffer>>& GetAllUniformBuffers() const { return m_UniformBuffers; }
 		inline const std::vector<Ref<SharedStorageBuffer>>& GetAllSharedStorageBuffers() const { return m_SharedStorageBuffers; }
-
-		static Ref<DescriptorSet> Create(const DescriptorSetCreateInfo& createInfo);
 	protected:
 		DescriptorSetCreateInfo m_CreateInfo;
 

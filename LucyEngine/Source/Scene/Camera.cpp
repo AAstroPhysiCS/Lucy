@@ -88,7 +88,8 @@ namespace Lucy {
 	}
 
 	void EditorCamera::UpdateProjection() {
-		if (m_ViewportWidth == 0 && m_ViewportHeight == 0) LUCY_ASSERT(false);
+		if (m_ViewportWidth == 0 && m_ViewportHeight == 0) 
+			LUCY_ASSERT(false);
 		m_Projection = glm::mat4(1.0f);
 		m_Projection = glm::perspective(glm::radians(m_Fov), (float)m_ViewportWidth / m_ViewportHeight, m_NearPlane, m_FarPlane);
 	}

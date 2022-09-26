@@ -14,11 +14,14 @@
 
 #include "Shader/ShaderLibrary.h"
 
+#include "Image/VulkanImageCube.h"
+
 namespace Lucy {
 
 	/* --- Individual Resource Handles --- */
-	static CommandResourceHandle g_GeometryPassHandle;
-	static CommandResourceHandle g_IDPassHandle;
+	static CommandResourceHandle g_GeometryResourceHandle;
+	static CommandResourceHandle g_IDResourceHandle;
+	static CommandResourceHandle g_CubeResourceHandle;
 
 	RendererModule::RendererModule(RenderArchitecture arch, Ref<Window> window, Ref<Scene> scene)
 		: Module(window, scene) {
@@ -37,6 +40,7 @@ namespace Lucy {
 		const ShaderLibrary& shaderLibrary = ShaderLibrary::Get();
 		const auto& pbrShader = shaderLibrary.GetShader("LucyPBR");
 		const auto& idShader = shaderLibrary.GetShader("LucyID");
+		const auto& hdrSkyboxShader = shaderLibrary.GetShader("LucyHDRSkybox");
 
 		const uint32_t maxFramesInFlight = Renderer::GetMaxFramesInFlight();
 
@@ -58,7 +62,7 @@ namespace Lucy {
 			.GenerateSampler = true
 		};
 
-		ImageCreateInfo depthImageCreateInfo {
+		ImageCreateInfo depthImageCreateInfo{
 			.Width = geometryTextureCreateInfo.Width,
 			.Height = geometryTextureCreateInfo.Height,
 			.ImageType = ImageType::Type2DDepth,
@@ -92,22 +96,27 @@ namespace Lucy {
 			}
 		};
 
-		RenderPassCreateInfo geometryPassCreateInfo {
+		RenderPassCreateInfo geometryPassCreateInfo{
 			.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f },
 			.Layout = geometryPassLayout,
 		};
 
-		FrameBufferCreateInfo geometryFrameBufferCreateInfo {
+		Ref<RenderPass> geometryRenderPass = RenderPass::Create(geometryPassCreateInfo);
+
+		FrameBufferCreateInfo geometryFrameBufferCreateInfo{
 			.Width = viewportWidth,
 			.Height = viewportHeight,
 			.IsInFlight = true,
+			.RenderPass = geometryRenderPass,
 			.ImageBuffers {
 				Image::Create(geometryTextureCreateInfo)
 			},
 			.DepthImage = Image::Create(depthImageCreateInfo)
 		};
 
-		GraphicsPipelineCreateInfo geometryPipelineCreateInfo {
+		Ref<FrameBuffer> geometryFrameBuffer = FrameBuffer::Create(geometryFrameBufferCreateInfo);
+
+		GraphicsPipelineCreateInfo geometryPipelineCreateInfo{
 			.Topology = Topology::TRIANGLES,
 			.Rasterization = {
 				.DisableBackCulling = true,
@@ -123,18 +132,35 @@ namespace Lucy {
 				{ "a_Tangents", ShaderDataSize::Float3 },
 				{ "a_BiTangents", ShaderDataSize::Float3 }
 			},
+			.RenderPass = geometryRenderPass,
+			.FrameBuffer = geometryFrameBuffer,
 			.Shader = pbrShader
 		};
 
-		Ref<RenderPass> geometryRenderPass = RenderPass::Create(geometryPassCreateInfo);
-		geometryPipelineCreateInfo.RenderPass = geometryRenderPass;
-		geometryFrameBufferCreateInfo.RenderPass = geometryRenderPass;
-
-		Ref<FrameBuffer> geometryFrameBuffer = FrameBuffer::Create(geometryFrameBufferCreateInfo);
-		geometryPipelineCreateInfo.FrameBuffer = geometryFrameBuffer;
-
 		m_GeometryPipeline = GraphicsPipeline::Create(geometryPipelineCreateInfo);
 #pragma endregion GeometryPipeline
+
+#pragma region CubemapPipeline
+
+		GraphicsPipelineCreateInfo cubemapPipelineCreateInfo{
+			.Topology = Topology::TRIANGLES,
+			.Rasterization = {
+				.DisableBackCulling = true,
+				.CullingMode = CullingMode::None,
+				.LineWidth = 1.0f,
+				.PolygonMode = PolygonMode::FILL
+			},
+			.VertexShaderLayout {
+				{ "a_Pos", ShaderDataSize::Float3 },
+			},
+			.DepthConfiguration = { .DepthCompareOp = DepthCompareOp::LessOrEqual },
+			.RenderPass = geometryRenderPass,
+			.FrameBuffer = geometryFrameBuffer,
+			.Shader = hdrSkyboxShader
+		};
+
+		m_CubemapPipeline = GraphicsPipeline::Create(cubemapPipelineCreateInfo);
+#pragma endregion CubemapPipeline
 
 #pragma region IDPipeline
 
@@ -145,16 +171,14 @@ namespace Lucy {
 		RenderPassLayout idPassLayout = geometryPassLayout;
 		idPassLayout.ColorAttachments[0].Format = idTextureCreateInfo.Format;
 		idPassLayout.ColorAttachments[0].Final = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		
+
 		RenderPassCreateInfo idPassCreateInfo = geometryPassCreateInfo;
 		idPassCreateInfo.Layout = idPassLayout;
 		Ref<RenderPass> idRenderPass = RenderPass::Create(idPassCreateInfo);
 
 		FrameBufferCreateInfo idFrameBufferCreateInfo = geometryFrameBufferCreateInfo;
 		idFrameBufferCreateInfo.RenderPass = idRenderPass;
-		idFrameBufferCreateInfo.ImageBuffers = {
-			Image::Create(idTextureCreateInfo)
-		};
+		idFrameBufferCreateInfo.ImageBuffers = { Image::Create(idTextureCreateInfo) };
 		idFrameBufferCreateInfo.DepthImage = Image::Create(depthImageCreateInfo);
 
 		Ref<FrameBuffer> idFrameBuffer = FrameBuffer::Create(idFrameBufferCreateInfo);
@@ -167,20 +191,43 @@ namespace Lucy {
 		m_IDPipeline = GraphicsPipeline::Create(idPipelineCreateInfo);
 #pragma endregion IDPipeline
 
-		g_GeometryPassHandle = Renderer::CreateCommandResource(GeometryPass, m_GeometryPipeline);
-		g_IDPassHandle = Renderer::CreateCommandResource(IDPass, m_IDPipeline);
+		g_GeometryResourceHandle = Renderer::CreateCommandResource(m_GeometryPipeline, GeometryPass);
+		g_IDResourceHandle = Renderer::CreateCommandResource(m_IDPipeline, IDPass);
+		g_CubeResourceHandle = Renderer::CreateChildCommandResource(g_GeometryResourceHandle, m_CubemapPipeline, CubemapPass);
 	}
 
 	void RendererModule::Begin() {
 		LUCY_PROFILE_NEW_EVENT("RendererModule::Begin");
+
+		Renderer::BeginScene(m_Scene);
 
 		const auto& directionalLightView = m_Scene->View<DirectionalLightComponent>();
 		for (auto& entity : directionalLightView) {
 			Entity e{ m_Scene.Get(), entity };
 			DirectionalLightComponent& lightComponent = e.GetComponent<DirectionalLightComponent>();
 
-			const auto& lightningAttributes = m_GeometryPipeline->GetUniformBuffers<VulkanUniformBuffer>("LucyLightningValues");
+			const auto& lightningAttributes = m_GeometryPipeline->GetUniformBuffers<UniformBuffer>("LucyLightningValues");
 			lightningAttributes->SetData((uint8_t*)&lightComponent, sizeof(DirectionalLightComponent));
+		}
+
+		const auto& cubemapView = m_Scene->View<HDRCubemapComponent>();
+		for (auto& entity : cubemapView) {
+			Entity e{ m_Scene.Get(), entity };
+			HDRCubemapComponent& hdrComponent = e.GetComponent<HDRCubemapComponent>();
+			if (!hdrComponent.IsValid())
+				continue;
+
+			if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan && hdrComponent.IsPrimary) {
+				const Ref<VulkanImageCube>& cubeMapImage = hdrComponent.GetCubemapImage();
+				const VulkanImageView& imageView = cubeMapImage->GetImageView();
+				const auto& samplerArray = m_CubemapPipeline->GetUniformBuffers<VulkanUniformImageBuffer>("u_EnvironmentMap");
+
+				samplerArray->BindImage(cubeMapImage);
+
+				Renderer::EnqueueCommand<CubeRenderCommand>(g_CubeResourceHandle, imageView.GetVulkanHandle(), cubeMapImage->GetCurrentLayout(),
+															imageView.GetSampler(), cubeMapImage->GetCubeMesh());
+				break;
+			}
 		}
 
 		const auto& meshView = m_Scene->View<MeshComponent>();
@@ -200,11 +247,9 @@ namespace Lucy {
 
 			//High priority stuff must be called earlier than low, since those meshes get render first.
 			//I won't be sorting the render commands accordingly, the sort must happen here (for performance reason)
-			Renderer::EnqueueCommand<StaticMeshRenderCommand>(g_GeometryPassHandle, Priority::LOW, meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
-			Renderer::EnqueueCommand<StaticMeshRenderCommand>(g_IDPassHandle, Priority::LOW, meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
+			Renderer::EnqueueCommand<StaticMeshRenderCommand>(g_GeometryResourceHandle, Priority::LOW, meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
+			Renderer::EnqueueCommand<StaticMeshRenderCommand>(g_IDResourceHandle, Priority::LOW, meshComponent.GetMesh(), e.GetComponent<TransformComponent>().GetMatrix());
 		}
-
-		Renderer::BeginScene(m_Scene);
 	}
 
 	void RendererModule::OnRender() {
@@ -213,14 +258,18 @@ namespace Lucy {
 		EditorCamera& camera = m_Scene->GetEditorCamera();
 		auto vp = camera.GetVP();
 
-		auto cameraBuffer = m_GeometryPipeline->GetUniformBuffers<VulkanUniformBuffer>("LucyCamera");
+		auto cameraBuffer = m_GeometryPipeline->GetUniformBuffers<UniformBuffer>("LucyCamera");
 		cameraBuffer->SetData((uint8_t*)&vp, sizeof(vp));
 
-		auto cameraBufferID = m_IDPipeline->GetUniformBuffers<VulkanUniformBuffer>("LucyCamera");
+		auto cameraBufferID = m_IDPipeline->GetUniformBuffers<UniformBuffer>("LucyCamera");
 		cameraBufferID->SetData((uint8_t*)&vp, sizeof(vp));
+
+		auto cameraBufferCubemap = m_CubemapPipeline->GetUniformBuffers<UniformBuffer>("LucyCamera");
+		cameraBufferCubemap->SetData((uint8_t*)&vp, sizeof(vp));
 
 		Renderer::UpdateDescriptorSets(m_GeometryPipeline);
 		Renderer::UpdateDescriptorSets(m_IDPipeline);
+		Renderer::UpdateDescriptorSets(m_CubemapPipeline);
 
 		Renderer::RenderScene();
 	}
@@ -245,6 +294,7 @@ namespace Lucy {
 
 		m_GeometryPipeline->Destroy();
 		m_IDPipeline->Destroy();
+		m_CubemapPipeline->Destroy();
 
 		Renderer::Destroy();
 	}
@@ -266,5 +316,6 @@ namespace Lucy {
 		const auto& [viewportWidth, viewportHeight] = Renderer::GetViewportArea();
 		m_GeometryPipeline->Recreate(viewportWidth, viewportHeight);
 		m_IDPipeline->Recreate(viewportWidth, viewportHeight);
+		m_CubemapPipeline->Recreate(viewportWidth, viewportHeight);
 	}
 }

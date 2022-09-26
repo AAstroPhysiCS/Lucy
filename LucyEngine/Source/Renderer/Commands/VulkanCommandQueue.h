@@ -16,10 +16,12 @@ namespace Lucy {
 		VulkanCommandQueue& operator=(VulkanCommandQueue&& other) noexcept = delete;
 
 		VkCommandBuffer BeginSingleTimeCommand() const;
-		void EndSingleTimeCommand(VkCommandBuffer commandBuffer) const;
+		void EndSingleTimeCommand() const;
 		VkCommandBuffer GetCurrentCommandBuffer() const;
 
 		void Init() final override;
 		void Execute() final override;
+		void SubmitWorkToGPU(void* queueHandle, const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) const final override;
+		void SubmitWorkToGPU(void* queueHandle, uint32_t commandBufferCount, void* commandBufferHandles) const final override;
 	};
 }

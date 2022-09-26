@@ -35,18 +35,17 @@ namespace Lucy {
 		static void EndRenderPass(Ref<GraphicsPipeline> pipeline);
 
 		static void DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size);
-		static void ExecuteSingleTimeCommand(std::function<void(VkCommandBuffer)>&& func);
+		static void SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func);
 
-		static CommandResourceHandle CreateCommandResource(CommandFunc&& func, Ref<GraphicsPipeline> pipeline);
+		static CommandResourceHandle CreateCommandResource(Ref<GraphicsPipeline> pipeline, CommandFunc&& func);
+		static CommandResourceHandle CreateChildCommandResource(CommandResourceHandle parentResourceHandle, Ref<GraphicsPipeline> childPipeline, CommandFunc&& func);
 
 		template <typename T, typename ... Args>
 		inline static void EnqueueCommand(CommandResourceHandle resourceHandle, Args&&... args) {
 			LUCY_PROFILE_NEW_EVENT("Renderer::EnqueueCommand");
 			s_Renderer->GetRenderDevice()->EnqueueCommand<T>(resourceHandle, std::forward<Args>(args)...);
 		}
-
-		static void EnqueueResourceFree(CommandResourceHandle resourceHandle);
-		static void EnqueueResourceFree(EnqueueFunc&& func);
+		static void EnqueueCommandResourceFree(CommandResourceHandle resourceHandle);
 
 		static void EnqueueToRenderThread(EnqueueFunc&& func);
 

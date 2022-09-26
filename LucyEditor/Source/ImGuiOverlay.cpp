@@ -112,11 +112,11 @@ namespace Lucy {
 				initInfo.CheckVkResultFn = VulkanMessageCallback::ImGui_DebugCallback;
 
 				ImGui_ImplVulkan_Init(&initInfo, m_ImGuiPipeline.UIRenderPass.As<VulkanRenderPass>()->GetVulkanHandle());
-				Renderer::ExecuteSingleTimeCommand(ImGui_ImplVulkan_CreateFontsTexture);
+				Renderer::SubmitImmediateCommand(ImGui_ImplVulkan_CreateFontsTexture);
 				ImGui_ImplVulkan_DestroyFontUploadObjects();
 			});
 
-			g_ImGuiPassHandle = Renderer::CreateCommandResource([this](void* commandBuffer, Ref<GraphicsPipeline> unused, RenderCommand* unusedC) {
+			g_ImGuiPassHandle = Renderer::CreateCommandResource(nullptr, [this](void* commandBuffer, Ref<GraphicsPipeline> unused, RenderCommand* unusedC) {
 				const auto& renderPass = m_ImGuiPipeline.UIRenderPass.As<VulkanRenderPass>();
 				const auto& frameBufferHandle = m_ImGuiPipeline.UIFramebuffer.As<VulkanFrameBuffer>();
 				const auto& targetFrameBuffer = frameBufferHandle->GetVulkanHandles()[Renderer::GetCurrentImageIndex()];
@@ -130,7 +130,7 @@ namespace Lucy {
 				renderPass->Begin(beginInfo);
 				ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), (VkCommandBuffer)commandBuffer);
 				renderPass->End();
-			}, nullptr);
+			});
 		}
 	}
 

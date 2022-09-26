@@ -67,12 +67,12 @@ namespace Lucy {
 		createInfo.ppEnabledExtensionNames = instanceExtensions.data();
 
 		LUCY_VK_ASSERT(vkCreateInstance(&createInfo, nullptr, &m_Instance));
-		LUCY_INFO("Vulkan successfully initialized");
 
 #ifdef LUCY_DEBUG
+		LUCY_INFO("Vulkan successfully initialized");
+
 		SetupMessageCallback();
 #endif
-		
 		m_Window->InitVulkanSurface(m_Instance);
 		VulkanContextDevice::Get().Create(m_Instance, m_ValidationLayers, m_Window->GetVulkanSurface());
 		VulkanSwapChain::Get().Create(m_Window);

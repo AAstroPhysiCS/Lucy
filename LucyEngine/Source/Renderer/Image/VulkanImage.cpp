@@ -17,6 +17,12 @@ namespace Lucy {
 		: Image(createInfo) {
 	}
 
+	void VulkanImage::CopyImageToImage(VkImage image, VkImageLayout layout, const std::vector<VkImageCopy>& regions) {
+		Renderer::SubmitImmediateCommand([=](VkCommandBuffer commandBuffer) {
+			vkCmdCopyImage(commandBuffer, m_Image, m_CurrentLayout, image, layout, regions.size(), regions.data());
+		});
+	}
+
 	void VulkanImage::CopyImageToBuffer(VkImage image, const VkBuffer& bufferToCopy, uint32_t layerCount) {
 		VkBufferImageCopy region{};
 		region.bufferOffset = 0;
@@ -68,13 +74,13 @@ namespace Lucy {
 	}
 
 	void VulkanImage::CopyImageToBuffer(VkImage image, const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& imageCopyRegions) {
-		Renderer::ExecuteSingleTimeCommand([=](VkCommandBuffer commandBuffer) {
+		Renderer::SubmitImmediateCommand([=](VkCommandBuffer commandBuffer) {
 			vkCmdCopyImageToBuffer(commandBuffer, image, m_CurrentLayout, bufferToCopy, imageCopyRegions.size(), imageCopyRegions.data());
 		});
 	}
 
 	void VulkanImage::CopyBufferToImage(VkImage image, const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& bufferCopyRegions) {
-		Renderer::ExecuteSingleTimeCommand([=](VkCommandBuffer commandBuffer) {
+		Renderer::SubmitImmediateCommand([=](VkCommandBuffer commandBuffer) {
 			vkCmdCopyBufferToImage(commandBuffer, bufferToCopy, image, m_CurrentLayout, bufferCopyRegions.size(), bufferCopyRegions.data());
 		});
 	}
@@ -89,7 +95,7 @@ namespace Lucy {
 
 		//Generate the mip chain
 		//Copying down the whole mip chain doing a blit from mip-1 to mip
-		Renderer::ExecuteSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+		Renderer::SubmitImmediateCommand([&](VkCommandBuffer commandBuffer) {
 			for (uint32_t i = 1; i < m_MaxMipLevel; i++) {
 				VkImageBlit blit{};
 				blit.srcSubresource.aspectMask = m_CreateInfo.ImageType == ImageType::Type2DDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
@@ -125,12 +131,24 @@ namespace Lucy {
 		TransitionImageLayout(m_Image, newLayout);
 	}
 
+	void VulkanImage::SetLayout(VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t levelCount, uint32_t layerCount) {
+		TransitionImageLayout(m_Image, newLayout, baseMipLevel, levelCount, layerCount);
+	}
+
+	void VulkanImage::CopyImageToImage(const Ref<VulkanImage>& imageToCopy, const std::vector<VkImageCopy>& imageCopyRegions) {
+		CopyImageToImage(imageToCopy->GetVulkanHandle(), imageToCopy->GetCurrentLayout(), imageCopyRegions);
+	}
+
+	void VulkanImage::CopyImageToImage(const VulkanImage* imageToCopy, const std::vector<VkImageCopy>& imageCopyRegions) {
+		CopyImageToImage(imageToCopy->GetVulkanHandle(), imageToCopy->GetCurrentLayout(), imageCopyRegions);
+	}
+
 	void VulkanImage::TransitionImageLayout(VkImage image, VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t levelCount, uint32_t layerCount) {
 		return TransitionImageLayout(image, m_CurrentLayout, newLayout, baseMipLevel, levelCount, layerCount);
 	}
 
 	void VulkanImage::TransitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t levelCount, uint32_t layerCount) {
-		Renderer::ExecuteSingleTimeCommand([&](VkCommandBuffer commandBuffer) {
+		Renderer::SubmitImmediateCommand([&](VkCommandBuffer commandBuffer) {
 			TransitionImageLayout(commandBuffer, image, oldLayout, newLayout, baseMipLevel, levelCount, layerCount);
 		});
 	}

@@ -6,6 +6,8 @@
 #include "../Events/InputEvent.h"
 #include "../Events/WindowEvent.h"
 
+#include "stb/stb_image.h"
+
 namespace Lucy {
 
 	std::function<void(Event*)> Window::s_EventFunc;
@@ -57,6 +59,11 @@ namespace Lucy {
 				LUCY_ASSERT(false);
 				break;
 		}
+
+		//TODO: Icon for the window (later)
+		//GLFWimage icon;
+		//icon.pixels = stbi_load("Assets/Textures/lucy_logo.png", &icon.width, &icon.height, 0, STBI_rgb_alpha);
+		//glfwSetWindowIcon(m_Window, 1, &icon);
 	}
 
 	void WinWindow::InitVulkanSurface(VkInstance instance) {

@@ -20,7 +20,7 @@ namespace Lucy {
 		void Destroy() final override;
 
 		void DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size);
-		void ExecuteSingleTimeCommand(std::function<void(VkCommandBuffer)>&& func);
+		void SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func);
 
 		void OnWindowResize() final override;
 		void OnViewportResize() final override;

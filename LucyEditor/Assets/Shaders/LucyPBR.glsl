@@ -26,7 +26,7 @@ layout (push_constant) uniform LocalPushConstant {
 void main() {
 	a_PosOut = a_Pos;
 	a_TextureCoordsOut = a_TextureCoords;
-	a_NormalsOut = a_Normals * mat3(u_ModelMatrix);
+	a_NormalsOut = a_Normals;
 
 	gl_Position = u_ProjMatrix * u_ViewMatrix * u_ModelMatrix * vec4(a_Pos, 1.0f);
 }
@@ -70,7 +70,8 @@ struct DirectionalLight {
 };
 
 layout (push_constant) uniform LocalPushConstant {
-	layout (offset = 64) float u_MaterialID;
+	mat4 u_ModelMatrix;
+	float u_MaterialID;
 };
 
 layout (set = 0, binding = 0) uniform LucyCamera {
@@ -136,15 +137,14 @@ float G_SchlicksmithGGX(float dotNL, float dotNV, float roughness) {
 /*
 	Fresnel function (Reflectance depending on angle of incidence)
 */
-vec3 F_Schlick(float cosTheta, vec3 albedoColor, float metallic) {
-	vec3 F0 = mix(vec3(0.04), albedoColor, metallic); // * material.specular
-	vec3 F = F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0); 
-	return F;
+vec3 F_Schlick(float cosTheta, vec3 F0, float roughness) {
+	return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
 /*
 	------------------ BRDF ------------------
 	Cook-Torrance Microfacet BRDF (Bidirectional Reflectance Distribution Function)
+	Specular Contribution
 	BRDF consists of mainly 2 parts:
 	1. Diffuse Part
 	2. Specular Part
@@ -165,8 +165,8 @@ vec3 F_Schlick(float cosTheta, vec3 albedoColor, float metallic) {
 
 	For these functions, we typically use an "approximation", since those are the fastest to compute
 */
-vec3 BRDF(vec3 L, vec3 V, vec3 N, float metallic, float roughness, vec3 lightColor, vec3 albedoColor) {
-	// Precalculate vectors and dot products	
+vec3 BRDF(vec3 L, vec3 V, vec3 N, vec3 F0, float metallic, float roughness, vec3 albedoColor, vec3 lightColor) {
+	// Precalculation...	
 	vec3 H = normalize (V + L);
 	float dotNV = clamp(dot(N, V), 0.0, 1.0);
 	float dotNL = clamp(dot(N, L), 0.0, 1.0);
@@ -180,11 +180,12 @@ vec3 BRDF(vec3 L, vec3 V, vec3 N, float metallic, float roughness, vec3 lightCol
 		float rroughness = max(0.05, roughness);
 		float D = D_GGX(dotNH, roughness); 
 		float G = G_SchlicksmithGGX(dotNL, dotNV, rroughness);
-		vec3 F = F_Schlick(dotNV, albedoColor, metallic);
+		vec3 F = F_Schlick(dotNV, F0, roughness);
 
-		vec3 spec = D * F * G / (4.0 * dotNL * dotNV);
+		vec3 spec = D * F * G / (4.0 * dotNL * dotNV + 0.001);
+		vec3 kD = (vec3(1.0) - F) * (1.0 - metallic);	
 
-		color += spec * dotNL * lightColor;
+		color += (kD * albedoColor / PI + spec) * dotNL * lightColor;
 	}
 
 	return color;
@@ -214,14 +215,22 @@ void main() {
 	if (alpha < 0.5f)
 		discard;
 
-	vec3 modelNormalNormalized = normalize(a_Normals);
-	vec3 viewDirCamera = normalize(u_CamPos - a_Pos);
+	vec3 modelWorldPos = vec3(mat3(u_ModelMatrix) * a_Pos);
+	vec3 modelNormalNormalized = normalize(mat3(u_ModelMatrix) * a_Normals);
+	vec3 viewDirCamera = normalize(u_CamPos - modelWorldPos);
 
-	vec3 outputColor = albedoColor.xyz * 0.2f;
+	vec3 F0 = vec3(0.04f);
+	F0 = mix(F0, albedoColor.xyz, metallicValue);
 
-	vec3 viewDirectionLight = normalize(u_DirectionalLight.Direction - a_Pos);
-	outputColor += BRDF(viewDirectionLight, viewDirCamera, modelNormalNormalized, metallicValue, roughnessValue, u_DirectionalLight.Color, albedoColor.xyz);
+	vec3 specularContribution = vec3(0.0f);
+	vec3 viewDirectionLight = normalize(u_DirectionalLight.Direction - modelWorldPos);
+	specularContribution += BRDF(viewDirectionLight, viewDirCamera, modelNormalNormalized, F0, metallicValue, roughnessValue, albedoColor.xyz, u_DirectionalLight.Color);
 	
+	//TODO: get rid of this
+	float ambientContribution = 0.2f;
+	vec3 outputColor = albedoColor.xyz * ambientContribution;
+	outputColor += specularContribution;
+
 	// Gamma correction
 	const float gamma = 2.2f;
 	outputColor = pow(outputColor, vec3(1.0f / gamma));

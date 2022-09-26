@@ -57,12 +57,19 @@ namespace Lucy {
 		inline const VulkanImageView& GetImageView() const { return m_ImageView; }
 
 		void SetLayout(VkImageLayout newLayout);
+		void SetLayout(VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t levelCount, uint32_t layerCount);
+
+		void CopyImageToImage(const Ref<VulkanImage>& imageToCopy, const std::vector<VkImageCopy>& imageCopyRegions);
+		void CopyImageToImage(const VulkanImage* imageToCopy, const std::vector<VkImageCopy>& imageCopyRegions);
+
 		void CopyImageToBuffer(const VkBuffer& bufferToCopy, uint32_t layerCount = 1);
 		void CopyBufferToImage(const VkBuffer& bufferToCopy, uint32_t layerCount = 1);
 
 		void CopyImageToBuffer(const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& imageCopyRegions);
 		void CopyBufferToImage(const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& bufferCopyRegions);
 	protected:
+		void CopyImageToImage(VkImage image, VkImageLayout layout, const std::vector<VkImageCopy>& regions);
+
 		void CopyImageToBuffer(VkImage image, const VkBuffer& bufferToCopy, uint32_t layerCount = 1);
 		void CopyBufferToImage(VkImage image, const VkBuffer& bufferToCopy, uint32_t layerCount = 1);
 

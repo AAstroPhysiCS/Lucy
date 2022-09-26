@@ -115,7 +115,9 @@ namespace Lucy {
 			m_DepthImage->Destroy();
 
 		for (uint32_t i = 0; i < m_FrameBufferHandles.size(); i++) {
-			vkDestroyFramebuffer(device, m_FrameBufferHandles[i], nullptr);
+			if (m_FrameBufferHandles[i])
+				vkDestroyFramebuffer(device, m_FrameBufferHandles[i], nullptr);
+			m_FrameBufferHandles[i] = VK_NULL_HANDLE;
 		}
 	}
 

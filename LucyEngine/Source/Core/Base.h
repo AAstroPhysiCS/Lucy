@@ -34,6 +34,7 @@
 																		LUCY_CRITICAL(fmt::format("Vulkan error: {0}", RendererAPICodesToString(arg)));					\
 																		LUCY_CRITICAL("Assert failed!");																\
 																		LUCY_DEBUG_BREAK }
+
 #ifdef LUCY_DEBUG
 	#define USE_OPTICK (1)
 #else
@@ -48,7 +49,7 @@
 #define LUCY_PROFILE_DESTROY()										OPTICK_SHUTDOWN()
 
 //not using it, since i will create my own
-#if defined (LUCY_PROFILE_GPU) && defined (LUCY_DEBUG)
+#if defined (LUCY_PROFILE_GPU_OPTICK) && defined (LUCY_DEBUG)
 	#define LUCY_PROFILE_GPU_INIT(...)								Optick::InitGpuVulkan(__VA_ARGS__)
 	#define LUCY_PROFILE_GPU_EVENT(Name)							OPTICK_GPU_EVENT(Name)
 	#define LUCY_PROFILE_GPU_FLIP(SwapChainHandle)					OPTICK_GPU_FLIP(SwapChainHandle)

@@ -60,11 +60,13 @@ namespace Lucy {
 	}
 
 	std::string FileSystem::GetFileExtension(std::string& file) {
+		FILE_EXISTS(file);
 		std::filesystem::path path(file);
 		return path.extension().string();
 	}
 
 	std::string FileSystem::GetFileExtension(const std::string& file) {
+		FILE_EXISTS(file);
 		std::filesystem::path path(file);
 		return path.extension().string();
 	}

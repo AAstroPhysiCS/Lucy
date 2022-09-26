@@ -49,13 +49,23 @@ namespace Lucy {
 		ForwardRenderMeshes((VkCommandBuffer)commandBuffer, idPipeline, (StaticMeshRenderCommand*)staticMeshRenderCommand, "ID Pass");
 	}
 
+	void CubemapPass(void* commandBuffer, Ref<GraphicsPipeline> cubemapPipeline, RenderCommand* cubemapRenderCommand) {
+		CubeRenderCommand* environmentRenderCommand = (CubeRenderCommand*)cubemapRenderCommand;
+		const Ref<Mesh>& cubeMesh = environmentRenderCommand->CubeMesh;
+
+		Renderer::BindPipeline(commandBuffer, cubemapPipeline);
+		Renderer::BindAllDescriptorSets(commandBuffer, cubemapPipeline);
+		Renderer::BindBuffers(commandBuffer, cubeMesh);
+
+		Renderer::DrawIndexed(commandBuffer, cubeMesh->GetIndexBuffer()->GetSize(), 1, 0, 0, 0);
+	}
+
 	struct CubePushConstantData {
 		glm::mat4 Proj;
-		int32_t ColorAttachmentOutputIndex;
 	};
 
-	void RenderEnvironmentalCube(void* commandBuffer, Ref<GraphicsPipeline> pipeline, RenderCommand* command) {
-		InternalRenderCommand* environmentRenderCommand = (InternalRenderCommand*)command;
+	void PrepareEnvironmentalCube(void* commandBuffer, Ref<GraphicsPipeline> pipeline, RenderCommand* command) {
+		CubeRenderCommand* environmentRenderCommand = (CubeRenderCommand*)command;
 
 		static glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
 
@@ -73,12 +83,9 @@ namespace Lucy {
 
 		CubePushConstantData pushConstantData;
 		pushConstantData.Proj = captureProjection;
+		pushConstant.SetData((uint8_t*)&pushConstantData, sizeof(CubePushConstantData));
 
 		for (uint32_t i = 0; i < 6; i++) {
-			pushConstantData.ColorAttachmentOutputIndex = i;
-
-			pushConstant.SetData((uint8_t*)&pushConstantData, sizeof(CubePushConstantData));
-
 			Renderer::BindPushConstant(commandBuffer, pipeline, pushConstant);
 			Renderer::DrawIndexed(commandBuffer, cubeMesh->GetIndexBuffer()->GetSize(), 1, 0, 0, 0);
 		}

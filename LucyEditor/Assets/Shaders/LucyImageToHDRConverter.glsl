@@ -1,6 +1,7 @@
 //type vertex
 #version 450
 #extension GL_ARB_shader_viewport_layer_array : require
+#extension GL_EXT_multiview : require
 
 layout (location = 0) in vec3 a_Pos;
 
@@ -25,23 +26,22 @@ mat4 LookAt(vec3 eye, vec3 at, vec3 up) {
 
 mat4 CaptureViews[6] = {
     LookAt(vec3(0.0f, 0.0f, 0.0f), vec3(1.0f,  0.0f,  0.0f), vec3(0.0f, -1.0f,  0.0f)),
-	LookAt(vec3(0.0f, 0.0f, 0.0f), vec3(-1.0f,  0.0f,  0.0f),vec3(0.0f, -1.0f,  0.0f)),
-	LookAt(vec3(0.0f, 0.0f, 0.0f), vec3(0.0f,  1.0f,  0.0f), vec3(0.0f,  0.0f,  1.0f)),
-	LookAt(vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, -1.0f,  0.0f), vec3(0.0f,  0.0f, -1.0f)),
-	LookAt(vec3(0.0f, 0.0f, 0.0f), vec3(0.0f,  0.0f,  1.0f), vec3(0.0f, -1.0f,  0.0f)),
-	LookAt(vec3(0.0f, 0.0f, 0.0f), vec3(0.0f,  0.0f, -1.0f), vec3(0.0f, -1.0f,  0.0f))
+    LookAt(vec3(0.0f, 0.0f, 0.0f), vec3(-1.0f,  0.0f,  0.0f),vec3(0.0f, -1.0f,  0.0f)),
+    LookAt(vec3(0.0f, 0.0f, 0.0f), vec3(0.0f,  1.0f,  0.0f), vec3(0.0f,  0.0f,  1.0f)),
+    LookAt(vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, -1.0f,  0.0f), vec3(0.0f,  0.0f, -1.0f)),
+    LookAt(vec3(0.0f, 0.0f, 0.0f), vec3(0.0f,  0.0f,  1.0f), vec3(0.0f, -1.0f,  0.0f)),
+    LookAt(vec3(0.0f, 0.0f, 0.0f), vec3(0.0f,  0.0f, -1.0f), vec3(0.0f, -1.0f,  0.0f))
 };
 
 layout (push_constant) uniform LucyCameraPushConstants {
-    //proj will be imported as a uniform, since we want to control the "lense" of the camera in certain areas
-	mat4 u_ProjMatrix;
-    int u_ColorAttachmentOutputIndex;
+    //proj will be imported as a uniform, since we want to control the "lense" of the camera in certain situations
+    mat4 u_ProjMatrix;
 };
 
 void main() {
-	a_PosOut = a_Pos;
-    gl_Layer = u_ColorAttachmentOutputIndex;
-	gl_Position = u_ProjMatrix * CaptureViews[u_ColorAttachmentOutputIndex] * vec4(a_Pos, 1.0f);
+    a_PosOut = a_Pos;
+    gl_Layer = gl_ViewIndex;
+    gl_Position = u_ProjMatrix * inverse(CaptureViews[gl_ViewIndex]) * vec4(a_Pos, 1.0f);
 }
 
 //type fragment

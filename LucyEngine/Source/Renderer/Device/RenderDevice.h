@@ -11,7 +11,13 @@ namespace Lucy {
 		void Init();
 		void Recreate();
 		void EnqueueToRenderThread(EnqueueFunc&& func);
-		CommandResourceHandle CreateCommandResource(CommandFunc&& func, Ref<GraphicsPipeline> pipeline);
+
+		CommandResourceHandle CreateCommandResource(Ref<GraphicsPipeline> pipeline, CommandFunc&& func);
+		CommandResourceHandle CreateChildCommandResource(CommandResourceHandle parentResourceHandle, Ref<GraphicsPipeline> childPipeline, CommandFunc&& func);
+
+		/// <param name="currentFrameWaitSemaphore: image is available, image is renderable"></param>
+		/// <param name="currentFrameSignalSemaphore: rendering finished, signal it"></param>
+		void SubmitWorkToGPU(void* queueHandle, const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore);
 
 		template <typename Command, typename ... Args>
 		inline void EnqueueCommand(CommandResourceHandle resourceHandle, Args&&... args) {
@@ -19,8 +25,7 @@ namespace Lucy {
 			m_CommandQueue->EnqueueCommand(resourceHandle, Memory::CreateRef<Command>(args...));
 		}
 
-		void EnqueueResourceFree(CommandResourceHandle resourceHandle);
-		void EnqueueResourceFree(EnqueueFunc&& func);
+		void EnqueueCommandResourceFree(CommandResourceHandle resourceHandle);
 
 		void DispatchCommands();
 		void ExecuteCommandQueue();
@@ -41,8 +46,6 @@ namespace Lucy {
 		virtual void EndRenderPass(Ref<GraphicsPipeline> pipeline) = 0;
 		
 		virtual void Destroy(); //leaving it to the child too
-
-		friend class VulkanRenderer;
 	protected:
 		std::vector<EnqueueFunc> m_RenderFunctionQueue;
 		std::vector<EnqueueFunc> m_DeletionQueue;

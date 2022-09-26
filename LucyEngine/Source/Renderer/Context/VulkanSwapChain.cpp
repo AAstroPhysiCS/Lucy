@@ -107,27 +107,6 @@ namespace Lucy {
 		return vkAcquireNextImageKHR(deviceVulkanHandle, m_SwapChain, UINT64_MAX, currentFrameImageAvailSemaphore, VK_NULL_HANDLE, &imageIndex);
 	}
 
-	void VulkanSwapChain::SubmitToQueue(VkQueue queue, VkCommandBuffer commandBuffer, const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) {
-		LUCY_PROFILE_NEW_EVENT("VulkanSwapChain::SubmitToQueue");
-
-		const VulkanContextDevice& device = VulkanContextDevice::Get();
-
-		VkSubmitInfo submitInfo{};
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-		VkPipelineStageFlags imageWaitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-		submitInfo.waitSemaphoreCount = 1;
-		submitInfo.pWaitSemaphores = &currentFrameWaitSemaphore.GetSemaphore();
-		submitInfo.pWaitDstStageMask = imageWaitStages;
-
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &commandBuffer;
-		submitInfo.signalSemaphoreCount = 1;
-		submitInfo.pSignalSemaphores = &currentFrameSignalSemaphore.GetSemaphore();
-
-		LUCY_VK_ASSERT(vkQueueSubmit(queue, 1, &submitInfo, currentFrameFence.GetFence()));
-	}
-
 	VkResult VulkanSwapChain::Present(const Semaphore& signalSemaphore, uint32_t& imageIndex) {
 		LUCY_PROFILE_NEW_EVENT("VulkanSwapChain::Present");
 		

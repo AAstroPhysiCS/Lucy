@@ -166,13 +166,13 @@ namespace Lucy {
 
 		VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo{};
 		depthStencilCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-		depthStencilCreateInfo.depthWriteEnable = VK_TRUE;
-		depthStencilCreateInfo.depthTestEnable = VK_TRUE;
-		depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
+		depthStencilCreateInfo.depthWriteEnable = m_CreateInfo.DepthConfiguration.DepthWriteEnable;
+		depthStencilCreateInfo.depthTestEnable = m_CreateInfo.DepthConfiguration.DepthTestEnable;
+		depthStencilCreateInfo.depthCompareOp = (VkCompareOp)m_CreateInfo.DepthConfiguration.DepthCompareOp;
 		depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE;
-		depthStencilCreateInfo.minDepthBounds = 0.0f;
-		depthStencilCreateInfo.maxDepthBounds = 1.0f;
-		depthStencilCreateInfo.stencilTestEnable = VK_FALSE;
+		depthStencilCreateInfo.minDepthBounds = m_CreateInfo.DepthConfiguration.MinDepth;
+		depthStencilCreateInfo.maxDepthBounds = m_CreateInfo.DepthConfiguration.MaxDepth;
+		depthStencilCreateInfo.stencilTestEnable = m_CreateInfo.DepthConfiguration.StencilTestEnable;
 
 		VkGraphicsPipelineCreateInfo pipelineCreateInfo{};
 		pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -196,7 +196,9 @@ namespace Lucy {
 		pipelineCreateInfo.basePipelineIndex = -1;
 
 		LUCY_VK_ASSERT(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_PipelineHandle));
+#ifdef LUCY_DEBUG
 		LUCY_INFO("Vulkan pipeline created successfully!");
+#endif
 	}
 
 	void VulkanGraphicsPipeline::Bind(const VulkanGraphicsPipelineBindInfo& bindInfo) {

@@ -132,10 +132,10 @@ namespace Lucy {
 		pipeline->GetRenderPass().As<VulkanRenderPass>()->End();
 	}
 
-	void VulkanRenderDevice::ExecuteSingleTimeCommand(std::function<void(VkCommandBuffer)>&& func) {
+	void VulkanRenderDevice::SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func) {
 		const auto& queue = m_CommandQueue.As<VulkanCommandQueue>();
 		VkCommandBuffer commandBuffer = queue->BeginSingleTimeCommand();
 		func(commandBuffer);
-		queue->EndSingleTimeCommand(commandBuffer);
+		queue->EndSingleTimeCommand();
 	}
 }

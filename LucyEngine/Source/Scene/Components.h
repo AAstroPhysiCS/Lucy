@@ -112,12 +112,14 @@ namespace Lucy {
 			hdrCreateInfo.Parameter.Mag = ImageFilterMode::LINEAR;
 			hdrCreateInfo.Parameter.Min = ImageFilterMode::LINEAR;
 			hdrCreateInfo.GenerateSampler = true;
-			hdrCreateInfo.GenerateMipmap = true;
+			hdrCreateInfo.GenerateMipmap = false; //does not support it yet
 
 			if (m_CubemapImage)
 				m_CubemapImage->Destroy();
 			m_CubemapImage = Image::CreateCube(path, hdrCreateInfo);
 		}
+		
+		bool IsPrimary = false;
 
 		inline bool IsValid() { return m_CubemapImage.Get() != nullptr && m_CubemapImage->GetWidth() > 0 && m_CubemapImage->GetHeight() > 0; }
 		inline const Ref<Image>& GetCubemapImage() { return m_CubemapImage; }
