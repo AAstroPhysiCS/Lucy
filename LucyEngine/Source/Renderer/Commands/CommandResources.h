@@ -3,7 +3,7 @@
 #include "Core/Base.h"
 
 #include "../Mesh.h"
-#include "Renderer/Context/GraphicsPipeline.h"
+#include "Renderer/Context/ContextPipeline.h"
 
 namespace Lucy {
 
@@ -16,19 +16,27 @@ namespace Lucy {
 
 	class CommandResource {
 	public:
-		CommandResource(Ref<GraphicsPipeline> pipeline, CommandFunc&& CommandFunc, bool isChild = false);
+		CommandResource(Ref<ContextPipeline> pipeline, CommandFunc&& CommandFunc, bool isChild = false);
 		CommandResource() = default;
 		~CommandResource() = default;
 
-		inline const Ref<GraphicsPipeline>& GetTargetPipeline() const { return m_Pipeline; }
+		inline const Ref<ContextPipeline>& GetTargetPipeline() const { return m_Pipeline; }
 		inline const CommandFunc& GetCommandFunc() const { return m_CommandFunc; }
+
+		inline bool IsChildValid() const {
+			if (m_IsChild && m_ChildCommandResourceHandles.size() != 0) {
+				LUCY_CRITICAL("Child resources should not have child resources!");
+				LUCY_ASSERT(false);
+			}
+			return m_IsChild;
+		}
 	private:
 		static CommandResourceHandle CreateUniqueHandle();
 
 		void DoPass(void* commandBuffer);
 		void EnqueueCommand(Ref<RenderCommand> renderCommand);
 
-		Ref<GraphicsPipeline> m_Pipeline = nullptr;
+		Ref<ContextPipeline> m_Pipeline = nullptr;
 		CommandFunc m_CommandFunc;
 		std::vector<Ref<RenderCommand>> m_RenderCommandList;
 
@@ -74,6 +82,21 @@ namespace Lucy {
 		VkImageView ImageView;
 		VkImageLayout Layout;
 		VkSampler Sampler;
+	};
+
+	struct ComputeDispatchCommand final : public RenderCommand {
+		ComputeDispatchCommand(Priority priority, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+		virtual ~ComputeDispatchCommand() = default;
+
+		void DoPass(void* commandBuffer, CommandResource* component) final override;
+
+		inline const uint32_t GetGroupCountX() const { return m_GroupCountX; }
+		inline const uint32_t GetGroupCountY() const { return m_GroupCountY; }
+		inline const uint32_t GetGroupCountZ() const { return m_GroupCountZ; }
+	private:
+		uint32_t m_GroupCountX = 0;
+		uint32_t m_GroupCountY = 0;
+		uint32_t m_GroupCountZ = 0;
 	};
 
 	//helper render command

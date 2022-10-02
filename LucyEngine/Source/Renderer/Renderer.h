@@ -6,6 +6,8 @@ namespace Lucy {
 
 	class Entity;
 
+	class ComputePipeline;
+
 	class Renderer final {
 	public:
 		Renderer() = delete;
@@ -16,20 +18,25 @@ namespace Lucy {
 		static void BeginScene(Ref<Scene>& scene);
 		static void RenderScene();
 		static RenderContextResultCodes EndScene();
+		
 		static void WaitForDevice();
+
 		static void Destroy();
 
 		//commandBufferHandle is the handle of the commandBuffer
 		//Vulkan: VkCommandBuffer
 		static void BindBuffers(void* commandBufferHandle, Ref<Mesh> mesh);
 		static void BindPushConstant(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline, const VulkanPushConstant& pushConstant);
-		static void BindPipeline(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline);
-		static void BindAllDescriptorSets(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline);
-		static void UpdateDescriptorSets(Ref<GraphicsPipeline> pipeline);
-		static void BindDescriptorSet(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline, uint32_t setIndex);
+		static void BindPipeline(void* commandBufferHandle, Ref<ContextPipeline> pipeline);
+		static void BindAllDescriptorSets(void* commandBufferHandle, Ref<ContextPipeline> pipeline);
+		static void UpdateDescriptorSets(Ref<ContextPipeline> pipeline);
+		static void BindDescriptorSet(void* commandBufferHandle, Ref<ContextPipeline> pipeline, uint32_t setIndex);
 		static void BindBuffers(void* commandBufferHandle, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer);
 		static void DrawIndexed(void* commandBufferHandle, uint32_t indexCount, uint32_t instanceCount,
 								 uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance);
+		static void DispatchCompute(void* commandBufferHandle, Ref<ComputePipeline> computePipeline, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+		static void ExecuteBarrier(void* commandBufferHandle, Ref<Image> image);
+		static void ExecuteBarrier(void* commandBufferHandle, void* imageHandle, uint32_t imageLayout, uint32_t layerCount, uint32_t mipCount);
 
 		static void BeginRenderPass(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline);
 		static void EndRenderPass(Ref<GraphicsPipeline> pipeline);
@@ -37,7 +44,7 @@ namespace Lucy {
 		static void DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size);
 		static void SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func);
 
-		static CommandResourceHandle CreateCommandResource(Ref<GraphicsPipeline> pipeline, CommandFunc&& func);
+		static CommandResourceHandle CreateCommandResource(Ref<ContextPipeline> pipeline, CommandFunc&& func);
 		static CommandResourceHandle CreateChildCommandResource(CommandResourceHandle parentResourceHandle, Ref<GraphicsPipeline> childPipeline, CommandFunc&& func);
 
 		template <typename T, typename ... Args>
@@ -46,6 +53,7 @@ namespace Lucy {
 			s_Renderer->GetRenderDevice()->EnqueueCommand<T>(resourceHandle, std::forward<Args>(args)...);
 		}
 		static void EnqueueCommandResourceFree(CommandResourceHandle resourceHandle);
+		static void EnqueueResourceFree(EnqueueFunc&& func);
 
 		static void EnqueueToRenderThread(EnqueueFunc&& func);
 

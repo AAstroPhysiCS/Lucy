@@ -59,6 +59,12 @@ namespace Lucy {
 		return nullptr;
 	}
 
+	static Ref<Image> s_BlankCube = nullptr;
+
+	Ref<Image>& Image::GetBlankCube() {
+		return s_BlankCube;
+	}
+
 	Image::Image(ImageCreateInfo& createInfo)
 		: m_CreateInfo(createInfo), m_Width(createInfo.Width), m_Height(createInfo.Height) {
 		if (m_CreateInfo.GenerateMipmap)

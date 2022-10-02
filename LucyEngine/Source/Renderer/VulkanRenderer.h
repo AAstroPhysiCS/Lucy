@@ -15,7 +15,11 @@ namespace Lucy {
 		void BeginScene(Ref<Scene>& scene) final override;
 		void RenderScene() final override;
 		RenderContextResultCodes EndScene() final override;
+
 		void WaitForDevice() final override;
+
+		void ExecuteBarrier(void* commandBufferHandle, Ref<Image> image) final override;
+		void ExecuteBarrier(void* commandBufferHandle, void* imageHandle, uint32_t imageLayout, uint32_t layerCount, uint32_t mipCount) final override;
 
 		void Destroy() final override;
 

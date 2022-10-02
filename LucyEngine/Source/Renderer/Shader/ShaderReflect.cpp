@@ -6,6 +6,7 @@
 
 namespace Lucy {
 
+	//TODO: Dynamic UBO and SSBO won't work, yet!
 	void ShaderReflect::Info(std::string& path, std::vector<uint32_t>& data, VkShaderStageFlags stageFlag) {
 		//heap allocating it because of the compiler warning/stack size: "function uses X bytes of stack consider moving some data to heap"
 		spirv_cross::CompilerGLSL* compiler = new spirv_cross::CompilerGLSL(data);
@@ -61,12 +62,6 @@ namespace Lucy {
 		Reflect(compiler, resourcesShaderStage, m_ShaderStageInfo, stageFlag);
 		
 		delete compiler;
-	}
-
-	//TODO: Dynamic UBO and SSBO won't work, yet!
-	void ShaderReflect::Info(std::string& path, std::vector<uint32_t>& dataVertex, std::vector<uint32_t>& dataFragment) {
-		Info(path, dataVertex, VK_SHADER_STAGE_VERTEX_BIT);
-		Info(path, dataFragment, VK_SHADER_STAGE_FRAGMENT_BIT);
 	}
 
 	void ShaderReflect::ParseStructMemberRecursive(spirv_cross::CompilerGLSL* compiler, spirv_cross::SPIRType parentType, std::vector<ShaderMemberVariable>& out) {

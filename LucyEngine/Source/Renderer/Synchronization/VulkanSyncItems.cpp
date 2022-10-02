@@ -50,7 +50,7 @@ namespace Lucy {
 		vkCmdPipelineBarrier(commandBuffer, sourceStage, destStage, 0, 0, nullptr, 0, nullptr, 1, &m_Barrier);
 	}
 
-	void ImageMemoryBarrier::DefineMasksByLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags& srcAccessMask,
+	void DefineMasksByLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags& srcAccessMask,
 												 VkAccessFlags& destAccessMask, VkPipelineStageFlags& sourceStage, VkPipelineStageFlags& destStage) {
 		switch (oldLayout) {
 			case VK_IMAGE_LAYOUT_UNDEFINED:
@@ -69,6 +69,10 @@ namespace Lucy {
 				srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 				sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 				break;
+			case VK_IMAGE_LAYOUT_GENERAL:
+				srcAccessMask = 0;
+				sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+				break;
 			default:
 				LUCY_ASSERT(false);
 		}
@@ -85,6 +89,10 @@ namespace Lucy {
 			case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
 				destAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 				destStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+				break;
+			case VK_IMAGE_LAYOUT_GENERAL:
+				destAccessMask = 0;
+				destStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 				break;
 			default:
 				LUCY_ASSERT(false);

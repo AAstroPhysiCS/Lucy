@@ -176,6 +176,20 @@ namespace Lucy {
 	}
 
 	void VulkanImage::CreateVulkanImageViewHandle() {
+		CreateVulkanImageViewHandle(m_ImageView, m_Image);
+
+		if (m_CreateInfo.ImGuiUsage) {
+			if (!m_ImGuiID) {
+				Renderer::EnqueueToRenderThread([&]() {
+					m_ImGuiID = ImGui_ImplVulkan_AddTexture(m_ImageView.GetSampler(), m_ImageView.GetVulkanHandle(), m_CurrentLayout);
+				});
+			} else {
+				ImGui_ImplVulkanH_UpdateTexture((VkDescriptorSet)m_ImGuiID, m_ImageView.GetSampler(), m_ImageView.GetVulkanHandle(), m_CurrentLayout);
+			}
+		}
+	}
+
+	void VulkanImage::CreateVulkanImageViewHandle(VulkanImageView& imageView, VkImage image) {
 		auto GetImageFilter = [](ImageFilterMode mode) {
 			switch (mode) {
 				case ImageFilterMode::LINEAR:
@@ -200,8 +214,8 @@ namespace Lucy {
 			}
 		};
 
-		ImageViewCreateInfo imageViewCreateInfo {
-			.Image = m_Image,
+		ImageViewCreateInfo imageViewCreateInfo{
+			.Image = image,
 			.ImageType = m_CreateInfo.ImageType,
 			.Format = (VkFormat)GetAPIImageFormat(m_CreateInfo.Format),
 			.GenerateSampler = m_CreateInfo.GenerateSampler,
@@ -215,17 +229,7 @@ namespace Lucy {
 			.ModeW = GetImageAddressMode(m_CreateInfo.Parameter.W)
 		};
 
-		m_ImageView = VulkanImageView(imageViewCreateInfo);
-
-		if (m_CreateInfo.ImGuiUsage) {
-			if (!m_ImGuiID) {
-				Renderer::EnqueueToRenderThread([&]() {
-					m_ImGuiID = ImGui_ImplVulkan_AddTexture(m_ImageView.GetSampler(), m_ImageView.GetVulkanHandle(), m_CurrentLayout);
-				});
-			} else {
-				ImGui_ImplVulkanH_UpdateTexture((VkDescriptorSet)m_ImGuiID, m_ImageView.GetSampler(), m_ImageView.GetVulkanHandle(), m_CurrentLayout);
-			}
-		}
+		imageView = VulkanImageView(imageViewCreateInfo);
 	}
 
 	VulkanImageView::VulkanImageView(const ImageViewCreateInfo& createInfo)

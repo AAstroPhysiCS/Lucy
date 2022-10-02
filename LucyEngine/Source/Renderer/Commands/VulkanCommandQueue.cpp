@@ -4,6 +4,7 @@
 #include "VulkanCommandPool.h"
 
 #include "Renderer/Context/VulkanContextDevice.h"
+#include "Renderer/Context/VulkanGraphicsPipeline.h"
 
 #include "Renderer/Renderer.h"
 #include "Renderer/Synchronization/VulkanSyncItems.h"
@@ -33,7 +34,7 @@ namespace Lucy {
 
 		//TODO: Multithreading here; mutex and locks for multithreading
 		for (auto& [handle, resource] : m_CommandResourceMap) {
-			if (resource.m_IsChild)
+			if (resource.IsChildValid())
 				continue;
 
 			const auto& currentResourcePipeline = resource.GetTargetPipeline();
@@ -44,11 +45,20 @@ namespace Lucy {
 				continue;
 			}
 
-			Renderer::BeginRenderPass(commandBuffer, currentResourcePipeline);
-			resource.DoPass(commandBuffer);
-			for (auto& childResourceHandle : resource.m_ChildCommandResourceHandles)
-				m_CommandResourceMap[childResourceHandle].DoPass(commandBuffer);
-			Renderer::EndRenderPass(currentResourcePipeline);
+			switch (currentResourcePipeline->GetType()) {
+				case ContextPipelineType::Graphics:
+					Renderer::BeginRenderPass(commandBuffer, currentResourcePipeline.As<VulkanGraphicsPipeline>());
+					resource.DoPass(commandBuffer);
+					for (auto& childResourceHandle : resource.m_ChildCommandResourceHandles)
+						m_CommandResourceMap[childResourceHandle].DoPass(commandBuffer);
+					Renderer::EndRenderPass(currentResourcePipeline.As<VulkanGraphicsPipeline>());
+					break;
+				case ContextPipelineType::Compute:
+					resource.DoPass(commandBuffer);
+					break;
+				default:
+					LUCY_ASSERT(false);
+			}
 		}
 
 		LUCY_VK_ASSERT(vkEndCommandBuffer(commandBuffer));

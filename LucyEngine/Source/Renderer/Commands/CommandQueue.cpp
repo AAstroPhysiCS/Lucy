@@ -2,6 +2,8 @@
 #include "CommandQueue.h"
 #include "VulkanCommandQueue.h"
 
+#include "Renderer/Context/GraphicsPipeline.h"
+
 #include "Renderer/Renderer.h"
 
 namespace Lucy {
@@ -15,7 +17,7 @@ namespace Lucy {
 		return nullptr;
 	}
 
-	CommandResourceHandle CommandQueue::CreateCommandResource(Ref<GraphicsPipeline> pipeline, CommandFunc&& func) {
+	CommandResourceHandle CommandQueue::CreateCommandResource(Ref<ContextPipeline> pipeline, CommandFunc&& func) {
 		LUCY_PROFILE_NEW_EVENT("CommandQueue::CreateCommandResource");
 		CommandResourceHandle uniqueHandle = CommandResource::CreateUniqueHandle();
 		CommandResource commandResource = CommandResource(pipeline, std::move(func));
@@ -28,8 +30,8 @@ namespace Lucy {
 		LUCY_PROFILE_NEW_EVENT("CommandQueue::CreateChildCommandResource");
 		CommandResource& parentCommandResource = m_CommandResourceMap[parentResourceHandle];
 
-		const Ref<GraphicsPipeline>& parentPipeline = parentCommandResource.GetTargetPipeline();
-		if (parentPipeline->GetRenderPass().Get() != childPipeline->GetRenderPass().Get() || parentPipeline->GetFrameBuffer().Get() != childPipeline->GetFrameBuffer().Get()) {
+		const Ref<GraphicsPipeline>& parentPipeline = parentCommandResource.GetTargetPipeline().As<GraphicsPipeline>();
+		if (parentPipeline->GetRenderPass() != childPipeline->GetRenderPass() || parentPipeline->GetFrameBuffer() != childPipeline->GetFrameBuffer()) {
 			LUCY_CRITICAL("This configuration cannot be processed!");
 			LUCY_CRITICAL("Child pipeline must have the same renderpass and framebuffer as the parent pipeline.");
 			LUCY_ASSERT(false);

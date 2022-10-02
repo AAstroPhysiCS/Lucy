@@ -2,6 +2,8 @@
 #include "VulkanRenderDevice.h"
 
 #include "Renderer/Context/VulkanGraphicsPipeline.h"
+#include "Renderer/Context/VulkanComputePipeline.h"
+
 #include "Renderer/Descriptors/VulkanDescriptorSet.h"
 
 #include "Renderer/Memory/Buffer/Vulkan/VulkanVertexBuffer.h"
@@ -45,17 +47,12 @@ namespace Lucy {
 		pushConstant.Bind((VkCommandBuffer)commandBufferHandle, pipeline.As<VulkanGraphicsPipeline>()->GetPipelineLayout());
 	}
 
-	void VulkanRenderDevice::BindPipeline(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline) {
+	void VulkanRenderDevice::BindPipeline(void* commandBufferHandle, Ref<ContextPipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindPipeline");
-
-		VulkanGraphicsPipelineBindInfo info;
-		info.PipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		info.CommandBuffer = (VkCommandBuffer)commandBufferHandle;
-
-		pipeline.As<VulkanGraphicsPipeline>()->Bind(info);
+		pipeline->Bind(commandBufferHandle);
 	}
 
-	void VulkanRenderDevice::UpdateDescriptorSets(Ref<GraphicsPipeline> pipeline) {
+	void VulkanRenderDevice::UpdateDescriptorSets(Ref<ContextPipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::UpdateDescriptorSets");
 
 		for (Ref<DescriptorSet> descriptorSet : pipeline->GetDescriptorSets()) {
@@ -68,15 +65,23 @@ namespace Lucy {
 	//vulkanpipeline bind. We can have a bind there with specific stuff.
 	//no need to have the parent class have a bind method (we cant generalize it like that)
 
-	void VulkanRenderDevice::BindAllDescriptorSets(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline) {
+	void VulkanRenderDevice::BindAllDescriptorSets(void* commandBufferHandle, Ref<ContextPipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindAllDescriptorSets");
-
-		Ref<VulkanGraphicsPipeline> vulkanPipeline = pipeline.As<VulkanGraphicsPipeline>();
 
 		VulkanDescriptorSetBindInfo bindInfo;
 		bindInfo.CommandBuffer = (VkCommandBuffer)commandBufferHandle;
-		bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		bindInfo.PipelineLayout = vulkanPipeline->GetPipelineLayout();
+		switch (pipeline->GetType()) {
+			case ContextPipelineType::Graphics:
+				bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+				bindInfo.PipelineLayout = pipeline.As<VulkanGraphicsPipeline>()->GetPipelineLayout();
+				break;
+			case ContextPipelineType::Compute:
+				bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
+				bindInfo.PipelineLayout = pipeline.As<VulkanComputePipeline>()->GetPipelineLayout();
+				break;
+			default:
+				LUCY_ASSERT(false);
+		}
 
 		for (Ref<DescriptorSet> descriptorSet : pipeline->GetDescriptorSets()) {
 			Ref<VulkanDescriptorSet> vulkanSet = descriptorSet.As<VulkanDescriptorSet>();
@@ -84,15 +89,22 @@ namespace Lucy {
 		}
 	}
 
-	void VulkanRenderDevice::BindDescriptorSet(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline, uint32_t setIndex) {
+	void VulkanRenderDevice::BindDescriptorSet(void* commandBufferHandle, Ref<ContextPipeline> pipeline, uint32_t setIndex) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindDescriptorSet");
-
-		Ref<VulkanGraphicsPipeline> vulkanPipeline = pipeline.As<VulkanGraphicsPipeline>();
 
 		VulkanDescriptorSetBindInfo bindInfo;
 		bindInfo.CommandBuffer = (VkCommandBuffer)commandBufferHandle;
 		bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		bindInfo.PipelineLayout = vulkanPipeline->GetPipelineLayout();
+		switch (pipeline->GetType()) {
+			case ContextPipelineType::Graphics:
+				bindInfo.PipelineLayout = pipeline.As<VulkanGraphicsPipeline>()->GetPipelineLayout();
+				break;
+			case ContextPipelineType::Compute:
+				bindInfo.PipelineLayout = pipeline.As<VulkanComputePipeline>()->GetPipelineLayout();
+				break;
+			default:
+				LUCY_ASSERT(false);
+		}
 
 		for (Ref<DescriptorSet> descriptorSet : pipeline->GetDescriptorSets()) {
 			if (descriptorSet->GetSetIndex() == setIndex) {
@@ -105,6 +117,10 @@ namespace Lucy {
 
 	void VulkanRenderDevice::DrawIndexed(void* commandBufferHandle, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {
 		vkCmdDrawIndexed((VkCommandBuffer)commandBufferHandle, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+	}
+
+	void VulkanRenderDevice::DispatchCompute(void* commandBufferHandle, Ref<ComputePipeline> computePipeline, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) {
+		computePipeline.As<VulkanComputePipeline>()->Dispatch(commandBufferHandle, groupCountX, groupCountY, groupCountZ);
 	}
 
 	void VulkanRenderDevice::BeginRenderPass(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline) {

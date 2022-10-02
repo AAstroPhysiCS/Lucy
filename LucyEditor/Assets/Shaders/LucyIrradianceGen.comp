@@ -1,0 +1,110 @@
+//type compute
+#version 450
+
+layout (local_size_x = 32, local_size_y = 32) in;
+
+layout (set = 0, binding = 0, rgba32f) readonly uniform imageCube u_EnvironmentMap;
+layout (set = 0, binding = 1, rgba32f) writeonly uniform imageCube u_EnvironmentIrradianceMap;
+
+#define PI 3.1415926535897932384626433832795f
+#define TWO_PI 6.283185307179586476925286766559f
+#define HALF_PI 1.57079632679489661923132169163975f
+
+/*
+    Helper function
+*/
+float max3(vec3 v) {
+    return max(max(v.x, v.y), v.z);
+}
+
+/*
+    Thanks to Alin for these conversion functions
+*/
+vec3 cubeCoordToWorld(ivec3 cubeCoord, vec2 cubemapSize) {
+    vec2 texCoord = vec2(cubeCoord.xy) / cubemapSize;
+    texCoord = texCoord  * 2.0 - 1.0;
+    switch(cubeCoord.z) {
+        case 0: 
+            return vec3(1.0, -texCoord.yx); // +x
+        case 1: 
+            return vec3(-1.0, -texCoord.y, texCoord.x); //-x
+        case 2: 
+            return vec3(texCoord.x, 1.0, texCoord.y); //+y
+        case 3: 
+            return vec3(texCoord.x, -1.0, -texCoord.y); //-y
+        case 4: 
+            return vec3(texCoord.x, -texCoord.y, 1.0); //+z
+        case 5: 
+            return vec3(-texCoord.xy, -1.0); //-z
+    }
+    return vec3(0.0);
+}
+
+ivec3 texCoordToCube(vec3 texCoord, vec2 cubemapSize) {
+    vec3 abst = abs(texCoord);
+    texCoord /= max3(abst);
+
+    float cubeFace;
+    vec2 uvCoord;
+    if (abst.x > abst.y && abst.x > abst.z) {
+        // x major
+        float negx = step(texCoord.x, 0.0);
+        uvCoord = mix(-texCoord.zy, vec2(texCoord.z, -texCoord.y), negx);
+        cubeFace = negx;
+    } else if (abst.y > abst.z) {
+        // y major
+        float negy = step(texCoord.y, 0.0);
+        uvCoord = mix(texCoord.xz, vec2(texCoord.x, -texCoord.z), negy);
+        cubeFace = 2.0 + negy;
+    } else {
+        // z major
+        float negz = step(texCoord.z, 0.0);
+        uvCoord = mix(vec2(texCoord.x, -texCoord.y), -texCoord.xy, negz);
+        cubeFace = 4.0 + negz;
+    }
+    uvCoord = (uvCoord + 1.0) * 0.5; // 0..1
+    uvCoord = uvCoord * cubemapSize;
+    uvCoord = clamp(uvCoord, vec2(0.0), cubemapSize - vec2(1.0));
+
+    return ivec3(ivec2(uvCoord), int(cubeFace));
+}
+
+void main() {
+    //TODO: make this dynamic
+    const vec2 cubemapSize = vec2(1024, 1024);
+
+    ivec3 cubeCoord = ivec3(gl_GlobalInvocationID);
+    vec3 worldPos = cubeCoordToWorld(cubeCoord, cubemapSize);
+
+	vec3 normalVector = normalize(worldPos);
+	vec3 upVector = vec3(0.0f, 1.0f, 0.0f);
+	vec3 rightVector = normalize(cross(upVector, normalVector));
+	upVector = cross(normalVector, rightVector);
+
+	vec3 irradianceColor = vec3(0.0f);
+
+	const float iterDeltaPhi = 0.025f;
+	const float iterDeltaTheta = 0.025f;
+
+	for (float phi = 0.0f; phi < TWO_PI; phi += iterDeltaPhi) {
+        float sinPhi = sin(phi);
+        float cosPhi = cos(phi);
+
+		for (float theta = 0.0f; theta < HALF_PI; theta += iterDeltaTheta) {
+            float sinTheta = sin(theta);
+            float cosTheta = cos(theta);
+
+            vec3 sphereCoord = vec3(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
+			vec3 sampleVector = sphereCoord.x * rightVector + sphereCoord.y * upVector + sphereCoord.z * normalVector;
+
+            ivec3 sampleCoord = texCoordToCube(sampleVector, cubemapSize);
+
+            irradianceColor += imageLoad(u_EnvironmentMap, sampleCoord).rgb * cosTheta * sinTheta;
+		}
+	}
+
+	float totalSampleCount = (TWO_PI / iterDeltaPhi) * (HALF_PI / iterDeltaTheta);
+
+    irradianceColor *= PI * (1.0f / totalSampleCount);
+	imageStore(u_EnvironmentIrradianceMap, cubeCoord, vec4(irradianceColor, 1.0f));
+}

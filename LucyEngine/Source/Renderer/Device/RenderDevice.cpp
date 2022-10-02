@@ -34,7 +34,7 @@ namespace Lucy {
 		m_CommandQueue->SubmitWorkToGPU(queueHandle, currentFrameFence, currentFrameWaitSemaphore, currentFrameSignalSemaphore);
 	}
 
-	CommandResourceHandle RenderDevice::CreateCommandResource(Ref<GraphicsPipeline> pipeline, CommandFunc&& func) {
+	CommandResourceHandle RenderDevice::CreateCommandResource(Ref<ContextPipeline> pipeline, CommandFunc&& func) {
 		LUCY_PROFILE_NEW_EVENT("RenderDevice::CreateCommandResource");
 		return m_CommandQueue->CreateCommandResource(pipeline, std::move(func));
 	}
@@ -49,6 +49,11 @@ namespace Lucy {
 		m_DeletionQueue.push_back([=]() {
 			m_CommandQueue->DeleteCommandResource(resourceHandle);
 		});
+	}
+	
+	void RenderDevice::EnqueueResourceFree(EnqueueFunc&& func) {
+		LUCY_PROFILE_NEW_EVENT("RenderDevice::EnqueueCommandResourceFree");
+		m_DeletionQueue.push_back(func);
 	}
 
 	void RenderDevice::DispatchCommands() {

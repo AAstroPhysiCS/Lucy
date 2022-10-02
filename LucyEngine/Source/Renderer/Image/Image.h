@@ -103,12 +103,17 @@ namespace Lucy {
 		static Ref<Image> CreateCube(const std::string& path, ImageCreateInfo& createInfo);
 		static Ref<Image> CreateCube(ImageCreateInfo& createInfo);
 
+		static Ref<Image>& GetBlankCube();
+
 		virtual void Destroy() = 0;
 
-		const std::string& GetPath() const { return m_Path; }
-		const int32_t& GetChannels() const { return m_Channels; }
-		const int32_t& GetWidth() const { return m_Width; }
-		const int32_t& GetHeight() const { return m_Height; }
+		inline const std::string& GetPath() const { return m_Path; }
+		inline const int32_t& GetChannels() const { return m_Channels; }
+		inline const int32_t& GetWidth() const { return m_Width; }
+		inline const int32_t& GetHeight() const { return m_Height; }
+
+		inline const uint32_t GetLayerCount() const { return m_LayerCount; }
+		inline const uint32_t GetMaxMipLevel() const { return m_MaxMipLevel; }
 
 		ImageImGuiID GetImGuiID() const { return m_ImGuiID; }
 	protected:
@@ -121,6 +126,8 @@ namespace Lucy {
 		int32_t m_Channels = 0;
 		int32_t m_Width = 0;
 		int32_t m_Height = 0;
+
+		uint32_t m_LayerCount = 1;
 
 		ImageImGuiID m_ImGuiID = 0;
 

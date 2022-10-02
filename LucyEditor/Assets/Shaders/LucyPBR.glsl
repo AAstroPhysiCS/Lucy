@@ -45,7 +45,7 @@ const uint ROUGHNESS_MASK = 0x00000001u;
 const uint METALLIC_MASK = 0x00000002u;
 const uint AO_MASK = 0x00000004u;
 
-const float PI = 3.14159265359f;
+#define PI 3.1415926535897932384626433832795f
 
 #define NULL_TEXTURE_SLOT -1
 
@@ -85,6 +85,8 @@ layout (set = 0, binding = 1) uniform LucyLightningValues {
 layout (set = 0, binding = 2) readonly buffer LucyMaterialAttributes {
 	MaterialAttributes b_MaterialAttributes[];
 };
+
+layout (set = 0, binding = 3) uniform samplerCube u_IrradianceMap;
 
 layout (set = 1, binding = 0) uniform sampler2D u_Textures[];
 
@@ -227,8 +229,9 @@ void main() {
 	specularContribution += BRDF(viewDirectionLight, viewDirCamera, modelNormalNormalized, F0, metallicValue, roughnessValue, albedoColor.xyz, u_DirectionalLight.Color);
 	
 	//TODO: get rid of this
-	float ambientContribution = 0.2f;
-	vec3 outputColor = albedoColor.xyz * ambientContribution;
+	vec3 ambientContribution = texture(u_IrradianceMap, normalize(a_Normals)).rgb;
+
+	vec3 outputColor = albedoColor.rgb * ambientContribution;
 	outputColor += specularContribution;
 
 	// Gamma correction

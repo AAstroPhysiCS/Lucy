@@ -26,7 +26,11 @@ namespace Lucy {
 		virtual void BeginScene(Ref<Scene>& scene) = 0;
 		virtual void RenderScene() = 0;
 		virtual RenderContextResultCodes EndScene() = 0;
+		
 		virtual void WaitForDevice() = 0;
+
+		virtual void ExecuteBarrier(void* commandBufferHandle, Ref<Image> image) = 0;
+		virtual void ExecuteBarrier(void* commandBufferHandle, void* imageHandle, uint32_t imageLayout, uint32_t layerCount, uint32_t mipCount) = 0;
 
 		virtual void Destroy();
 

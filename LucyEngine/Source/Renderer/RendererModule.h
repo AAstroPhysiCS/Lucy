@@ -2,6 +2,8 @@
 
 #include "Core/Module.h"
 
+#include "Context/GraphicsPipeline.h"
+
 namespace Lucy {
 
 	class RendererModule : public Module {
@@ -28,7 +30,7 @@ namespace Lucy {
 	};
 
 	/* --- Individual Passes --- */
-	extern void GeometryPass(void* commandBuffer, Ref<GraphicsPipeline> geometryPipeline, RenderCommand* staticMeshRenderCommand);
-	extern void IDPass(void* commandBuffer, Ref<GraphicsPipeline> idPipeline, RenderCommand* staticMeshRenderCommand);
-	extern void CubemapPass(void* commandBuffer, Ref<GraphicsPipeline> cubemapPipeline, RenderCommand* cubemapRenderCommand);
+	extern void GeometryPass(void* commandBuffer, Ref<ContextPipeline> geometryPipeline, RenderCommand* staticMeshRenderCommand);
+	extern void IDPass(void* commandBuffer, Ref<ContextPipeline> idPipeline, RenderCommand* staticMeshRenderCommand);
+	extern void CubemapPass(void* commandBuffer, Ref<ContextPipeline> cubemapPipeline, RenderCommand* cubemapRenderCommand);
 }

@@ -42,6 +42,7 @@ namespace Lucy {
 		m_Path = other->m_Path;
 		m_CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		m_ImGuiID = 0;
+		m_LayerCount = other->m_LayerCount;
 
 		if (other->m_CreateInfo.ImageType != ImageType::Type2DColor &&
 			other->m_CreateInfo.ImageType != ImageType::Type2DDepth &&

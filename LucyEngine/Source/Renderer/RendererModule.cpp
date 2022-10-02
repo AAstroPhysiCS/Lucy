@@ -153,7 +153,7 @@ namespace Lucy {
 			.VertexShaderLayout {
 				{ "a_Pos", ShaderDataSize::Float3 },
 			},
-			.DepthConfiguration = { .DepthCompareOp = DepthCompareOp::LessOrEqual },
+			.DepthConfiguration = {.DepthCompareOp = DepthCompareOp::LessOrEqual },
 			.RenderPass = geometryRenderPass,
 			.FrameBuffer = geometryFrameBuffer,
 			.Shader = hdrSkyboxShader
@@ -211,6 +211,15 @@ namespace Lucy {
 		}
 
 		const auto& cubemapView = m_Scene->View<HDRCubemapComponent>();
+
+		if (cubemapView.size() == 0 && Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan) {
+			const auto& irradianceMapBuffer = m_GeometryPipeline->GetUniformBuffers<VulkanUniformImageBuffer>("u_IrradianceMap");
+
+			const auto& blankCubemapImage = Image::GetBlankCube().As<VulkanImageCube>();
+			const auto& blankView = blankCubemapImage->GetImageView();
+			irradianceMapBuffer->BindImage(blankView.GetVulkanHandle(), blankCubemapImage->GetCurrentLayout(), blankView.GetSampler());
+		}
+
 		for (auto& entity : cubemapView) {
 			Entity e{ m_Scene.Get(), entity };
 			HDRCubemapComponent& hdrComponent = e.GetComponent<HDRCubemapComponent>();
@@ -218,14 +227,19 @@ namespace Lucy {
 				continue;
 
 			if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan && hdrComponent.IsPrimary) {
+				const auto& irradianceMapBuffer = m_GeometryPipeline->GetUniformBuffers<VulkanUniformImageBuffer>("u_IrradianceMap");
+
 				const Ref<VulkanImageCube>& cubeMapImage = hdrComponent.GetCubemapImage();
 				const VulkanImageView& imageView = cubeMapImage->GetImageView();
-				const auto& samplerArray = m_CubemapPipeline->GetUniformBuffers<VulkanUniformImageBuffer>("u_EnvironmentMap");
 
+				const auto& samplerArray = m_CubemapPipeline->GetUniformBuffers<VulkanUniformImageBuffer>("u_EnvironmentMap");
 				samplerArray->BindImage(cubeMapImage);
 
 				Renderer::EnqueueCommand<CubeRenderCommand>(g_CubeResourceHandle, imageView.GetVulkanHandle(), cubeMapImage->GetCurrentLayout(),
 															imageView.GetSampler(), cubeMapImage->GetCubeMesh());
+
+				const auto& irradianceView = cubeMapImage->GetIrradianceView();
+				irradianceMapBuffer->BindImage(irradianceView.GetVulkanHandle(), cubeMapImage->GetCurrentLayout(), irradianceView.GetSampler());
 				break;
 			}
 		}

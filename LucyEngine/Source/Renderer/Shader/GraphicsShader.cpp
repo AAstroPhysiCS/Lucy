@@ -31,13 +31,15 @@ namespace Lucy {
 			std::vector<uint32_t> dataVert = LoadSPIRVData(m_Path, compiler, options, shaderc_shader_kind::shaderc_vertex_shader, cacheFileVert);
 			std::vector<uint32_t> dataFrag = LoadSPIRVData(m_Path, compiler, options, shaderc_shader_kind::shaderc_fragment_shader, cacheFileFrag);
 
-			m_Reflect.Info(m_Path, dataVert, dataFrag);
+			m_Reflect.Info(m_Path, dataVert, VK_SHADER_STAGE_VERTEX_BIT);
+			m_Reflect.Info(m_Path, dataFrag, VK_SHADER_STAGE_FRAGMENT_BIT);
 			LoadInternal(dataVert, dataFrag);
 		} else {
 			std::vector<uint32_t> dataVert = LoadSPIRVDataFromCache(cacheFileVert);
 			std::vector<uint32_t> dataFrag = LoadSPIRVDataFromCache(cacheFileFrag);
 
-			m_Reflect.Info(m_Path, dataVert, dataFrag);
+			m_Reflect.Info(m_Path, dataVert, VK_SHADER_STAGE_VERTEX_BIT);
+			m_Reflect.Info(m_Path, dataFrag, VK_SHADER_STAGE_FRAGMENT_BIT);
 			LoadInternal(dataVert, dataFrag);
 		}
 	}

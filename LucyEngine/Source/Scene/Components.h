@@ -111,6 +111,7 @@ namespace Lucy {
 			hdrCreateInfo.Parameter.W = ImageAddressMode::REPEAT;
 			hdrCreateInfo.Parameter.Mag = ImageFilterMode::LINEAR;
 			hdrCreateInfo.Parameter.Min = ImageFilterMode::LINEAR;
+			hdrCreateInfo.Flags = VK_IMAGE_USAGE_STORAGE_BIT;
 			hdrCreateInfo.GenerateSampler = true;
 			hdrCreateInfo.GenerateMipmap = false; //does not support it yet
 

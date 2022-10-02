@@ -60,8 +60,8 @@ namespace Lucy {
 
 	using EnqueueFunc = std::function<void()>;
 
-	class GraphicsPipeline;
+	class ContextPipeline;
 	class RenderCommand;
 
-	using CommandFunc = std::function<void(void*, Ref<GraphicsPipeline>, RenderCommand*)>;
+	using CommandFunc = std::function<void(void*, Ref<ContextPipeline>, RenderCommand*)>;
 }

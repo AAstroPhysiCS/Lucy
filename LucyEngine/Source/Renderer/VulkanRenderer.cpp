@@ -1,6 +1,7 @@
 #include "lypch.h"
 #include "VulkanRenderer.h"
 
+#include "Context/GraphicsPipeline.h"
 #include "Context/VulkanSwapChain.h"
 #include "Context/VulkanContextDevice.h"
 
@@ -67,11 +68,33 @@ namespace Lucy {
 		return result;
 	}
 
+	void VulkanRenderer::ExecuteBarrier(void* commandBufferHandle, Ref<Image> image) {
+		const auto& vulkanImage = image.As<VulkanImage>();
+		ExecuteBarrier(commandBufferHandle, (void*)vulkanImage->GetVulkanHandle(), vulkanImage->GetCurrentLayout(), vulkanImage->GetLayerCount(), vulkanImage->GetMaxMipLevel());
+	}
+
+	void VulkanRenderer::ExecuteBarrier(void* commandBufferHandle, void* imageHandle, uint32_t imageLayout, uint32_t layerCount, uint32_t mipCount) {
+		VkImageSubresourceRange subResourceRange{};
+		subResourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		subResourceRange.baseMipLevel = 0;
+		subResourceRange.baseArrayLayer = 0;
+		subResourceRange.layerCount = layerCount;
+		subResourceRange.levelCount = mipCount;
+
+		ImageMemoryBarrierCreateInfo createInfo;
+		createInfo.ImageHandle = (VkImage)imageHandle;
+		createInfo.NewLayout = (VkImageLayout)imageLayout;
+		createInfo.OldLayout = createInfo.NewLayout; //no layout changes
+		createInfo.SubResourceRange = subResourceRange;
+
+		ImageMemoryBarrier barrier(createInfo);
+
+		barrier.RunBarrier((VkCommandBuffer)commandBufferHandle);
+	}
+
 	void VulkanRenderer::WaitForDevice() {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::WaitForDevice");
-		
-		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
-		LUCY_VK_ASSERT(vkDeviceWaitIdle(device));
+		LUCY_VK_ASSERT(vkDeviceWaitIdle(VulkanContextDevice::Get().GetLogicalDevice()));
 	}
 
 	void VulkanRenderer::Destroy() {

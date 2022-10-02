@@ -42,6 +42,7 @@ namespace Lucy {
 		ImageViewCreateInfo m_CreateInfo;
 
 		friend class VulkanImage;
+		friend class VulkanImageCube; //for irradiance (can't really reinstantiate the class again, since that would invoke it endlessly)
 	};
 
 	class VulkanImage : public Image {
@@ -77,6 +78,7 @@ namespace Lucy {
 		void CopyBufferToImage(VkImage image, const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& bufferCopyRegions);
 
 		void CreateVulkanImageViewHandle();
+		void CreateVulkanImageViewHandle(VulkanImageView& imageView, VkImage image);
 
 		void GenerateMipmaps();
 		void GenerateMipmaps(VkImage image);

@@ -41,6 +41,9 @@ namespace Lucy {
 		VkImageLayout NewLayout;
 	};
 
+	void DefineMasksByLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags& srcAccessMask, VkAccessFlags& destAccessMask,
+							 VkPipelineStageFlags& sourceStage, VkPipelineStageFlags& destStage);
+
 	//for image layout transitions
 	class ImageMemoryBarrier final {
 	public:
@@ -49,9 +52,6 @@ namespace Lucy {
 
 		void RunBarrier(VkCommandBuffer commandBuffer);
 	private:
-		void DefineMasksByLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags& srcAccessMask, VkAccessFlags& destAccessMask,
-								 VkPipelineStageFlags& sourceStage, VkPipelineStageFlags& destStage);
-
 		ImageMemoryBarrierCreateInfo m_CreateInfo;
 		VkImageMemoryBarrier m_Barrier{};
 	};

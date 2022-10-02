@@ -6,17 +6,12 @@
 
 namespace Lucy {
 
-	struct VulkanGraphicsPipelineBindInfo {
-		VkCommandBuffer CommandBuffer = VK_NULL_HANDLE;
-		VkPipelineBindPoint PipelineBindPoint;
-	};
-
 	class VulkanGraphicsPipeline : public GraphicsPipeline {
 	public:
 		VulkanGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo);
 		virtual ~VulkanGraphicsPipeline() = default;
 
-		void Bind(const VulkanGraphicsPipelineBindInfo& bindInfo);
+		void Bind(void* commandBufferHandle) final override;
 		void Destroy() final override;
 		void Recreate(uint32_t width, uint32_t height) final override;
 
@@ -24,7 +19,6 @@ namespace Lucy {
 		inline VkPipelineLayout GetPipelineLayout() { return m_PipelineLayoutHandle; }
 	private:
 		void Create();
-		void ParseDescriptorSets() final override;
 
 		VkVertexInputBindingDescription CreateBindingDescription();
 		std::vector<VkVertexInputAttributeDescription> CreateAttributeDescription(uint32_t binding);

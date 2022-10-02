@@ -1,35 +1,10 @@
 #include "lypch.h"
-#include "VulkanGraphicsPipeline.h"
-
-#include "Renderer/Renderer.h"
+#include "GraphicsPipeline.h"
 
 namespace Lucy {
 
-	Ref<GraphicsPipeline> GraphicsPipeline::Create(const GraphicsPipelineCreateInfo& createInfo) {
-		switch (Renderer::GetRenderArchitecture()) {
-			case RenderArchitecture::Vulkan:
-				return Memory::CreateRef<VulkanGraphicsPipeline>(createInfo);
-				break;
-			default:
-				LUCY_CRITICAL("Other API's not supported!");
-				LUCY_ASSERT(false);
-				break;
-		}
-		return nullptr;
-	}
-
 	GraphicsPipeline::GraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo)
-		: m_CreateInfo(createInfo) {
-	}
-
-	VulkanPushConstant& GraphicsPipeline::GetPushConstants(const char* name) {
-		for (VulkanPushConstant& pushConstant : m_PushConstants) {
-			if (name == pushConstant.GetName()) {
-				return pushConstant;
-			}
-		}
-		LUCY_CRITICAL(fmt::format("Could not find a suitable Push Constant for the given name: {0}", name));
-		LUCY_ASSERT(false);
+		: ContextPipeline(ContextPipelineType::Graphics), m_CreateInfo(createInfo) {
 	}
 
 	uint32_t GraphicsPipeline::GetSizeFromType(ShaderDataSize size) {

@@ -73,7 +73,6 @@ namespace Lucy {
 		inline std::unordered_multimap<uint32_t, std::vector<ShaderUniformBlock>>& GetShaderUniformBlockMap() { return m_ShaderUniformBlockMap; }
 
 		void Info(std::string& path, std::vector<uint32_t>& data, VkShaderStageFlags stageFlag);
-		void Info(std::string& path, std::vector<uint32_t>& dataVertex, std::vector<uint32_t>& dataFragment);
 	private:
 		ShaderReflect() = default;
 

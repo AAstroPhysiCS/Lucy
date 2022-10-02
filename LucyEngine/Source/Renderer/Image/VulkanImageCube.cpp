@@ -4,9 +4,17 @@
 #include "VulkanImage2D.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/VulkanRenderPass.h"
+
+#include "Renderer/Context/GraphicsPipeline.h"
+#include "Renderer/Context/ComputePipeline.h"
+
 #include "Renderer/Memory/VulkanAllocator.h"
-#include "Renderer/Shader/ShaderLibrary.h"
+
 #include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
+#include "Renderer/Memory/Buffer/Vulkan/VulkanUniformBuffer.h"
+
+#include "Renderer/Shader/ShaderLibrary.h"
+#include "Renderer/Shader/VulkanComputeShader.h"
 
 #include "stb/stb_image.h"
 
@@ -15,10 +23,13 @@
 
 namespace Lucy {
 
-	extern void PrepareEnvironmentalCube(void* commandBuffer, Ref<GraphicsPipeline> pipeline, RenderCommand* command);
+	extern void PrepareEnvironmentalCube(void* commandBuffer, Ref<ContextPipeline> pipeline, RenderCommand* command);
+	extern void ComputeIrradiancePass(void* commandBuffer, Ref<ContextPipeline> pipeline, RenderCommand* command);
 
 	VulkanImageCube::VulkanImageCube(const std::string& path, ImageCreateInfo& createInfo)
 		: VulkanImage(path, createInfo) {
+		m_LayerCount = 6;
+
 		if (m_CreateInfo.ImageType != ImageType::TypeCubeColor)
 			LUCY_ASSERT(false);
 
@@ -27,29 +38,24 @@ namespace Lucy {
 			LUCY_ASSERT(false);
 		}
 
-		ImageCreateInfo hdrImageCreateInfo;
-		hdrImageCreateInfo.Format = m_CreateInfo.Format;
-		hdrImageCreateInfo.ImageType = ImageType::Type2DColor;
-		hdrImageCreateInfo.Parameter = m_CreateInfo.Parameter;
-		hdrImageCreateInfo.GenerateSampler = true;
+		ImageCreateInfo hdrImageCreateInfo {
+			.ImageType = ImageType::Type2DColor,
+			.Format = m_CreateInfo.Format,
+			.Parameter = m_CreateInfo.Parameter,
+			.GenerateSampler = true
+		};
 		m_HDRImage = Image::Create(path, hdrImageCreateInfo).As<VulkanImage2D>();
 
 		//the resolution of the hdr image. its an arbitrary number
-		m_Width = 2048;
-		m_Height = 2048;
+		m_Width = 1024;
+		m_Height = 1024;
 
 		ImageCreateInfo frameBufferImageCreateInfo{
 			.Width = m_Width,
 			.Height = m_Height,
 			.ImageType = ImageType::Type2DArrayColor,
-			.Format = ImageFormat::R32G32B32A32_SFLOAT,
-			.Parameter {
-				.U = ImageAddressMode::REPEAT,
-				.V = ImageAddressMode::REPEAT,
-				.W = ImageAddressMode::REPEAT,
-				.Min = ImageFilterMode::LINEAR,
-				.Mag = ImageFilterMode::LINEAR,
-			},
+			.Format = m_CreateInfo.Format,
+			.Parameter = m_CreateInfo.Parameter,
 			.Flags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
 			.Layers = 6,
 			.GenerateSampler = true
@@ -178,8 +184,9 @@ namespace Lucy {
 	}
 
 	void VulkanImageCube::CreateFromPath() {
-		uint32_t faceCount = 6;
-
+		m_LayerCount = 6;
+		
+		//Storage bit is for compute shaders (for irradiance and co.)
 		VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | m_CreateInfo.Flags;
 
 		if (m_CreateInfo.GenerateSampler)
@@ -190,12 +197,12 @@ namespace Lucy {
 
 		VulkanAllocator& allocator = VulkanAllocator::Get();
 		allocator.CreateVulkanImageVma(m_Width, m_Height, m_MaxMipLevel, (VkFormat)GetAPIImageFormat(m_CreateInfo.Format), m_CurrentLayout,
-									   flags, VK_IMAGE_TYPE_2D, m_Image, m_ImageVma, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT, faceCount);
+									   flags, VK_IMAGE_TYPE_2D, m_Image, m_ImageVma, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT, m_LayerCount);
 
 		if (m_CreateInfo.GenerateMipmap)
 			GenerateMipmaps();
 		else //transitioning only then, when we dont care about mipmapping. Mipmapping already transitions to the right layout#
-			SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 1, faceCount);
+			SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 1, m_LayerCount);
 
 		CreateVulkanImageViewHandle();
 	}
@@ -216,11 +223,11 @@ namespace Lucy {
 			Ref<VulkanFrameBuffer> preparedFrameBuffer = m_Pipeline->GetFrameBuffer();
 			Ref<VulkanImage2D> preparedImage = preparedFrameBuffer->GetImages()[0]; //we are sure, that we have only 1 image
 
-			preparedImage->SetLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 1, 6);
-			SetLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 1, 6);
+			preparedImage->SetLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 1, m_LayerCount);
+			SetLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 1, m_LayerCount);
 
 			std::vector<VkImageCopy> regions;
-			for (uint32_t face = 0; face < 6; face++) {
+			for (uint32_t face = 0; face < m_LayerCount; face++) {
 				VkImageCopy region = {
 					.srcSubresource = {
 						.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -246,7 +253,7 @@ namespace Lucy {
 			}
 			preparedImage->CopyImageToImage(this, regions);
 
-			SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 1, 6);
+			SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 1, m_LayerCount);
 
 			m_Pipeline->Destroy();
 			m_RenderPass->Destroy();
@@ -254,6 +261,45 @@ namespace Lucy {
 
 			m_HDRImage->Destroy();
 		});
+
+#pragma region Irradiance
+
+		Renderer::EnqueueToRenderThread([=]() {
+			VulkanAllocator& allocator = VulkanAllocator::Get();
+			allocator.CreateVulkanImageVma(m_Width, m_Height, m_MaxMipLevel, (VkFormat)GetAPIImageFormat(m_CreateInfo.Format), VK_IMAGE_LAYOUT_UNDEFINED,
+										   VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TYPE_2D, m_IrradianceImageVulkanHandle, m_IrradianceImageVma, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT, m_LayerCount);
+			CreateVulkanImageViewHandle(m_IrradianceImageView, m_IrradianceImageVulkanHandle);
+		});
+
+		m_IrradianceComputePipeline = ComputePipeline::Create({ ShaderLibrary::Get().GetShader("LucyIrradianceGen").As<VulkanComputeShader>() });
+
+		Renderer::EnqueueToRenderThread([=]() {
+			SetLayout(VK_IMAGE_LAYOUT_GENERAL, 0, 1, m_LayerCount);
+			TransitionImageLayout(m_IrradianceImageVulkanHandle, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, 1, m_LayerCount);
+
+			const auto& environmentMap = m_IrradianceComputePipeline->GetUniformBuffers<VulkanUniformImageBuffer>("u_EnvironmentMap");
+			environmentMap->BindImage(m_ImageView.GetVulkanHandle(), m_CurrentLayout, m_ImageView.GetSampler());
+
+			const auto& environmentIrradianceMap = m_IrradianceComputePipeline->GetUniformBuffers<VulkanUniformImageBuffer>("u_EnvironmentIrradianceMap");
+			environmentIrradianceMap->BindImage(m_IrradianceImageView.GetVulkanHandle(), m_CurrentLayout, m_IrradianceImageView.GetSampler());
+			CommandResourceHandle computeHandle = Renderer::CreateCommandResource(m_IrradianceComputePipeline, ComputeIrradiancePass);
+
+			constexpr uint32_t workGroupSize = 32;
+			Renderer::EnqueueCommand<ComputeDispatchCommand>(computeHandle, Priority::HIGH, m_Width / workGroupSize, m_Height / workGroupSize, m_LayerCount);
+			Renderer::EnqueueCommandResourceFree(computeHandle);
+
+			//TODO: Investigate the slow performance
+			//TODO: Investigate, Should I set the layout to VK_IMAGE_SHADER_READ_ONLY_OPTIMAL after irradiance pass?
+		});
+#pragma endregion Irradiance
+
+#pragma region BRDF
+
+#pragma endregion BRDF
+
+#pragma region Prefiltering
+
+#pragma endregion Prefiltering
 	}
 
 	void VulkanImageCube::Recreate(uint32_t width, uint32_t height) {
@@ -274,10 +320,20 @@ namespace Lucy {
 		if (!m_Image)
 			return;
 
-		m_CubeMesh->Destroy();
+		auto& allocator = VulkanAllocator::Get();
+
+		m_IrradianceImageView.Destroy();
+		allocator.DestroyImage(m_IrradianceImageVulkanHandle, m_IrradianceImageVma);
+		m_IrradianceImageVulkanHandle = VK_NULL_HANDLE;
+
+		if (m_IrradianceComputePipeline)
+			m_IrradianceComputePipeline->Destroy();
+
+		if (m_CubeMesh)
+			m_CubeMesh->Destroy();
 		
 		m_ImageView.Destroy();
-		VulkanAllocator::Get().DestroyImage(m_Image, m_ImageVma);
+		allocator.DestroyImage(m_Image, m_ImageVma);
 		m_Image = VK_NULL_HANDLE;
 	}
 }

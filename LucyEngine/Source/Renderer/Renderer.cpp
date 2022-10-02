@@ -20,6 +20,21 @@ namespace Lucy {
 		s_Renderer->Init();
 
 		ShaderLibrary::Get().Init();
+
+		static ImageCreateInfo blankCubeCreateInfo;
+		blankCubeCreateInfo.Width = 1024;
+		blankCubeCreateInfo.Height = 1024;
+		blankCubeCreateInfo.Format = ImageFormat::R32G32B32A32_SFLOAT;
+		blankCubeCreateInfo.ImageType = ImageType::TypeCubeColor;
+		blankCubeCreateInfo.Parameter.U = ImageAddressMode::REPEAT;
+		blankCubeCreateInfo.Parameter.V = ImageAddressMode::REPEAT;
+		blankCubeCreateInfo.Parameter.W = ImageAddressMode::REPEAT;
+		blankCubeCreateInfo.Parameter.Mag = ImageFilterMode::LINEAR;
+		blankCubeCreateInfo.Parameter.Min = ImageFilterMode::LINEAR;
+		blankCubeCreateInfo.GenerateSampler = true;
+
+		auto& blankCube = Image::GetBlankCube();
+		blankCube = Image::CreateCube(blankCubeCreateInfo);
 	}
 
 	void Renderer::BeginScene(Ref<Scene>& scene) {
@@ -49,6 +64,8 @@ namespace Lucy {
 	}
 
 	void Renderer::Destroy() {
+		auto& blankCube = Image::GetBlankCube();
+		blankCube->Destroy();
 		return s_Renderer->Destroy();
 	}
 
@@ -62,22 +79,22 @@ namespace Lucy {
 		s_Renderer->GetRenderDevice()->BindPushConstant(commandBufferHandle, pipeline, pushConstant);
 	}
 
-	void Renderer::BindPipeline(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline) {
+	void Renderer::BindPipeline(void* commandBufferHandle, Ref<ContextPipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::BindPipeline");
 		s_Renderer->GetRenderDevice()->BindPipeline(commandBufferHandle, pipeline);
 	}
 
-	void Renderer::BindAllDescriptorSets(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline) {
+	void Renderer::BindAllDescriptorSets(void* commandBufferHandle, Ref<ContextPipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::BindAllDescriptorSets");
 		s_Renderer->GetRenderDevice()->BindAllDescriptorSets(commandBufferHandle, pipeline);
 	}
 
-	void Renderer::UpdateDescriptorSets(Ref<GraphicsPipeline> pipeline) {
+	void Renderer::UpdateDescriptorSets(Ref<ContextPipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::UpdateDescriptorSets");
 		s_Renderer->GetRenderDevice()->UpdateDescriptorSets(pipeline);
 	}
 
-	void Renderer::BindDescriptorSet(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline, uint32_t setIndex) {
+	void Renderer::BindDescriptorSet(void* commandBufferHandle, Ref<ContextPipeline> pipeline, uint32_t setIndex) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::BindDescriptorSet");
 		s_Renderer->GetRenderDevice()->BindDescriptorSet(commandBufferHandle, pipeline, setIndex);
 	}
@@ -90,6 +107,18 @@ namespace Lucy {
 	void Renderer::DrawIndexed(void* commandBufferHandle, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::DrawIndexed");
 		s_Renderer->GetRenderDevice()->DrawIndexed(commandBufferHandle, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+	}
+
+	void Renderer::DispatchCompute(void* commandBufferHandle, Ref<ComputePipeline> computePipeline, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) {
+		s_Renderer->GetRenderDevice()->DispatchCompute(commandBufferHandle, computePipeline, groupCountX, groupCountY, groupCountZ);
+	}
+
+	void Renderer::ExecuteBarrier(void* commandBufferHandle, Ref<Image> image) {
+		s_Renderer->ExecuteBarrier(commandBufferHandle, image);
+	}
+
+	void Renderer::ExecuteBarrier(void* commandBufferHandle, void* imageHandle, uint32_t imageLayout, uint32_t layerCount, uint32_t mipCount) {
+		s_Renderer->ExecuteBarrier(commandBufferHandle, imageHandle, imageLayout, layerCount, mipCount);
 	}
 
 	void Renderer::BeginRenderPass(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline) {
@@ -110,7 +139,7 @@ namespace Lucy {
 		s_Renderer.As<VulkanRenderer>()->SubmitImmediateCommand(std::move(func));
 	}
 
-	CommandResourceHandle Renderer::CreateCommandResource(Ref<GraphicsPipeline> pipeline, CommandFunc&& func) {
+	CommandResourceHandle Renderer::CreateCommandResource(Ref<ContextPipeline> pipeline, CommandFunc&& func) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::CreateCommandResource");
 		return s_Renderer->GetRenderDevice()->CreateCommandResource(pipeline, std::move(func));
 	}
@@ -123,6 +152,11 @@ namespace Lucy {
 	void Renderer::EnqueueCommandResourceFree(CommandResourceHandle resourceHandle) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::EnqueueCommandResourceFree");
 		return s_Renderer->GetRenderDevice()->EnqueueCommandResourceFree(resourceHandle);
+	}
+
+	void Renderer::EnqueueResourceFree(EnqueueFunc&& func) {
+		LUCY_PROFILE_NEW_EVENT("Renderer::EnqueueResourceFree");
+		return s_Renderer->GetRenderDevice()->EnqueueResourceFree(std::move(func));
 	}
 	
 	void Renderer::EnqueueToRenderThread(EnqueueFunc&& func) {
