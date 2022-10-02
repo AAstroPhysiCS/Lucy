@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="100%" height="100%" src="Content/lucy_logo.png">
+  <img width="65%" height="65%" src="Content/lucy_logo.png">
 </p>
 
 Welcome to Lucy, a high-fidelity game engine, capable of rendering high quality assets, with main emphasis on performance and in-game graphics.
