@@ -228,7 +228,6 @@ void main() {
 	vec3 viewDirectionLight = normalize(u_DirectionalLight.Direction - modelWorldPos);
 	specularContribution += BRDF(viewDirectionLight, viewDirCamera, modelNormalNormalized, F0, metallicValue, roughnessValue, albedoColor.xyz, u_DirectionalLight.Color);
 	
-	//TODO: get rid of this
 	vec3 ambientContribution = texture(u_IrradianceMap, normalize(a_Normals)).rgb;
 
 	vec3 outputColor = albedoColor.rgb * ambientContribution;

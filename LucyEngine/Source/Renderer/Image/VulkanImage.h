@@ -58,7 +58,7 @@ namespace Lucy {
 		inline const VulkanImageView& GetImageView() const { return m_ImageView; }
 
 		void SetLayout(VkImageLayout newLayout);
-		void SetLayout(VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t levelCount, uint32_t layerCount);
+		void SetLayout(VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount);
 
 		void CopyImageToImage(const Ref<VulkanImage>& imageToCopy, const std::vector<VkImageCopy>& imageCopyRegions);
 		void CopyImageToImage(const VulkanImage* imageToCopy, const std::vector<VkImageCopy>& imageCopyRegions);
@@ -83,9 +83,9 @@ namespace Lucy {
 		void GenerateMipmaps();
 		void GenerateMipmaps(VkImage image);
 
-		void TransitionImageLayout(VkImage image, VkImageLayout newLayout, uint32_t baseMipLevel = 0, uint32_t levelCount = 1, uint32_t layerCount = 1);
-		void TransitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel = 0, uint32_t levelCount = 1, uint32_t layerCount = 1);
-		void TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel = 0, uint32_t levelCount = 1, uint32_t layerCount = 1);
+		void TransitionImageLayout(VkImage image, VkImageLayout newLayout, uint32_t baseMipLevel = 0, uint32_t baseArrayLayer = 0, uint32_t levelCount = 1, uint32_t layerCount = 1);
+		void TransitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel = 0, uint32_t baseArrayLayer = 0, uint32_t levelCount = 1, uint32_t layerCount = 1);
+		void TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel = 0, uint32_t baseArrayLayer = 0, uint32_t levelCount = 1, uint32_t layerCount = 1);
 
 		VkImage m_Image = VK_NULL_HANDLE;
 		VmaAllocation m_ImageVma = VK_NULL_HANDLE;

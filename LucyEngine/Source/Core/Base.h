@@ -22,7 +22,7 @@
 #define LUCY_BIND_FUNC(func) std::bind(func, this, std::placeholders::_1)
 
 #define LUCY_ASSERT(arg)											if(!arg) {																							\
-																		LUCY_CRITICAL("Assert failed!");																\
+																		LUCY_CRITICAL(fmt::format("Assert failed! File: {0}, Line: {0}", __FILE__, __LINE__));			\
 																		LUCY_DEBUG_BREAK }
 
 #define LUCY_ASSERT_TEXT(arg, text)									if(!arg) {																							\
@@ -32,7 +32,7 @@
 
 #define LUCY_VK_ASSERT(arg)											if(arg != VK_SUCCESS) {																				\
 																		LUCY_CRITICAL(fmt::format("Vulkan error: {0}", RendererAPICodesToString(arg)));					\
-																		LUCY_CRITICAL("Assert failed!");																\
+																		LUCY_CRITICAL(fmt::format("Vulkan assert failed! File: {0}, Line: {0}", __FILE__, __LINE__));	\
 																		LUCY_DEBUG_BREAK }
 
 #ifdef LUCY_DEBUG
@@ -57,6 +57,8 @@
 #endif
 
 namespace Lucy {
+
+#define USE_COMPUTE_FOR_CUBEMAP_GEN 0
 
 	using EnqueueFunc = std::function<void()>;
 

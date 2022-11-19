@@ -3,7 +3,9 @@
 #include "VulkanImage.h"
 
 #include "Renderer/RenderPass.h"
-#include "Renderer/Memory/Buffer/FrameBuffer.h"
+#include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
+
+#include "Renderer/Context/GraphicsPipeline.h"
 
 #include "Renderer/Mesh.h"
 
@@ -36,7 +38,18 @@ namespace Lucy {
 		VkImage m_IrradianceImageVulkanHandle = VK_NULL_HANDLE;
 		VmaAllocation m_IrradianceImageVma = VK_NULL_HANDLE;
 		VulkanImageView m_IrradianceImageView;
+
+		VkImage m_PrefilterImageVulkanHandle = VK_NULL_HANDLE;
+		VmaAllocation m_PrefilterImageVma = VK_NULL_HANDLE;
+		VulkanImageView m_PrefilterImageView;
+
+#if USE_COMPUTE_FOR_CUBEMAP_GEN
 		Ref<ComputePipeline> m_IrradianceComputePipeline = nullptr;
+		Ref<ComputePipeline> m_PrefilterComputePipeline = nullptr;
+#else
+		Ref<GraphicsPipeline> m_IrradiancePipeline = nullptr;
+		Ref<GraphicsPipeline> m_PrefilterPipeline = nullptr;
+#endif
 
 		Ref<RenderPass> m_RenderPass = nullptr;
 		Ref<FrameBuffer> m_FrameBuffer = nullptr;

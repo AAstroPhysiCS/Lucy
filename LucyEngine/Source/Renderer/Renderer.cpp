@@ -74,7 +74,7 @@ namespace Lucy {
 		s_Renderer->GetRenderDevice()->BindBuffers(commandBufferHandle, mesh);
 	}
 
-	void Renderer::BindPushConstant(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline, const VulkanPushConstant& pushConstant) {
+	void Renderer::BindPushConstant(void* commandBufferHandle, Ref<ContextPipeline> pipeline, const VulkanPushConstant& pushConstant) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::BindPushConstant");
 		s_Renderer->GetRenderDevice()->BindPushConstant(commandBufferHandle, pipeline, pushConstant);
 	}
@@ -129,6 +129,16 @@ namespace Lucy {
 	void Renderer::EndRenderPass(Ref<GraphicsPipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::EndRenderPass");
 		s_Renderer->GetRenderDevice()->EndRenderPass(pipeline);
+	}
+
+	void Renderer::BeginRenderDeviceTimestamp(void* commandBufferHandle) {
+		LUCY_PROFILE_NEW_EVENT("Renderer::BeginRenderDeviceTimestamp");
+		s_Renderer->GetRenderDevice()->BeginTimestamp(commandBufferHandle);
+	}
+
+	void Renderer::EndRenderDeviceTimestamp(void* commandBufferHandle) {
+		LUCY_PROFILE_NEW_EVENT("Renderer::EndRenderDeviceTimestamp");
+		s_Renderer->GetRenderDevice()->EndTimestamp(commandBufferHandle);
 	}
 
 	void Renderer::DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size) {

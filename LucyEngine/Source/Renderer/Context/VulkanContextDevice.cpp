@@ -53,6 +53,7 @@ namespace Lucy {
 			LUCY_INFO(fmt::format("Device API Version: {0}", deviceInfo.ApiVersion));
 			LUCY_INFO("-------------------------------------");
 			deviceInfo.MinUniformBufferAlignment = properties.limits.minUniformBufferOffsetAlignment;
+			deviceInfo.TimestampPeriod = properties.limits.timestampPeriod;
 
 			FindQueueFamilies(device);
 

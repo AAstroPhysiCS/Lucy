@@ -2,6 +2,8 @@
 
 #include "CommandQueue.h"
 
+#include "Renderer/Synchronization/VulkanSyncItems.h"
+
 namespace Lucy {
 
 	class VulkanCommandQueue : public CommandQueue {
@@ -23,5 +25,8 @@ namespace Lucy {
 		void Execute() final override;
 		void SubmitWorkToGPU(void* queueHandle, const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) const final override;
 		void SubmitWorkToGPU(void* queueHandle, uint32_t commandBufferCount, void* commandBufferHandles) const final override;
+		void Free() final override;
+	private:
+		Unique<Fence> m_ImmediateCommandFence = Memory::CreateUnique<Fence>();
 	};
 }

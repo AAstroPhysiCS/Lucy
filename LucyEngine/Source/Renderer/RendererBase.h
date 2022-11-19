@@ -41,11 +41,15 @@ namespace Lucy {
 		inline const uint32_t GetCurrentFrameIndex() const { return m_CurrentFrameIndex; }
 		inline const uint32_t GetMaxFramesInFlight() const { return m_MaxFramesInFlight; }
 
+		inline const double GetRenderTime() const { return m_RenderTime; }
+
 		virtual void OnWindowResize() = 0;
 		virtual void OnViewportResize() = 0;
 		virtual Entity OnMousePicking(Ref<Scene>& scene, const Ref<GraphicsPipeline>& idPipeline) = 0;
 	protected:
 		RendererBase(RenderArchitecture arch, Ref<Window>& window);
+
+		double m_RenderTime = 0.0;
 
 		Ref<RenderContext> m_RenderContext = nullptr;
 		Ref<RenderDevice> m_RenderDevice = nullptr;

@@ -38,6 +38,8 @@ namespace Lucy {
 		m_LastSwapChainResult = VulkanSwapChain::Get().AcquireNextImage(m_WaitSemaphores[m_CurrentFrameIndex].GetSemaphore(), m_ImageIndex);
 		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR)
 			return;
+
+		m_RenderTime = m_RenderDevice->GetTimestampResults();
 	}
 
 	void VulkanRenderer::RenderScene() {
@@ -45,6 +47,7 @@ namespace Lucy {
 
 		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR)
 			return;
+		
 		m_RenderDevice->ExecuteCommandQueue();
 	}
 
@@ -60,7 +63,7 @@ namespace Lucy {
 
 		VulkanContextDevice& contextDevice = VulkanContextDevice::Get();
 		m_RenderDevice->SubmitWorkToGPU(contextDevice.GetGraphicsQueue(), currentFrameFence, currentFrameWaitSemaphore, currentFrameSignalSemaphore);
-		
+
 		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 		RenderContextResultCodes result = (RenderContextResultCodes) swapChain.Present(m_SignalSemaphores[m_CurrentFrameIndex], m_ImageIndex);
 		m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % m_MaxFramesInFlight;

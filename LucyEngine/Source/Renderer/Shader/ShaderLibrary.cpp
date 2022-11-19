@@ -18,7 +18,13 @@ namespace Lucy {
 		PushShader(Shader::Create("LucyHDRSkybox", "Assets/Shaders/LucyHDRSkybox.glsl"));
 		PushShader(Shader::Create("LucyImageToHDRConverter", "Assets/Shaders/LucyImageToHDRConverter.glsl"));
 
+#if USE_COMPUTE_FOR_CUBEMAP_GEN
 		PushShader(Shader::Create("LucyIrradianceGen", "Assets/Shaders/LucyIrradianceGen.comp"));
+		PushShader(Shader::Create("LucyPrefilterGen", "Assets/Shaders/LucyPrefilterGen.comp"));
+#else
+		PushShader(Shader::Create("LucyIrradianceGen", "Assets/Shaders/LucyIrradianceGen.glsl"));
+		PushShader(Shader::Create("LucyPrefilterGen", "Assets/Shaders/LucyPrefilterGen.glsl"));
+#endif
 	}
 
 	void ShaderLibrary::Destroy() {

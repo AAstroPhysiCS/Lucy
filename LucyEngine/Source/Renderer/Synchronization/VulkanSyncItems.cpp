@@ -70,8 +70,8 @@ namespace Lucy {
 				sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 				break;
 			case VK_IMAGE_LAYOUT_GENERAL:
-				srcAccessMask = 0;
-				sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+				srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+				sourceStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 				break;
 			default:
 				LUCY_ASSERT(false);
@@ -91,8 +91,8 @@ namespace Lucy {
 				destStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
 				break;
 			case VK_IMAGE_LAYOUT_GENERAL:
-				destAccessMask = 0;
-				destStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+				destAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+				destStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 				break;
 			default:
 				LUCY_ASSERT(false);

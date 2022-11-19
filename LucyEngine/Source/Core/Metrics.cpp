@@ -1,6 +1,8 @@
 #include "lypch.h"
 #include "Metrics.h"
 
+#include "Renderer/Renderer.h"
+
 #include <chrono>
 
 #include "GLFW/glfw3.h"
@@ -31,6 +33,8 @@ namespace Lucy {
 			Frames = localFrames;
 			localFrames = 0;
 		}
+
+		RenderTime = Renderer::GetRenderTime();
 	}
 
 	void MemoryTracker::Update() {

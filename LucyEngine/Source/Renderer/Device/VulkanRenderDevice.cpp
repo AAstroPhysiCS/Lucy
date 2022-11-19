@@ -1,5 +1,6 @@
 #include "lypch.h"
 #include "VulkanRenderDevice.h"
+#include "Renderer/Context/VulkanContextDevice.h"
 
 #include "Renderer/Context/VulkanGraphicsPipeline.h"
 #include "Renderer/Context/VulkanComputePipeline.h"
@@ -17,6 +18,19 @@
 #include "../Mesh.h"
 
 namespace Lucy {
+
+	void VulkanRenderDevice::Init() {
+		RenderDevice::Init();
+
+		VkQueryPoolCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+		createInfo.queryCount = s_QueryCount;
+		createInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+
+		m_QueryPools.resize(Renderer::GetMaxFramesInFlight());
+		for (uint32_t i = 0; i < Renderer::GetMaxFramesInFlight(); i++)
+			LUCY_VK_ASSERT(vkCreateQueryPool(VulkanContextDevice::Get().GetLogicalDevice(), &createInfo, nullptr, &m_QueryPools[i]));
+	}
 
 	void VulkanRenderDevice::BindBuffers(void* commandBufferHandle, Ref<Mesh> mesh) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindBuffers");
@@ -42,9 +56,18 @@ namespace Lucy {
 		indexBuffer.As<VulkanIndexBuffer>()->Bind(indexInfo);
 	}
 
-	void VulkanRenderDevice::BindPushConstant(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline, const VulkanPushConstant& pushConstant) {
+	void VulkanRenderDevice::BindPushConstant(void* commandBufferHandle, Ref<ContextPipeline> pipeline, const VulkanPushConstant& pushConstant) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindPushConstant");
-		pushConstant.Bind((VkCommandBuffer)commandBufferHandle, pipeline.As<VulkanGraphicsPipeline>()->GetPipelineLayout());
+		switch (pipeline->GetType()) {
+			case ContextPipelineType::Graphics:
+				pushConstant.Bind((VkCommandBuffer)commandBufferHandle, pipeline.As<VulkanGraphicsPipeline>()->GetPipelineLayout());
+				break;
+			case ContextPipelineType::Compute:
+				pushConstant.Bind((VkCommandBuffer)commandBufferHandle, pipeline.As<VulkanComputePipeline>()->GetPipelineLayout());
+				break;
+			default:
+				LUCY_ASSERT(false);
+		}
 	}
 
 	void VulkanRenderDevice::BindPipeline(void* commandBufferHandle, Ref<ContextPipeline> pipeline) {
@@ -94,12 +117,13 @@ namespace Lucy {
 
 		VulkanDescriptorSetBindInfo bindInfo;
 		bindInfo.CommandBuffer = (VkCommandBuffer)commandBufferHandle;
-		bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		switch (pipeline->GetType()) {
 			case ContextPipelineType::Graphics:
+				bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 				bindInfo.PipelineLayout = pipeline.As<VulkanGraphicsPipeline>()->GetPipelineLayout();
 				break;
 			case ContextPipelineType::Compute:
+				bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
 				bindInfo.PipelineLayout = pipeline.As<VulkanComputePipeline>()->GetPipelineLayout();
 				break;
 			default:
@@ -146,6 +170,43 @@ namespace Lucy {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::EndRenderPass");
 
 		pipeline->GetRenderPass().As<VulkanRenderPass>()->End();
+	}
+		
+	void VulkanRenderDevice::BeginTimestamp(void* commandBufferHandle) {
+		vkCmdResetQueryPool((VkCommandBuffer)commandBufferHandle, m_QueryPools[Renderer::GetCurrentFrameIndex()], 0, s_QueryCount);
+		
+		size_t queryIndex = m_QueryStack.size();
+		vkCmdWriteTimestamp((VkCommandBuffer)commandBufferHandle, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_QueryPools[Renderer::GetCurrentFrameIndex()], queryIndex);
+		m_QueryStack.push(queryIndex);
+	}
+
+	double VulkanRenderDevice::GetTimestampResults() {
+		static double localFrameTime = 0;
+
+		uint32_t timestampData[2] = {};
+		VkResult result = vkGetQueryPoolResults(VulkanContextDevice::Get().GetLogicalDevice(), m_QueryPools[Renderer::GetCurrentFrameIndex()], 0, 2,
+												sizeof(timestampData), timestampData, sizeof(timestampData[0]), 0);
+		if (result == VK_SUCCESS) {
+			const float timestampPeriod = VulkanContextDevice::Get().GetTimestampPeriod();
+			double beginFrameTime = timestampData[0] * timestampPeriod * 1e-6;
+			double endFrameTime = timestampData[1] * timestampPeriod * 1e-6;
+
+			localFrameTime = localFrameTime * 0.95 + (endFrameTime - beginFrameTime) * 0.05; //calculating the average
+		}
+
+		return localFrameTime;
+	}
+
+	void VulkanRenderDevice::EndTimestamp(void* commandBufferHandle) {
+		size_t queryIndex = m_QueryStack.top() + 1;
+		vkCmdWriteTimestamp((VkCommandBuffer)commandBufferHandle, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_QueryPools[Renderer::GetCurrentFrameIndex()], queryIndex);
+		m_QueryStack.pop();
+	}
+
+	void VulkanRenderDevice::Destroy() {
+		for (uint32_t i = 0; i < m_QueryPools.size(); i++)
+			vkDestroyQueryPool(VulkanContextDevice::Get().GetLogicalDevice(), m_QueryPools[i], nullptr);
+		RenderDevice::Destroy();
 	}
 
 	void VulkanRenderDevice::SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func) {

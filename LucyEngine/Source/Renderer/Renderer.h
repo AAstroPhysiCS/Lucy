@@ -19,6 +19,7 @@ namespace Lucy {
 		static void RenderScene();
 		static RenderContextResultCodes EndScene();
 		
+		inline static double GetRenderTime() { return s_Renderer->GetRenderTime(); }
 		static void WaitForDevice();
 
 		static void Destroy();
@@ -26,7 +27,7 @@ namespace Lucy {
 		//commandBufferHandle is the handle of the commandBuffer
 		//Vulkan: VkCommandBuffer
 		static void BindBuffers(void* commandBufferHandle, Ref<Mesh> mesh);
-		static void BindPushConstant(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline, const VulkanPushConstant& pushConstant);
+		static void BindPushConstant(void* commandBufferHandle, Ref<ContextPipeline> pipeline, const VulkanPushConstant& pushConstant);
 		static void BindPipeline(void* commandBufferHandle, Ref<ContextPipeline> pipeline);
 		static void BindAllDescriptorSets(void* commandBufferHandle, Ref<ContextPipeline> pipeline);
 		static void UpdateDescriptorSets(Ref<ContextPipeline> pipeline);
@@ -40,6 +41,9 @@ namespace Lucy {
 
 		static void BeginRenderPass(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline);
 		static void EndRenderPass(Ref<GraphicsPipeline> pipeline);
+
+		static void BeginRenderDeviceTimestamp(void* commandBufferHandle);
+		static void EndRenderDeviceTimestamp(void* commandBufferHandle);
 
 		static void DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size);
 		static void SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func);

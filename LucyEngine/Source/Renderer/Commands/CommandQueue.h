@@ -37,7 +37,7 @@ namespace Lucy {
 		void EnqueueCommand(CommandResourceHandle resourceHandle, const Ref<RenderCommand>& command);
 		void Recreate();
 		void Clear();
-		void Free();
+		virtual void Free();
 
 		inline size_t GetQueueSize() const { return m_CommandResourceMap.size(); }
 	protected:

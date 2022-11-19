@@ -82,19 +82,19 @@ namespace Lucy {
 
 		uint64_t imageSize = (uint64_t)m_Width * m_Height * 4 * GetFormatSize(m_CreateInfo.Format);
 
-		VkBuffer m_ImageStagingBuffer = VK_NULL_HANDLE;
-		VmaAllocation m_ImageStagingBufferVma = VK_NULL_HANDLE;
+		VkBuffer imageStagingBuffer = VK_NULL_HANDLE;
+		VmaAllocation imageStagingBufferVma = VK_NULL_HANDLE;
 
 		VulkanAllocator& allocator = VulkanAllocator::Get();
-		allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, m_ImageStagingBuffer, m_ImageStagingBufferVma);
+		allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, imageStagingBuffer, imageStagingBufferVma);
 
 		void* pixelData = nullptr;
-		allocator.MapMemory(m_ImageStagingBufferVma, pixelData);
+		allocator.MapMemory(imageStagingBufferVma, pixelData);
 		if (isHDR)
 			memcpy(pixelData, (float*)data, imageSize);
 		else
 			memcpy(pixelData, data, imageSize);
-		allocator.UnmapMemory(m_ImageStagingBufferVma);
+		allocator.UnmapMemory(imageStagingBufferVma);
 
 		stbi_image_free(data);
 
@@ -110,14 +110,14 @@ namespace Lucy {
 									   flags, VK_IMAGE_TYPE_2D, m_Image, m_ImageVma);
 
 		TransitionImageLayout(m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-		CopyBufferToImage(m_ImageStagingBuffer);
+		CopyBufferToImage(imageStagingBuffer);
 
 		if (m_CreateInfo.GenerateMipmap)
 			GenerateMipmaps();
 		else //transitioning only then, when we dont care about mipmapping. Mipmapping already transitions to the right layout
 			SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-		allocator.DestroyBuffer(m_ImageStagingBuffer, m_ImageStagingBufferVma);
+		allocator.DestroyBuffer(imageStagingBuffer, imageStagingBufferVma);
 
 		CreateVulkanImageViewHandle();
 	}

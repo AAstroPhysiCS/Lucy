@@ -9,6 +9,7 @@ namespace Lucy {
 		uint32_t DriverVersion;
 		uint32_t ApiVersion;
 		uint32_t MinUniformBufferAlignment = 0;
+		float TimestampPeriod = 0;
 	};
 
 	struct QueueFamilyIndices {
@@ -42,6 +43,7 @@ namespace Lucy {
 		inline VkQueue GetComputeQueue() const { return m_ComputeQueue; }
 		
 		inline uint32_t GetMinUniformBufferOffsetAlignment() const { return m_DeviceInfo.MinUniformBufferAlignment; }
+		inline float GetTimestampPeriod() const { return m_DeviceInfo.TimestampPeriod; }
 	private:
 		void PickDeviceByRanking(const std::vector<VkPhysicalDevice>& devices);
 		void CreateLogicalDevice(std::vector<const char*>& enabledValidationLayers);

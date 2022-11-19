@@ -30,6 +30,7 @@ namespace Lucy {
 		std::string outputStr;
 
 		fmt::format_to(std::back_inserter(outputStr), "Frame Time: {0} ms \n", perfMetrics.FrameTime);
+		fmt::format_to(std::back_inserter(outputStr), "Render Time: {0} ms \n", perfMetrics.RenderTime);
 		fmt::format_to(std::back_inserter(outputStr), "Frames: {0} FPS \n", perfMetrics.Frames);
 
 		fmt::format_to(std::back_inserter(outputStr), "Total Allocated Memory: {0} mb \n", tracker.GetTotalAllocated());

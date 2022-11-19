@@ -90,40 +90,44 @@ namespace Lucy {
 	}
 
 	void VulkanImage::GenerateMipmaps(VkImage image) {
-		//Transfering first mip to "src optimal" for read during vkCmdBlit
-		TransitionImageLayout(image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+		//Transfering first mip of all the layers (if it has any) to "src optimal" for read during vkCmdBlit
+		TransitionImageLayout(image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0, 1, m_LayerCount);
 
 		//Generate the mip chain
 		//Copying down the whole mip chain doing a blit from mip-1 to mip
 		Renderer::SubmitImmediateCommand([&](VkCommandBuffer commandBuffer) {
-			for (uint32_t i = 1; i < m_MaxMipLevel; i++) {
-				VkImageBlit blit{};
-				blit.srcSubresource.aspectMask = m_CreateInfo.ImageType == ImageType::Type2DDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
-				blit.srcSubresource.layerCount = 1;
-				blit.srcSubresource.mipLevel = i - 1;
-				blit.srcOffsets[1].x = (m_Width >> (i - 1));
-				blit.srcOffsets[1].y = (m_Height >> (i - 1));
-				blit.srcOffsets[1].z = 1;
+			for (uint32_t mip = 1; mip < m_MaxMipLevel; mip++) {
+				for (uint32_t face = 0; face < m_LayerCount; face++) {
+					VkImageBlit blit{};
+					blit.srcSubresource.aspectMask = m_CreateInfo.ImageType == ImageType::Type2DDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+					blit.srcSubresource.baseArrayLayer = face;
+					blit.srcSubresource.layerCount = 1;
+					blit.srcSubresource.mipLevel = mip - 1;
+					blit.srcOffsets[1].x = (m_Width >> (mip - 1));
+					blit.srcOffsets[1].y = (m_Height >> (mip - 1));
+					blit.srcOffsets[1].z = 1;
 
-				blit.dstSubresource.aspectMask = blit.srcSubresource.aspectMask;
-				blit.dstSubresource.layerCount = 1;
-				blit.dstSubresource.mipLevel = i;
-				blit.dstOffsets[1].x = (m_Width >> i);
-				blit.dstOffsets[1].y = (m_Height >> i);
-				blit.dstOffsets[1].z = 1;
+					blit.dstSubresource.aspectMask = blit.srcSubresource.aspectMask;
+					blit.dstSubresource.baseArrayLayer = face;
+					blit.dstSubresource.layerCount = 1;
+					blit.dstSubresource.mipLevel = mip;
+					blit.dstOffsets[1].x = (m_Width >> mip);
+					blit.dstOffsets[1].y = (m_Height >> mip);
+					blit.dstOffsets[1].z = 1;
 
-				// Prepare current mip level as image blit destination
-				TransitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, i);
+					// Prepare current mip level as image blit destination
+					TransitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mip, face, 1, 1);
 
-				// Blit from previous level
-				vkCmdBlitImage(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+					// Blit from previous level
+					vkCmdBlitImage(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
 
-				// Prepare current mip level as image blit source for next level
-				TransitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, i);
+					// Prepare current mip level as image blit source for next level
+					TransitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, mip, face, 1, 1);
+				}
 			}
 
 			// After the loop, all mip layers are in TRANSFER_SRC layout, so transition all to SHADER_READ
-			TransitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, m_MaxMipLevel);
+			TransitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, m_MaxMipLevel, m_LayerCount);
 		});
 	}
 
@@ -131,8 +135,8 @@ namespace Lucy {
 		TransitionImageLayout(m_Image, newLayout);
 	}
 
-	void VulkanImage::SetLayout(VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t levelCount, uint32_t layerCount) {
-		TransitionImageLayout(m_Image, newLayout, baseMipLevel, levelCount, layerCount);
+	void VulkanImage::SetLayout(VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {
+		TransitionImageLayout(m_Image, newLayout, baseMipLevel, baseArrayLayer, levelCount, layerCount);
 	}
 
 	void VulkanImage::CopyImageToImage(const Ref<VulkanImage>& imageToCopy, const std::vector<VkImageCopy>& imageCopyRegions) {
@@ -143,27 +147,27 @@ namespace Lucy {
 		CopyImageToImage(imageToCopy->GetVulkanHandle(), imageToCopy->GetCurrentLayout(), imageCopyRegions);
 	}
 
-	void VulkanImage::TransitionImageLayout(VkImage image, VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t levelCount, uint32_t layerCount) {
-		return TransitionImageLayout(image, m_CurrentLayout, newLayout, baseMipLevel, levelCount, layerCount);
+	void VulkanImage::TransitionImageLayout(VkImage image, VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {
+		return TransitionImageLayout(image, m_CurrentLayout, newLayout, baseMipLevel, baseArrayLayer, levelCount, layerCount);
 	}
 
-	void VulkanImage::TransitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t levelCount, uint32_t layerCount) {
+	void VulkanImage::TransitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {
 		Renderer::SubmitImmediateCommand([&](VkCommandBuffer commandBuffer) {
-			TransitionImageLayout(commandBuffer, image, oldLayout, newLayout, baseMipLevel, levelCount, layerCount);
+			TransitionImageLayout(commandBuffer, image, oldLayout, newLayout, baseMipLevel, baseArrayLayer, levelCount, layerCount);
 		});
 	}
 
 	/// This is for mipmapping. We dont submit this to the queue. It's just a vorlage
-	void VulkanImage::TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t levelCount, uint32_t layerCount) {
+	void VulkanImage::TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {
 		ImageMemoryBarrierCreateInfo createInfo;
 		createInfo.ImageHandle = image;
 
 		VkImageSubresourceRange subresourceRange{};
 		subresourceRange.aspectMask = m_CreateInfo.ImageType == ImageType::Type2DDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
 		subresourceRange.baseMipLevel = baseMipLevel;
+		subresourceRange.baseArrayLayer = baseArrayLayer;
 		subresourceRange.levelCount = levelCount;
 		subresourceRange.layerCount = layerCount;
-		subresourceRange.baseArrayLayer = 0;
 
 		createInfo.SubResourceRange = subresourceRange;
 		createInfo.OldLayout = oldLayout;

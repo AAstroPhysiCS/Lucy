@@ -211,15 +211,8 @@ namespace Lucy {
 		}
 
 		const auto& cubemapView = m_Scene->View<HDRCubemapComponent>();
-
-		if (cubemapView.size() == 0 && Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan) {
-			const auto& irradianceMapBuffer = m_GeometryPipeline->GetUniformBuffers<VulkanUniformImageBuffer>("u_IrradianceMap");
-
-			const auto& blankCubemapImage = Image::GetBlankCube().As<VulkanImageCube>();
-			const auto& blankView = blankCubemapImage->GetImageView();
-			irradianceMapBuffer->BindImage(blankView.GetVulkanHandle(), blankCubemapImage->GetCurrentLayout(), blankView.GetSampler());
-		}
-
+		bool noValidCubemap = true;
+		
 		for (auto& entity : cubemapView) {
 			Entity e{ m_Scene.Get(), entity };
 			HDRCubemapComponent& hdrComponent = e.GetComponent<HDRCubemapComponent>();
@@ -240,8 +233,18 @@ namespace Lucy {
 
 				const auto& irradianceView = cubeMapImage->GetIrradianceView();
 				irradianceMapBuffer->BindImage(irradianceView.GetVulkanHandle(), cubeMapImage->GetCurrentLayout(), irradianceView.GetSampler());
+				
+				noValidCubemap = false;
 				break;
 			}
+		}
+
+		if (noValidCubemap && Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan) {
+			const auto& irradianceMapBuffer = m_GeometryPipeline->GetUniformBuffers<VulkanUniformImageBuffer>("u_IrradianceMap");
+
+			const auto& blankCubemapImage = Image::GetBlankCube().As<VulkanImageCube>();
+			const auto& blankView = blankCubemapImage->GetImageView();
+			irradianceMapBuffer->BindImage(blankView.GetVulkanHandle(), blankCubemapImage->GetCurrentLayout(), blankView.GetSampler());
 		}
 
 		const auto& meshView = m_Scene->View<MeshComponent>();

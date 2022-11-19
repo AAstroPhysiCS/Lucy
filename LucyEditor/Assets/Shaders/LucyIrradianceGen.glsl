@@ -39,7 +39,7 @@ mat4 CaptureViews[6] = {
 };
 
 void main() {
-    a_PosOut = a_Pos;
+	a_PosOut = a_Pos;
     gl_Layer = gl_ViewIndex;
     gl_Position = u_ProjMatrix * inverse(CaptureViews[gl_ViewIndex]) * vec4(a_Pos, 1.0f);
 }
@@ -51,16 +51,40 @@ layout (location = 0) in vec3 a_Pos;
 
 layout (location = 0) out vec4 a_LayeredColorAttachments; //6 layers
 
-layout (set = 0, binding = 0) uniform sampler2D u_EquirectangularMap;
+layout (set = 0, binding = 0) uniform samplerCube u_EnvironmentMap;
 
-vec2 SampleSphericalMap(vec3 v) {
-    vec2 uv = vec2(atan(v.z, v.x), asin(v.y));
-    uv *= vec2(0.1591, 0.3183);
-    uv += 0.5f;
-    return uv;
-}
+#define PI 3.1415926535897932384626433832795f
+#define TWO_PI 6.283185307179586476925286766559f
+#define HALF_PI 1.57079632679489661923132169163975f
 
 void main() {
-    vec4 color = texture(u_EquirectangularMap, SampleSphericalMap(normalize(a_Pos)));
-    a_LayeredColorAttachments = vec4(color.rgb, 1.0);
+	vec3 normalVector = normalize(a_Pos);
+	vec3 upVector = vec3(0.0f, 1.0f, 0.0f);
+	vec3 rightVector = normalize(cross(upVector, normalVector));
+	upVector = cross(normalVector, rightVector);
+
+	vec3 irradianceColor = vec3(0.0f);
+
+	const float iterDeltaPhi = TWO_PI / 360.0;
+	const float iterDeltaTheta = HALF_PI / 90.0;
+
+	for (float phi = 0.0f; phi < TWO_PI; phi += iterDeltaPhi) {
+        float sinPhi = sin(phi);
+        float cosPhi = cos(phi);
+
+		for (float theta = 0.0f; theta < HALF_PI; theta += iterDeltaTheta) {
+            float sinTheta = sin(theta);
+            float cosTheta = cos(theta);
+
+            vec3 sphereCoord = vec3(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
+			vec3 sampleVector = sphereCoord.x * rightVector + sphereCoord.y * upVector + sphereCoord.z * normalVector;
+
+            irradianceColor += texture(u_EnvironmentMap, sampleVector).rgb * cosTheta * sinTheta;
+		}
+	}
+
+	float totalSampleCount = (TWO_PI / iterDeltaPhi) * (HALF_PI / iterDeltaTheta);
+
+    irradianceColor *= PI * (1.0f / totalSampleCount);
+	a_LayeredColorAttachments = vec4(irradianceColor, 1.0f);
 }

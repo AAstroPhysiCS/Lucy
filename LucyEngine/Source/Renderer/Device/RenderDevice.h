@@ -5,14 +5,28 @@
 namespace Lucy {
 
 	class ComputePipeline;
-
+	/*
+	struct RenderDeviceResource {
+		virtual void Destroy() = 0;
+	};
+	*/
 	class RenderDevice {
 	public:
 		static Ref<RenderDevice> Create();
 
-		void Init();
+		virtual void Init();
 		void Recreate();
 		void EnqueueToRenderThread(EnqueueFunc&& func);
+
+		/*
+		virtual Ref<GraphicsPipeline> CreateGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo) = 0;
+		virtual Ref<ComputePipeline> CreateComputePipeline(const ComputePipelineCreateInfo& createInfo) = 0;
+		virtual Ref<RenderPass> CreateRenderPass(const RenderPassCreateInfo& createInfo) = 0;
+		virtual Ref<Image> CreateImage(const ImageCreateInfo& createInfo);
+		virtual Ref<FrameBuffer> CreateFrameBuffer(const FrameBufferCreateInfo& createInfo) = 0;
+		virtual Ref<VertexBuffer> CreateVertexBuffer(uint32_t size) = 0;
+		virtual Ref<IndexBuffer> CreateIndexBuffer(uint32_t size) = 0;
+		*/
 
 		CommandResourceHandle CreateCommandResource(Ref<ContextPipeline> pipeline, CommandFunc&& func);
 		CommandResourceHandle CreateChildCommandResource(CommandResourceHandle parentResourceHandle, Ref<GraphicsPipeline> childPipeline, CommandFunc&& func);
@@ -36,7 +50,7 @@ namespace Lucy {
 		//commandBufferHandle is the handle of the commandBuffer
 		//Vulkan: VkCommandBuffer
 		virtual void BindBuffers(void* commandBufferHandle, Ref<Mesh> mesh) = 0;
-		virtual void BindPushConstant(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline, const VulkanPushConstant& pushConstant) = 0;
+		virtual void BindPushConstant(void* commandBufferHandle, Ref<ContextPipeline> pipeline, const VulkanPushConstant& pushConstant) = 0;
 		virtual void BindPipeline(void* commandBufferHandle, Ref<ContextPipeline> pipeline) = 0;
 		virtual void UpdateDescriptorSets(Ref<ContextPipeline> pipeline) = 0;
 		virtual void BindAllDescriptorSets(void* commandBufferHandle, Ref<ContextPipeline> pipeline) = 0;
@@ -48,8 +62,12 @@ namespace Lucy {
 
 		virtual void BeginRenderPass(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline) = 0;
 		virtual void EndRenderPass(Ref<GraphicsPipeline> pipeline) = 0;
-		
-		virtual void Destroy(); //leaving it to the child too
+
+		virtual void BeginTimestamp(void* commandBufferHandle) = 0;
+		virtual void EndTimestamp(void* commandBufferHandle) = 0;
+		virtual double GetTimestampResults() = 0;
+
+		virtual void Destroy();
 	protected:
 		std::vector<EnqueueFunc> m_RenderFunctionQueue;
 		std::vector<EnqueueFunc> m_DeletionQueue;

@@ -5,9 +5,9 @@
 
 #include "Renderer/Context/VulkanContextDevice.h"
 #include "Renderer/Context/VulkanGraphicsPipeline.h"
+#include "Renderer/Device/VulkanRenderDevice.h"
 
 #include "Renderer/Renderer.h"
-#include "Renderer/Synchronization/VulkanSyncItems.h"
 
 namespace Lucy {
 
@@ -31,6 +31,8 @@ namespace Lucy {
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 		LUCY_VK_ASSERT(vkBeginCommandBuffer(commandBuffer, &beginInfo));
+
+		Renderer::BeginRenderDeviceTimestamp(commandBuffer);
 
 		//TODO: Multithreading here; mutex and locks for multithreading
 		for (auto& [handle, resource] : m_CommandResourceMap) {
@@ -61,6 +63,8 @@ namespace Lucy {
 			}
 		}
 
+		Renderer::EndRenderDeviceTimestamp(commandBuffer);
+
 		LUCY_VK_ASSERT(vkEndCommandBuffer(commandBuffer));
 	}
 
@@ -86,13 +90,23 @@ namespace Lucy {
 	}
 
 	void VulkanCommandQueue::SubmitWorkToGPU(void* queueHandle, uint32_t commandBufferCount, void* commandBufferHandles) const {
+		LUCY_PROFILE_NEW_EVENT("VulkanCommandQueue::SubmitToQueue");
+		
+		VkFence fenceHandle = m_ImmediateCommandFence->GetFence();
+		vkResetFences(VulkanContextDevice::Get().GetLogicalDevice(), 1, &fenceHandle);
+
 		VkSubmitInfo submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		submitInfo.commandBufferCount = commandBufferCount;
 		submitInfo.pCommandBuffers = (VkCommandBuffer*)&commandBufferHandles;
 
-		vkQueueSubmit((VkQueue)queueHandle, 1, &submitInfo, VK_NULL_HANDLE);
-		vkQueueWaitIdle((VkQueue)queueHandle);
+		vkQueueSubmit((VkQueue)queueHandle, 1, &submitInfo, fenceHandle);
+		vkWaitForFences(VulkanContextDevice::Get().GetLogicalDevice(), 1, &fenceHandle, VK_TRUE, UINT64_MAX);
+	}
+
+	void VulkanCommandQueue::Free() {
+		CommandQueue::Free();
+		m_ImmediateCommandFence->Destroy();
 	}
 
 	VkCommandBuffer VulkanCommandQueue::BeginSingleTimeCommand() const {

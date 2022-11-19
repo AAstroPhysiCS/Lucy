@@ -214,6 +214,11 @@ namespace Lucy {
 			Move<Casted>(other);
 		}
 
+		inline Unique& operator=(std::nullptr_t) {
+			m_Ptr = nullptr;
+			return *this;
+		}
+
 		inline Unique& operator=(const Unique& other) = delete;
 
 		inline Unique& operator=(Unique&& other) noexcept {
@@ -255,6 +260,15 @@ namespace Lucy {
 
 			Unique<Casted> castedRef(castedPtr);
 			return castedRef;
+		}
+
+		template <typename U>
+		void Move(Unique<U>&& other) {
+			m_Ptr = static_cast<T*>(other.m_Ptr);
+			other.m_Ptr = nullptr;
+
+			//or
+			//std::swap(m_Ptr, other.m_Ptr)
 		}
 
 		inline T* Get() { return m_Ptr; }

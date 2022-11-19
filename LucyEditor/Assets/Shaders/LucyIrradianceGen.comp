@@ -4,7 +4,7 @@
 layout (local_size_x = 32, local_size_y = 32) in;
 
 layout (set = 0, binding = 0, rgba32f) readonly uniform imageCube u_EnvironmentMap;
-layout (set = 0, binding = 1, rgba32f) writeonly uniform imageCube u_EnvironmentIrradianceMap;
+layout (set = 0, binding = 1, rgba16f) writeonly uniform imageCube u_EnvironmentIrradianceMap;
 
 #define PI 3.1415926535897932384626433832795f
 #define TWO_PI 6.283185307179586476925286766559f
