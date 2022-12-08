@@ -179,8 +179,8 @@ namespace Lucy {
 		ImGui::End(); //end of dockspace window
 
 		ImGuiIO& io = ImGui::GetIO();
-		float time = glfwGetTime();
-		io.DeltaTime = time > 0.0f ? (time - m_Time) : (1.0f / 60.0f);
+		double time = glfwGetTime();
+		io.DeltaTime = (float) (time > 0.0f ? (time - m_Time) : (1.0f / 60.0f));
 		m_Time = time;
 
 		ImGui::Render();
@@ -214,7 +214,7 @@ namespace Lucy {
 		EventDispatcher& dispatcher = EventDispatcher::GetInstance();
 		dispatcher.Dispatch<ScrollEvent>(e, EventType::ScrollEvent, [&](ScrollEvent& e) {
 			ImGuiIO& io = ImGui::GetIO();
-			io.AddMouseWheelEvent(e.GetXOffset(), e.GetYOffset());
+			io.AddMouseWheelEvent((float)e.GetXOffset(), (float)e.GetYOffset());
 		});
 
 		dispatcher.Dispatch<CursorPosEvent>(e, EventType::CursorPosEvent, [&](CursorPosEvent& e) {

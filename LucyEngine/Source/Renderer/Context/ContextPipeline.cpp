@@ -80,7 +80,7 @@ namespace Lucy {
 
 			VkDescriptorSetLayoutCreateInfo descriptorLayoutInfo{};
 			descriptorLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			descriptorLayoutInfo.bindingCount = layoutBindings.size();
+			descriptorLayoutInfo.bindingCount = (uint32_t)layoutBindings.size();
 			descriptorLayoutInfo.pBindings = layoutBindings.data();
 			descriptorLayoutInfo.pNext = nullptr;
 
@@ -103,7 +103,7 @@ namespace Lucy {
 
 			VkDescriptorSetLayoutBindingFlagsCreateInfo extendedLayoutInfo{};
 			extendedLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
-			extendedLayoutInfo.bindingCount = layoutBindings.size();
+			extendedLayoutInfo.bindingCount = (uint32_t)layoutBindings.size();
 			extendedLayoutInfo.pBindingFlags = bindlessDescriptorFlags.data();
 
 			descriptorLayoutInfo.pNext = &extendedLayoutInfo;

@@ -10,10 +10,10 @@ namespace Lucy {
 
 		void Update();
 
-		float DeltaTime = 0.0f;
-		float FrameTime = 0.0f;
-		float RenderTime = 0.0f;
-		float Frames = 0.0f;
+		double DeltaTime = 0.0;
+		double FrameTime = 0.0;
+		double RenderTime = 0.0;
+		double Frames = 0.0;
 
 		friend struct Metrics;
 	private:

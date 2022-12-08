@@ -51,7 +51,7 @@ namespace Lucy {
 		return {};
 	}
 
-	void Scene::Update(float viewportWidth, float viewportHeight) {
+	void Scene::Update(int32_t viewportWidth, int32_t viewportHeight) {
 		LUCY_PROFILE_NEW_EVENT("Scene::Update");
 
 		m_Camera.SetViewportSize(viewportWidth, viewportHeight);

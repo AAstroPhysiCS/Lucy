@@ -2,11 +2,11 @@
 
 #include "Renderer/RendererBase.h"
 
+#include "Context/ComputePipeline.h"
+
 namespace Lucy {
 
 	class Entity;
-
-	class ComputePipeline;
 
 	class Renderer final {
 	public:

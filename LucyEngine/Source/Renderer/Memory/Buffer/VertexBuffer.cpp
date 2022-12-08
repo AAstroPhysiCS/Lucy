@@ -6,7 +6,7 @@
 
 namespace Lucy {
 
-	Ref<VertexBuffer> VertexBuffer::Create(uint32_t size) {
+	Ref<VertexBuffer> VertexBuffer::Create(size_t size) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanVertexBuffer>(size);
@@ -15,7 +15,7 @@ namespace Lucy {
 		return nullptr;
 	}
 	
-	VertexBuffer::VertexBuffer(uint32_t size) {
+	VertexBuffer::VertexBuffer(size_t size) {
 		Resize(size); //internal std::vector allocation
 	}
 }

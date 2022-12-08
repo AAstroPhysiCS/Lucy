@@ -43,7 +43,7 @@ namespace Utils {
 
 	void OpenDialog(std::string& outString, const DialogFilter filterList[], size_t count, const char* defaultPath) {
 		char* outPath;
-		nfdresult_t result = NFD_OpenDialog(&outPath, (nfdfilteritem_t*)filterList, count, defaultPath);
+		nfdresult_t result = NFD_OpenDialog(&outPath, (nfdfilteritem_t*)filterList, (nfdfiltersize_t)count, defaultPath);
 		if (result == NFD_OKAY) {
 			outString = std::string(outPath);
 			NFD_FreePath((nfdu8char_t*)outPath);
@@ -54,16 +54,16 @@ namespace Utils {
 namespace UIUtils {
 
 	void TextCenter(const std::string& text, float xPadding, uint32_t indent) {
-		TextCenter(text, xPadding);
+		TextCenter(text.c_str(), xPadding);
 	}
 
-	void TextCenter(const char const* text, float xPadding, uint32_t indent) {
+	void TextCenter(const char* const text, float xPadding, uint32_t indent) {
 		float fontSize = ImGui::GetFontSize() * strlen(text) / 2;
 		ImGui::SameLine(ImGui::GetWindowSize().x / 2 - fontSize + (fontSize / 2));
 		ImGui::Text(text);
 	}
 
-	void TextCenterTable(const char const* text, float xPadding, float yPadding, uint32_t indent) {
+	void TextCenterTable(const char* const text, float xPadding, float yPadding, uint32_t indent) {
 		float fontSize = ImGui::GetFontSize() * strlen(text) / 2;
 		float yHalfed = ImGui::CalcItemWidth() / ImGui::GetColumnsCount() / 2;
 		ImGui::SetCursorPosX(ImGui::GetColumnWidth() / 2 - fontSize + (fontSize / 2) + xPadding + indent);

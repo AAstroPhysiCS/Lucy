@@ -60,7 +60,7 @@ namespace Lucy {
 			depthAttachmentDescription.finalLayout = (VkImageLayout)depthAttachment.Final;
 
 			VkAttachmentReference depthAttachmentReference{};
-			depthAttachmentReference.attachment = colorAttachments.size(); //last element will always be the depth attachment
+			depthAttachmentReference.attachment = (uint32_t)colorAttachments.size(); //last element will always be the depth attachment
 			depthAttachmentReference.layout = (VkImageLayout)depthAttachment.Reference.Layout;
 
 			attachmentDescription.push_back(depthAttachmentDescription);
@@ -89,7 +89,7 @@ namespace Lucy {
 
 		VkSubpassDescription subpassDescription{};
 		subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpassDescription.colorAttachmentCount = colorAttachments.size();
+		subpassDescription.colorAttachmentCount = (uint32_t)colorAttachments.size();
 		subpassDescription.pColorAttachments = attachmentReferences.data();
 		subpassDescription.pDepthStencilAttachment = nullptr;
 		
@@ -101,15 +101,15 @@ namespace Lucy {
 
 		VkRenderPassCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-		createInfo.attachmentCount = attachmentDescription.size();
+		createInfo.attachmentCount = (uint32_t)attachmentDescription.size();
 		createInfo.pAttachments = attachmentDescription.data();
 		createInfo.subpassCount = 1;
 		createInfo.pSubpasses = &subpassDescription;
-		createInfo.dependencyCount = subpassDependencies.size();
+		createInfo.dependencyCount = (uint32_t)subpassDependencies.size();
 		createInfo.pDependencies = subpassDependencies.data();
 
 		m_AttachmentCount = createInfo.attachmentCount;
-		m_ColorAttachmentCount = colorAttachments.size();
+		m_ColorAttachmentCount = (uint32_t)colorAttachments.size();
 
 		VkRenderPassMultiviewCreateInfo renderPassMultiview{};
 		if (m_CreateInfo.Multiview.IsValid()) {
@@ -145,7 +145,7 @@ namespace Lucy {
 		if (m_DepthBuffered)
 			clearValues.push_back(clearDepth);
 
-		beginInfo.clearValueCount = clearValues.size();
+		beginInfo.clearValueCount = (uint32_t)clearValues.size();
 		beginInfo.pClearValues = clearValues.data();
 
 		m_BoundedCommandBuffer = info.CommandBuffer;
@@ -154,8 +154,8 @@ namespace Lucy {
 		VkViewport viewport;
 		viewport.x = 0;
 		viewport.y = 0;
-		viewport.width = info.Width;
-		viewport.height = info.Height;
+		viewport.width = (float)info.Width;
+		viewport.height = (float)info.Height;
 		viewport.minDepth = 0.0f;
 		viewport.maxDepth = 1.0f;
 

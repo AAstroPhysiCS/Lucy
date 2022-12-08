@@ -45,7 +45,7 @@ namespace Lucy {
 		TagComponent& tagComponent = entityContext.GetComponent<TagComponent>();
 		char buffer[512];
 		std::string tag = tagComponent.GetTag();
-		std::strncpy(buffer, tag.c_str(), sizeof(buffer));
+		strncpy_s(buffer, tag.c_str(), sizeof(buffer));
 		ImGui::InputText("##hidelabel EntityTagLabel", buffer, sizeof(buffer));
 		tagComponent.SetTag(buffer);
 
@@ -159,7 +159,7 @@ namespace Lucy {
 
 				if (mesh) {
 					std::string& path = mesh->GetPath();
-					std::strncpy(buf, path.c_str(), sizeof(buf));
+					strncpy_s(buf, path.c_str(), sizeof(buf));
 				}
 
 				ImGui::AlignTextToFramePadding();
@@ -199,7 +199,7 @@ namespace Lucy {
 						else
 							textureID = s_CheckerBoardTexture->GetImGuiID();
 
-						ImGui::ImageButton((ImTextureID)textureID, { 64, 64 }, { 0, 0 }, { 1, 1 }, 0.0f);
+						ImGui::ImageButton((ImTextureID)textureID, { 64.0f, 64.0f }, { 0.0f, 0.0f }, { 1.0f, 1.0f }, 0);
 						ImGui::SameLine();
 
 						if (ImGui::BeginCombo("##hideLabel combo", m->GetName().c_str())) {
@@ -246,7 +246,7 @@ namespace Lucy {
 
 				if (cubemap) {
 					const std::string& path = cubemap->GetPath();
-					std::strncpy(buf, path.c_str(), sizeof(buf));
+					strncpy_s(buf, path.c_str(), sizeof(buf));
 				}
 
 				ImGui::Text("Path");

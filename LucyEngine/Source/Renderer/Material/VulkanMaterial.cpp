@@ -27,23 +27,23 @@ namespace Lucy {
 
 		if (HasImage(Material::ALBEDO_TYPE)) {
 			uint32_t pos = uniformImageBuffer->BindImage(GetImage(Material::ALBEDO_TYPE));
-			m_MaterialShaderData.AlbedoSlot = pos;
+			m_MaterialShaderData.AlbedoSlot = (float)pos;
 		}
 		else if (HasImage(Material::NORMALS_TYPE)) {
 			uint32_t pos = uniformImageBuffer->BindImage(GetImage(Material::NORMALS_TYPE));
-			m_MaterialShaderData.NormalSlot = pos;
+			m_MaterialShaderData.NormalSlot = (float)pos;
 		}
 		else if (HasImage(Material::METALLIC_TYPE)) {
 			uint32_t pos = uniformImageBuffer->BindImage(GetImage(Material::METALLIC_TYPE));
-			m_MaterialShaderData.MetallicSlot = pos;
+			m_MaterialShaderData.MetallicSlot = (float)pos;
 		}
 		else if (HasImage(Material::ROUGHNESS_TYPE)) {
 			uint32_t pos = uniformImageBuffer->BindImage(GetImage(Material::ROUGHNESS_TYPE));
-			m_MaterialShaderData.RoughnessSlot = pos;
+			m_MaterialShaderData.RoughnessSlot = (float)pos;
 		}
 		else if (HasImage(Material::AO_TYPE)) {
 			uint32_t pos = uniformImageBuffer->BindImage(GetImage(Material::AO_TYPE));
-			m_MaterialShaderData.AOSlot = pos;
+			m_MaterialShaderData.AOSlot = (float)pos;
 		}
 
 		//TODO: Change diffuse color to vec4

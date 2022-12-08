@@ -17,16 +17,16 @@ namespace Lucy {
 		static bool IsKeyRelease(KeyCode mouseCode);
 
 		static auto GetMousePosition() {
-			struct Size {
-				float x;
-				float y;
+			struct Position {
+				double x;
+				double y;
 			};
-			return Size{ MouseX, MouseY };
+			return Position{ MouseX, MouseY };
 		}
 	private:
 		Input() = delete;
 		~Input() = delete;
-		static float MouseX, MouseY;
+		static double MouseX, MouseY;
 
 		static GLFWwindow* m_RawWindowPtr;
 

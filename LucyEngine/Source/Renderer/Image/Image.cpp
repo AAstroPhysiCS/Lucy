@@ -68,7 +68,7 @@ namespace Lucy {
 	Image::Image(ImageCreateInfo& createInfo)
 		: m_CreateInfo(createInfo), m_Width(createInfo.Width), m_Height(createInfo.Height) {
 		if (m_CreateInfo.GenerateMipmap)
-			m_MaxMipLevel = glm::floor(glm::log2(glm::max(m_Width, m_Height))) + 1;
+			m_MaxMipLevel = (uint32_t)glm::floor(glm::log2(glm::max(m_Width, m_Height))) + 1u;
 	}
 
 	Image::Image(const std::string& path, ImageCreateInfo& createInfo)

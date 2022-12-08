@@ -75,7 +75,7 @@ namespace Lucy {
 		vkEndCommandBuffer(m_CommandBuffers[m_CommandBuffers.size() - 1]);
 	}
 
-	void VulkanCommandPool::FreeCommandBuffers(uint32_t commandBufferCount, uint32_t commandBufferStartIndex) {
+	void VulkanCommandPool::FreeCommandBuffers(uint32_t commandBufferCount, size_t commandBufferStartIndex) {
 		vkFreeCommandBuffers(VulkanContextDevice::Get().GetLogicalDevice(), m_CommandPool, commandBufferCount, &m_CommandBuffers[commandBufferStartIndex]);
 		m_CommandBuffers.erase(m_CommandBuffers.begin() + commandBufferStartIndex, m_CommandBuffers.begin() + commandBufferStartIndex + commandBufferCount);
 	}

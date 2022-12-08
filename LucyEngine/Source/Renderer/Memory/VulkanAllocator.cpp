@@ -88,7 +88,7 @@ namespace Lucy {
 		return 0;
 	}
 
-	void VulkanAllocator::CreateVulkanBufferVma(VulkanBufferUsage lucyBufferUsage, uint32_t size, VkBufferUsageFlags usage,
+	void VulkanAllocator::CreateVulkanBufferVma(VulkanBufferUsage lucyBufferUsage, VkDeviceSize size, VkBufferUsageFlags usage,
 												VkBuffer& bufferHandle, VmaAllocation& vmaAllocation) {
 		VkBufferCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;

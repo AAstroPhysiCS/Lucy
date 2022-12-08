@@ -48,7 +48,7 @@ namespace Lucy {
 		R32_SFLOAT,
 		R32_UINT,
 
-		Unknown
+		Unknown = -1
 	};
 
 	//to be implemented by CLIENT

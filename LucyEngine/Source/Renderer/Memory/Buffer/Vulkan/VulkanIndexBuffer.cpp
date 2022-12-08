@@ -6,14 +6,14 @@
 
 namespace Lucy {
 
-	VulkanIndexBuffer::VulkanIndexBuffer(uint32_t size)
+	VulkanIndexBuffer::VulkanIndexBuffer(size_t size)
 		: IndexBuffer(size) {
 		Renderer::EnqueueToRenderThread([&, size]() {
 			Create(size); //staging buffer allocation
 		});
 	}
 
-	void VulkanIndexBuffer::Create(uint32_t size) {
+	void VulkanIndexBuffer::Create(size_t size) {
 		VulkanAllocator& allocator = VulkanAllocator::Get(); 
 		allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 										m_StagingBufferHandle, m_StagingBufferVma);

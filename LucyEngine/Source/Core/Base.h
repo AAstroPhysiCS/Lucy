@@ -58,7 +58,7 @@
 
 namespace Lucy {
 
-#define USE_COMPUTE_FOR_CUBEMAP_GEN 0
+#define USE_COMPUTE_FOR_CUBEMAP_GEN 1
 
 	using EnqueueFunc = std::function<void()>;
 

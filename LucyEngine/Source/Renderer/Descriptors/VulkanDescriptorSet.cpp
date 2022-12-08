@@ -107,7 +107,7 @@ namespace Lucy {
 						break;
 
 					setWrite.pImageInfo = imageInfos.data();
-					setWrite.descriptorCount = imageInfos.size();
+					setWrite.descriptorCount = (uint32_t)imageInfos.size();
 					setWrite.descriptorType = (VkDescriptorType)ConvertDescriptorType(descriptorType);
 
 					vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr);

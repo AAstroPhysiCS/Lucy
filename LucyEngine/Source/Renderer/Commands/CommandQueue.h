@@ -4,13 +4,13 @@
 
 #include "CommandPool.h"
 
+#include "Renderer/Context/ContextPipeline.h"
+#include "Renderer/Context/GraphicsPipeline.h"
+
 namespace Lucy {
 
 	class Fence;
 	class Semaphore;
-
-	class ContextPipeline;
-	class GraphicsPipeline;
 
 	class CommandQueue {
 	public:

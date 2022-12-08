@@ -85,7 +85,7 @@ namespace Lucy {
 		m_VertexBuffer = VertexBuffer::Create(m_MetadataInfo.TotalVerticesSize * 17);
 		IncreaseMeshCount(this);
 
-		uint32_t from = 0;
+		size_t from = 0;
 		for (uint32_t i = 0; i < m_Submeshes.size(); i++) {
 			Submesh& submesh = m_Submeshes[i];
 			auto& faces = submesh.Faces;

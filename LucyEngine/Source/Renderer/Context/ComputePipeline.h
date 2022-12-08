@@ -2,9 +2,9 @@
 
 #include "ContextPipeline.h"
 
-namespace Lucy {
+#include "Renderer/Shader/ComputeShader.h"
 
-	class ComputeShader;
+namespace Lucy {
 
 	struct ComputePipelineCreateInfo {
 		Ref<ComputeShader> Shader = nullptr;

@@ -47,8 +47,8 @@ namespace Lucy {
 				LUCY_ASSERT(false);
 			}
 
-			std::size_t indexData = 0;
-			for (uint32_t i = from; i < to + from; i++) {
+			size_t indexData = 0;
+			for (size_t i = from; i < to + from; i++) {
 				m_Data[i] = data[indexData++];
 			}
 		}

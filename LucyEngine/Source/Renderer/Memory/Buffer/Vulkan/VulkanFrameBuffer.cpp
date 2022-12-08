@@ -71,7 +71,7 @@ namespace Lucy {
 			VkFramebufferCreateInfo createInfo{};
 			createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 			createInfo.renderPass = m_RenderPass->GetVulkanHandle();
-			createInfo.attachmentCount = imageViewHandles.size();
+			createInfo.attachmentCount = (uint32_t)imageViewHandles.size();
 			createInfo.pAttachments = imageViewHandles.data();
 			createInfo.width = m_CreateInfo.Width;
 			createInfo.height = m_CreateInfo.Height;

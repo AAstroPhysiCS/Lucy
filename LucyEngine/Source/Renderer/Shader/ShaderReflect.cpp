@@ -60,7 +60,7 @@ namespace Lucy {
 		};
 
 		Reflect(compiler, resourcesShaderStage, m_ShaderStageInfo, stageFlag);
-		
+
 		delete compiler;
 	}
 
@@ -78,11 +78,11 @@ namespace Lucy {
 			variable.Offset = compiler->type_struct_member_offset(parentType, index);
 
 			if (variable.Type == ShaderMemberType::Struct) {
-				variable.Size = compiler->get_declared_struct_size(memberType);
+				variable.Size = (uint32_t)compiler->get_declared_struct_size(memberType);
 				//if the member is a struct or a block and if it has member variables
 				ParseStructMemberRecursive(compiler, memberType, variable.Children);
 			} else {
-				variable.Size = compiler->get_declared_struct_member_size(parentType, index);
+				variable.Size = (uint32_t)compiler->get_declared_struct_member_size(parentType, index);
 			}
 
 			out.push_back(variable);
@@ -112,8 +112,8 @@ namespace Lucy {
 			uint32_t set = compiler->get_decoration(ub.id, spv::DecorationDescriptorSet);
 			uint32_t binding = compiler->get_decoration(ub.id, spv::DecorationBinding);
 			auto& arr = compiler->get_type(ub.type_id).array;
-			uint32_t dimension = arr.size();
-			int32_t memberCount = type.member_types.size();
+			size_t dimension = arr.size();
+			size_t memberCount = type.member_types.size();
 
 			if (dimension) {
 				uniformBlock.ArraySize = arr[0];
@@ -125,7 +125,7 @@ namespace Lucy {
 			//excluding samplers, since they dont support "get_declared_struct_size", because they don't have a block of member variables for example
 			uint32_t bufferSize = 0;
 			if (type.basetype != SPIRType::SampledImage && type.basetype != SPIRType::Sampler && type.basetype != SPIRType::Image) {
-				bufferSize = compiler->get_declared_struct_size(type);
+				bufferSize = (uint32_t)compiler->get_declared_struct_size(type);
 
 				//if (bufferSize == 0 && descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) //means we are dealing with a dynamic ssbo
 					//descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
@@ -182,8 +182,8 @@ namespace Lucy {
 
 			const auto& type = compiler->get_type(ub.base_type_id);
 
-			int32_t memberCount = type.member_types.size();
-			uint32_t bufferSize = compiler->get_declared_struct_size(type);
+			size_t memberCount = type.member_types.size();
+			uint32_t bufferSize = (uint32_t)compiler->get_declared_struct_size(type);
 
 			LUCY_INFO(fmt::format("Name = '{0}'", uniformBlock.Name));
 			LUCY_INFO(fmt::format("Members = {0}", memberCount));
@@ -201,9 +201,9 @@ namespace Lucy {
 		auto result = std::find_if(buffer.begin(), buffer.end(), [uniformBlockName](const ShaderUniformBlock& uniformBlock) {
 			return uniformBlockName == uniformBlock.Name;
 		});
-		
+
 		if (result != buffer.end()) {
-			uint32_t index = result - buffer.begin();
+			size_t index = result - buffer.begin();
 			buffer[index].StageFlag = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 			return true;
 		}

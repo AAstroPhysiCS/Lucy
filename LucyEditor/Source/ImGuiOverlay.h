@@ -44,7 +44,7 @@ namespace Lucy {
 		VulkanDescriptorPoolCreateInfo m_PoolSpecs = { {}, VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT, IMGUI_MAX_POOL_SIZES};
 		Ref<VulkanDescriptorPool> m_ImGuiPool = nullptr;
 
-		uint32_t m_Time = 0;
+		double m_Time = 0;
 		std::vector<Panel*> m_Panels;
 
 		ImGuiPipeline m_ImGuiPipeline;

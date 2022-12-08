@@ -70,7 +70,7 @@ namespace Lucy {
 			data = stbi_load(m_Path.c_str(), &m_Width, &m_Height, &m_Channels, STBI_rgb_alpha);
 
 		if (m_CreateInfo.GenerateMipmap)
-			m_MaxMipLevel = glm::floor(glm::log2(glm::max(m_Width, m_Height))) + 1;
+			m_MaxMipLevel = (uint32_t)glm::floor(glm::log2(glm::max(m_Width, m_Height))) + 1u;
 
 		if (!data) {
 			LUCY_CRITICAL(fmt::format("Failed to load a texture. Texture path: {0}", m_Path));
@@ -80,7 +80,7 @@ namespace Lucy {
 		if (m_Width == 0 && m_Height == 0)
 			LUCY_ASSERT(false);
 
-		uint64_t imageSize = (uint64_t)m_Width * m_Height * 4 * GetFormatSize(m_CreateInfo.Format);
+		VkDeviceSize imageSize = (VkDeviceSize)m_Width * m_Height * 4 * GetFormatSize(m_CreateInfo.Format);
 
 		VkBuffer imageStagingBuffer = VK_NULL_HANDLE;
 		VmaAllocation imageStagingBufferVma = VK_NULL_HANDLE;
@@ -127,7 +127,7 @@ namespace Lucy {
 			LUCY_ASSERT(false);
 
 		if (m_CreateInfo.GenerateMipmap)
-			m_MaxMipLevel = glm::floor(glm::log2(glm::max(m_Width, m_Height))) + 1;
+			m_MaxMipLevel = (uint32_t)glm::floor(glm::log2(glm::max(m_Width, m_Height))) + 1u;
 
 		VkImageUsageFlags flags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | m_CreateInfo.Flags;
 

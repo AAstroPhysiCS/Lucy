@@ -161,7 +161,7 @@ namespace Lucy {
 		auto& image = idPipeline->GetFrameBuffer().As<VulkanFrameBuffer>()->GetImages()[m_CurrentFrameIndex];
 		uint32_t imageWidth = image->GetWidth();
 		uint32_t imageHeight = image->GetHeight();
-		uint64_t imageSize = (uint64_t)imageWidth * imageHeight * 4;
+		VkDeviceSize imageSize = (VkDeviceSize)imageWidth * imageHeight * 4;
 
 		if (!m_IDBuffer)
 			VulkanAllocator::Get().CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, m_IDBuffer, m_IDBufferVma);
@@ -178,7 +178,7 @@ namespace Lucy {
 		allocator.UnmapMemory(m_IDBufferVma);
 
 		auto [viewportMouseX, viewportMouseY] = Renderer::GetViewportMousePos();
-		uint32_t bufferPos = 4 * ((viewportMouseY * imageWidth) + viewportMouseX);
+		uint32_t bufferPos = (uint32_t) (4 * ((viewportMouseY * imageWidth) + viewportMouseX));
 		glm::vec3 meshID = glm::vec3(rawData[bufferPos], rawData[bufferPos + 1], rawData[bufferPos + 2]);
 
 		image->SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);

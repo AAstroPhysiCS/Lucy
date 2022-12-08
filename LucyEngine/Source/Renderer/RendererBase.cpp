@@ -10,7 +10,7 @@ namespace Lucy {
 		m_RenderContext = RenderContext::Create(arch, window);
 		m_RenderDevice = RenderDevice::Create();
 	
-		m_MaxFramesInFlight = VulkanSwapChain::Get().m_SwapChainImages.size();
+		m_MaxFramesInFlight = (uint32_t)VulkanSwapChain::Get().m_SwapChainImages.size();
 	}
 
 	Ref<RendererBase> RendererBase::Create(RenderArchitecture arch, Ref<Window>& window) {

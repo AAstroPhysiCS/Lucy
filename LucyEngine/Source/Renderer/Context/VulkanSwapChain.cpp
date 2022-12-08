@@ -174,7 +174,7 @@ namespace Lucy {
 			int32_t width, height;
 			glfwGetFramebufferSize(m_Window->Raw(), &width, &height);
 
-			VkExtent2D actualExtent = { width, height };
+			VkExtent2D actualExtent = { (uint32_t)width, (uint32_t)height };
 
 			actualExtent.width = std::clamp(actualExtent.width, capabilities.surfaceCapabilities.minImageExtent.width, capabilities.surfaceCapabilities.maxImageExtent.width);
 			actualExtent.height = std::clamp(actualExtent.height, capabilities.surfaceCapabilities.minImageExtent.height, capabilities.surfaceCapabilities.maxImageExtent.height);

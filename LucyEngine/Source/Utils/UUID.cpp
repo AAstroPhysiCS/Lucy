@@ -53,7 +53,7 @@ namespace Lucy {
 			return RequestID();
 		}
 
-		uint32_t index = std::distance(s_IDCount.begin(), result);
+		ptrdiff_t index = std::distance(s_IDCount.begin(), result);
 		s_IDCount[index] = index + 1;
 
 		return index;

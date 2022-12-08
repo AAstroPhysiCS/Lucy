@@ -6,16 +6,16 @@ namespace Lucy {
 
 	struct VulkanDeviceInfo {
 		std::string Name;
-		uint32_t DriverVersion;
-		uint32_t ApiVersion;
+		uint32_t DriverVersion = 0;
+		uint32_t ApiVersion = 0;
 		uint32_t MinUniformBufferAlignment = 0;
 		float TimestampPeriod = 0;
 	};
 
 	struct QueueFamilyIndices {
-		uint32_t GraphicsFamily;
-		uint32_t PresentFamily;
-		uint32_t ComputeFamily;
+		uint32_t GraphicsFamily = UINT32_MAX;
+		uint32_t PresentFamily = UINT32_MAX;
+		uint32_t ComputeFamily = UINT32_MAX;
 		bool GraphicsFamilyHasValue = false;
 		bool PresentFamilyHasValue = false;
 		bool ComputeFamilyHasValue = false;
@@ -75,6 +75,6 @@ namespace Lucy {
 		VulkanDeviceInfo m_DeviceInfo;
 		QueueFamilyIndices m_QueueFamilyIndices;
 
-		VkSurfaceKHR m_Surface;
+		VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
 	};
 }

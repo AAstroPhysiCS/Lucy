@@ -38,7 +38,7 @@ namespace Lucy {
 
 			MeshPushConstantData pushConstantData;
 			pushConstantData.FinalTransform = entityTransform * submesh.Transform;
-			pushConstantData.MaterialID = material->GetID();
+			pushConstantData.MaterialID = (float)material->GetID();
 			meshPushConstant.SetData((uint8_t*)&pushConstantData, sizeof(pushConstantData));
 
 			Renderer::BindPushConstant(commandBuffer, pipeline, meshPushConstant);
@@ -62,7 +62,7 @@ namespace Lucy {
 		Renderer::BindAllDescriptorSets(commandBuffer, cubemapPipeline);
 		Renderer::BindBuffers(commandBuffer, cubeMesh);
 
-		Renderer::DrawIndexed(commandBuffer, cubeMesh->GetIndexBuffer()->GetSize(), 1, 0, 0, 0);
+		Renderer::DrawIndexed(commandBuffer, (uint32_t)cubeMesh->GetIndexBuffer()->GetSize(), 1, 0, 0, 0);
 	}
 
 	struct CubePushConstantData {
@@ -88,7 +88,7 @@ namespace Lucy {
 
 		for (uint32_t i = 0; i < 6; i++) {
 			Renderer::BindPushConstant(commandBuffer, pipeline, pushConstant);
-			Renderer::DrawIndexed(commandBuffer, cubeMesh->GetIndexBuffer()->GetSize(), 1, 0, 0, 0);
+			Renderer::DrawIndexed(commandBuffer, (uint32_t)cubeMesh->GetIndexBuffer()->GetSize(), 1, 0, 0, 0);
 		}
 	}
 

@@ -10,14 +10,14 @@ namespace Lucy {
 		VulkanCommandPool(const CommandPoolCreateInfo& createInfo);
 		virtual ~VulkanCommandPool() = default;
 
-		inline VkCommandBuffer GetCommandBuffer(uint32_t index) { return m_CommandBuffers[index]; }
+		inline VkCommandBuffer GetCommandBuffer(size_t index) { return m_CommandBuffers[index]; }
 		inline size_t GetCommandBufferSize() { return m_CommandBuffers.size(); }
 
 		void Destroy() final override;
 		void Recreate() final override;
 	private:
 		void Allocate() final override;
-		void FreeCommandBuffers(uint32_t commandBufferCount, uint32_t commandBufferStartIndex);
+		void FreeCommandBuffers(uint32_t commandBufferCount, size_t commandBufferStartIndex);
 
 		VkCommandBuffer BeginSingleTimeCommand();
 		void EndSingleTimeCommand();

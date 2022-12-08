@@ -12,6 +12,7 @@ namespace Lucy {
 	public:
 		Entity() = default;
 		Entity(Scene* scene, const entt::entity& entity);
+		~Entity() = default;
 
 		bool operator==(Entity& other) {
 			return GetComponent<UUIDComponent>().GetUUID() == other.GetComponent<UUIDComponent>().GetUUID();

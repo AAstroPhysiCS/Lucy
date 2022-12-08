@@ -14,7 +14,7 @@ namespace Lucy {
 	void VulkanDescriptorPool::Create() {
 		VkDescriptorPoolCreateInfo info{};
 		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		info.poolSizeCount = m_CreateInfo.PoolSizesVector.size();
+		info.poolSizeCount = (uint32_t)m_CreateInfo.PoolSizesVector.size();
 		info.pPoolSizes = m_CreateInfo.PoolSizesVector.data();
 		info.maxSets = m_CreateInfo.MaxSet;
 		info.flags = m_CreateInfo.PoolFlags;

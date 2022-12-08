@@ -13,14 +13,14 @@ namespace Lucy {
 
 	class VulkanVertexBuffer : public VertexBuffer {
 	public:
-		VulkanVertexBuffer(uint32_t size);
+		VulkanVertexBuffer(size_t size);
 		virtual ~VulkanVertexBuffer() = default;
 
 		void Bind(const VulkanVertexBindInfo& info);
 		void LoadToGPU() final override;
 		void DestroyHandle() final override;
 	private:
-		void Create(uint32_t size);
+		void Create(size_t size);
 
 		VkBuffer m_StagingBufferHandle = VK_NULL_HANDLE;
 		VkBuffer m_BufferHandle = VK_NULL_HANDLE;

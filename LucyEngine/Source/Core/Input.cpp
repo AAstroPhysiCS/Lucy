@@ -8,8 +8,8 @@ namespace Lucy {
 								LUCY_ASSERT(false); \
 							} \
 
-	float Input::MouseX = 0;
-	float Input::MouseY = 0;
+	double Input::MouseX = 0;
+	double Input::MouseY = 0;
 
 	GLFWwindow* Input::m_RawWindowPtr = nullptr;
 

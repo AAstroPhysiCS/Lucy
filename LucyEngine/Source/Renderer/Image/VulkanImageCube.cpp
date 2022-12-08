@@ -395,6 +395,7 @@ namespace Lucy {
 
 #pragma endregion BRDF
 
+		/*
 #pragma region Prefiltering
 
 #if USE_COMPUTE_FOR_CUBEMAP_GEN //should not be used yet
@@ -512,6 +513,7 @@ namespace Lucy {
 		m_PrefilterPipeline = GraphicsPipeline::Create(prefilterGraphicsPipelineCreateInfo);
 #endif
 #pragma endregion Prefiltering
+*/
 	}
 
 	void VulkanImageCube::Recreate(uint32_t width, uint32_t height) {

@@ -68,7 +68,7 @@ namespace Lucy {
 
 		auto [w, h] = Renderer::GetViewportArea();
 		if (w != m_Size.x || h != m_Size.y) {
-			Renderer::SetViewportArea(m_Size.x, m_Size.y);
+			Renderer::SetViewportArea((int32_t)m_Size.x, (int32_t)m_Size.y);
 			Renderer::OnViewportResize();
 
 			m_RendererModuleOnViewportResize();

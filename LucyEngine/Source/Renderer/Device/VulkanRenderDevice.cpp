@@ -175,7 +175,7 @@ namespace Lucy {
 	void VulkanRenderDevice::BeginTimestamp(void* commandBufferHandle) {
 		vkCmdResetQueryPool((VkCommandBuffer)commandBufferHandle, m_QueryPools[Renderer::GetCurrentFrameIndex()], 0, s_QueryCount);
 		
-		size_t queryIndex = m_QueryStack.size();
+		uint32_t queryIndex = (uint32_t)m_QueryStack.size();
 		vkCmdWriteTimestamp((VkCommandBuffer)commandBufferHandle, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_QueryPools[Renderer::GetCurrentFrameIndex()], queryIndex);
 		m_QueryStack.push(queryIndex);
 	}
@@ -198,7 +198,7 @@ namespace Lucy {
 	}
 
 	void VulkanRenderDevice::EndTimestamp(void* commandBufferHandle) {
-		size_t queryIndex = m_QueryStack.top() + 1;
+		uint32_t queryIndex = m_QueryStack.top() + 1;
 		vkCmdWriteTimestamp((VkCommandBuffer)commandBufferHandle, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_QueryPools[Renderer::GetCurrentFrameIndex()], queryIndex);
 		m_QueryStack.pop();
 	}

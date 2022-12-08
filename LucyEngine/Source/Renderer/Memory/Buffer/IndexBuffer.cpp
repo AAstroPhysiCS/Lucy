@@ -7,7 +7,7 @@
 
 namespace Lucy {
 
-	Ref<IndexBuffer> IndexBuffer::Create(uint32_t size) {
+	Ref<IndexBuffer> IndexBuffer::Create(size_t size) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanIndexBuffer>(size);
@@ -16,7 +16,7 @@ namespace Lucy {
 		return nullptr;
 	}
 
-	IndexBuffer::IndexBuffer(uint32_t size) {
+	IndexBuffer::IndexBuffer(size_t size) {
 		Resize(size); //internal std::vector allocation
 	}
 }

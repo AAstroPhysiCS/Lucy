@@ -7,7 +7,9 @@
 
 #include "GLFW/glfw3.h"
 
-#define NOW() std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count()
+using namespace std::chrono;
+
+#define NOW() duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch()).count()
 
 namespace Lucy {
 
@@ -18,8 +20,8 @@ namespace Lucy {
 
 	void PerformanceMetrics::Update() {
 		static auto startTime = NOW();
-		static float localFrames = 0;
-		static float oldDeltaTime = 0;
+		static double localFrames = 0.0;
+		static double oldDeltaTime = 0.0;
 
 		DeltaTime = glfwGetTime() - oldDeltaTime;
 		oldDeltaTime = DeltaTime;

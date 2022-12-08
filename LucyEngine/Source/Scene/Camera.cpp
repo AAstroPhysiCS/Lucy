@@ -38,11 +38,11 @@ namespace Lucy {
 	void EditorCamera::UpdateValues() {
 		auto [x, y] = Input::GetMousePosition();
 
-		static float lastX = x;
-		static float lastY = y;
+		static double lastX = x;
+		static double lastY = y;
 
-		float xOffset = (x - lastX) * m_Sensivity;
-		float yOffset = (y - lastY) * m_Sensivity;
+		float xOffset = (float) ((x - lastX) * m_Sensivity);
+		float yOffset = (float) ((y - lastY) * m_Sensivity);
 
 		lastX = x;
 		lastY = y;

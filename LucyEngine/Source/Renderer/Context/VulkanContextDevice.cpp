@@ -52,7 +52,7 @@ namespace Lucy {
 			LUCY_INFO(fmt::format("Device Driver Version: {0}", deviceInfo.DriverVersion));
 			LUCY_INFO(fmt::format("Device API Version: {0}", deviceInfo.ApiVersion));
 			LUCY_INFO("-------------------------------------");
-			deviceInfo.MinUniformBufferAlignment = properties.limits.minUniformBufferOffsetAlignment;
+			deviceInfo.MinUniformBufferAlignment = (uint32_t)properties.limits.minUniformBufferOffsetAlignment;
 			deviceInfo.TimestampPeriod = properties.limits.timestampPeriod;
 
 			FindQueueFamilies(device);
@@ -122,15 +122,15 @@ namespace Lucy {
 		VkDeviceCreateInfo deviceCreateInfo{};
 		deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 		deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
-		deviceCreateInfo.queueCreateInfoCount = queueCreateInfos.size();
+		deviceCreateInfo.queueCreateInfoCount = (uint32_t)queueCreateInfos.size();
 		//deviceCreateInfo.pEnabledFeatures = &features;
 		deviceCreateInfo.pNext = &features;
 
 		deviceCreateInfo.ppEnabledExtensionNames = m_DeviceExtensions.data();
-		deviceCreateInfo.enabledExtensionCount = m_DeviceExtensions.size();
+		deviceCreateInfo.enabledExtensionCount = (uint32_t)m_DeviceExtensions.size();
 
 #ifdef LUCY_DEBUG
-		deviceCreateInfo.enabledLayerCount = enabledValidationLayers.size();
+		deviceCreateInfo.enabledLayerCount = (uint32_t)enabledValidationLayers.size();
 		deviceCreateInfo.ppEnabledLayerNames = enabledValidationLayers.data();
 #else
 		deviceCreateInfo.enabledLayerCount = 0;

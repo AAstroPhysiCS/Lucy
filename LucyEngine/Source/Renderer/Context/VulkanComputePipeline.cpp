@@ -31,14 +31,14 @@ namespace Lucy {
 
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutInfo.setLayoutCount = m_DescriptorSetLayouts.size();
+		pipelineLayoutInfo.setLayoutCount = (uint32_t)m_DescriptorSetLayouts.size();
 		pipelineLayoutInfo.pSetLayouts = m_DescriptorSetLayouts.data();
 
 		std::vector<VkPushConstantRange> pushConstantRanges;
 		for (VulkanPushConstant& pc : m_PushConstants)
 			pushConstantRanges.push_back(pc.GetHandle());
 
-		pipelineLayoutInfo.pushConstantRangeCount = pushConstantRanges.size();
+		pipelineLayoutInfo.pushConstantRangeCount = (uint32_t)pushConstantRanges.size();
 		pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.data();
 
 		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();

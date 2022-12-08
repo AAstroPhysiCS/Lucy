@@ -19,7 +19,7 @@ namespace Lucy {
 
 	void VulkanImage::CopyImageToImage(VkImage image, VkImageLayout layout, const std::vector<VkImageCopy>& regions) {
 		Renderer::SubmitImmediateCommand([=](VkCommandBuffer commandBuffer) {
-			vkCmdCopyImage(commandBuffer, m_Image, m_CurrentLayout, image, layout, regions.size(), regions.data());
+			vkCmdCopyImage(commandBuffer, m_Image, m_CurrentLayout, image, layout, (uint32_t)regions.size(), regions.data());
 		});
 	}
 
@@ -75,13 +75,13 @@ namespace Lucy {
 
 	void VulkanImage::CopyImageToBuffer(VkImage image, const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& imageCopyRegions) {
 		Renderer::SubmitImmediateCommand([=](VkCommandBuffer commandBuffer) {
-			vkCmdCopyImageToBuffer(commandBuffer, image, m_CurrentLayout, bufferToCopy, imageCopyRegions.size(), imageCopyRegions.data());
+			vkCmdCopyImageToBuffer(commandBuffer, image, m_CurrentLayout, bufferToCopy, (uint32_t)imageCopyRegions.size(), imageCopyRegions.data());
 		});
 	}
 
 	void VulkanImage::CopyBufferToImage(VkImage image, const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& bufferCopyRegions) {
 		Renderer::SubmitImmediateCommand([=](VkCommandBuffer commandBuffer) {
-			vkCmdCopyBufferToImage(commandBuffer, bufferToCopy, image, m_CurrentLayout, bufferCopyRegions.size(), bufferCopyRegions.data());
+			vkCmdCopyBufferToImage(commandBuffer, bufferToCopy, image, m_CurrentLayout, (uint32_t)bufferCopyRegions.size(), bufferCopyRegions.data());
 		});
 	}
 
@@ -126,8 +126,8 @@ namespace Lucy {
 				}
 			}
 
-			// After the loop, all mip layers are in TRANSFER_SRC layout, so transition all to SHADER_READ
-			TransitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, m_MaxMipLevel, m_LayerCount);
+		// After the loop, all mip layers are in TRANSFER_SRC layout, so transition all to SHADER_READ
+		TransitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, m_MaxMipLevel, m_LayerCount);
 		});
 	}
 
@@ -328,7 +328,7 @@ namespace Lucy {
 		if (!m_CreateInfo.GenerateMipmap) {
 			createInfo.maxLod = 0.0f;
 		} else {
-			createInfo.maxLod = m_CreateInfo.MipmapLevel;
+			createInfo.maxLod = (float)m_CreateInfo.MipmapLevel;
 		}
 
 		LUCY_VK_ASSERT(vkCreateSampler(device.GetLogicalDevice(), &createInfo, nullptr, &m_Sampler));
@@ -349,80 +349,84 @@ namespace Lucy {
 	}
 
 	uint32_t GetAPIImageFormat(ImageFormat format) {
-		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan) {
-			switch (format) {
-				case ImageFormat::R8G8B8A8_UNORM:
-					return VK_FORMAT_R8G8B8A8_UNORM;
-				case ImageFormat::R8G8B8A8_UINT:
-					return VK_FORMAT_R8G8B8A8_UINT;
-				case ImageFormat::R8G8B8A8_SRGB:
-					return VK_FORMAT_R8G8B8A8_SRGB;
-				case ImageFormat::B8G8R8A8_SRGB:
-					return VK_FORMAT_B8G8R8A8_SRGB;
-				case ImageFormat::B8G8R8A8_UINT:
-					return VK_FORMAT_B8G8R8A8_UINT;
-				case ImageFormat::B8G8R8A8_UNORM:
-					return VK_FORMAT_B8G8R8A8_UNORM;
-				case ImageFormat::D32_SFLOAT:
-					return VK_FORMAT_D32_SFLOAT;
-				case ImageFormat::R16G16B16A16_SFLOAT:
-					return VK_FORMAT_R16G16B16A16_SFLOAT;
-				case ImageFormat::R16G16B16A16_UINT:
-					return VK_FORMAT_R16G16B16A16_UINT;
-				case ImageFormat::R16G16B16A16_UNORM:
-					return VK_FORMAT_R16G16B16A16_UNORM;
-				case ImageFormat::R32G32B32A32_SFLOAT:
-					return VK_FORMAT_R32G32B32A32_SFLOAT;
-				case ImageFormat::R32G32B32A32_UINT:
-					return VK_FORMAT_R32G32B32A32_UINT;
-				case ImageFormat::R32G32B32_SFLOAT:
-					return VK_FORMAT_R32G32B32_SFLOAT;
-				case ImageFormat::R32_SFLOAT:
-					return VK_FORMAT_R32_SFLOAT;
-				case ImageFormat::R32_UINT:
-					return VK_FORMAT_R32_UINT;
-				default:
-					return VK_FORMAT_MAX_ENUM;
-			}
+		if (Renderer::GetRenderArchitecture() != RenderArchitecture::Vulkan) {
+			LUCY_ASSERT(false);
+			return VK_FORMAT_MAX_ENUM;
+		}
+		switch (format) {
+			case ImageFormat::R8G8B8A8_UNORM:
+				return VK_FORMAT_R8G8B8A8_UNORM;
+			case ImageFormat::R8G8B8A8_UINT:
+				return VK_FORMAT_R8G8B8A8_UINT;
+			case ImageFormat::R8G8B8A8_SRGB:
+				return VK_FORMAT_R8G8B8A8_SRGB;
+			case ImageFormat::B8G8R8A8_SRGB:
+				return VK_FORMAT_B8G8R8A8_SRGB;
+			case ImageFormat::B8G8R8A8_UINT:
+				return VK_FORMAT_B8G8R8A8_UINT;
+			case ImageFormat::B8G8R8A8_UNORM:
+				return VK_FORMAT_B8G8R8A8_UNORM;
+			case ImageFormat::D32_SFLOAT:
+				return VK_FORMAT_D32_SFLOAT;
+			case ImageFormat::R16G16B16A16_SFLOAT:
+				return VK_FORMAT_R16G16B16A16_SFLOAT;
+			case ImageFormat::R16G16B16A16_UINT:
+				return VK_FORMAT_R16G16B16A16_UINT;
+			case ImageFormat::R16G16B16A16_UNORM:
+				return VK_FORMAT_R16G16B16A16_UNORM;
+			case ImageFormat::R32G32B32A32_SFLOAT:
+				return VK_FORMAT_R32G32B32A32_SFLOAT;
+			case ImageFormat::R32G32B32A32_UINT:
+				return VK_FORMAT_R32G32B32A32_UINT;
+			case ImageFormat::R32G32B32_SFLOAT:
+				return VK_FORMAT_R32G32B32_SFLOAT;
+			case ImageFormat::R32_SFLOAT:
+				return VK_FORMAT_R32_SFLOAT;
+			case ImageFormat::R32_UINT:
+				return VK_FORMAT_R32_UINT;
+			default:
+				return VK_FORMAT_MAX_ENUM;
 		}
 	}
 
 	ImageFormat GetLucyImageFormat(uint32_t format) {
-		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan) {
-			switch (format) {
-				case VK_FORMAT_R8G8B8A8_UNORM:
-					return ImageFormat::R8G8B8A8_UNORM;
-				case VK_FORMAT_R8G8B8A8_UINT:
-					return ImageFormat::R8G8B8A8_UINT;
-				case VK_FORMAT_R8G8B8A8_SRGB:
-					return ImageFormat::R8G8B8A8_SRGB;
-				case VK_FORMAT_B8G8R8A8_SRGB:
-					return ImageFormat::B8G8R8A8_SRGB;
-				case VK_FORMAT_B8G8R8A8_UINT:
-					return ImageFormat::B8G8R8A8_UINT;
-				case VK_FORMAT_B8G8R8A8_UNORM:
-					return ImageFormat::B8G8R8A8_UNORM;
-				case VK_FORMAT_D32_SFLOAT:
-					return ImageFormat::D32_SFLOAT;
-				case VK_FORMAT_R16G16B16A16_SFLOAT:
-					return ImageFormat::R16G16B16A16_SFLOAT;
-				case VK_FORMAT_R16G16B16A16_UINT:
-					return ImageFormat::R16G16B16A16_UINT;
-				case VK_FORMAT_R16G16B16A16_UNORM:
-					return ImageFormat::R16G16B16A16_UNORM;
-				case VK_FORMAT_R32G32B32A32_SFLOAT:
-					return ImageFormat::R32G32B32A32_SFLOAT;
-				case VK_FORMAT_R32G32B32A32_UINT:
-					return ImageFormat::R32G32B32A32_UINT;
-				case VK_FORMAT_R32G32B32_SFLOAT:
-					return ImageFormat::R32G32B32_SFLOAT;
-				case VK_FORMAT_R32_SFLOAT:
-					return ImageFormat::R32_SFLOAT;
-				case VK_FORMAT_R32_UINT:
-					return ImageFormat::R32_UINT;
-				default:
-					return ImageFormat::Unknown;
-			}
+		if (Renderer::GetRenderArchitecture() != RenderArchitecture::Vulkan) {
+			LUCY_ASSERT(false);
+			return ImageFormat::Unknown;
+		}
+		switch (format) {
+			case VK_FORMAT_R8G8B8A8_UNORM:
+				return ImageFormat::R8G8B8A8_UNORM;
+			case VK_FORMAT_R8G8B8A8_UINT:
+				return ImageFormat::R8G8B8A8_UINT;
+			case VK_FORMAT_R8G8B8A8_SRGB:
+				return ImageFormat::R8G8B8A8_SRGB;
+			case VK_FORMAT_B8G8R8A8_SRGB:
+				return ImageFormat::B8G8R8A8_SRGB;
+			case VK_FORMAT_B8G8R8A8_UINT:
+				return ImageFormat::B8G8R8A8_UINT;
+			case VK_FORMAT_B8G8R8A8_UNORM:
+				return ImageFormat::B8G8R8A8_UNORM;
+			case VK_FORMAT_D32_SFLOAT:
+				return ImageFormat::D32_SFLOAT;
+			case VK_FORMAT_R16G16B16A16_SFLOAT:
+				return ImageFormat::R16G16B16A16_SFLOAT;
+			case VK_FORMAT_R16G16B16A16_UINT:
+				return ImageFormat::R16G16B16A16_UINT;
+			case VK_FORMAT_R16G16B16A16_UNORM:
+				return ImageFormat::R16G16B16A16_UNORM;
+			case VK_FORMAT_R32G32B32A32_SFLOAT:
+				return ImageFormat::R32G32B32A32_SFLOAT;
+			case VK_FORMAT_R32G32B32A32_UINT:
+				return ImageFormat::R32G32B32A32_UINT;
+			case VK_FORMAT_R32G32B32_SFLOAT:
+				return ImageFormat::R32G32B32_SFLOAT;
+			case VK_FORMAT_R32_SFLOAT:
+				return ImageFormat::R32_SFLOAT;
+			case VK_FORMAT_R32_UINT:
+				return ImageFormat::R32_UINT;
+			default:
+				return ImageFormat::Unknown;
 		}
 	}
 }

@@ -59,7 +59,7 @@ namespace Lucy {
 	void RenderDevice::DispatchCommands() {
 		LUCY_PROFILE_NEW_EVENT("RenderDevice::DispatchCommands");
 
-		uint32_t oldSize = m_RenderFunctionQueue.size();
+		size_t oldSize = m_RenderFunctionQueue.size();
 		for (uint32_t i = 0; i < oldSize; i++) {
 			m_RenderFunctionQueue[i](); //functions can contain nested functions
 		}
@@ -71,7 +71,7 @@ namespace Lucy {
 		LUCY_PROFILE_NEW_EVENT("RenderDevice::ExecuteCommandQueue");
 		m_CommandQueue->Execute();
 
-		uint32_t oldSizeDeletionQueue = m_DeletionQueue.size();
+		size_t oldSizeDeletionQueue = m_DeletionQueue.size();
 		for (uint32_t i = 0; i < oldSizeDeletionQueue; i++) {
 			m_DeletionQueue[i]();
 		}

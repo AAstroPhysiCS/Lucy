@@ -118,9 +118,9 @@ namespace Lucy {
 		vulkanCommandPool->EndSingleTimeCommand();
 
 		VkQueue targetedQueue = VulkanContextDevice::Get().GetGraphicsQueue();
-		SubmitWorkToGPU(targetedQueue, 1, vulkanCommandPool->GetCommandBuffer(vulkanCommandPool->GetCommandBufferSize() - 1));
+		SubmitWorkToGPU(targetedQueue, 1u, vulkanCommandPool->GetCommandBuffer(vulkanCommandPool->GetCommandBufferSize() - 1));
 
-		vulkanCommandPool->FreeCommandBuffers(1, vulkanCommandPool->GetCommandBufferSize() - 1);
+		vulkanCommandPool->FreeCommandBuffers(1u, vulkanCommandPool->GetCommandBufferSize() - 1);
 	}
 
 	VkCommandBuffer VulkanCommandQueue::GetCurrentCommandBuffer() const {

@@ -48,7 +48,7 @@ namespace Lucy {
 		std::vector<const char*> instanceExtensions(glfwExtensionNames, glfwExtensionNames + glfwExtensionCount);
 #ifdef LUCY_DEBUG
 		CheckValidationSupport();
-		createInfo.enabledLayerCount = m_ValidationLayers.size();
+		createInfo.enabledLayerCount = (uint32_t)m_ValidationLayers.size();
 		createInfo.ppEnabledLayerNames = m_ValidationLayers.data();
 
 		VkDebugUtilsMessengerCreateInfoEXT debugForVkInstanceAndDestroy{};
@@ -63,7 +63,7 @@ namespace Lucy {
 		createInfo.enabledLayerCount = 0;
 		createInfo.ppEnabledLayerNames = nullptr;
 #endif
-		createInfo.enabledExtensionCount = instanceExtensions.size();
+		createInfo.enabledExtensionCount = (uint32_t)instanceExtensions.size();
 		createInfo.ppEnabledExtensionNames = instanceExtensions.data();
 
 		LUCY_VK_ASSERT(vkCreateInstance(&createInfo, nullptr, &m_Instance));

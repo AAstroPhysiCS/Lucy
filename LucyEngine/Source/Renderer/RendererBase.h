@@ -3,14 +3,13 @@
 #include "Context/RenderContext.h"
 #include "Device/RenderDevice.h"
 
+#include "Scene/Scene.h"
+
 namespace Lucy {
 
 	class Window;
 	class VulkanPushConstant;
 	class DescriptorSet;
-
-	class Scene;
-	class Entity;
 
 	class RendererBase {
 	protected:

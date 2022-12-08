@@ -6,14 +6,14 @@
 
 namespace Lucy {
 
-	VulkanVertexBuffer::VulkanVertexBuffer(uint32_t size)
+	VulkanVertexBuffer::VulkanVertexBuffer(size_t size)
 		: VertexBuffer(size) {
 		Renderer::EnqueueToRenderThread([&, size]() {
 			Create(size); //staging buffer allocation
 		});
 	}
 
-	void VulkanVertexBuffer::Create(uint32_t size) {
+	void VulkanVertexBuffer::Create(size_t size) {
 		VulkanAllocator& allocator = VulkanAllocator::Get();
 		allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 										m_StagingBufferHandle, m_StagingBufferVma);
