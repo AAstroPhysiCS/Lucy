@@ -5,6 +5,8 @@
 #include "Renderer/Context/VulkanGraphicsPipeline.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 
+#include "Core/Application.h"
+
 #include "imgui_impl_vulkan.h"
 #include "glm/gtc/type_ptr.hpp"
 
@@ -16,8 +18,9 @@ namespace Lucy {
 	}
 
 	void ViewportPanel::OnEvent(Event& e) {
-		EventDispatcher& dispatcher = EventDispatcher::GetInstance();
-		dispatcher.Dispatch<KeyEvent>(e, EventType::KeyEvent, [this](const KeyEvent& keyEvent) {
+		auto& inputHandler = Application::Get()->GetInputHandler();
+
+		inputHandler.Dispatch<KeyEvent>(e, EventType::KeyEvent, [this](const KeyEvent& keyEvent) {
 			if (keyEvent == KeyCode::V)
 				UseSnap = !UseSnap;
 

@@ -4,7 +4,7 @@
 #include "VulkanGraphicsShader.h"
 #include "VulkanComputeShader.h"
 
-#include "Core/FileSystem.h"
+#include "Core/Application.h"
 
 #include "shaderc/shaderc.hpp"
 
@@ -14,7 +14,7 @@ namespace Lucy {
 
 	Ref<Shader> Shader::Create(const std::string& name, const std::string& path) {
 		Ref<Shader> instance = nullptr;
-		auto extension = FileSystem::GetFileExtension(path);
+		auto extension = Application::Get()->GetFilesystem().GetFileExtension(path);
 
 		if (extension == ".comp") {
 			if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan)
@@ -52,8 +52,10 @@ namespace Lucy {
 			return buffer;
 		};
 
+		auto& filesystem = Application::Get()->GetFilesystem();
+
 		std::vector<std::string> lines;
-		FileSystem::ReadFileLine<std::string>(path, lines);
+		filesystem.ReadFileLine<std::string>(path, lines);
 
 		std::string shaderType = "";
 		Iter from, to;
@@ -77,21 +79,21 @@ namespace Lucy {
 
 		std::string data = LoadData(lines, from, to);
 
-		shaderc::SpvCompilationResult result = compiler.CompileGlslToSpv(data, kind, FileSystem::GetFileName(path).c_str(), options);
+		shaderc::SpvCompilationResult result = compiler.CompileGlslToSpv(data, kind, filesystem.GetFileName(path).c_str(), options);
 		uint32_t status = result.GetCompilationStatus();
 		if (status != shaderc_compilation_status_success) {
 			LUCY_CRITICAL(fmt::format("{0} Shader; Status: {1}, Message: {2}", shaderType, status, result.GetErrorMessage()));
 			LUCY_ASSERT(false);
 		}
 		std::vector<uint32_t> dataAsSPIRV(result.cbegin(), result.cend());
-		FileSystem::WriteToFile<uint32_t>(cachedData, dataAsSPIRV, OpenMode::Binary);
+		filesystem.WriteToFile<uint32_t>(cachedData, dataAsSPIRV, OpenMode::Binary);
 
 		return dataAsSPIRV;
 	}
 
 	std::vector<uint32_t> Shader::LoadSPIRVDataFromCache(const std::string& cachedFile) {
 		std::vector<uint32_t> data;
-		FileSystem::ReadFile<uint32_t>(cachedFile, data, OpenMode::Binary);
+		Application::Get()->GetFilesystem().ReadFile<uint32_t>(cachedFile, data, OpenMode::Binary);
 		return data;
 	}
 }

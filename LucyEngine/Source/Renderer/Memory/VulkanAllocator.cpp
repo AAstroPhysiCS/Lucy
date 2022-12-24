@@ -46,14 +46,9 @@ namespace Lucy {
 
 	void VulkanAllocator::CreateVulkanBuffer(uint32_t size, VkBufferUsageFlags usage, VkSharingMode sharingMode,
 											   uint32_t memProperties, VkBuffer& bufferHandle, VkDeviceMemory& memory) {
-		VkBufferCreateInfo bufferInfo{};
-		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		bufferInfo.size = size;
-		bufferInfo.usage = usage;
-		bufferInfo.sharingMode = sharingMode;
-
 		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
 
+		VkBufferCreateInfo bufferInfo = VulkanAPI::BufferCreateInfo(size, usage, sharingMode);
 		LUCY_VK_ASSERT(vkCreateBuffer(device, &bufferInfo, nullptr, &bufferHandle));
 
 		VkMemoryRequirements memoryRequirements{};
@@ -90,10 +85,7 @@ namespace Lucy {
 
 	void VulkanAllocator::CreateVulkanBufferVma(VulkanBufferUsage lucyBufferUsage, VkDeviceSize size, VkBufferUsageFlags usage,
 												VkBuffer& bufferHandle, VmaAllocation& vmaAllocation) {
-		VkBufferCreateInfo createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		createInfo.size = size;
-		createInfo.usage = usage;
+		VkBufferCreateInfo createInfo = VulkanAPI::BufferCreateInfo(size, usage, VK_SHARING_MODE_EXCLUSIVE);
 
 		VmaAllocationCreateInfo vmaCreateInfo{};
 		vmaCreateInfo.priority = 1.0f;
@@ -122,22 +114,9 @@ namespace Lucy {
 
 	void VulkanAllocator::CreateVulkanImageVma(uint32_t width, uint32_t height, uint32_t mipLevel, VkFormat format, VkImageLayout currentLayout, VkImageUsageFlags usage,
 											   VkImageType imageType, VkImage& imageHandle, VmaAllocation& allocationHandle, VkImageCreateFlags flags, uint32_t arrayLayers) {
-		VkImageCreateInfo imageCreateInfo{};
-		imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		imageCreateInfo.imageType = imageType;
-		imageCreateInfo.extent.width = width;
-		imageCreateInfo.extent.height = height;
-		imageCreateInfo.extent.depth = 1;
-		imageCreateInfo.mipLevels = mipLevel;
-		imageCreateInfo.arrayLayers = arrayLayers;
-		imageCreateInfo.format = format;
-		imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		imageCreateInfo.initialLayout = currentLayout;
-		imageCreateInfo.usage = usage;
-		imageCreateInfo.flags = flags;
-		imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT; //no multisampling
-
+		VkImageCreateInfo imageCreateInfo = VulkanAPI::ImageCreateInfo(imageType, { width, height, 1 }, mipLevel, arrayLayers, 
+																	   format, VK_IMAGE_TILING_OPTIMAL, currentLayout, usage, 
+																	   VK_SHARING_MODE_EXCLUSIVE, VK_SAMPLE_COUNT_1_BIT, flags);
 		VmaAllocationCreateInfo allocationCreateInfo{};
 		allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
 		allocationCreateInfo.flags = 0;

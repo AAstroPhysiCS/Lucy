@@ -1,7 +1,8 @@
 #include "lypch.h"
 
 #include "Utils.h"
-#include "Core/FileSystem.h"
+#include "Core/Application.h"
+
 #include "../ImGui/imgui.h"
 
 namespace Utils {
@@ -24,7 +25,7 @@ namespace Utils {
 
 	Attribute ReadAttributeFromIni(const char* windowName, const char* attributeName) {
 		std::string buffer;
-		Lucy::FileSystem::ReadFile("lucyconfig.ini", buffer);
+		Lucy::Application::Get()->GetFilesystem().ReadFile("lucyconfig.ini", buffer);
 
 		std::string windowNameFull = "[Window][";
 		windowNameFull.append(windowName).append("]");

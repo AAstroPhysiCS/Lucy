@@ -1,6 +1,9 @@
 #include "SceneExplorerPanel.h"
 #include "ViewportPanel.h"
 
+#include "Core/Application.h"
+#include "Events/MouseCode.h"
+
 #include "Renderer/Renderer.h"
 
 namespace Lucy {
@@ -11,9 +14,9 @@ namespace Lucy {
 	}
 
 	void SceneExplorerPanel::OnEvent(Event& e) {
-		EventDispatcher& dispatcher = EventDispatcher::GetInstance();
+		auto& inputHandler = Application::Get()->GetInputHandler();
 
-		dispatcher.Dispatch<MouseEvent>(e, EventType::MouseEvent, [&](const MouseEvent& e) {
+		inputHandler.Dispatch<MouseEvent>(e, EventType::MouseEvent, [&](const MouseEvent& e) {
 			ViewportPanel& viewportPanel = ViewportPanel::GetInstance();
 			if (viewportPanel.IsOverAnyGizmo() || !viewportPanel.IsViewportActive()) return;
 

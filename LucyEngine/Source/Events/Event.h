@@ -4,7 +4,7 @@ namespace Lucy {
 
 	enum class EventType {
 		MouseEvent, KeyEvent, CharCallbackEvent, ScrollEvent, CursorPosEvent,
-		WindowResizeEvent, WindowCloseEvent, CustomEvent
+		WindowResizeEvent, WindowCloseEvent, CustomEvent, Unknown
 	};
 
 	class Event {
@@ -14,6 +14,6 @@ namespace Lucy {
 
 		EventType GetType() { return m_Type; }
 	protected:
-		EventType m_Type;
+		EventType m_Type = EventType::Unknown;
 	};
 }

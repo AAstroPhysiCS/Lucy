@@ -6,8 +6,9 @@
 #include "UI/ViewportPanel.h"
 #include "UI/DetailsPanel.h"
 #include "UI/ApplicationMetricsPanel.h"
+#include "UI/ContentBrowserPanel.h"
 
-#include "Core/Input.h"
+#include "Core/Application.h"
 
 #include "Renderer/Renderer.h"
 #include "Renderer/RendererModule.h"
@@ -29,6 +30,7 @@ namespace Lucy {
 		m_Panels.push_back(&DetailsPanel::GetInstance());
 		m_Panels.push_back(&ApplicationMetricsPanel::GetInstance());
 		m_Panels.push_back(&ViewportPanel::GetInstance());
+		m_Panels.push_back(&ContentBrowserPanel::GetInstance());
 
 #pragma region ImGuiPipeline
 		/*
@@ -70,11 +72,14 @@ namespace Lucy {
 	}
 
 	void ImGuiOverlay::Init(Ref<Window> window, Ref<Scene> scene, const Ref<RendererModule>& rendererModule) {
-		SceneExplorerPanel::GetInstance().SetScene(scene);
-		SceneExplorerPanel::GetInstance().SetIDPipeline(rendererModule->GetIDPipeline());
+		auto& sceneExplorerPanel = SceneExplorerPanel::GetInstance();
+		auto& viewportPanel = ViewportPanel::GetInstance();
 
-		ViewportPanel::GetInstance().SetViewportOutputPipeline(rendererModule->GetGeometryPipeline());
-		ViewportPanel::GetInstance().SetOnViewportResizeCallback([rendererModule]() { rendererModule->OnViewportResize(); });
+		sceneExplorerPanel.SetScene(scene);
+		sceneExplorerPanel.SetIDPipeline(rendererModule->GetIDPipeline());
+
+		viewportPanel.SetViewportOutputPipeline(rendererModule->GetGeometryPipeline());
+		viewportPanel.SetOnViewportResizeCallback([rendererModule]() { rendererModule->OnViewportResize(); });
 
 		ImGui::CreateContext();
 
@@ -138,9 +143,8 @@ namespace Lucy {
 		LUCY_PROFILE_NEW_EVENT("ImGuiOverlay::Begin");
 
 		auto currentArchitecture = Renderer::GetRenderArchitecture();
-		if (currentArchitecture == RenderArchitecture::Vulkan) {
+		if (currentArchitecture == RenderArchitecture::Vulkan)
 			ImGui_ImplVulkan_NewFrame();
-		}
 
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
@@ -211,31 +215,33 @@ namespace Lucy {
 	}
 
 	void ImGuiOverlay::OnEvent(Event& e) {
-		EventDispatcher& dispatcher = EventDispatcher::GetInstance();
-		dispatcher.Dispatch<ScrollEvent>(e, EventType::ScrollEvent, [&](ScrollEvent& e) {
+		auto& inputHandler = Application::Get()->GetInputHandler();
+
+		inputHandler.Dispatch<ScrollEvent>(e, EventType::ScrollEvent, [&](ScrollEvent& e) {
 			ImGuiIO& io = ImGui::GetIO();
 			io.AddMouseWheelEvent((float)e.GetXOffset(), (float)e.GetYOffset());
 		});
 
-		dispatcher.Dispatch<CursorPosEvent>(e, EventType::CursorPosEvent, [&](CursorPosEvent& e) {
-			Input::MouseX = e.GetXPos();
-			Input::MouseY = e.GetYPos();
-			ImGui_ImplGlfw_CursorPosCallback(e.GetWindowHandle(), Input::MouseX, Input::MouseY);
+		inputHandler.Dispatch<CursorPosEvent>(e, EventType::CursorPosEvent, [&](CursorPosEvent& e) {
+			auto& inputHandler = Application::Get()->GetInputHandler();
+			inputHandler.MouseX = e.GetXPos();
+			inputHandler.MouseY = e.GetYPos();
+			ImGui_ImplGlfw_CursorPosCallback(e.GetWindowHandle(), inputHandler.MouseX, inputHandler.MouseY);
 		});
 
-		dispatcher.Dispatch<MouseEvent>(e, EventType::MouseEvent, [&](MouseEvent& e) {
+		inputHandler.Dispatch<MouseEvent>(e, EventType::MouseEvent, [&](MouseEvent& e) {
 			ImGui_ImplGlfw_MouseButtonCallback(e.GetWindowHandle(), e.GetButton(), e.GetAction(), e.GetMods());
 		});
 
-		dispatcher.Dispatch<KeyEvent>(e, EventType::KeyEvent, [&](KeyEvent& e) {
+		inputHandler.Dispatch<KeyEvent>(e, EventType::KeyEvent, [&](KeyEvent& e) {
 			ImGui_ImplGlfw_KeyCallback(e.GetWindowHandle(), e.GetKey(), e.GetScanCode(), e.GetAction(), e.GetMods());
 		});
 
-		dispatcher.Dispatch<CharCallbackEvent>(e, EventType::CharCallbackEvent, [&](CharCallbackEvent& e) {
+		inputHandler.Dispatch<CharCallbackEvent>(e, EventType::CharCallbackEvent, [&](CharCallbackEvent& e) {
 			ImGui_ImplGlfw_CharCallback(e.GetWindowHandle(), e.GetCodePoint());
 		});
 
-		dispatcher.Dispatch<WindowResizeEvent>(e, EventType::WindowResizeEvent, [&](WindowResizeEvent& e) {
+		inputHandler.Dispatch<WindowResizeEvent>(e, EventType::WindowResizeEvent, [&](WindowResizeEvent& e) {
 			ImGuiIO& io = ImGui::GetIO();
 			io.DisplaySize = { (float)e.GetWidth(), (float)e.GetHeight() };
 			io.DisplayFramebufferScale = { 1.0f, 1.0f };

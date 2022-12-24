@@ -58,6 +58,10 @@ namespace Lucy {
 			memcpy(m_Data.data(), data, size);
 		}
 
+		void SetData(const Buffer<T>& other) {
+			SetData(other.m_Data);
+		}
+
 		inline T* Data() { return m_Data.data(); }
 
 		inline void Append(const std::vector<T>& data) {

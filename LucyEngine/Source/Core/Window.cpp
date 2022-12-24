@@ -2,7 +2,6 @@
 #include "Window.h"
 
 #include "Renderer/Context/RenderContext.h"
-#include "../Events/EventDispatcher.h"
 #include "../Events/InputEvent.h"
 #include "../Events/WindowEvent.h"
 

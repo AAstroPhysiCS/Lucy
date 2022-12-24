@@ -2,7 +2,7 @@
 #include "RendererModule.h"
 #include "Renderer/Renderer.h"
 
-#include "Events/EventDispatcher.h"
+#include "Core/Application.h"
 #include "Events/WindowEvent.h"
 
 #include "Context/VulkanSwapChain.h"
@@ -153,7 +153,7 @@ namespace Lucy {
 			.VertexShaderLayout {
 				{ "a_Pos", ShaderDataSize::Float3 },
 			},
-			.DepthConfiguration = {.DepthCompareOp = DepthCompareOp::LessOrEqual },
+			.DepthConfiguration = { .DepthCompareOp = DepthCompareOp::LessOrEqual },
 			.RenderPass = geometryRenderPass,
 			.FrameBuffer = geometryFrameBuffer,
 			.Shader = hdrSkyboxShader
@@ -212,7 +212,7 @@ namespace Lucy {
 
 		const auto& cubemapView = m_Scene->View<HDRCubemapComponent>();
 		bool noValidCubemap = true;
-		
+
 		for (auto& entity : cubemapView) {
 			Entity e{ m_Scene.Get(), entity };
 			HDRCubemapComponent& hdrComponent = e.GetComponent<HDRCubemapComponent>();
@@ -300,8 +300,8 @@ namespace Lucy {
 	}
 
 	void RendererModule::OnEvent(Event& e) {
-		EventDispatcher& dispatcher = EventDispatcher::GetInstance();
-		dispatcher.Dispatch<WindowResizeEvent>(e, EventType::WindowResizeEvent, [&](const WindowResizeEvent& e) {
+		auto& inputHandler = Application::Get()->GetInputHandler();
+		inputHandler.Dispatch<WindowResizeEvent>(e, EventType::WindowResizeEvent, [&](const WindowResizeEvent& e) {
 			OnWindowResize();
 		});
 	}

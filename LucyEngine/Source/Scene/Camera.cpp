@@ -4,7 +4,8 @@
 
 #include "Events/Event.h"
 #include "Events/InputEvent.h"
-#include "Core/Input.h"
+
+#include "Core/Application.h"
 
 namespace Lucy {
 
@@ -36,7 +37,8 @@ namespace Lucy {
 	}
 
 	void EditorCamera::UpdateValues() {
-		auto [x, y] = Input::GetMousePosition();
+		auto& inputHandler = Application::Get()->GetInputHandler();
+		auto [x, y] = inputHandler.GetMousePosition();
 
 		static double lastX = x;
 		static double lastY = y;
@@ -47,7 +49,7 @@ namespace Lucy {
 		lastX = x;
 		lastY = y;
 
-		if (Input::IsMousePressed(MouseCode::Button1)) {
+		if (inputHandler.IsMousePressed(MouseCode::Button1)) {
 			m_Rotation.x += xOffset;
 			m_Rotation.y += yOffset;
 			m_Rotation.y = glm::clamp(m_Rotation.y, -90.0f, 90.0f);
@@ -56,26 +58,26 @@ namespace Lucy {
 		float rad90 = glm::radians(m_Rotation.x + 90);
 		float rad = glm::radians(m_Rotation.x);
 
-		if (Input::IsKeyPressed(KeyCode::W)) {
+		if (inputHandler.IsKeyPressed(KeyCode::W)) {
 			m_Position.x -= glm::cos(rad90) * m_CameraSpeed;
 			m_Position.z -= glm::sin(rad90) * m_CameraSpeed;
 		}
-		if (Input::IsKeyPressed(KeyCode::S)) {
+		if (inputHandler.IsKeyPressed(KeyCode::S)) {
 			m_Position.x += glm::cos(rad90) * m_CameraSpeed;
 			m_Position.z += glm::sin(rad90) * m_CameraSpeed;
 		}
-		if (Input::IsKeyPressed(KeyCode::D)) {
+		if (inputHandler.IsKeyPressed(KeyCode::D)) {
 			m_Position.x += glm::cos(rad) * m_CameraSpeed;
 			m_Position.z += glm::sin(rad) * m_CameraSpeed;
 		}
-		if (Input::IsKeyPressed(KeyCode::A)) {
+		if (inputHandler.IsKeyPressed(KeyCode::A)) {
 			m_Position.x -= glm::cos(rad) * m_CameraSpeed;
 			m_Position.z -= glm::sin(rad) * m_CameraSpeed;
 		}
 
-		if (Input::IsKeyPressed(KeyCode::LeftShift)) {
+		if (inputHandler.IsKeyPressed(KeyCode::LeftShift)) {
 			m_Position.y -= m_CameraSpeed;
-		} else if (Input::IsKeyPressed(KeyCode::Space)) {
+		} else if (inputHandler.IsKeyPressed(KeyCode::Space)) {
 			m_Position.y += m_CameraSpeed;
 		}
 	}

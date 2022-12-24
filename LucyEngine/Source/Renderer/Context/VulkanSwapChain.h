@@ -55,5 +55,7 @@ namespace Lucy {
 		Ref<Window> m_Window = nullptr;
 
 		friend class RendererBase; //for swapchain image count
+
+		friend VkSwapchainCreateInfoKHR VulkanAPI::SwapchainCreateInfo(const void* swapChainInstance, uint32_t imageCount, VkSwapchainKHR oldSwapChain, VkSurfaceTransformFlagBitsKHR preTransform);
 	};
 }

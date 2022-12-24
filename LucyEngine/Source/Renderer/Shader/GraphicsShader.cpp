@@ -3,7 +3,7 @@
 
 #include "shaderc/shaderc.hpp"
 
-#include "Core/FileSystem.h"
+#include "Core/Application.h"
 
 #include "Renderer/Renderer.h"
 
@@ -23,11 +23,13 @@ namespace Lucy {
 		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan)
 			options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
 
-		const auto [vertexFileExtension, fragmentFileExtension] = GetCachedFileExtension();
-		const std::string& cacheFileVert = FileSystem::GetParentPath(m_Path) + "/" + FileSystem::GetFileName(m_Path) + vertexFileExtension;
-		const std::string& cacheFileFrag = FileSystem::GetParentPath(m_Path) + "/" + FileSystem::GetFileName(m_Path) + fragmentFileExtension;
+		auto& filesystem = Application::Get()->GetFilesystem();
 
-		if (!FileSystem::FileExists(cacheFileVert) || !FileSystem::FileExists(cacheFileFrag)) {
+		const auto [vertexFileExtension, fragmentFileExtension] = GetCachedFileExtension();
+		const std::string& cacheFileVert = filesystem.GetParentPath(m_Path) + "/" + filesystem.GetFileName(m_Path) + vertexFileExtension;
+		const std::string& cacheFileFrag = filesystem.GetParentPath(m_Path) + "/" + filesystem.GetFileName(m_Path) + fragmentFileExtension;
+
+		if (!filesystem.FileExists(cacheFileVert) || !filesystem.FileExists(cacheFileFrag)) {
 			std::vector<uint32_t> dataVert = LoadSPIRVData(m_Path, compiler, options, shaderc_shader_kind::shaderc_vertex_shader, cacheFileVert);
 			std::vector<uint32_t> dataFrag = LoadSPIRVData(m_Path, compiler, options, shaderc_shader_kind::shaderc_fragment_shader, cacheFileFrag);
 

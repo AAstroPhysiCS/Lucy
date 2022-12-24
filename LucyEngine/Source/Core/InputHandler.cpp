@@ -1,5 +1,5 @@
 #include "lypch.h"
-#include "Input.h"
+#include "InputHandler.h"
 
 namespace Lucy {
 
@@ -8,31 +8,26 @@ namespace Lucy {
 								LUCY_ASSERT(false); \
 							} \
 
-	double Input::MouseX = 0;
-	double Input::MouseY = 0;
-
-	GLFWwindow* Input::m_RawWindowPtr = nullptr;
-
-	void Input::Init(GLFWwindow* windowRawPtr) {
+	void InputHandler::Init(GLFWwindow* windowRawPtr) {
 		m_RawWindowPtr = windowRawPtr;
 	}
 
-	bool Input::IsMousePressed(MouseCode mouseCode) {
+	bool InputHandler::IsMousePressed(MouseCode mouseCode) {
 		CHECK_FOR_NULL();
 		return glfwGetMouseButton(m_RawWindowPtr, (int32_t)mouseCode) == GLFW_PRESS;
 	}
 
-	bool Input::IsKeyPressed(KeyCode keyCode) {
+	bool InputHandler::IsKeyPressed(KeyCode keyCode) {
 		CHECK_FOR_NULL();
 		return glfwGetKey(m_RawWindowPtr, (int32_t)keyCode) == GLFW_PRESS;
 	}
 
-	bool Input::IsMouseRelease(KeyCode mouseCode) {
+	bool InputHandler::IsMouseRelease(KeyCode mouseCode) {
 		CHECK_FOR_NULL();
 		return glfwGetMouseButton(m_RawWindowPtr, (int32_t)mouseCode) == GLFW_RELEASE;
 	}
 
-	bool Input::IsKeyRelease(KeyCode keyCode) {
+	bool InputHandler::IsKeyRelease(KeyCode keyCode) {
 		CHECK_FOR_NULL();
 		return glfwGetKey(m_RawWindowPtr, (int32_t)keyCode) == GLFW_RELEASE;
 	}

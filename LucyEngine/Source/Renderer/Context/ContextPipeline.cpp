@@ -60,10 +60,7 @@ namespace Lucy {
 			std::vector<bool> isBindlessVector;
 
 			for (auto& buffer : info) {
-				VkDescriptorSetLayoutBinding binding{};
-				binding.binding = buffer.Binding;
-				binding.descriptorCount = buffer.ArraySize == 0 ? 1 : buffer.ArraySize;
-
+				VkDescriptorSetLayoutBinding binding = VulkanAPI::DescriptorSetLayoutBinding(buffer.Binding, buffer.ArraySize == 0 ? 1 : buffer.ArraySize, buffer.Type, buffer.StageFlag);
 				isBindlessVector.push_back(buffer.DynamicallyAllocated); //the set is bindless if true
 
 				if (buffer.DynamicallyAllocated) {
@@ -71,18 +68,10 @@ namespace Lucy {
 					binding.descriptorCount = buffer.ArraySize;
 				}
 
-				binding.descriptorType = (VkDescriptorType)ConvertDescriptorType(buffer.Type);
-				binding.stageFlags = buffer.StageFlag;
-				binding.pImmutableSamplers = nullptr;
-
 				layoutBindings.push_back(binding);
 			}
 
-			VkDescriptorSetLayoutCreateInfo descriptorLayoutInfo{};
-			descriptorLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-			descriptorLayoutInfo.bindingCount = (uint32_t)layoutBindings.size();
-			descriptorLayoutInfo.pBindings = layoutBindings.data();
-			descriptorLayoutInfo.pNext = nullptr;
+			VkDescriptorSetLayoutCreateInfo descriptorLayoutInfo = VulkanAPI::DescriptorSetCreateInfo((uint32_t)layoutBindings.size(), layoutBindings.data());
 
 			/*
 			* cant summarize these since these are stack allocated
@@ -101,11 +90,7 @@ namespace Lucy {
 				bindlessDescriptorFlags.push_back(0); //yes, we really need the 0.
 			}
 
-			VkDescriptorSetLayoutBindingFlagsCreateInfo extendedLayoutInfo{};
-			extendedLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
-			extendedLayoutInfo.bindingCount = (uint32_t)layoutBindings.size();
-			extendedLayoutInfo.pBindingFlags = bindlessDescriptorFlags.data();
-
+			VkDescriptorSetLayoutBindingFlagsCreateInfo extendedLayoutInfo = VulkanAPI::DescriptorSetLayoutBindingFlagsCreateInfo((uint32_t)layoutBindings.size(), bindlessDescriptorFlags.data());
 			descriptorLayoutInfo.pNext = &extendedLayoutInfo;
 
 			VkDescriptorSetLayout descriptorSetLayout;

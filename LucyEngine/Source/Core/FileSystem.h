@@ -16,21 +16,26 @@ namespace Lucy {
 		return (a | (uint16_t)b);
 	}
 
-	class FileSystem {
+	class Filesystem {
+	private:
+		Filesystem() = default;
+		~Filesystem() = default;
+
+		friend class Application;
 	public:
-		static void Init();
-		static void Destroy();
+		void Init();
+		void Destroy();
 
-		static std::string GetParentPath(std::string& path);
-		static std::string GetParentPath(const std::string& path);
-		static std::string GetFileName(std::string& file);
-		static std::string GetFileName(const std::string& file);
+		std::string GetParentPath(std::string& path);
+		std::string GetParentPath(const std::string& path);
+		std::string GetFileName(std::string& file);
+		std::string GetFileName(const std::string& file);
 
-		static std::string GetFileExtension(std::string& file);
-		static std::string GetFileExtension(const std::string& file);
+		std::string GetFileExtension(std::string& file);
+		std::string GetFileExtension(const std::string& file);
 
 		template <typename T>
-		inline static void WriteToFile(const std::string& path, const std::vector<T>& data, OpenMode mode) {
+		inline void WriteToFile(const std::string& path, const std::vector<T>& data, OpenMode mode) {
 			uint16_t flags = 0x02 | mode; //see std::ios::out
 
 			std::ofstream of(path, flags);
@@ -44,10 +49,10 @@ namespace Lucy {
 			of.close();
 		}
 
-		static void ReadFile(const char* path, std::string& data);
+		void ReadFile(const char* path, std::string& data);
 
 		template <typename T>
-		inline static void ReadFile(const std::string& path, std::vector<T>& data, OpenMode mode) {
+		inline void ReadFile(const std::string& path, std::vector<T>& data, OpenMode mode) {
 			uint16_t flags = 0x01 | mode; //see std::ios::in
 
 			std::ifstream f(path, flags);
@@ -66,7 +71,7 @@ namespace Lucy {
 		}
 
 		template <typename T>
-		inline static void ReadFileLine(const std::string& path, std::vector<T>& data) {
+		inline void ReadFileLine(const std::string& path, std::vector<T>& data) {
 			std::ifstream f(path);
 
 			if (!f || !f.is_open()) {
@@ -86,10 +91,7 @@ namespace Lucy {
 			}
 		}
 
-		static bool FileExists(std::string& file);
-		static bool FileExists(const std::string& file);
-	private:
-		FileSystem() = delete;
-		~FileSystem() = delete;
+		bool FileExists(std::string& file);
+		bool FileExists(const std::string& file);
 	};
 }

@@ -1,7 +1,6 @@
 #include "lypch.h"
 #include "EditorApplication.h"
 
-#include "Events/EventDispatcher.h"
 #include "Events/KeyCodes.h"
 #include "Events/WindowEvent.h"
 #include "Events/InputEvent.h"
@@ -12,7 +11,9 @@
 namespace Lucy {
 
 	Application* CreateApplication(const ApplicationArgs& args, const ApplicationCreateInfo& applicationCreateInfo) {
-		return new EditorApplication(args, applicationCreateInfo);
+		auto& instance = Application::Get();
+		instance = new EditorApplication(args, applicationCreateInfo);
+		return instance;
 	}
 }
 
@@ -61,8 +62,7 @@ void EditorApplication::Run() {
 void EditorApplication::OnEvent(Event* e) {
 	m_Window->WaitEventsIfMinimized();
 
-	EventDispatcher& dispatcher = EventDispatcher::GetInstance();
-	dispatcher.Dispatch<KeyEvent>(*e, EventType::KeyEvent, [&](const KeyEvent& e) {
+	m_InputHandler.Dispatch<KeyEvent>(*e, EventType::KeyEvent, [&](const KeyEvent& e) {
 		if (e == KeyCode::Escape) {
 			glfwSetWindowShouldClose(m_Window->Raw(), true);
 		}

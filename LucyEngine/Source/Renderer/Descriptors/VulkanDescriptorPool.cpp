@@ -12,12 +12,8 @@ namespace Lucy {
 	}
 
 	void VulkanDescriptorPool::Create() {
-		VkDescriptorPoolCreateInfo info{};
-		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		info.poolSizeCount = (uint32_t)m_CreateInfo.PoolSizesVector.size();
-		info.pPoolSizes = m_CreateInfo.PoolSizesVector.data();
-		info.maxSets = m_CreateInfo.MaxSet;
-		info.flags = m_CreateInfo.PoolFlags;
+		VkDescriptorPoolCreateInfo info = VulkanAPI::DescriptorPoolCreateInfo((uint32_t)m_CreateInfo.PoolSizesVector.size(), m_CreateInfo.PoolSizesVector.data(), 
+																			  m_CreateInfo.MaxSet, m_CreateInfo.PoolFlags);
 
 		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
 		LUCY_VK_ASSERT(vkCreateDescriptorPool(device, &info, nullptr, &m_DescriptorPool));

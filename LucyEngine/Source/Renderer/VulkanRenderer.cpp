@@ -77,12 +77,7 @@ namespace Lucy {
 	}
 
 	void VulkanRenderer::ExecuteBarrier(void* commandBufferHandle, void* imageHandle, uint32_t imageLayout, uint32_t layerCount, uint32_t mipCount) {
-		VkImageSubresourceRange subResourceRange{};
-		subResourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		subResourceRange.baseMipLevel = 0;
-		subResourceRange.baseArrayLayer = 0;
-		subResourceRange.layerCount = layerCount;
-		subResourceRange.levelCount = mipCount;
+		VkImageSubresourceRange subResourceRange = VulkanAPI::ImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, mipCount, layerCount);
 
 		ImageMemoryBarrierCreateInfo createInfo;
 		createInfo.ImageHandle = (VkImage)imageHandle;
@@ -115,10 +110,7 @@ namespace Lucy {
 	// Should not be used in a loop 
 	void VulkanRenderer::DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size) {
 		m_RenderDevice.As<VulkanRenderDevice>()->SubmitImmediateCommand([&](VkCommandBuffer commandBuffer) {
-			VkBufferCopy copyRegion{};
-			copyRegion.srcOffset = 0;
-			copyRegion.dstOffset = 0;
-			copyRegion.size = size;
+			VkBufferCopy copyRegion = VulkanAPI::BufferCopy(0, 0, size);
 			vkCmdCopyBuffer(commandBuffer, stagingBuffer, buffer, 1, &copyRegion);
 		});
 	}

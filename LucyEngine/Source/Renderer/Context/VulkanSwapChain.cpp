@@ -36,24 +36,7 @@ namespace Lucy {
 			imageCount = capabilities.surfaceCapabilities.maxImageCount;
 		}
 
-		VkSwapchainCreateInfoKHR createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-		createInfo.surface = m_Window->GetVulkanSurface();
-		createInfo.minImageCount = imageCount;
-		createInfo.imageFormat = m_SelectedFormat.format;
-		createInfo.imageColorSpace = m_SelectedFormat.colorSpace;
-		createInfo.imageExtent = m_SelectedSwapExtent;
-		createInfo.imageArrayLayers = 1;
-		createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-		createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		createInfo.queueFamilyIndexCount = 0;
-		createInfo.pQueueFamilyIndices = nullptr;
-		createInfo.preTransform = capabilities.surfaceCapabilities.currentTransform;
-		createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-		createInfo.presentMode = m_SelectedPresentMode;
-		createInfo.clipped = VK_TRUE;
-		createInfo.oldSwapchain = oldSwapChain;
+		VkSwapchainCreateInfoKHR createInfo = VulkanAPI::SwapchainCreateInfo(this, imageCount, oldSwapChain, capabilities.surfaceCapabilities.currentTransform);
 
 		VkSwapchainKHR swapChain;
 		LUCY_VK_ASSERT(vkCreateSwapchainKHR(logicalDevice, &createInfo, nullptr, &swapChain));
@@ -110,15 +93,7 @@ namespace Lucy {
 	VkResult VulkanSwapChain::Present(const Semaphore& signalSemaphore, uint32_t& imageIndex) {
 		LUCY_PROFILE_NEW_EVENT("VulkanSwapChain::Present");
 		
-		VkPresentInfoKHR presentInfo{};
-		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		presentInfo.waitSemaphoreCount = 1;
-		presentInfo.pWaitSemaphores = &signalSemaphore.GetSemaphore();
-
-		presentInfo.swapchainCount = 1;
-		presentInfo.pSwapchains = &m_SwapChain;
-		presentInfo.pImageIndices = &imageIndex;
-		presentInfo.pResults = nullptr;
+		VkPresentInfoKHR presentInfo = VulkanAPI::PresentInfoKHR(1, &m_SwapChain, &imageIndex, 1, &signalSemaphore.GetSemaphore());
 
 		const auto& device = VulkanContextDevice::Get();
 		VkResult queuePresentResult = vkQueuePresentKHR(device.GetPresentQueue(), &presentInfo);

@@ -21,7 +21,7 @@ namespace Lucy {
 			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10 }
 		};
 
-		VulkanDescriptorPoolCreateInfo poolCreateInfo{};
+		VulkanDescriptorPoolCreateInfo poolCreateInfo;
 		poolCreateInfo.PoolSizesVector = poolSizes;
 		poolCreateInfo.MaxSet = 100;
 		poolCreateInfo.PoolFlags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
@@ -29,26 +29,16 @@ namespace Lucy {
 
 		VulkanContextPipelineUtils::ParseVulkanDescriptorSets(m_DescriptorSetLayouts, m_CreateInfo.Shader, m_DescriptorPool, m_DescriptorSets, m_PushConstants);
 
-		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutInfo.setLayoutCount = (uint32_t)m_DescriptorSetLayouts.size();
-		pipelineLayoutInfo.pSetLayouts = m_DescriptorSetLayouts.data();
-
 		std::vector<VkPushConstantRange> pushConstantRanges;
 		for (VulkanPushConstant& pc : m_PushConstants)
 			pushConstantRanges.push_back(pc.GetHandle());
-
-		pipelineLayoutInfo.pushConstantRangeCount = (uint32_t)pushConstantRanges.size();
-		pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.data();
+		
+		VkPipelineLayoutCreateInfo pipelineLayoutInfo = VulkanAPI::PipelineLayoutCreateInfo((uint32_t)m_DescriptorSetLayouts.size(), m_DescriptorSetLayouts.data(), (uint32_t)pushConstantRanges.size(), pushConstantRanges.data());
 
 		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
 		LUCY_VK_ASSERT(vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_PipelineLayoutHandle));
 
-		VkComputePipelineCreateInfo pipelineInfo{};
-		pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-		pipelineInfo.layout = m_PipelineLayoutHandle;
-		pipelineInfo.stage = m_CreateInfo.Shader.As<VulkanComputeShader>()->GetShaderStageInfo();
-
+		VkComputePipelineCreateInfo pipelineInfo = VulkanAPI::ComputePipelineCreateInfo(m_PipelineLayoutHandle, m_CreateInfo.Shader.As<VulkanComputeShader>()->GetShaderStageInfo());
 		LUCY_VK_ASSERT(vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_PipelineHandle));
 	}
 

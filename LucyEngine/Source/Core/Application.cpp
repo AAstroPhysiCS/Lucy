@@ -1,12 +1,14 @@
 #include "lypch.h"
 #include "Application.h"
 
-#include "FileSystem.h"
-#include "Input.h"
-
 namespace Lucy {
 
 	Metrics Application::s_Metrics;
+
+	Application*& Application::Get() {
+		static Application* s_Instance = nullptr;
+		return s_Instance;
+	}
 
 	Application::Application(const ApplicationArgs& args, const ApplicationCreateInfo& createInfo)
 		: m_Args(args), m_CreateInfo(createInfo) {
@@ -16,14 +18,14 @@ namespace Lucy {
 		m_Window->Init(m_CreateInfo.RenderArchitecture);
 		m_Window->SetEventCallback(LUCY_BIND_FUNC(&Application::OnEvent));
 
-		Input::Init(m_Window->Raw());
-		FileSystem::Init();
+		m_InputHandler.Init(m_Window->Raw());
+		m_Filesystem.Init();
 	}
 
 	Application::~Application() {
 		for (Ref<Module> m : m_ModuleStack)
 			m->Destroy();
 		m_Window->Destroy();
-		FileSystem::Destroy();
+		m_Filesystem.Destroy();
 	}
 }

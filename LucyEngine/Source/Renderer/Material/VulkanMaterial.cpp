@@ -1,7 +1,7 @@
 #include "lypch.h"
 #include "VulkanMaterial.h"
 
-#include "Core/FileSystem.h"
+#include "Core/Application.h"
 
 #include "Renderer/Renderer.h"
 #include "Renderer/Context/GraphicsPipeline.h"
@@ -58,7 +58,7 @@ namespace Lucy {
 	void VulkanMaterial::LoadTexture(aiMaterial* aiMaterial, const MaterialImageType& type, const std::string& importedFilePath) {
 		aiString path;
 		if (aiMaterial->GetTexture((aiTextureType)type.Type, 0, &path) == aiReturn_SUCCESS) {
-			std::string properTexturePath = FileSystem::GetParentPath(importedFilePath) + "/" + std::string(path.data);
+			std::string properTexturePath = Application::Get()->GetFilesystem().GetParentPath(importedFilePath) + "/" + std::string(path.data);
 
 			ImageCreateInfo createInfo;
 			createInfo.Format = ImageFormat::R8G8B8A8_UNORM;

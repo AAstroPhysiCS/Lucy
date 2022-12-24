@@ -68,15 +68,7 @@ namespace Lucy {
 			if (m_RenderPass->IsDepthBuffered())
 				imageViewHandles.push_back(m_DepthImage->GetImageView().GetVulkanHandle());
 
-			VkFramebufferCreateInfo createInfo{};
-			createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-			createInfo.renderPass = m_RenderPass->GetVulkanHandle();
-			createInfo.attachmentCount = (uint32_t)imageViewHandles.size();
-			createInfo.pAttachments = imageViewHandles.data();
-			createInfo.width = m_CreateInfo.Width;
-			createInfo.height = m_CreateInfo.Height;
-			createInfo.layers = 1;
-
+			VkFramebufferCreateInfo createInfo = VulkanAPI::FramebufferCreateInfo(m_RenderPass->GetVulkanHandle(), (uint32_t)imageViewHandles.size(), imageViewHandles.data(), m_CreateInfo.Width, m_CreateInfo.Height, 1);
 			LUCY_VK_ASSERT(vkCreateFramebuffer(device, &createInfo, nullptr, &m_FrameBufferHandles[i]));
 		}
 	}
@@ -89,15 +81,7 @@ namespace Lucy {
 		for (uint32_t i = 0; i < m_FrameBufferHandles.size(); i++) {
 			VkImageView swapChainView = m_CreateInfo.ImageViews[i].GetVulkanHandle();
 
-			VkFramebufferCreateInfo createInfo{};
-			createInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-			createInfo.renderPass = m_RenderPass->GetVulkanHandle();
-			createInfo.attachmentCount = 1;
-			createInfo.pAttachments = &swapChainView;
-			createInfo.width = m_CreateInfo.Width;
-			createInfo.height = m_CreateInfo.Height;
-			createInfo.layers = 1;
-
+			VkFramebufferCreateInfo createInfo = VulkanAPI::FramebufferCreateInfo(m_RenderPass->GetVulkanHandle(), 1, &swapChainView, m_CreateInfo.Width, m_CreateInfo.Height, 1);
 			LUCY_VK_ASSERT(vkCreateFramebuffer(device, &createInfo, nullptr, &m_FrameBufferHandles[i]));
 		}
 	}

@@ -22,10 +22,7 @@ namespace Lucy {
 	void VulkanRenderDevice::Init() {
 		RenderDevice::Init();
 
-		VkQueryPoolCreateInfo createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
-		createInfo.queryCount = s_QueryCount;
-		createInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+		VkQueryPoolCreateInfo createInfo = VulkanAPI::QueryPoolCreateInfo(s_QueryCount, VK_QUERY_TYPE_TIMESTAMP);
 
 		m_QueryPools.resize(Renderer::GetMaxFramesInFlight());
 		for (uint32_t i = 0; i < Renderer::GetMaxFramesInFlight(); i++)

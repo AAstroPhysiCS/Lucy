@@ -30,110 +30,59 @@ namespace Lucy {
 		for (uint32_t i = 0; i < colorAttachments.size(); i++) {
 			const RenderPassLayout::Attachment& attachment = colorAttachments[i];
 
-			VkAttachmentDescription colorAttachment{};
-			colorAttachment.format = (VkFormat)GetAPIImageFormat(attachment.Format);
-			colorAttachment.loadOp = (VkAttachmentLoadOp)GetAPILoadOp(attachment.LoadOp);
-			colorAttachment.storeOp = (VkAttachmentStoreOp)GetAPIStoreOp(attachment.StoreOp);
-			colorAttachment.stencilLoadOp = (VkAttachmentLoadOp)GetAPILoadOp(attachment.StencilLoadOp);
-			colorAttachment.stencilStoreOp = (VkAttachmentStoreOp)GetAPIStoreOp(attachment.StencilStoreOp);
-			colorAttachment.samples = (VkSampleCountFlagBits)attachment.Samples;
-			colorAttachment.initialLayout = (VkImageLayout)attachment.Initial;
-			colorAttachment.finalLayout = (VkImageLayout)attachment.Final;
-
-			VkAttachmentReference colorAttachmentReference{};
-			colorAttachmentReference.attachment = i;
-			colorAttachmentReference.layout = (VkImageLayout)attachment.Reference.Layout;
+			VkAttachmentDescription colorAttachment = VulkanAPI::AttachmentDescription((VkFormat)GetAPIImageFormat(attachment.Format), (VkAttachmentLoadOp)GetAPILoadOp(attachment.LoadOp),
+																					   (VkAttachmentStoreOp)GetAPIStoreOp(attachment.StoreOp), (VkAttachmentLoadOp)GetAPILoadOp(attachment.StencilLoadOp),
+																					   (VkAttachmentStoreOp)GetAPIStoreOp(attachment.StencilStoreOp), (VkSampleCountFlagBits)attachment.Samples,
+																					   (VkImageLayout)attachment.Initial, (VkImageLayout)attachment.Final);
+			VkAttachmentReference colorAttachmentReference = VulkanAPI::AttachmentReference(i, (VkImageLayout)attachment.Reference.Layout);
 
 			attachmentDescription[i] = colorAttachment;
 			attachmentReferences[i] = colorAttachmentReference;
 		}
 
 		if (m_DepthBuffered) {
-			VkAttachmentDescription depthAttachmentDescription{};
-			depthAttachmentDescription.format = (VkFormat)GetAPIImageFormat(depthAttachment.Format);
-			depthAttachmentDescription.loadOp = (VkAttachmentLoadOp)GetAPILoadOp(depthAttachment.LoadOp);
-			depthAttachmentDescription.storeOp = (VkAttachmentStoreOp)GetAPIStoreOp(depthAttachment.StoreOp);
-			depthAttachmentDescription.stencilLoadOp = (VkAttachmentLoadOp)GetAPILoadOp(depthAttachment.StencilLoadOp);
-			depthAttachmentDescription.stencilStoreOp = (VkAttachmentStoreOp)GetAPIStoreOp(depthAttachment.StencilStoreOp);
-			depthAttachmentDescription.samples = (VkSampleCountFlagBits)depthAttachment.Samples;
-			depthAttachmentDescription.initialLayout = (VkImageLayout)depthAttachment.Initial;
-			depthAttachmentDescription.finalLayout = (VkImageLayout)depthAttachment.Final;
+			VkAttachmentDescription depthAttachmentDescription = VulkanAPI::AttachmentDescription((VkFormat)GetAPIImageFormat(depthAttachment.Format), (VkAttachmentLoadOp)GetAPILoadOp(depthAttachment.LoadOp),
+																								  (VkAttachmentStoreOp)GetAPIStoreOp(depthAttachment.StoreOp), (VkAttachmentLoadOp)GetAPILoadOp(depthAttachment.StencilLoadOp),
+																								  (VkAttachmentStoreOp)GetAPIStoreOp(depthAttachment.StencilStoreOp), (VkSampleCountFlagBits)depthAttachment.Samples,
+																								  (VkImageLayout)depthAttachment.Initial, (VkImageLayout)depthAttachment.Final);
 
-			VkAttachmentReference depthAttachmentReference{};
-			depthAttachmentReference.attachment = (uint32_t)colorAttachments.size(); //last element will always be the depth attachment
-			depthAttachmentReference.layout = (VkImageLayout)depthAttachment.Reference.Layout;
-
+			VkAttachmentReference depthAttachmentReference = VulkanAPI::AttachmentReference((uint32_t)colorAttachments.size(), //last element will always be the depth attachment
+																							(VkImageLayout)depthAttachment.Reference.Layout);
 			attachmentDescription.push_back(depthAttachmentDescription);
 			attachmentReferences.push_back(depthAttachmentReference);
 		}
 
-		VkSubpassDependency subpassColorDependency{};
-		subpassColorDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-		subpassColorDependency.dstSubpass = 0;
-		subpassColorDependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		subpassColorDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		subpassColorDependency.srcAccessMask = 0;
-		subpassColorDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		subpassColorDependency.dependencyFlags = 0;
-
-		VkSubpassDependency subpassDepthDependency{};
-		subpassDepthDependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-		subpassDepthDependency.dstSubpass = 0;
-		subpassDepthDependency.srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-		subpassDepthDependency.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-		subpassDepthDependency.srcAccessMask = 0;
-		subpassDepthDependency.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-		subpassDepthDependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+		VkSubpassDependency subpassColorDependency = VulkanAPI::SubpassDependency(VK_SUBPASS_EXTERNAL, 0,
+																				  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+																				  0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0);
+		VkSubpassDependency subpassDepthDependency = VulkanAPI::SubpassDependency(VK_SUBPASS_EXTERNAL, 0,
+																				  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+																				  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+																				  0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_DEPENDENCY_BY_REGION_BIT);
 
 		std::vector<VkSubpassDependency> subpassDependencies = { subpassColorDependency };
 
-		VkSubpassDescription subpassDescription{};
-		subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpassDescription.colorAttachmentCount = (uint32_t)colorAttachments.size();
-		subpassDescription.pColorAttachments = attachmentReferences.data();
-		subpassDescription.pDepthStencilAttachment = nullptr;
-		
+		VkSubpassDescription subpassDescription = VulkanAPI::SubpassDescription(VK_PIPELINE_BIND_POINT_GRAPHICS, (uint32_t)colorAttachments.size(), attachmentReferences.data(), nullptr);
+
 		if (m_DepthBuffered) {
 			subpassDependencies.push_back(subpassDepthDependency);
-
 			subpassDescription.pDepthStencilAttachment = &attachmentReferences[attachmentReferences.size() - 1]; //depth will always be the last one
 		}
 
-		VkRenderPassCreateInfo createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-		createInfo.attachmentCount = (uint32_t)attachmentDescription.size();
-		createInfo.pAttachments = attachmentDescription.data();
-		createInfo.subpassCount = 1;
-		createInfo.pSubpasses = &subpassDescription;
-		createInfo.dependencyCount = (uint32_t)subpassDependencies.size();
-		createInfo.pDependencies = subpassDependencies.data();
-
+		VkRenderPassCreateInfo createInfo = VulkanAPI::RenderPassCreateInfo((uint32_t)attachmentDescription.size(), attachmentDescription.data(), 1, &subpassDescription,
+																			(uint32_t)subpassDependencies.size(), subpassDependencies.data());
 		m_AttachmentCount = createInfo.attachmentCount;
 		m_ColorAttachmentCount = (uint32_t)colorAttachments.size();
 
-		VkRenderPassMultiviewCreateInfo renderPassMultiview{};
-		if (m_CreateInfo.Multiview.IsValid()) {
-			renderPassMultiview.sType = VK_STRUCTURE_TYPE_RENDER_PASS_MULTIVIEW_CREATE_INFO;
-			renderPassMultiview.subpassCount = createInfo.subpassCount;
-			renderPassMultiview.pViewMasks = &m_CreateInfo.Multiview.ViewMask;
-			renderPassMultiview.correlationMaskCount = 1;
-			renderPassMultiview.pCorrelationMasks = &m_CreateInfo.Multiview.CorrelationMask;
-
+		VkRenderPassMultiviewCreateInfo renderPassMultiview = VulkanAPI::RenderPassMultiviewCreateInfo(createInfo.subpassCount, &m_CreateInfo.Multiview.ViewMask, 1, &m_CreateInfo.Multiview.CorrelationMask);
+		if (m_CreateInfo.Multiview.IsValid())
 			createInfo.pNext = &renderPassMultiview;
-		}
 
 		LUCY_VK_ASSERT(vkCreateRenderPass(device.GetLogicalDevice(), &createInfo, nullptr, &m_RenderPass));
 	}
 
 	void VulkanRenderPass::Begin(VulkanRenderPassBeginInfo& info) {
 		const VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-
-		VkRenderPassBeginInfo beginInfo{};
-		beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		beginInfo.renderPass = m_RenderPass;
-		beginInfo.framebuffer = info.VulkanFrameBuffer;
-		beginInfo.renderArea.offset = { 0, 0 };
-		beginInfo.renderArea.extent = { info.Width, info.Height };
 
 		VkClearValue clearColor;
 		clearColor.color = { m_CreateInfo.ClearColor.r, m_CreateInfo.ClearColor.g, m_CreateInfo.ClearColor.b, m_CreateInfo.ClearColor.a };
@@ -145,10 +94,9 @@ namespace Lucy {
 		if (m_DepthBuffered)
 			clearValues.push_back(clearDepth);
 
-		beginInfo.clearValueCount = (uint32_t)clearValues.size();
-		beginInfo.pClearValues = clearValues.data();
-
 		m_BoundedCommandBuffer = info.CommandBuffer;
+
+		VkRenderPassBeginInfo beginInfo = VulkanAPI::RenderPassBeginInfo(m_RenderPass, info.VulkanFrameBuffer, { { 0, 0 }, { info.Width, info.Height } }, (uint32_t)clearValues.size(), clearValues.data());
 		vkCmdBeginRenderPass(m_BoundedCommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 		VkViewport viewport;
@@ -162,7 +110,7 @@ namespace Lucy {
 		if (viewport.width == 0 || viewport.height == 0)
 			LUCY_ASSERT(false);
 
-		VkRect2D scissor{};
+		VkRect2D scissor;
 		scissor.offset = { 0, 0 };
 		scissor.extent = { info.Width, info.Height };
 

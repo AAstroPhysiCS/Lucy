@@ -23,8 +23,6 @@ namespace Lucy {
 		void OnEvent(Event& e) final override;
 		void Destroy() final override;
 		void Wait() final override;
-
-		inline const Ref<Scene>& GetScene() const { return m_Scene; }
 	private:
 		ImGuiOverlay m_ImGuiOverlay;
 	};

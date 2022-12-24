@@ -27,9 +27,7 @@ namespace Lucy {
 
 		VkCommandBuffer commandBuffer = GetCurrentCommandBuffer();
 
-		VkCommandBufferBeginInfo beginInfo{};
-		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		VkCommandBufferBeginInfo beginInfo = VulkanAPI::CommandBufferBeginInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 		LUCY_VK_ASSERT(vkBeginCommandBuffer(commandBuffer, &beginInfo));
 
 		Renderer::BeginRenderDeviceTimestamp(commandBuffer);
@@ -72,20 +70,9 @@ namespace Lucy {
 		LUCY_PROFILE_NEW_EVENT("VulkanCommandQueue::SubmitToQueue");
 
 		VkCommandBuffer currentCommandBuffer = GetCurrentCommandBuffer();
-
-		VkSubmitInfo submitInfo{};
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
 		VkPipelineStageFlags imageWaitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-		submitInfo.waitSemaphoreCount = 1;
-		submitInfo.pWaitSemaphores = &currentFrameWaitSemaphore.GetSemaphore();
-		submitInfo.pWaitDstStageMask = imageWaitStages;
 
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &currentCommandBuffer;
-		submitInfo.signalSemaphoreCount = 1;
-		submitInfo.pSignalSemaphores = &currentFrameSignalSemaphore.GetSemaphore();
-
+		VkSubmitInfo submitInfo = VulkanAPI::QueueSubmitInfo(1, &currentCommandBuffer, 1, &currentFrameWaitSemaphore.GetSemaphore(), imageWaitStages, 1, &currentFrameSignalSemaphore.GetSemaphore());
 		LUCY_VK_ASSERT(vkQueueSubmit((VkQueue)queueHandle, 1, &submitInfo, currentFrameFence.GetFence()));
 	}
 
@@ -95,11 +82,7 @@ namespace Lucy {
 		VkFence fenceHandle = m_ImmediateCommandFence->GetFence();
 		vkResetFences(VulkanContextDevice::Get().GetLogicalDevice(), 1, &fenceHandle);
 
-		VkSubmitInfo submitInfo{};
-		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		submitInfo.commandBufferCount = commandBufferCount;
-		submitInfo.pCommandBuffers = (VkCommandBuffer*)&commandBufferHandles;
-
+		VkSubmitInfo submitInfo = VulkanAPI::QueueSubmitInfo(commandBufferCount, (VkCommandBuffer*)&commandBufferHandles, 0, nullptr, nullptr, 0, nullptr);
 		vkQueueSubmit((VkQueue)queueHandle, 1, &submitInfo, fenceHandle);
 		vkWaitForFences(VulkanContextDevice::Get().GetLogicalDevice(), 1, &fenceHandle, VK_TRUE, UINT64_MAX);
 	}

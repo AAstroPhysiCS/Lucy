@@ -50,21 +50,13 @@ namespace Lucy {
 	}
 
 	uint32_t VulkanUniformImageBuffer::BindImage(Ref<VulkanImage> image) {
-		VkDescriptorImageInfo imageInfo{};
-		imageInfo.imageLayout = image->GetCurrentLayout();
-		imageInfo.imageView = image->GetImageView().GetVulkanHandle();
-		imageInfo.sampler = image->GetImageView().GetSampler();
-
+		VkDescriptorImageInfo imageInfo = VulkanAPI::DescriptorImageInfo(image->GetCurrentLayout(), image->GetImageView().GetVulkanHandle(), image->GetImageView().GetSampler());
 		m_ImageInfos.push_back(imageInfo);
 		return (uint32_t)m_ImageInfos.size() - 1;
 	}
 
 	uint32_t VulkanUniformImageBuffer::BindImage(VkImageView imageView, VkImageLayout layout, VkSampler sampler) {
-		VkDescriptorImageInfo imageInfo{};
-		imageInfo.imageLayout = layout;
-		imageInfo.imageView = imageView;
-		imageInfo.sampler = sampler;
-
+		VkDescriptorImageInfo imageInfo = VulkanAPI::DescriptorImageInfo(layout, imageView, sampler);
 		m_ImageInfos.push_back(imageInfo);
 		return (uint32_t)m_ImageInfos.size() - 1;
 	}

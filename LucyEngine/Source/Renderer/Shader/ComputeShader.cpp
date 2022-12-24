@@ -2,7 +2,7 @@
 #include "ComputeShader.h"
 #include "VulkanComputeShader.h"
 
-#include "Core/FileSystem.h"
+#include "Core/Application.h"
 
 #include "Renderer/Renderer.h"
 
@@ -19,15 +19,17 @@ namespace Lucy {
 		options.SetOptimizationLevel(shaderc_optimization_level::shaderc_optimization_level_performance);
 		options.SetGenerateDebugInfo();
 
+		auto& filesystem = Application::Get()->GetFilesystem();
+
 		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan)
 			options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
 
 		const char* computeFileExtension = ".cached_vulkan.comp";
-		const std::string& cacheCompute = FileSystem::GetParentPath(m_Path) + "/" + FileSystem::GetFileName(m_Path) + computeFileExtension;
+		const std::string& cacheCompute = filesystem.GetParentPath(m_Path) + "/" + filesystem.GetFileName(m_Path) + computeFileExtension;
 
 		std::vector<uint32_t> dataCompute;
 
-		if (!FileSystem::FileExists(cacheCompute))
+		if (!filesystem.FileExists(cacheCompute))
 			dataCompute = LoadSPIRVData(m_Path, compiler, options, shaderc_shader_kind::shaderc_compute_shader, cacheCompute);
 		else
 			dataCompute = LoadSPIRVDataFromCache(cacheCompute);

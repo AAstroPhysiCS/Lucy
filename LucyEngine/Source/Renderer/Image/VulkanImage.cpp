@@ -24,35 +24,15 @@ namespace Lucy {
 	}
 
 	void VulkanImage::CopyImageToBuffer(VkImage image, const VkBuffer& bufferToCopy, uint32_t layerCount) {
-		VkBufferImageCopy region{};
-		region.bufferOffset = 0;
-		region.bufferRowLength = 0;
-		region.bufferImageHeight = 0;
-		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		region.imageSubresource.mipLevel = 0;
-		region.imageSubresource.baseArrayLayer = 0;
-		region.imageSubresource.layerCount = layerCount;
-		region.imageOffset = { 0, 0, 0 };
-		region.imageExtent.width = (uint32_t)m_Width;
-		region.imageExtent.height = (uint32_t)m_Height;
-		region.imageExtent.depth = 1;
+		VkImageSubresourceLayers imageSubresource = VulkanAPI::ImageSubresourceLayers(VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, layerCount);
+		VkBufferImageCopy region = VulkanAPI::BufferImageCopy(0, 0, 0, imageSubresource, { 0, 0, 0 }, { (uint32_t)m_Width, (uint32_t)m_Height, 1 });
 
 		CopyImageToBuffer(image, bufferToCopy, { region });
 	}
 
 	void VulkanImage::CopyBufferToImage(VkImage image, const VkBuffer& bufferToCopy, uint32_t layerCount) {
-		VkBufferImageCopy region{};
-		region.bufferOffset = 0;
-		region.bufferRowLength = 0;
-		region.bufferImageHeight = 0;
-		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		region.imageSubresource.mipLevel = 0;
-		region.imageSubresource.baseArrayLayer = 0;
-		region.imageSubresource.layerCount = layerCount;
-		region.imageOffset = { 0, 0, 0 };
-		region.imageExtent.width = (uint32_t)m_Width;
-		region.imageExtent.height = (uint32_t)m_Height;
-		region.imageExtent.depth = 1;
+		VkImageSubresourceLayers imageSubresource = VulkanAPI::ImageSubresourceLayers(VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, layerCount);
+		VkBufferImageCopy region = VulkanAPI::BufferImageCopy(0, 0, 0, imageSubresource, { 0, 0, 0 }, { (uint32_t)m_Width, (uint32_t)m_Height, 1 });
 
 		CopyBufferToImage(image, bufferToCopy, { region });
 	}
@@ -98,22 +78,20 @@ namespace Lucy {
 		Renderer::SubmitImmediateCommand([&](VkCommandBuffer commandBuffer) {
 			for (uint32_t mip = 1; mip < m_MaxMipLevel; mip++) {
 				for (uint32_t face = 0; face < m_LayerCount; face++) {
-					VkImageBlit blit{};
-					blit.srcSubresource.aspectMask = m_CreateInfo.ImageType == ImageType::Type2DDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
-					blit.srcSubresource.baseArrayLayer = face;
-					blit.srcSubresource.layerCount = 1;
-					blit.srcSubresource.mipLevel = mip - 1;
-					blit.srcOffsets[1].x = (m_Width >> (mip - 1));
-					blit.srcOffsets[1].y = (m_Height >> (mip - 1));
-					blit.srcOffsets[1].z = 1;
+					VkImageSubresourceLayers srcSubresource = VulkanAPI::ImageSubresourceLayers(m_CreateInfo.ImageType == ImageType::Type2DDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT, mip - 1, face, 1);
+					VkImageSubresourceLayers dstSubresource = VulkanAPI::ImageSubresourceLayers(srcSubresource.aspectMask, mip, face, 1);
 
-					blit.dstSubresource.aspectMask = blit.srcSubresource.aspectMask;
-					blit.dstSubresource.baseArrayLayer = face;
-					blit.dstSubresource.layerCount = 1;
-					blit.dstSubresource.mipLevel = mip;
-					blit.dstOffsets[1].x = (m_Width >> mip);
-					blit.dstOffsets[1].y = (m_Height >> mip);
-					blit.dstOffsets[1].z = 1;
+					VkOffset3D srcOffsets[2] = { {}, {} };
+					srcOffsets[1].x = (m_Width >> (mip - 1));
+					srcOffsets[1].y = (m_Height >> (mip - 1));
+					srcOffsets[1].z = 1;
+
+					VkOffset3D dstOffsets[2] = { {}, {} };
+					dstOffsets[1].x = (m_Width >> mip);
+					dstOffsets[1].y = (m_Height >> mip);
+					dstOffsets[1].z = 1;
+
+					VkImageBlit blit = VulkanAPI::ImageBlit(srcSubresource, srcOffsets, dstSubresource, dstOffsets);
 
 					// Prepare current mip level as image blit destination
 					TransitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mip, face, 1, 1);
@@ -162,12 +140,8 @@ namespace Lucy {
 		ImageMemoryBarrierCreateInfo createInfo;
 		createInfo.ImageHandle = image;
 
-		VkImageSubresourceRange subresourceRange{};
-		subresourceRange.aspectMask = m_CreateInfo.ImageType == ImageType::Type2DDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
-		subresourceRange.baseMipLevel = baseMipLevel;
-		subresourceRange.baseArrayLayer = baseArrayLayer;
-		subresourceRange.levelCount = levelCount;
-		subresourceRange.layerCount = layerCount;
+		VkImageSubresourceRange subresourceRange = VulkanAPI::ImageSubresourceRange(m_CreateInfo.ImageType == ImageType::Type2DDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT, 
+																					baseMipLevel, baseArrayLayer, levelCount, layerCount);
 
 		createInfo.SubResourceRange = subresourceRange;
 		createInfo.OldLayout = oldLayout;
@@ -278,59 +252,24 @@ namespace Lucy {
 
 		const VulkanContextDevice& device = VulkanContextDevice::Get();
 
-		VkImageViewCreateInfo createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		createInfo.image = m_CreateInfo.Image;
-		createInfo.viewType = GetImageType(m_CreateInfo.ImageType);
-		createInfo.format = m_CreateInfo.Format;
-
-		if (m_CreateInfo.ImageType == ImageType::Type2DDepth)
-			createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-		else
-			createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-
-		createInfo.subresourceRange.baseMipLevel = 0;
-		createInfo.subresourceRange.levelCount = m_CreateInfo.MipmapLevel;
-		createInfo.subresourceRange.baseArrayLayer = 0;
-		createInfo.subresourceRange.layerCount = GetLayerCount(m_CreateInfo.ImageType);
-		createInfo.components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
+		VkImageSubresourceRange subresourceRange = VulkanAPI::ImageSubresourceRange(m_CreateInfo.ImageType == ImageType::Type2DDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
+																					0, 0, m_CreateInfo.MipmapLevel, GetLayerCount(m_CreateInfo.ImageType));
+		VkComponentMapping components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
 			VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
+		VkImageViewCreateInfo createInfo = VulkanAPI::ImageViewCreateInfo(m_CreateInfo.Image, GetImageType(m_CreateInfo.ImageType), m_CreateInfo.Format, subresourceRange, components);
 
 		LUCY_VK_ASSERT(vkCreateImageView(device.GetLogicalDevice(), &createInfo, nullptr, &m_ImageView));
 	}
 
 	void VulkanImageView::CreateSampler() {
 		const VulkanContextDevice& device = VulkanContextDevice::Get();
-
-		VkSamplerCreateInfo createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		createInfo.magFilter = m_CreateInfo.MagFilter;
-		createInfo.minFilter = m_CreateInfo.MinFilter;
-		createInfo.addressModeU = m_CreateInfo.ModeU;
-		createInfo.addressModeV = m_CreateInfo.ModeV;
-		createInfo.addressModeW = m_CreateInfo.ModeW;
-
-		createInfo.anisotropyEnable = VK_TRUE;
-
+		
 		VkPhysicalDeviceProperties properties{};
 		vkGetPhysicalDeviceProperties(device.GetPhysicalDevice(), &properties);
 
-		createInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy; //best quality, TODO: in the future, add an option
-		createInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-		createInfo.unnormalizedCoordinates = VK_FALSE;
-		//TODO: for pcf
-		createInfo.compareEnable = VK_FALSE;
-		createInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-		createInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		createInfo.mipLodBias = 0.0f;
-		createInfo.minLod = 0.0f;
-
-		if (!m_CreateInfo.GenerateMipmap) {
-			createInfo.maxLod = 0.0f;
-		} else {
-			createInfo.maxLod = (float)m_CreateInfo.MipmapLevel;
-		}
-
+		VkSamplerCreateInfo createInfo = VulkanAPI::SamplerCreateInfo(m_CreateInfo.MagFilter, m_CreateInfo.MinFilter, m_CreateInfo.ModeU, m_CreateInfo.ModeV, m_CreateInfo.ModeW, VK_TRUE,
+																	  properties.limits.maxSamplerAnisotropy, VK_BORDER_COLOR_INT_OPAQUE_BLACK, VK_FALSE, VK_FALSE, VK_COMPARE_OP_ALWAYS, VK_SAMPLER_MIPMAP_MODE_LINEAR,
+																	  0.0f, 0.0f, m_CreateInfo.GenerateMipmap ? (float)m_CreateInfo.MipmapLevel : 0.0f);
 		LUCY_VK_ASSERT(vkCreateSampler(device.GetLogicalDevice(), &createInfo, nullptr, &m_Sampler));
 	}
 

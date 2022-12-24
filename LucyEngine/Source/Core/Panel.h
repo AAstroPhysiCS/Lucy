@@ -1,7 +1,8 @@
 #pragma once
 
+#include "Core/Base.h" //for child classes
+
 #include "Events/Event.h"
-#include "Events/EventDispatcher.h" //for child classes
 #include "Events/KeyCodes.h" //for child classes
 #include "Events/InputEvent.h" //for child classes
 #include "Events/WindowEvent.h" //for child classes

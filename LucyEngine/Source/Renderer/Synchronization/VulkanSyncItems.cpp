@@ -8,9 +8,7 @@
 namespace Lucy {
 
 	Semaphore::Semaphore() {
-		VkSemaphoreCreateInfo createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
+		VkSemaphoreCreateInfo createInfo = VulkanAPI::SemaphoreCreateInfo();
 		LUCY_VK_ASSERT(vkCreateSemaphore(VulkanContextDevice::Get().GetLogicalDevice(), &createInfo, nullptr, &m_Handle));
 	}
 
@@ -19,10 +17,7 @@ namespace Lucy {
 	}
 
 	Fence::Fence() {
-		VkFenceCreateInfo createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-		createInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
+		VkFenceCreateInfo createInfo = VulkanAPI::FenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
 		LUCY_VK_ASSERT(vkCreateFence(VulkanContextDevice::Get().GetLogicalDevice(), &createInfo, nullptr, &m_Handle));
 	}
 
@@ -31,16 +26,8 @@ namespace Lucy {
 	}
 
 	ImageMemoryBarrier::ImageMemoryBarrier(const ImageMemoryBarrierCreateInfo& createInfo)
-		: m_CreateInfo(createInfo) {
-		m_Barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		m_Barrier.image = m_CreateInfo.ImageHandle;
-		m_Barrier.oldLayout = m_CreateInfo.OldLayout;
-		m_Barrier.newLayout = m_CreateInfo.NewLayout;
-
-		m_Barrier.subresourceRange = createInfo.SubResourceRange;
-
-		m_Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED; //TODO: Investigate and support queue ownership transfer
-		m_Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		: m_CreateInfo(createInfo), 
+		m_Barrier(VulkanAPI::ImageMemoryBarrier(m_CreateInfo.ImageHandle, m_CreateInfo.OldLayout, m_CreateInfo.NewLayout, m_CreateInfo.SubResourceRange)) {
 	}
 
 	void ImageMemoryBarrier::RunBarrier(VkCommandBuffer commandBuffer) {
