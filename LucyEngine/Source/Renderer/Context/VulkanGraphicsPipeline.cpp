@@ -117,9 +117,6 @@ namespace Lucy {
 				return VK_FORMAT_R32G32B32A32_SINT;
 			case ShaderDataSize::Float4:
 				return VK_FORMAT_R32G32B32A32_SFLOAT;
-			case ShaderDataSize::Mat4:
-				LUCY_ASSERT(false); //in vulkan, that's kinda hard...
-				return VK_FORMAT_UNDEFINED;
 			default:
 				LUCY_ASSERT(false);
 				return VK_FORMAT_UNDEFINED;

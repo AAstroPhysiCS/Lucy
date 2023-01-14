@@ -51,8 +51,7 @@ namespace Lucy {
 					}
 				}
 			}
-			LUCY_CRITICAL(fmt::format("Could not find a suitable Uniform Buffer for the given name: {0}", name));
-			LUCY_ASSERT(false);
+			LUCY_ASSERT(false, "Could not find a suitable Uniform Buffer for the given name: {0}", name);
 			return nullptr;
 		}
 
@@ -66,8 +65,7 @@ namespace Lucy {
 					}
 				}
 			}
-			LUCY_CRITICAL(fmt::format("Could not find a suitable Uniform Buffer for the given name: {0}", name));
-			LUCY_ASSERT(false);
+			LUCY_ASSERT(false, "Could not find a suitable Shared Storage Buffer for the given name: {0}", name);
 			return nullptr;
 		}
 

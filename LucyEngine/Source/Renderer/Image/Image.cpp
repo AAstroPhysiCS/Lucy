@@ -14,7 +14,7 @@ namespace Lucy {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanImage2D>(path, createInfo);
 			default:
-				LUCY_ASSERT(false);
+				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
 		return nullptr;
 	}
@@ -24,7 +24,7 @@ namespace Lucy {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanImage2D>(other);
 			default:
-				LUCY_ASSERT(false);
+				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
 		return nullptr;
 	}
@@ -34,7 +34,7 @@ namespace Lucy {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanImage2D>(createInfo);
 			default:
-				LUCY_ASSERT(false);
+				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
 		return nullptr;
 	}
@@ -44,7 +44,7 @@ namespace Lucy {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanImageCube>(path, createInfo);
 			default:
-				LUCY_ASSERT(false);
+				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
 		return nullptr;
 	}
@@ -54,7 +54,7 @@ namespace Lucy {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanImageCube>(createInfo);
 			default:
-				LUCY_ASSERT(false);
+				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
 		return nullptr;
 	}

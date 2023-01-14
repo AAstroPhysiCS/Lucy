@@ -16,8 +16,7 @@ namespace Lucy {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanGraphicsPipeline>(createInfo);
 			default:
-				LUCY_CRITICAL("Other API's not supported!");
-				LUCY_ASSERT(false);
+				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
 		return nullptr;
 	}
@@ -27,8 +26,7 @@ namespace Lucy {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanComputePipeline>(createInfo);
 			default:
-				LUCY_CRITICAL("Other API's not supported!");
-				LUCY_ASSERT(false);
+				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
 		return nullptr;
 	}
@@ -43,8 +41,7 @@ namespace Lucy {
 				return pushConstant;
 			}
 		}
-		LUCY_CRITICAL(fmt::format("Could not find a suitable Push Constant for the given name: {0}", name));
-		LUCY_ASSERT(false);
+		LUCY_ASSERT(false, "Could not find a suitable Push Constant for the given name: {0}", name);
 	}
 
 	void VulkanContextPipelineUtils::ParseVulkanDescriptorSets(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts, const Ref<Shader>& shader, 

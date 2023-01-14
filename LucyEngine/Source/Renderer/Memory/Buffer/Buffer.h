@@ -41,7 +41,7 @@ namespace Lucy {
 		void SetData(const std::vector<T>& data, size_t from = 0, size_t to = 0) {
 			if (to == 0)
 				to = data.size();
-
+			
 			if (to > data.size() || m_Data.size() < data.size()) {
 				LUCY_CRITICAL("Index out of bounds");
 				LUCY_ASSERT(false);

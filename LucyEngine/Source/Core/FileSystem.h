@@ -39,10 +39,7 @@ namespace Lucy {
 			uint16_t flags = 0x02 | mode; //see std::ios::out
 
 			std::ofstream of(path, flags);
-			if (!of || !of.is_open()) {
-				LUCY_CRITICAL(fmt::format("Writing to {0} failed", path));
-				LUCY_ASSERT(false);
-			}
+			LUCY_ASSERT(of && of.is_open(), "Writing to {0} failed", path);
 
 			of.write((const char*)data.data(), data.size() * sizeof(T));
 			of.flush();
@@ -56,10 +53,7 @@ namespace Lucy {
 			uint16_t flags = 0x01 | mode; //see std::ios::in
 
 			std::ifstream f(path, flags);
-			if (!f || !f.is_open()) {
-				LUCY_CRITICAL(fmt::format("Error opening the file! Or it can not be found {0}", path));
-				LUCY_ASSERT(false);
-			}
+			LUCY_ASSERT(f && f.is_open(), "Error opening the file! Or it can not be found {0}", path);
 
 			f.seekg(0, std::ios::end);
 			std::size_t size = f.tellg();
@@ -73,11 +67,7 @@ namespace Lucy {
 		template <typename T>
 		inline void ReadFileLine(const std::string& path, std::vector<T>& data) {
 			std::ifstream f(path);
-
-			if (!f || !f.is_open()) {
-				LUCY_CRITICAL(fmt::format("Error opening the file! Or it can not be found {0}", path));
-				LUCY_ASSERT(false);
-			}
+			LUCY_ASSERT(f && f.is_open(), "Error opening the file! Or it can not be found {0}", path);
 
 			f.seekg(0, std::ios::end);
 			std::size_t size = f.tellg();

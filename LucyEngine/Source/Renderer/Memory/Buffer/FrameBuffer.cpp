@@ -12,8 +12,7 @@ namespace Lucy {
 				return Memory::CreateRef<VulkanFrameBuffer>(createInfo);
 				break;
 			default:
-				LUCY_CRITICAL("Other API's are not supported!");
-				LUCY_ASSERT(false);
+				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 				break;
 		}
 		return nullptr;

@@ -107,8 +107,7 @@ namespace Lucy {
 		viewport.minDepth = 0.0f;
 		viewport.maxDepth = 1.0f;
 
-		if (viewport.width == 0 || viewport.height == 0)
-			LUCY_ASSERT(false);
+		LUCY_ASSERT(viewport.width != 0 || viewport.height != 0);
 
 		VkRect2D scissor;
 		scissor.offset = { 0, 0 };

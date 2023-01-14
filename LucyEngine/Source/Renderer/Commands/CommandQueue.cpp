@@ -31,11 +31,8 @@ namespace Lucy {
 		CommandResource& parentCommandResource = m_CommandResourceMap[parentResourceHandle];
 
 		const Ref<GraphicsPipeline>& parentPipeline = parentCommandResource.GetTargetPipeline().As<GraphicsPipeline>();
-		if (parentPipeline->GetRenderPass() != childPipeline->GetRenderPass() || parentPipeline->GetFrameBuffer() != childPipeline->GetFrameBuffer()) {
-			LUCY_CRITICAL("This configuration cannot be processed!");
-			LUCY_CRITICAL("Child pipeline must have the same renderpass and framebuffer as the parent pipeline.");
-			LUCY_ASSERT(false);
-		}
+		LUCY_ASSERT(parentPipeline->GetRenderPass() == childPipeline->GetRenderPass() || parentPipeline->GetFrameBuffer() == childPipeline->GetFrameBuffer(),
+					"This configuration cannot be processed!\n Child pipeline must have the same renderpass and framebuffer as the parent pipeline.");
 
 		CommandResourceHandle childUniqueHandle = CommandResource::CreateUniqueHandle();
 		CommandResource childCommandResource = CommandResource(childPipeline, std::move(func), true);
@@ -47,11 +44,7 @@ namespace Lucy {
 	}
 
 	void CommandQueue::DeleteCommandResource(CommandResourceHandle commandHandle) {
-		if (m_CommandResourceMap.find(commandHandle) == m_CommandResourceMap.end()) {
-			LUCY_CRITICAL("Could not find a handle for a given command resource");
-			LUCY_ASSERT(false);
-			return;
-		}
+		LUCY_ASSERT(m_CommandResourceMap.find(commandHandle) != m_CommandResourceMap.end(), "Could not find a handle for a given command resource");
 		m_CommandResourceMap.erase(commandHandle);
 	}
 

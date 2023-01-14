@@ -28,8 +28,7 @@ namespace Lucy {
 			return instance;
 		}
 
-		LUCY_CRITICAL("Shader extension not supported!");
-		LUCY_ASSERT(false);
+		LUCY_ASSERT(false, "Shader extension not supported!");
 		return instance;
 	}
 
@@ -81,10 +80,7 @@ namespace Lucy {
 
 		shaderc::SpvCompilationResult result = compiler.CompileGlslToSpv(data, kind, filesystem.GetFileName(path).c_str(), options);
 		uint32_t status = result.GetCompilationStatus();
-		if (status != shaderc_compilation_status_success) {
-			LUCY_CRITICAL(fmt::format("{0} Shader; Status: {1}, Message: {2}", shaderType, status, result.GetErrorMessage()));
-			LUCY_ASSERT(false);
-		}
+		LUCY_ASSERT(status == shaderc_compilation_status_success, "{0} Shader; Status: {1}, Message: {2}", shaderType, status, result.GetErrorMessage());
 		std::vector<uint32_t> dataAsSPIRV(result.cbegin(), result.cend());
 		filesystem.WriteToFile<uint32_t>(cachedData, dataAsSPIRV, OpenMode::Binary);
 

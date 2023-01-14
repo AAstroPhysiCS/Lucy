@@ -31,13 +31,8 @@ namespace Lucy {
 		: VulkanImage(path, createInfo) {
 		m_LayerCount = 6;
 
-		if (m_CreateInfo.ImageType != ImageType::TypeCubeColor)
-			LUCY_ASSERT(false);
-
-		if (!stbi_is_hdr(m_Path.c_str())) {
-			LUCY_CRITICAL(fmt::format("The texture isnt HDR. Texture path: {0}", m_Path));
-			LUCY_ASSERT(false);
-		}
+		LUCY_ASSERT(m_CreateInfo.ImageType == ImageType::TypeCubeColor);
+		LUCY_ASSERT(stbi_is_hdr(m_Path.c_str()), "The texture isnt HDR. Texture path: {0}", m_Path);
 
 		ImageCreateInfo hdrImageCreateInfo{
 			.ImageType = ImageType::Type2DColor,
@@ -178,8 +173,7 @@ namespace Lucy {
 	VulkanImageCube::VulkanImageCube(ImageCreateInfo& createInfo)
 		: VulkanImage(createInfo) {
 		m_LayerCount = 6;
-		if (m_CreateInfo.ImageType != ImageType::TypeCubeColor)
-			LUCY_ASSERT(false);
+		LUCY_ASSERT(m_CreateInfo.ImageType == ImageType::TypeCubeColor);
 		Renderer::EnqueueToRenderThread([=]() {
 			CreateEmptyImage();
 		});

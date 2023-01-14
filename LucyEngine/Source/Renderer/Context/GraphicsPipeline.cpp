@@ -17,7 +17,6 @@ namespace Lucy {
 			case ShaderDataSize::Float3: return 3; break;
 			case ShaderDataSize::Int4:
 			case ShaderDataSize::Float4: return 4; break;
-			case ShaderDataSize::Mat4:	 return 4 * 4; break;
 		}
 		return 0;
 	}

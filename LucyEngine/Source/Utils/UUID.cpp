@@ -67,8 +67,7 @@ namespace Lucy {
 			return;
 		}
 
-		LUCY_CRITICAL(fmt::format("Material ID: {0} does not exist!", id));
-		LUCY_ASSERT(false);
+		LUCY_ASSERT(false, "Material ID: {0} does not exist!", id);
 	}
 
 	LucyID IDProvider::Renew(LucyID oldId) {

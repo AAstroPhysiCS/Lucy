@@ -95,7 +95,7 @@ namespace Lucy {
 				}
 			}
 			if (!notFound)
-				LUCY_ASSERT(false);
+				LUCY_ASSERT(false, "Vulkan validation support isn't being supported!");
 		}
 	}
 
@@ -107,8 +107,7 @@ namespace Lucy {
 		createInfo.pfnUserCallback = VulkanMessageCallback::DebugCallback;
 		createInfo.pUserData = nullptr; // Optional
 
-		auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(m_Instance, "vkCreateDebugUtilsMessengerEXT");
-		if (func) {
+		if (auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(m_Instance, "vkCreateDebugUtilsMessengerEXT")) {
 			LUCY_VK_ASSERT(func(m_Instance, &createInfo, nullptr, &m_DebugMessenger));
 			return;
 		}

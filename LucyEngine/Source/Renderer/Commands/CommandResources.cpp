@@ -75,10 +75,7 @@ namespace Lucy {
 	}
 
 	void ComputeDispatchCommand::DoPass(void* commandBuffer, CommandResource* component) {
-		if (m_GroupCountX == 0 || m_GroupCountY == 0 || m_GroupCountZ == 0) {
-			LUCY_CRITICAL("Dispatching compute cannot be processed, since the group count is 0.");
-			LUCY_ASSERT(false);
-		}
+		LUCY_ASSERT(m_GroupCountX != 0 || m_GroupCountY != 0 || m_GroupCountZ != 0, "Dispatching compute cannot be processed, since the group count is 0.");
 		component->GetCommandFunc()(commandBuffer, component->GetTargetPipeline(), this);
 	}
 }

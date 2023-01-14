@@ -14,10 +14,7 @@ namespace Lucy {
 		uint32_t deviceCount = 0;
 		vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
 
-		if (deviceCount == 0) {
-			LUCY_CRITICAL("No physical device found that supports vulkan!");
-			LUCY_ASSERT(false);
-		}
+		LUCY_ASSERT(deviceCount != 0, "No physical device found that supports Vulkan!");
 
 		std::vector<VkPhysicalDevice> availablePhysicalDevices(deviceCount);
 		vkEnumeratePhysicalDevices(instance, &deviceCount, availablePhysicalDevices.data());
@@ -71,8 +68,7 @@ namespace Lucy {
 			}
 		}
 
-		LUCY_CRITICAL("No suitable device found!");
-		LUCY_ASSERT(false);
+		LUCY_ASSERT(false, "No suitable device found!");
 	}
 
 	void VulkanContextDevice::CreateLogicalDevice(std::vector<const char*>& enabledValidationLayers) {
@@ -187,10 +183,10 @@ namespace Lucy {
 		}
 
 		if (!requiredExtensions.empty()) {
-			LUCY_INFO("Not available extensions");
+			LUCY_CRITICAL("Not available extensions");
 			uint32_t i = 0;
 			for (const auto& notAvailableExtensions : requiredExtensions) {
-				LUCY_INFO(fmt::format("Index: {0}, Name: {1}", (i++), notAvailableExtensions));
+				LUCY_CRITICAL(fmt::format("Index: {0}, Name: {1}", (i++), notAvailableExtensions));
 			}
 			LUCY_ASSERT(false);
 		}

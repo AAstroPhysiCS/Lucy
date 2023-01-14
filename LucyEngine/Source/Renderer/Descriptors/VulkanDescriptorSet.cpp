@@ -93,8 +93,7 @@ namespace Lucy {
 					break;
 				}
 				case DescriptorType::Undefined:
-					LUCY_CRITICAL("Descriptor type is undefined!");
-					LUCY_ASSERT(false);
+					LUCY_ASSERT(false, "Descriptor type is undefined!");
 					break;
 			}
 		}
@@ -113,12 +112,10 @@ namespace Lucy {
 					break;
 				case DescriptorType::SSBODynamic:
 					setWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-					LUCY_CRITICAL("Not implemented yet!");
-					LUCY_ASSERT(false);
+					LUCY_ASSERT(false, "Dynamic SSBO not yet supported!");
 					break;
 				case DescriptorType::Undefined:
-					LUCY_CRITICAL("Descriptor type is undefined!");
-					LUCY_ASSERT(false);
+					LUCY_ASSERT(false, "Descriptor type is undefined!");
 					break;
 			}
 

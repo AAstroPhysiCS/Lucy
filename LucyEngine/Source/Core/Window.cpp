@@ -23,18 +23,11 @@ namespace Lucy {
 	}
 
 	void WinWindow::Init(RenderArchitecture architecture) {
-		if (m_CreateInfo.Width == 0 || m_CreateInfo.Height == 0) {
-			LUCY_CRITICAL("Window size is 0.");
-			LUCY_ASSERT(false);
-		}
-
-		if (!glfwInit()) {
-			LUCY_CRITICAL("GLFW init failed!");
-			LUCY_ASSERT(false);
-		}
+		LUCY_ASSERT(m_CreateInfo.Width != 0 || m_CreateInfo.Height != 0, "Window size is 0.");
+		LUCY_ASSERT(glfwInit(), "GLFW init failed!");
 
 		if (architecture == RenderArchitecture::Vulkan) {
-			LUCY_ASSERT(glfwVulkanSupported());
+			LUCY_ASSERT(glfwVulkanSupported(), "Vulkan loader has not been found!");
 			glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		} else {
 			glfwWindowHint(GLFW_DOUBLEBUFFER, true);
@@ -54,7 +47,6 @@ namespace Lucy {
 				break;
 			}
 			default:
-				LUCY_CRITICAL("Should not happen?");
 				LUCY_ASSERT(false);
 				break;
 		}

@@ -10,8 +10,9 @@ namespace Lucy {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan:
 				return Memory::CreateRef<VulkanCommandPool>(createInfo);
+			default:
+				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		LUCY_ASSERT(false);
 		return nullptr;
 	}
 

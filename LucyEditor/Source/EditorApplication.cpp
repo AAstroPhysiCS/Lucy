@@ -19,7 +19,6 @@ namespace Lucy {
 
 EditorApplication::EditorApplication(const ApplicationArgs& args, const ApplicationCreateInfo& applicationCreateInfo)
 	: Application(args, applicationCreateInfo) {
-
 	m_Scene = Memory::CreateRef<Scene>();
 
 	Ref<RendererModule> rendererModule = Memory::CreateRef<RendererModule>(applicationCreateInfo.RenderArchitecture, m_Window, m_Scene);
@@ -30,8 +29,8 @@ EditorApplication::EditorApplication(const ApplicationArgs& args, const Applicat
 }
 
 EditorApplication::~EditorApplication() {
-	for (Ref<Module> m : m_ModuleStack)
-		m->Wait();
+	for (Ref<Module> mod : m_ModuleStack)
+		mod->Wait();
 	m_Scene->Destroy();
 }
 
@@ -43,8 +42,8 @@ void EditorApplication::Run() {
 
 		/*
 		* All the modules needs to pass the corresponding module stage in order to switch to the next stage
+		* so, all the modules needs to pass the funcs, step by step
 		*/
-		//so, all the modules needs to pass the funcs, step by step
 		LUCY_PROFILE_NEW_EVENT("Module::Begin");
 		for (Ref<Module> mod : m_ModuleStack)
 			mod->Begin();

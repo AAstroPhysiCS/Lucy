@@ -101,7 +101,6 @@ namespace Lucy {
 			m_ImGuiPool = Memory::CreateRef<VulkanDescriptorPool>(m_PoolSpecs);
 
 			Renderer::EnqueueToRenderThread([&]() mutable {
-				VulkanSwapChain& swapChain = VulkanSwapChain::Get();
 				const auto& vulkanContext = Renderer::GetRenderContext().As<VulkanContext>();
 				VulkanContextDevice device = VulkanContextDevice::Get();
 
@@ -217,31 +216,30 @@ namespace Lucy {
 	void ImGuiOverlay::OnEvent(Event& e) {
 		auto& inputHandler = Application::Get()->GetInputHandler();
 
-		inputHandler.Dispatch<ScrollEvent>(e, EventType::ScrollEvent, [&](ScrollEvent& e) {
+		inputHandler.Dispatch<ScrollEvent>(e, EventType::ScrollEvent, [&](const ScrollEvent& e) {
 			ImGuiIO& io = ImGui::GetIO();
 			io.AddMouseWheelEvent((float)e.GetXOffset(), (float)e.GetYOffset());
 		});
 
-		inputHandler.Dispatch<CursorPosEvent>(e, EventType::CursorPosEvent, [&](CursorPosEvent& e) {
-			auto& inputHandler = Application::Get()->GetInputHandler();
+		inputHandler.Dispatch<CursorPosEvent>(e, EventType::CursorPosEvent, [&](const CursorPosEvent& e) {
 			inputHandler.MouseX = e.GetXPos();
 			inputHandler.MouseY = e.GetYPos();
 			ImGui_ImplGlfw_CursorPosCallback(e.GetWindowHandle(), inputHandler.MouseX, inputHandler.MouseY);
 		});
 
-		inputHandler.Dispatch<MouseEvent>(e, EventType::MouseEvent, [&](MouseEvent& e) {
+		inputHandler.Dispatch<MouseEvent>(e, EventType::MouseEvent, [&](const MouseEvent& e) {
 			ImGui_ImplGlfw_MouseButtonCallback(e.GetWindowHandle(), e.GetButton(), e.GetAction(), e.GetMods());
 		});
 
-		inputHandler.Dispatch<KeyEvent>(e, EventType::KeyEvent, [&](KeyEvent& e) {
+		inputHandler.Dispatch<KeyEvent>(e, EventType::KeyEvent, [&](const KeyEvent& e) {
 			ImGui_ImplGlfw_KeyCallback(e.GetWindowHandle(), e.GetKey(), e.GetScanCode(), e.GetAction(), e.GetMods());
 		});
 
-		inputHandler.Dispatch<CharCallbackEvent>(e, EventType::CharCallbackEvent, [&](CharCallbackEvent& e) {
+		inputHandler.Dispatch<CharCallbackEvent>(e, EventType::CharCallbackEvent, [&](const CharCallbackEvent& e) {
 			ImGui_ImplGlfw_CharCallback(e.GetWindowHandle(), e.GetCodePoint());
 		});
 
-		inputHandler.Dispatch<WindowResizeEvent>(e, EventType::WindowResizeEvent, [&](WindowResizeEvent& e) {
+		inputHandler.Dispatch<WindowResizeEvent>(e, EventType::WindowResizeEvent, [&](const WindowResizeEvent& e) {
 			ImGuiIO& io = ImGui::GetIO();
 			io.DisplaySize = { (float)e.GetWidth(), (float)e.GetHeight() };
 			io.DisplayFramebufferScale = { 1.0f, 1.0f };

@@ -24,10 +24,8 @@ namespace Lucy {
 		inline const CommandFunc& GetCommandFunc() const { return m_CommandFunc; }
 
 		inline bool IsChildValid() const {
-			if (m_IsChild && m_ChildCommandResourceHandles.size() != 0) {
-				LUCY_CRITICAL("Child resources should not have child resources!");
-				LUCY_ASSERT(false);
-			}
+			if (m_IsChild && !m_ChildCommandResourceHandles.empty())
+				LUCY_ASSERT(false, "Child resources should not have child resources!");
 			return m_IsChild;
 		}
 	private:

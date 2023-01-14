@@ -3,7 +3,7 @@
 
 #include "Shader.h"
 
-#include "Core/FileSystem.h"
+#include "Core/Filesystem.h"
 
 namespace Lucy {
 
@@ -38,8 +38,7 @@ namespace Lucy {
 				return shader;
 		}
 
-		LUCY_CRITICAL("Shader not found!");
-		LUCY_ASSERT(false);
+		LUCY_ASSERT(false, "{0} Shader not found!", name);
 		return nullptr;
 	}
 

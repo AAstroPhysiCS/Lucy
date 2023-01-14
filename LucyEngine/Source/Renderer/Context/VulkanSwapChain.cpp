@@ -117,10 +117,7 @@ namespace Lucy {
 		capabilities.presentModes.resize(presentModesCount);
 		vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModesCount, capabilities.presentModes.data());
 
-		if (capabilities.presentModes.empty() || capabilities.formats.empty()) {
-			LUCY_CRITICAL("Graphics card does not support swap chain formats/present modes");
-			LUCY_ASSERT(false);
-		}
+		LUCY_ASSERT(!capabilities.presentModes.empty() || !capabilities.formats.empty(), "Graphics card does not support swap chain formats/present modes");
 		return capabilities;
 	}
 

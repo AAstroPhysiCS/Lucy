@@ -5,7 +5,7 @@
 #include "Metrics.h"
 
 #include "InputHandler.h"
-#include "FileSystem.h"
+#include "Filesystem.h"
 
 #include "Renderer/RenderArchitecture.h"
 
@@ -27,6 +27,14 @@ namespace Lucy {
 		RenderArchitecture RenderArchitecture;
 	};
 
+	class ApplicationThreadScheduler {
+		ApplicationThreadScheduler() = default;
+		~ApplicationThreadScheduler() = default;
+
+		friend class Application;
+	public:
+	};
+
 	class Application {
 	public:
 		static Application*& Get();
@@ -35,7 +43,7 @@ namespace Lucy {
 		virtual ~Application();
 
 		inline static Metrics& GetApplicationMetrics() { return s_Metrics; }
-		inline ApplicationArgs GetProgramArguments() { return m_Args; }
+		inline ApplicationArgs GetProgramArguments() const { return m_Args; }
 
 		inline InputHandler& GetInputHandler() { return m_InputHandler; }
 		inline Filesystem& GetFilesystem() { return m_Filesystem; }
@@ -52,6 +60,8 @@ namespace Lucy {
 
 		InputHandler m_InputHandler;
 		Filesystem m_Filesystem;
+
+		ApplicationThreadScheduler m_ThreadScheduler;
 
 		friend int ::main(int argc, char** argv);
 	};

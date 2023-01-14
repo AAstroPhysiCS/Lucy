@@ -23,10 +23,7 @@ namespace Lucy {
 			return;
 		}
 
-		if (m_CreateInfo.ImageBuffers.empty()) {
-			LUCY_CRITICAL("Neither a imageview nor a imagebuffer is defined!");
-			LUCY_ASSERT(false);
-		}
+		LUCY_ASSERT(!m_CreateInfo.ImageBuffers.empty(), "Neither a imageview nor a imagebuffer is defined!");
 
 		Renderer::EnqueueToRenderThread([=]() {
 			Create();

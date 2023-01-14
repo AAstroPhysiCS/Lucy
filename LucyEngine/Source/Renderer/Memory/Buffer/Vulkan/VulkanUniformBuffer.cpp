@@ -11,10 +11,7 @@ namespace Lucy {
 
 	VulkanUniformBuffer::VulkanUniformBuffer(UniformBufferCreateInfo& createInfo)
 		: UniformBuffer(createInfo) {
-		if (m_CreateInfo.BufferSize == 0) {
-			LUCY_CRITICAL("Size is 0.");
-			LUCY_ASSERT(false);
-		}
+		LUCY_ASSERT(m_CreateInfo.BufferSize != 0, "The size of UBO is 0.");
 
 		const uint32_t maxFramesInFlight = Renderer::GetMaxFramesInFlight();
 		m_Buffers.resize(maxFramesInFlight, VK_NULL_HANDLE);

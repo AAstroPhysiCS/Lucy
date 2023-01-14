@@ -78,8 +78,7 @@ namespace Lucy {
 			}
 		}
 
-		LUCY_ASSERT(false);
-		LUCY_INFO("Cant find a suitable memory type or property");
+		LUCY_ASSERT(false, "Cant find a suitable memory type or property");
 		return 0;
 	}
 

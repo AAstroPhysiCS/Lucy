@@ -33,8 +33,7 @@ namespace Lucy {
 
 	enum class ShaderDataSize : uint16_t {
 		Float1, Float2, Float3, Float4,
-		Int1, Int2, Int3, Int4,
-		Mat4
+		Int1, Int2, Int3, Int4
 	};
 
 	struct ShaderLayoutElement {

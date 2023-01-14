@@ -42,8 +42,6 @@ namespace Lucy {
 		const auto& idShader = shaderLibrary.GetShader("LucyID");
 		const auto& hdrSkyboxShader = shaderLibrary.GetShader("LucyHDRSkybox");
 
-		const uint32_t maxFramesInFlight = Renderer::GetMaxFramesInFlight();
-
 #pragma region GeometryPipeline
 
 		ImageCreateInfo geometryTextureCreateInfo = {
@@ -153,7 +151,7 @@ namespace Lucy {
 			.VertexShaderLayout {
 				{ "a_Pos", ShaderDataSize::Float3 },
 			},
-			.DepthConfiguration = { .DepthCompareOp = DepthCompareOp::LessOrEqual },
+			.DepthConfiguration = {.DepthCompareOp = DepthCompareOp::LessOrEqual },
 			.RenderPass = geometryRenderPass,
 			.FrameBuffer = geometryFrameBuffer,
 			.Shader = hdrSkyboxShader
@@ -233,7 +231,7 @@ namespace Lucy {
 
 				const auto& irradianceView = cubeMapImage->GetIrradianceView();
 				irradianceMapBuffer->BindImage(irradianceView.GetVulkanHandle(), cubeMapImage->GetCurrentLayout(), irradianceView.GetSampler());
-				
+
 				noValidCubemap = false;
 				break;
 			}
@@ -248,7 +246,7 @@ namespace Lucy {
 		}
 
 		const auto& meshView = m_Scene->View<MeshComponent>();
-		for (entt::sparse_set::reverse_iterator it = meshView.rbegin(); it != meshView.rend(); it++) {
+		for (auto it = meshView.rbegin(); it != meshView.rend(); it++) {
 			Entity e{ m_Scene.Get(), *it };
 			MeshComponent& meshComponent = e.GetComponent<MeshComponent>();
 			if (!meshComponent.IsValid())
@@ -257,7 +255,7 @@ namespace Lucy {
 			const Ref<Mesh>& mesh = meshComponent.GetMesh();
 
 			auto& materials = mesh->GetMaterials();
-			for (Submesh& submesh : mesh->GetSubmeshes()) {
+			for (const Submesh& submesh : mesh->GetSubmeshes()) {
 				const Ref<Material>& material = materials[submesh.MaterialIndex];
 				material->Update(m_GeometryPipeline);
 			}

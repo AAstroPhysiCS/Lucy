@@ -47,7 +47,7 @@ namespace Lucy {
 			if (meshIDValue == meshID)
 				return e;
 		}
-		LUCY_ASSERT(false);
+		LUCY_ASSERT(false, "Getting an entity by ID failed!");
 		return {};
 	}
 

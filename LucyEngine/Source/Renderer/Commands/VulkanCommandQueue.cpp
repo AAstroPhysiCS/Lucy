@@ -22,7 +22,7 @@ namespace Lucy {
 
 	void VulkanCommandQueue::Execute() {
 		LUCY_PROFILE_NEW_EVENT("VulkanCommandQueue::Execute");
-		if (m_CommandResourceMap.size() == 0)
+		if (m_CommandResourceMap.empty())
 			return;
 
 		VkCommandBuffer commandBuffer = GetCurrentCommandBuffer();
@@ -49,7 +49,7 @@ namespace Lucy {
 				case ContextPipelineType::Graphics:
 					Renderer::BeginRenderPass(commandBuffer, currentResourcePipeline.As<VulkanGraphicsPipeline>());
 					resource.DoPass(commandBuffer);
-					for (auto& childResourceHandle : resource.m_ChildCommandResourceHandles)
+					for (const auto& childResourceHandle : resource.m_ChildCommandResourceHandles)
 						m_CommandResourceMap[childResourceHandle].DoPass(commandBuffer);
 					Renderer::EndRenderPass(currentResourcePipeline.As<VulkanGraphicsPipeline>());
 					break;

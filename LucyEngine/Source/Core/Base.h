@@ -16,24 +16,28 @@
 
 #ifdef LUCY_WINDOWS
 	//for potential platform diversion (in android for example its some asm instruction)
-	#define LUCY_DEBUG_BREAK __debugbreak();
+	#define LUCY_DEBUG_BREAK __debugbreak()
 #endif
 
 #define LUCY_BIND_FUNC(func) std::bind(func, this, std::placeholders::_1)
 
-#define LUCY_ASSERT(arg)											if(!arg) {																							\
-																		LUCY_CRITICAL(fmt::format("Assert failed! File: {0}, Line: {0}", __FILE__, __LINE__));			\
-																		LUCY_DEBUG_BREAK }
+template <typename... T>
+static void LucyAssert(bool arg, const char* text = "", T&&... args) {
+	if (!arg) {
+		LUCY_CRITICAL(fmt::format("{0}\n File: {1}, Line: {2}", fmt::format(text, std::forward<T>(args)...), __FILE__, __LINE__));
+		LUCY_DEBUG_BREAK;
+	}
+}
 
-#define LUCY_ASSERT_TEXT(arg, text)									if(!arg) {																							\
-																		LUCY_CRITICAL(text);																			\
-																		LUCY_CRITICAL("Assert failed!");																\
-																		LUCY_DEBUG_BREAK }
+static void LucyVulkanAssert(int32_t result) {
+	if (result != 0) //0 for VK_SUCCESS
+		LucyAssert(false, "Vulkan error: {0}", Lucy::RendererAPICodesToString(result));
+}
 
-#define LUCY_VK_ASSERT(arg)											if(arg != VK_SUCCESS) {																				\
-																		LUCY_CRITICAL(fmt::format("Vulkan error: {0}", RendererAPICodesToString(arg)));					\
-																		LUCY_CRITICAL(fmt::format("Vulkan assert failed! File: {0}, Line: {0}", __FILE__, __LINE__));	\
-																		LUCY_DEBUG_BREAK }
+#define NUMARGS(...)												std::tuple_size<decltype(std::make_tuple(__VA_ARGS__))>::value
+
+#define LUCY_ASSERT(arg, ...)										if (NUMARGS(__VA_ARGS__) == 0) LucyAssert((arg)); else LucyAssert((arg), __VA_ARGS__)
+#define LUCY_VK_ASSERT(arg)											LucyVulkanAssert(arg)
 
 #ifdef LUCY_DEBUG
 	#define USE_OPTICK (1)

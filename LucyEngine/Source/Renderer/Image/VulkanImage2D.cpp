@@ -72,13 +72,8 @@ namespace Lucy {
 		if (m_CreateInfo.GenerateMipmap)
 			m_MaxMipLevel = (uint32_t)glm::floor(glm::log2(glm::max(m_Width, m_Height))) + 1u;
 
-		if (!data) {
-			LUCY_CRITICAL(fmt::format("Failed to load a texture. Texture path: {0}", m_Path));
-			LUCY_ASSERT(false);
-		}
-
-		if (m_Width == 0 && m_Height == 0)
-			LUCY_ASSERT(false);
+		LUCY_ASSERT(data, "Failed to load a texture. Texture path: {0}", m_Path);
+		LUCY_ASSERT(m_Width != 0 && m_Height != 0);
 
 		VkDeviceSize imageSize = (VkDeviceSize)m_Width * m_Height * 4 * GetFormatSize(m_CreateInfo.Format);
 
@@ -123,8 +118,7 @@ namespace Lucy {
 	}
 
 	void VulkanImage2D::CreateEmptyImage() {
-		if (m_Width == 0 && m_Height == 0)
-			LUCY_ASSERT(false);
+		LUCY_ASSERT(m_Width != 0 && m_Height != 0);
 
 		if (m_CreateInfo.GenerateMipmap)
 			m_MaxMipLevel = (uint32_t)glm::floor(glm::log2(glm::max(m_Width, m_Height))) + 1u;
@@ -150,8 +144,7 @@ namespace Lucy {
 	}
 
 	void VulkanImage2D::CreateDepthImage() {
-		if (m_Width == 0 && m_Height == 0)
-			LUCY_ASSERT(false);
+		LUCY_ASSERT(m_Width != 0 && m_Height != 0);
 
 		VulkanAllocator& allocator = VulkanAllocator::Get();
 		allocator.CreateVulkanImageVma(m_Width, m_Height, 1, (VkFormat)GetAPIImageFormat(m_CreateInfo.Format), m_CurrentLayout,
