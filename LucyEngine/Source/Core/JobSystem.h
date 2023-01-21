@@ -9,6 +9,7 @@
 #include <queue>
 
 namespace Lucy {
+
 	/*
 	* Influenced by: https://ubm-twvideo01.s3.amazonaws.com/o1/vault/gdc2015/presentations/Gyrling_Christian_Parallelizing_The_Naughty.pdf
 	* which used fibers... After reading about fibers I decided not to use it as it also comes with some hefty downsides.
@@ -22,8 +23,7 @@ namespace Lucy {
 	};
 
 	template <typename Param>
-	using Fnc = std::function<void(Param)>;
-
+	using Fnc = std::function<void([[maybe_unused]]Param)>;
 	using JobFnc = Fnc<JobArgs>;
 
 	struct Job {
@@ -79,6 +79,7 @@ namespace Lucy {
 		JobSystem(uint32_t maxThreads = std::thread::hardware_concurrency());
 		~JobSystem();
 
+		void Init();
 		void ExecuteJob(const JobFnc& jobFnc);
 		void Dispatch(uint32_t jobCount, uint32_t groupSize, const JobFnc&& jobFnc);
 		void WaitIdle();
@@ -90,7 +91,6 @@ namespace Lucy {
 		std::vector<std::thread> m_Workers;
 
 		std::condition_variable m_WakeUpCondition;
-		std::condition_variable m_WaitToFinishCondition;
 
 		std::atomic_int m_CurrentJobCounter;
 		std::atomic_bool m_Running = true;

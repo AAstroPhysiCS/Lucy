@@ -16,15 +16,14 @@ namespace Lucy {
 		return (a | (uint16_t)b);
 	}
 
-	class Filesystem {
+	class FileSystem {
 	private:
-		Filesystem() = default;
-		~Filesystem() = default;
+		FileSystem() = default;
+		~FileSystem();
 
 		friend class Application;
 	public:
 		void Init();
-		void Destroy();
 
 		std::string GetParentPath(std::string& path);
 		std::string GetParentPath(const std::string& path);

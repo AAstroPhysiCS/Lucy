@@ -25,7 +25,7 @@ namespace Utils {
 
 	Attribute ReadAttributeFromIni(const char* windowName, const char* attributeName) {
 		std::string buffer;
-		Lucy::Application::Get()->GetFilesystem().ReadFile("lucyconfig.ini", buffer);
+		Lucy::Application::Get()->GetFileSystem().ReadFile("lucyconfig.ini", buffer);
 
 		std::string windowNameFull = "[Window][";
 		windowNameFull.append(windowName).append("]");

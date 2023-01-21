@@ -3,7 +3,8 @@
 
 #include "Shader/ShaderLibrary.h"
 
-#include "../Core/Timer.h"
+#include "Core/Application.h"
+#include "Core/Timer.h"
 
 namespace Lucy {
 
@@ -59,7 +60,7 @@ namespace Lucy {
 
 	Mesh::Mesh(const std::string& path)
 		: m_Path(path) {
-		ScopedTimer scopedTimer;
+		ScopedTimer scopedTimer("Mesh import");
 
 		Assimp::Importer importer;
 		const aiScene* scene = importer.ReadFile(path, ASSIMP_FLAGS);
@@ -76,7 +77,7 @@ namespace Lucy {
 		TraverseHierarchy(scene->mRootNode, glm::mat4(1.0f));
 
 		//Getting the size of the buffer
-		for (Submesh& submesh : m_Submeshes) {
+		for (const Submesh& submesh : m_Submeshes) {
 			m_MetadataInfo.TotalIndicesSize += submesh.IndexCount;
 			m_MetadataInfo.TotalVerticesSize += submesh.VertexCount;
 		}
@@ -87,7 +88,7 @@ namespace Lucy {
 
 		size_t from = 0;
 		for (uint32_t i = 0; i < m_Submeshes.size(); i++) {
-			Submesh& submesh = m_Submeshes[i];
+			const Submesh& submesh = m_Submeshes[i];
 			auto& faces = submesh.Faces;
 			m_IndexBuffer->SetData(faces, from);
 			from += faces.size();
@@ -154,6 +155,8 @@ namespace Lucy {
 	}
 
 	void Mesh::LoadData(const aiScene* scene) {
+		ScopedTimer scopedTimer(fmt::format("{0} data parsing", m_Name));
+
 		aiMesh** meshes = scene->mMeshes;
 		uint32_t meshCount = scene->mNumMeshes;
 

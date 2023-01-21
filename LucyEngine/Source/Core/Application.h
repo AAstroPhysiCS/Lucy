@@ -5,7 +5,8 @@
 #include "Metrics.h"
 
 #include "InputHandler.h"
-#include "Filesystem.h"
+#include "FileSystem.h"
+#include "JobSystem.h"
 
 #include "Renderer/RenderArchitecture.h"
 
@@ -46,7 +47,8 @@ namespace Lucy {
 		inline ApplicationArgs GetProgramArguments() const { return m_Args; }
 
 		inline InputHandler& GetInputHandler() { return m_InputHandler; }
-		inline Filesystem& GetFilesystem() { return m_Filesystem; }
+		inline FileSystem& GetFileSystem() { return m_FileSystem; }
+		inline JobSystem& GetJobSystem() { return m_JobSystem; }
 	protected:
 		virtual void Run() = 0;
 		virtual void OnEvent(Event* e) = 0;
@@ -59,7 +61,8 @@ namespace Lucy {
 		static Metrics s_Metrics;
 
 		InputHandler m_InputHandler;
-		Filesystem m_Filesystem;
+		FileSystem m_FileSystem;
+		JobSystem m_JobSystem;
 
 		ApplicationThreadScheduler m_ThreadScheduler;
 

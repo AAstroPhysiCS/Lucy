@@ -19,7 +19,7 @@ namespace Lucy {
 		options.SetOptimizationLevel(shaderc_optimization_level::shaderc_optimization_level_performance);
 		options.SetGenerateDebugInfo();
 
-		auto& filesystem = Application::Get()->GetFilesystem();
+		auto& filesystem = Application::Get()->GetFileSystem();
 
 		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan)
 			options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);

@@ -23,7 +23,7 @@ namespace Lucy {
 		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan)
 			options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
 
-		auto& filesystem = Application::Get()->GetFilesystem();
+		auto& filesystem = Application::Get()->GetFileSystem();
 
 		const auto [vertexFileExtension, fragmentFileExtension] = GetCachedFileExtension();
 		const std::string& cacheFileVert = filesystem.GetParentPath(m_Path) + "/" + filesystem.GetFileName(m_Path) + vertexFileExtension;

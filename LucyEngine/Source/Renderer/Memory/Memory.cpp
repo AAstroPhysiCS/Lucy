@@ -3,11 +3,11 @@
 
 #include "Core/Application.h"
 
-void* __cdecl operator new(std::size_t size) {
+void* __cdecl operator new(size_t size) {
 	using namespace Lucy;
 	Metrics& metrics = Application::GetApplicationMetrics();
 
-	if (void* ptr = std::malloc(size)) {
+	if (void* ptr = malloc(size)) {
 		metrics.MemTracker.m_TotalAllocated += size;
 		return ptr;
 	}
@@ -19,10 +19,10 @@ void* __cdecl operator new(std::size_t size) {
 	return nullptr;
 }
 
-void operator delete(void* o, std::size_t size) {
+void operator delete(void* o, size_t size) {
 	using namespace Lucy;
 	Metrics& metrics = Application::GetApplicationMetrics();
 
 	metrics.MemTracker.m_TotalFreed += size;
-	std::free(o);
+	free(o);
 }

@@ -20,7 +20,7 @@ namespace Lucy {
 		Metrics& metrics = EditorApplication::GetApplicationMetrics();
 
 		PerformanceMetrics& perfMetrics = metrics.PerfMetrics;
-		MemoryTracker& tracker = metrics.MemTracker;
+		const MemoryTracker& tracker = metrics.MemTracker;
 
 		if (!m_Show) return;
 

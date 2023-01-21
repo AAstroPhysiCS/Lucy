@@ -19,13 +19,13 @@ namespace Lucy {
 		m_Window->SetEventCallback(LUCY_BIND_FUNC(&Application::OnEvent));
 
 		m_InputHandler.Init(m_Window->Raw());
-		m_Filesystem.Init();
+		m_FileSystem.Init();
+		m_JobSystem.Init();
 	}
 
 	Application::~Application() {
 		for (Ref<Module> m : m_ModuleStack)
 			m->Destroy();
 		m_Window->Destroy();
-		m_Filesystem.Destroy();
 	}
 }

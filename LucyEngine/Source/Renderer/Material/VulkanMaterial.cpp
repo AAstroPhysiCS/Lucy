@@ -58,7 +58,7 @@ namespace Lucy {
 	void VulkanMaterial::LoadTexture(aiMaterial* aiMaterial, const MaterialImageType& type, const std::string& importedFilePath) {
 		aiString path;
 		if (aiMaterial->GetTexture((aiTextureType)type.Type, 0, &path) == aiReturn_SUCCESS) {
-			std::string properTexturePath = Application::Get()->GetFilesystem().GetParentPath(importedFilePath) + "/" + std::string(path.data);
+			std::string properTexturePath = Application::Get()->GetFileSystem().GetParentPath(importedFilePath) + "/" + std::string(path.data);
 
 			ImageCreateInfo createInfo;
 			createInfo.Format = ImageFormat::R8G8B8A8_UNORM;

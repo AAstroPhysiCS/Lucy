@@ -14,7 +14,7 @@ namespace Lucy {
 
 	Ref<Shader> Shader::Create(const std::string& name, const std::string& path) {
 		Ref<Shader> instance = nullptr;
-		auto extension = Application::Get()->GetFilesystem().GetFileExtension(path);
+		auto extension = Application::Get()->GetFileSystem().GetFileExtension(path);
 
 		if (extension == ".comp") {
 			if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan)
@@ -51,7 +51,7 @@ namespace Lucy {
 			return buffer;
 		};
 
-		auto& filesystem = Application::Get()->GetFilesystem();
+		auto& filesystem = Application::Get()->GetFileSystem();
 
 		std::vector<std::string> lines;
 		filesystem.ReadFileLine<std::string>(path, lines);
@@ -89,7 +89,7 @@ namespace Lucy {
 
 	std::vector<uint32_t> Shader::LoadSPIRVDataFromCache(const std::string& cachedFile) {
 		std::vector<uint32_t> data;
-		Application::Get()->GetFilesystem().ReadFile<uint32_t>(cachedFile, data, OpenMode::Binary);
+		Application::Get()->GetFileSystem().ReadFile<uint32_t>(cachedFile, data, OpenMode::Binary);
 		return data;
 	}
 }

@@ -6,7 +6,15 @@ namespace Lucy {
 	JobSystem::JobSystem(uint32_t maxThreads)
 		: m_MaxThreads(maxThreads) {
 		m_Workers.reserve(m_MaxThreads);
+	}
 
+	JobSystem::~JobSystem() {
+		m_Running = false;
+		m_WakeUpCondition.notify_all();
+		Join();
+	};
+
+	void JobSystem::Init() {
 		for (uint32_t threadIndex = 0; threadIndex < m_MaxThreads; threadIndex++) {
 			m_Workers.emplace_back(([this, threadIndex]() {
 				while (m_Running) {
@@ -29,10 +37,10 @@ namespace Lucy {
 
 			DWORD_PTR affinityMask = 1ull << threadIndex;
 			DWORD_PTR affinityResult = SetThreadAffinityMask(handle, affinityMask);
-			LUCY_ASSERT(affinityResult < 0);
+			LUCY_ASSERT(affinityResult != 0);
 
 			BOOL priorityResult = SetThreadPriority(handle, THREAD_PRIORITY_HIGHEST);
-			LUCY_ASSERT(priorityResult == 0);
+			LUCY_ASSERT(priorityResult != 0);
 
 			std::wstringstream wss;
 			wss << "LucyJobSystem" << threadIndex;
@@ -40,12 +48,6 @@ namespace Lucy {
 			LUCY_ASSERT(SUCCEEDED(hr));
 		}
 	}
-
-	JobSystem::~JobSystem() {
-		m_Running = false;
-		m_WakeUpCondition.notify_all();
-		Join();
-	};
 
 	void JobSystem::ExecuteJob(const JobFnc& jobFnc) {
 		Job job;
@@ -61,7 +63,7 @@ namespace Lucy {
 	void JobSystem::Dispatch(uint32_t jobCount, uint32_t groupSize, const JobFnc&& jobFnc) {
 		const uint32_t groupCount = (jobCount + groupSize - 1) / groupSize;
 
-		m_CurrentJobCounter.fetch_add(groupCount);
+		m_CurrentJobCounter.fetch_add(groupCount * groupSize);
 
 		for (uint32_t groupID = 0; groupID < groupCount; groupID++) {
 			for (uint32_t groupOffset = 0; groupOffset < groupSize; groupOffset++) {
