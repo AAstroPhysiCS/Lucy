@@ -1,78 +1,103 @@
 #include "lypch.h"
 #include "VulkanRenderer.h"
 
-#include "Context/GraphicsPipeline.h"
 #include "Context/VulkanSwapChain.h"
-#include "Context/VulkanContextDevice.h"
+#include "Context/VulkanContext.h"
 
-#include "Commands/VulkanCommandQueue.h"
 #include "Device/VulkanRenderDevice.h"
 
 #include "Memory/Buffer/Buffer.h"
-#include "Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
+#include "Commands/VulkanCommandPool.h"
 
-#include "Renderer.h"
-
-#include "Scene/Entity.h"
+#include "Events/InputEvent.h"
 
 namespace Lucy {
 	
-	VulkanRenderer::VulkanRenderer(RenderArchitecture arch, Ref<Window>& window)
-		: RendererBase(arch, window) {
+	VulkanRenderer::VulkanRenderer(RendererConfiguration config, const Ref<Window>& window)
+		: RendererBackend(config, window) {
+	}
+
+	void VulkanRenderer::Init() {
+		RendererBackend::Init();
+
 		m_WaitSemaphores.resize(m_MaxFramesInFlight);
 		m_SignalSemaphores.resize(m_MaxFramesInFlight);
 		m_InFlightFences.resize(m_MaxFramesInFlight);
+
+		m_TransientCommandPool = Memory::CreateRef<VulkanTransientCommandPool>(GetRenderDevice()->As<VulkanRenderDevice>());
 	}
 
-	void VulkanRenderer::BeginScene(Ref<Scene>& scene) {
-		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::BeginScene");
+	void VulkanRenderer::BeginFrame() {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::BeginFrame");
 
-		m_RenderDevice->DispatchCommands();
-
-		const auto& device = VulkanContextDevice::Get();
-		VkDevice deviceVulkanHandle = device.GetLogicalDevice();
+		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
+		VkDevice deviceVulkanHandle = renderDevice->GetLogicalDevice();
 
 		vkWaitForFences(deviceVulkanHandle, 1, &m_InFlightFences[m_CurrentFrameIndex].GetFence(), VK_TRUE, UINT64_MAX);
 		vkResetFences(deviceVulkanHandle, 1, &m_InFlightFences[m_CurrentFrameIndex].GetFence());
 
-		m_LastSwapChainResult = VulkanSwapChain::Get().AcquireNextImage(m_WaitSemaphores[m_CurrentFrameIndex].GetSemaphore(), m_ImageIndex);
-		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR)
+		m_LastSwapChainResult = GetRenderContext()->As<VulkanContext>()->GetSwapChain().AcquireNextImage(m_WaitSemaphores[m_CurrentFrameIndex].GetSemaphore(), m_ImageIndex);
+		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR || m_LastSwapChainResult == VK_NOT_READY)
 			return;
-
-		m_RenderTime = m_RenderDevice->GetTimestampResults();
 	}
-
-	void VulkanRenderer::RenderScene() {
-		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::RenderScene");
-
-		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR)
+	
+	void VulkanRenderer::RenderFrame() {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::RenderFrame");
+		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR || m_LastSwapChainResult == VK_NOT_READY)
 			return;
-		
-		m_RenderDevice->ExecuteCommandQueue();
-	}
-
-	RenderContextResultCodes VulkanRenderer::EndScene() {
-		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::EndScene");
-
-		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR)
-			return (RenderContextResultCodes)m_LastSwapChainResult;
 
 		Fence currentFrameFence = m_InFlightFences[m_CurrentFrameIndex];
 		Semaphore currentFrameWaitSemaphore = m_WaitSemaphores[m_CurrentFrameIndex];
 		Semaphore currentFrameSignalSemaphore = m_SignalSemaphores[m_CurrentFrameIndex];
 
-		VulkanContextDevice& contextDevice = VulkanContextDevice::Get();
-		m_RenderDevice->SubmitWorkToGPU(contextDevice.GetGraphicsQueue(), currentFrameFence, currentFrameWaitSemaphore, currentFrameSignalSemaphore);
+		const auto& cmdLists = GetCommandLists();
 
-		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
-		RenderContextResultCodes result = (RenderContextResultCodes) swapChain.Present(m_SignalSemaphores[m_CurrentFrameIndex], m_ImageIndex);
+		std::vector<Ref<CommandPool>> cmdPools;
+		cmdPools.resize(cmdLists.size(), nullptr);
+
+		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
+		for (size_t i = 0; const auto& cmdList : cmdLists)
+			cmdPools[i++] = cmdList.GetPrimaryCommandPool();
+			
+		renderDevice->SubmitWorkToGPU(TargetQueueFamily::Graphics, cmdPools, currentFrameFence, currentFrameWaitSemaphore, currentFrameSignalSemaphore);
+	}
+
+	void VulkanRenderer::EndFrame() {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::EndFrame");
+		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR || m_LastSwapChainResult == VK_NOT_READY)
+			return;
+
+		VulkanSwapChain& swapChain = GetRenderContext()->As<VulkanContext>()->GetSwapChain();
+		m_LastSwapChainResult = swapChain.Present(m_SignalSemaphores[m_CurrentFrameIndex], m_ImageIndex);
 		m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % m_MaxFramesInFlight;
+	}
+	
+	RenderContextResultCodes VulkanRenderer::WaitAndPresent() {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::WaitAndPresent");
+		if (GetRendererConfig().ThreadingPolicy == ThreadingPolicy::Multithreaded) {
+			const Ref<RenderThread>& renderThread = GetRenderThread();
+			//renderThread->SubmitCommandQueue(m_CommandQueue);
+			renderThread->SignalToPresent();
 
-		return result;
+			const auto WaitUntilFrameIsFinished = []() {
+			};
+
+			WaitUntilFrameIsFinished();
+			return renderThread->GetResultCode();
+		}
+
+		BeginFrame();
+		FlushCommandQueue();
+		FlushSubmitQueue();
+		RenderFrame();
+		EndFrame();
+		FlushDeletionQueue();
+
+		return (RenderContextResultCodes)m_LastSwapChainResult;
 	}
 
 	void VulkanRenderer::ExecuteBarrier(void* commandBufferHandle, Ref<Image> image) {
-		const auto& vulkanImage = image.As<VulkanImage>();
+		const auto& vulkanImage = image->As<VulkanImage>();
 		ExecuteBarrier(commandBufferHandle, (void*)vulkanImage->GetVulkanHandle(), vulkanImage->GetCurrentLayout(), vulkanImage->GetLayerCount(), vulkanImage->GetMaxMipLevel());
 	}
 
@@ -90,11 +115,6 @@ namespace Lucy {
 		barrier.RunBarrier((VkCommandBuffer)commandBufferHandle);
 	}
 
-	void VulkanRenderer::WaitForDevice() {
-		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::WaitForDevice");
-		LUCY_VK_ASSERT(vkDeviceWaitIdle(VulkanContextDevice::Get().GetLogicalDevice()));
-	}
-
 	void VulkanRenderer::Destroy() {
 		for (uint32_t i = 0; i < m_MaxFramesInFlight; i++) {
 			m_WaitSemaphores[i].Destroy();
@@ -102,90 +122,111 @@ namespace Lucy {
 			m_InFlightFences[i].Destroy();
 		}
 
-		VulkanAllocator::Get().DestroyBuffer(m_IDBuffer, m_IDBufferVma);
+		auto& allocator = GetRenderDevice()->As<VulkanRenderDevice>()->GetAllocator();
+		allocator.DestroyBuffer(s_IDBuffer, s_IDBufferVma);
 
-		RendererBase::Destroy();
+		RendererBackend::Destroy();
 	}
 
 	// Should not be used in a loop 
 	void VulkanRenderer::DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size) {
-		m_RenderDevice.As<VulkanRenderDevice>()->SubmitImmediateCommand([&](VkCommandBuffer commandBuffer) {
+		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
+		renderDevice->SubmitImmediateCommand([&](VkCommandBuffer commandBuffer) {
 			VkBufferCopy copyRegion = VulkanAPI::BufferCopy(0, 0, size);
 			vkCmdCopyBuffer(commandBuffer, stagingBuffer, buffer, 1, &copyRegion);
-		});
+		}, m_TransientCommandPool);
 	}
 
 	// Should not be used in a loop 
 	void VulkanRenderer::SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func) {
-		m_RenderDevice.As<VulkanRenderDevice>()->SubmitImmediateCommand(std::move(func));
+		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
+		renderDevice->SubmitImmediateCommand(func, m_TransientCommandPool);
 	}
 
 	void VulkanRenderer::OnWindowResize() {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::OnWindowResize");
 
-		VulkanSwapChain& swapChain = VulkanSwapChain::Get();
+		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
+		renderDevice->WaitForDevice();
+
+		VulkanSwapChain& swapChain = GetRenderContext()->As<VulkanContext>()->GetSwapChain();
 		swapChain.Recreate();
 
-		m_RenderDevice->Recreate();
+		RecreateCommandQueue();
 
-		auto& allocator = VulkanAllocator::Get();
-		allocator.DestroyBuffer(m_IDBuffer, m_IDBufferVma);
+		auto& allocator = renderDevice->GetAllocator();
+		allocator.DestroyBuffer(s_IDBuffer, s_IDBufferVma);
 
-		m_IDBuffer = VK_NULL_HANDLE;
-		m_IDBufferVma = VK_NULL_HANDLE;
+		s_IDBuffer = VK_NULL_HANDLE;
+		s_IDBufferVma = VK_NULL_HANDLE;
 	}
 
 	void VulkanRenderer::OnViewportResize() {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::OnViewportResize");
 
-		WaitForDevice();
+		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
+		renderDevice->WaitForDevice();
 
-		auto& allocator = VulkanAllocator::Get();
-		allocator.DestroyBuffer(m_IDBuffer, m_IDBufferVma);
+		auto& allocator = renderDevice->GetAllocator();
+		allocator.DestroyBuffer(s_IDBuffer, s_IDBufferVma);
 
-		m_IDBuffer = VK_NULL_HANDLE;
-		m_IDBufferVma = VK_NULL_HANDLE;
+		s_IDBuffer = VK_NULL_HANDLE;	
+		s_IDBufferVma = VK_NULL_HANDLE;
 	}
 	
-	Entity VulkanRenderer::OnMousePicking(Ref<Scene>& scene, const Ref<GraphicsPipeline>& idPipeline) {
+	glm::vec3 VulkanRenderer::OnMousePicking(const EntityPickedEvent& e, const Ref<Image>& currentFrameBufferImage) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::OnMousePicking");
 
-		auto& image = idPipeline->GetFrameBuffer().As<VulkanFrameBuffer>()->GetImages()[m_CurrentFrameIndex];
+		float viewportMouseX = e.GetViewportMouseX();
+		float viewportMouseY = e.GetViewportMouseY();
+
+		if (viewportMouseX < 0 && viewportMouseY < 0)
+			return glm::vec3(-1.0f);
+
+		const auto& image = currentFrameBufferImage->As<VulkanImage2D>();
 		uint32_t imageWidth = image->GetWidth();
 		uint32_t imageHeight = image->GetHeight();
 		VkDeviceSize imageSize = (VkDeviceSize)imageWidth * imageHeight * 4;
 
-		if (!m_IDBuffer)
-			VulkanAllocator::Get().CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, m_IDBuffer, m_IDBufferVma);
+		auto& allocator = GetRenderDevice()->As<VulkanRenderDevice>()->GetAllocator();
+		if (!s_IDBuffer)
+			allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, s_IDBuffer, s_IDBufferVma);
 
-		image->SetLayout(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-		image->CopyImageToBuffer(m_IDBuffer);
+		image->SetLayoutImmediate(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+		image->CopyImageToBufferImmediate(s_IDBuffer);
 
-		VulkanAllocator& allocator = VulkanAllocator::Get();
-		Buffer<uint8_t> rawData;
+		ByteBuffer rawData;
 
 		void* rawDataMapped;
-		allocator.MapMemory(m_IDBufferVma, rawDataMapped);
+		allocator.MapMemory(s_IDBufferVma, rawDataMapped);
 		rawData.SetData((uint8_t*)rawDataMapped, imageSize);
-		allocator.UnmapMemory(m_IDBufferVma);
+		allocator.UnmapMemory(s_IDBufferVma);
 
-		auto [viewportMouseX, viewportMouseY] = Renderer::GetViewportMousePos();
 		uint32_t bufferPos = (uint32_t) (4 * ((viewportMouseY * imageWidth) + viewportMouseX));
 		glm::vec3 meshID = glm::vec3(rawData[bufferPos], rawData[bufferPos + 1], rawData[bufferPos + 2]);
 
-		image->SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		image->SetLayoutImmediate(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 		//checking if the data that is being read make sense
 		if ((meshID.x > 255.0f || meshID.x < 0.0f) ||
 			(meshID.y > 255.0f || meshID.y < 0.0f) ||
 			(meshID.z > 255.0f || meshID.z < 0.0f))
-			return {};
+			return glm::vec3(-1.0f);
 
 		//checking if we clicked on the void
 		if (meshID.x == 0 && meshID.y == 0 && meshID.z == 0)
-			return {};
+			return glm::vec3(-1.0f);
 
-		Entity selectedEntity = scene->GetEntityByMeshID(meshID);
-		return selectedEntity;
+		return meshID;
+	}
+
+	void VulkanRenderer::InitializeImGui() {
+		m_ImGuiPass.Init(GetRenderContext());
+	}
+
+	void VulkanRenderer::RenderImGui() {
+		EnqueueToRenderThread([this](RenderCommandList& cmdList) {
+			m_ImGuiPass.Render(GetRenderContext()->As<VulkanContext>()->GetSwapChain(), cmdList);
+		});
 	}
 }

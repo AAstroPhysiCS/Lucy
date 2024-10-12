@@ -6,32 +6,15 @@
 
 namespace Lucy {
 
-	Ref<DescriptorSet> DescriptorSet::Create(const DescriptorSetCreateInfo& createInfo) {
-		switch (Renderer::GetRenderArchitecture()) {
-			case RenderArchitecture::Vulkan:
-				return Memory::CreateRef<VulkanDescriptorSet>(createInfo);
-				break;
-		}
-		return nullptr;
-	}
-
 	DescriptorSet::DescriptorSet(const DescriptorSetCreateInfo& createInfo) 
-		: m_CreateInfo(createInfo) {
+		: RenderResource("DescriptorSet"), m_CreateInfo(createInfo) {
 	}
 
-	void DescriptorSet::AddBuffer(const Ref<UniformBuffer>& buffer) {
-		m_UniformBuffers.push_back(buffer);
+	void DescriptorSet::AddUniformBuffer(const std::string& name, RenderResourceHandle bufferHandle) {
+		m_UniformBufferHandles.try_emplace(name, bufferHandle);
 	}
 
-	void DescriptorSet::AddBuffer(const Ref<SharedStorageBuffer>& buffer) {
-		m_SharedStorageBuffers.push_back(buffer);
-	}
-
-	void DescriptorSet::Destroy() {
-		for (Ref<UniformBuffer>& buffer : m_UniformBuffers)
-			buffer->DestroyHandle();
-
-		for (Ref<SharedStorageBuffer>& buffer : m_SharedStorageBuffers)
-			buffer->DestroyHandle();
+	void DescriptorSet::AddSharedStorageBuffer(const std::string& name, RenderResourceHandle bufferHandle) {
+		m_SharedStorageBufferHandles.try_emplace(name, bufferHandle);
 	}
 }

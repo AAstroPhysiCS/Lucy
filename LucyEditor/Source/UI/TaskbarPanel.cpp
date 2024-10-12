@@ -1,5 +1,5 @@
 #include "TaskbarPanel.h"
-#include "ApplicationMetricsPanel.h"
+#include "DebugPanel.h"
 
 #include "imgui.h"
 
@@ -45,11 +45,8 @@ namespace Lucy {
 			}
 
 			if (ImGui::BeginMenu("Panel")) {
-				static bool show = false;
-				if (ImGui::MenuItem("Performance", 0, show)) {
-					show = !show;
-					ApplicationMetricsPanel::GetInstance().SetShow(show);
-				}
+				if (bool show = DebugPanel::GetInstance().GetShow(); ImGui::MenuItem("Debug", 0, show))
+					DebugPanel::GetInstance().ToggleShow();
 				ImGui::EndMenu();
 			}
 			ImGui::EndMenuBar();

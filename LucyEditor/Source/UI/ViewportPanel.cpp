@@ -1,13 +1,13 @@
 #include "ViewportPanel.h"
 #include "SceneExplorerPanel.h"
 
+#include "Core/RenderPipeline.h"
 #include "Renderer/Renderer.h"
-#include "Renderer/Context/VulkanGraphicsPipeline.h"
-#include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 
-#include "Core/Application.h"
+#include "Events/EventHandler.h"
+#include "Events/InputEvent.h"
+#include "Events/WindowEvent.h"
 
-#include "imgui_impl_vulkan.h"
 #include "glm/gtc/type_ptr.hpp"
 
 namespace Lucy {
@@ -18,9 +18,7 @@ namespace Lucy {
 	}
 
 	void ViewportPanel::OnEvent(Event& e) {
-		auto& inputHandler = Application::Get()->GetInputHandler();
-
-		inputHandler.Dispatch<KeyEvent>(e, EventType::KeyEvent, [this](const KeyEvent& keyEvent) {
+		EventHandler::AddListener<KeyEvent>(e, [this](const KeyEvent& keyEvent) {
 			if (keyEvent == KeyCode::V)
 				UseSnap = !UseSnap;
 
@@ -61,40 +59,41 @@ namespace Lucy {
 
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
-				void* outputTextureID = m_ViewportOutputPipeline->GetFrameBuffer().As<VulkanFrameBuffer>()->GetImages()[Renderer::GetCurrentFrameIndex()]->GetImGuiID();
-				ImGui::Image(outputTextureID, m_Size);
+				void* outputTextureID = m_RenderPipeline->GetOutputImage()->GetImGuiID();
+				ImGui::Image(outputTextureID, m_Size, {0, 1}, {1, 0});
 				break;
 			}
 			default:
 				LUCY_ASSERT(false);
 		}
 
-		auto [w, h] = Renderer::GetViewportArea();
-		if (w != m_Size.x || h != m_Size.y) {
-			Renderer::SetViewportArea((int32_t)m_Size.x, (int32_t)m_Size.y);
-			Renderer::OnViewportResize();
-
-			m_RendererModuleOnViewportResize();
-		}
+		auto [w, h] = m_RenderPipeline->GetViewportArea();
+		if (w != m_Size.x || h != m_Size.y)
+			EventHandler::DispatchImmediateEvent<ViewportAreaResizeEvent>((uint32_t)m_Size.x, (uint32_t)m_Size.y);
 
 		const ImVec2& mousePos = ImGui::GetMousePos();
 		const ImVec2& offset = ImGui::GetCursorPos();
 		const ImVec2& windowPos = ImGui::GetWindowPos();
 
-		Renderer::SetViewportMouse(mousePos.x - windowPos.x - offset.x,
-								   mousePos.y - windowPos.y);
+		m_ViewportMouseX = mousePos.x - windowPos.x - offset.x;
+		m_ViewportMouseY = mousePos.y - windowPos.y;
+		EventHandler::DispatchImmediateEvent<CursorPosEvent>(nullptr, m_ViewportMouseX, m_ViewportMouseY);
+
 		ImGuizmo::SetDrawlist();
 		ImGuizmo::SetRect(windowPos.x, windowPos.y, ImGui::GetWindowWidth(), ImGui::GetWindowHeight());
 
 		Entity& e = SceneExplorerPanel::GetInstance().GetEntityContext();
 		if (e.IsValid()) {
-			EditorCamera& editorCamera = SceneExplorerPanel::GetInstance().GetActiveScene()->GetEditorCamera();
+			const auto& scene = SceneExplorerPanel::GetInstance().GetActiveScene();
 			TransformComponent& t = e.GetComponent<TransformComponent>();
 			float matrixTranslation[3], matrixRotation[3], matrixScale[3];
 			t.CalculateMatrix();
+
+			const auto& editorCamera = scene->GetEditorCamera();
 			ImGuizmo::Manipulate(glm::value_ptr(editorCamera.GetViewMatrix()), glm::value_ptr(editorCamera.GetProjectionMatrix()),
 								 CurrentGizmoOperation, ImGuizmo::MODE::LOCAL, glm::value_ptr(t.GetMatrix()), nullptr, UseSnap ? &SnapValue : nullptr, nullptr, nullptr);
 			ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(t.GetMatrix()), matrixTranslation, matrixRotation, matrixScale);
+
 			t.GetPosition().x = matrixTranslation[0]; t.GetPosition().y = matrixTranslation[1]; t.GetPosition().z = matrixTranslation[2];
 			t.GetRotation().x = matrixRotation[0]; t.GetRotation().y = matrixRotation[1]; t.GetRotation().z = matrixRotation[2];
 			t.GetScale().x = matrixScale[0]; t.GetScale().y = matrixScale[1]; t.GetScale().z = matrixScale[2];
@@ -103,39 +102,35 @@ namespace Lucy {
 		ImGui::End();
 	}
 
-	bool ViewportPanel::IsViewportHovered() {
+	bool ViewportPanel::IsViewportHovered() const {
 		return m_IsViewportHovered;
 	}
 
-	bool ViewportPanel::IsViewportActive() {
+	bool ViewportPanel::IsViewportActive() const {
 		return m_IsViewportActive;
 	}
 
-	bool ViewportPanel::IsOverAnyGizmo() {
+	bool ViewportPanel::IsOverAnyGizmo() const {
 		return m_IsOverAnyGizmo;
 	}
 
-	bool ViewportPanel::IsOverTranslateGizmo() {
+	bool ViewportPanel::IsOverTranslateGizmo() const {
 		return ImGuizmo::IsOver(ImGuizmo::OPERATION::TRANSLATE) && CurrentGizmoOperation == ImGuizmo::OPERATION::TRANSLATE;
 	}
 
-	bool ViewportPanel::IsOverRotateGizmo() {
+	bool ViewportPanel::IsOverRotateGizmo() const {
 		return ImGuizmo::IsOver(ImGuizmo::OPERATION::ROTATE) && CurrentGizmoOperation == ImGuizmo::OPERATION::ROTATE;
 	}
 
-	bool ViewportPanel::IsOverScaleGizmo() {
+	bool ViewportPanel::IsOverScaleGizmo() const {
 		return ImGuizmo::IsOver(ImGuizmo::OPERATION::SCALE) && CurrentGizmoOperation == ImGuizmo::OPERATION::SCALE;
 	}
 
-	bool ViewportPanel::IsOverAnyGizmoM() {
+	bool ViewportPanel::IsOverAnyGizmoM() const {
 		return IsOverTranslateGizmo() || IsOverRotateGizmo() || IsOverScaleGizmo();
 	}
 
-	void ViewportPanel::SetOnViewportResizeCallback(std::function<void()>&& callback) {
-		m_RendererModuleOnViewportResize = callback;
-	}
-
-	void ViewportPanel::SetViewportOutputPipeline(Ref<GraphicsPipeline> pipeline) {
-		m_ViewportOutputPipeline = pipeline;
+	void ViewportPanel::SetRenderPipeline(Ref<RenderPipeline> renderPipeline) {
+		m_RenderPipeline = renderPipeline;
 	}
 }

@@ -1,24 +1,23 @@
 #include "lypch.h"
 #include "VulkanContext.h"
 
-#include "Renderer/Memory/VulkanAllocator.h"
-#include "Renderer/Context/VulkanContextDevice.h"
 #include "Renderer/Context/VulkanSwapChain.h"
+
+#include "Renderer/Device/VulkanRenderDevice.h"
 
 namespace Lucy {
 	
-	VulkanContext::VulkanContext(Ref<Window>& window)
-		: RenderContext(window) {
-		Init();
+	VulkanContext::VulkanContext(const Ref<Window>& window)
+		: RenderContext(window, Memory::CreateRef<VulkanRenderDevice>()) {
 	}
 
 	void VulkanContext::Destroy() {
-		VulkanAllocator::Get().Destroy();
-		VulkanSwapChain::Get().Destroy();
-		VulkanContextDevice::Get().Destroy();
-		m_Window->DestroyVulkanSurface(m_Instance);
+		//RenderDevice is being destroyed on the parent.
+		m_SwapChain.Destroy();
+		const auto& window = GetWindow();
+		window->DestroyVulkanSurface(m_Instance);
 
-		DestroyMessageCallback();
+		DestroyDebugCallbacks();
 		vkDestroyInstance(m_Instance, nullptr);
 	}
 
@@ -53,9 +52,18 @@ namespace Lucy {
 
 		VkDebugUtilsMessengerCreateInfoEXT debugForVkInstanceAndDestroy{};
 		debugForVkInstanceAndDestroy.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-		debugForVkInstanceAndDestroy.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-		debugForVkInstanceAndDestroy.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+		debugForVkInstanceAndDestroy.messageSeverity =
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT;
+		debugForVkInstanceAndDestroy.messageType =
+			VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 		debugForVkInstanceAndDestroy.pfnUserCallback = VulkanMessageCallback::DebugCallback;
+		debugForVkInstanceAndDestroy.pUserData = nullptr; // Optional
+
 		createInfo.pNext = &debugForVkInstanceAndDestroy;
 
 		instanceExtensions.insert(instanceExtensions.end(), m_InstanceExtensions.begin(), m_InstanceExtensions.end());
@@ -71,15 +79,21 @@ namespace Lucy {
 #ifdef LUCY_DEBUG
 		LUCY_INFO("Vulkan successfully initialized");
 
-		SetupMessageCallback();
+		if (auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(m_Instance, "vkCreateDebugUtilsMessengerEXT"))
+			LUCY_VK_ASSERT(func(m_Instance, &debugForVkInstanceAndDestroy, nullptr, &m_DebugMessenger));
+
+		SetupDebugLabels();
 #endif
-		m_Window->InitVulkanSurface(m_Instance);
-		VulkanContextDevice::Get().Create(m_Instance, m_ValidationLayers, m_Window->GetVulkanSurface());
-		VulkanSwapChain::Get().Create(m_Window);
-		VulkanAllocator::Get().Init(m_Instance);
+		const Ref<Window>& window = GetWindow();
+		window->InitVulkanSurface(m_Instance);
+		
+		auto vulkanRenderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
+		vulkanRenderDevice->Init(m_Instance, m_ValidationLayers, window->GetVulkanSurface(), appInfo.apiVersion);
+
+		m_SwapChain.Create(window, vulkanRenderDevice);
 	}
 
-	void VulkanContext::CheckValidationSupport() {
+	void VulkanContext::CheckValidationSupport() const {
 		uint32_t layerCount = 0;
 		vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 
@@ -99,26 +113,15 @@ namespace Lucy {
 		}
 	}
 
-	void VulkanContext::SetupMessageCallback() {
-		VkDebugUtilsMessengerCreateInfoEXT createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-		createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-		createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-		createInfo.pfnUserCallback = VulkanMessageCallback::DebugCallback;
-		createInfo.pUserData = nullptr; // Optional
-
-		if (auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(m_Instance, "vkCreateDebugUtilsMessengerEXT")) {
-			LUCY_VK_ASSERT(func(m_Instance, &createInfo, nullptr, &m_DebugMessenger));
-			return;
-		}
-		LUCY_ASSERT(false);
+	void VulkanContext::SetupDebugLabels() {
+		VulkanExternalFuncLinkage::vkCmdBeginDebugUtilsLabelEXT = (PFN_vkCmdBeginDebugUtilsLabelEXT)(vkGetInstanceProcAddr(m_Instance, "vkCmdBeginDebugUtilsLabelEXT"));
+		VulkanExternalFuncLinkage::vkCmdEndDebugUtilsLabelEXT = (PFN_vkCmdEndDebugUtilsLabelEXT)(vkGetInstanceProcAddr(m_Instance, "vkCmdEndDebugUtilsLabelEXT"));
+		VulkanExternalFuncLinkage::vkCmdInsertDebugUtilsLabelEXT = (PFN_vkCmdInsertDebugUtilsLabelEXT)(vkGetInstanceProcAddr(m_Instance, "vkCmdInsertDebugUtilsLabelEXT"));
 	}
 
-	void VulkanContext::DestroyMessageCallback() {
-		auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(m_Instance, "vkDestroyDebugUtilsMessengerEXT");
-		if (func) {
-			func(m_Instance, m_DebugMessenger, nullptr);
-		}
+	void VulkanContext::DestroyDebugCallbacks() {
+		if (auto destroyDebugUtils = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(m_Instance, "vkDestroyDebugUtilsMessengerEXT"))
+			destroyDebugUtils(m_Instance, m_DebugMessenger, nullptr);
 	}
 
 	VKAPI_ATTR VkBool32 VKAPI_CALL VulkanMessageCallback::DebugCallback(
@@ -131,6 +134,12 @@ namespace Lucy {
 			LUCY_WARN(fmt::format("Vulkan validation warning {0}", pCallbackData->pMessage));
 		} else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
 			LUCY_CRITICAL(fmt::format("Vulkan validation error {0}", pCallbackData->pMessage));
+		} else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
+			LUCY_INFO(fmt::format("Vulkan validation verbose {0}", pCallbackData->pMessage));
+		} else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
+			LUCY_INFO(fmt::format("Vulkan validation info {0}", pCallbackData->pMessage));
+		} else {
+			LUCY_INFO(fmt::format("Unknown vulkan validation {0}", pCallbackData->pMessage));
 		}
 
 		return VK_FALSE;
@@ -138,6 +147,6 @@ namespace Lucy {
 
 	void VulkanMessageCallback::ImGui_DebugCallback(VkResult result) {
 		if (result != VK_SUCCESS) 
-			LUCY_CRITICAL(fmt::format("Vulkan ImGui error {0}", RendererAPICodesToString(result)));
+			LUCY_CRITICAL(fmt::format("Vulkan ImGui error {0}", RendererBackendCodesToString(result)));
 	}
 }

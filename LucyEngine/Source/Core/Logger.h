@@ -1,11 +1,17 @@
 #pragma once
 
+#include <format>
+
 #include "spdlog/spdlog.h"
 #include "spdlog/sinks/stdout_color_sinks.h"
 
-#include "glm/glm.hpp"
-
 namespace Lucy {
+
+	//https://en.cppreference.com/w/cpp/utility/format/formattable
+	template <typename T>
+	concept IsFormattable = requires (T&& v, std::format_context ctx) {
+		std::formatter<std::remove_cvref_t<T>>().format(v, ctx);
+	};
 
 	enum class LoggerInfo {
 		LUCY_TRACE,
@@ -20,7 +26,7 @@ namespace Lucy {
 
 	class Logger {
 	public:
-		inline static std::shared_ptr<spdlog::logger> s_Logger;
+		static inline std::shared_ptr<spdlog::logger> s_Logger;
 
 		static void Init() {
 			s_Logger = spdlog::stdout_color_mt("LUCY");
@@ -28,40 +34,34 @@ namespace Lucy {
 			s_Logger->set_level((spdlog::level::level_enum)LoggerInfo::LUCY_TRACE);
 		}
 
-		template<typename T>
-		static void Log(LoggerInfo info, T&& log) {
+		template <IsFormattable T, typename ... TArgs>
+		static void Log(LoggerInfo info, T&& log, TArgs&& ... args) {
+			s_Logger->set_level((spdlog::level::level_enum)info);
+			auto&& formattedT = std::vformat(std::forward<T>(log), std::make_format_args(args...));
 			switch (info) {
-			case LoggerInfo::LUCY_WARN:
-				s_Logger->set_level((spdlog::level::level_enum)info);
-				s_Logger->warn(log);
-				break;
-			case LoggerInfo::LUCY_INFO:
-				s_Logger->set_level((spdlog::level::level_enum)info);
-				s_Logger->info(log);
-				break;
-			case LoggerInfo::LUCY_CRITICAL:
-				s_Logger->set_level((spdlog::level::level_enum)info);
-				s_Logger->critical(log);
-				break;
+				using enum Lucy::LoggerInfo;
+				case LUCY_WARN:
+					s_Logger->warn(formattedT);
+					break;
+				case LUCY_INFO:
+					s_Logger->info(formattedT);
+					break;
+				case LUCY_CRITICAL:
+					s_Logger->critical(formattedT);
+					break;
+				case LUCY_TRACE:
+					s_Logger->trace(formattedT);
+					break;
+				case LUCY_LDEBUG:
+					s_Logger->debug(formattedT);
+					break;
+				case LUCY_ERROR:
+					s_Logger->error(formattedT);
+					break;
+				default:
+					s_Logger->error("Unhandled logger message!");
+					break;
 			}
-		}
-
-		template<typename T>
-		static void LogInfo(T&& log) {
-			s_Logger->set_level((spdlog::level::level_enum)LoggerInfo::LUCY_INFO);
-			s_Logger->info(log);
-		}
-
-		template<typename T>
-		static void LogCritical(T&& log) {
-			s_Logger->set_level((spdlog::level::level_enum)LoggerInfo::LUCY_CRITICAL);
-			s_Logger->critical(log);
-		}
-
-		template<typename T>
-		static void LogWarning(T&& log) {
-			s_Logger->set_level((spdlog::level::level_enum)LoggerInfo::LUCY_WARN);
-			s_Logger->warn(log);
 		}
 	private:
 		Logger() = delete;

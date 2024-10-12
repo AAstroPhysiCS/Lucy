@@ -1,7 +1,6 @@
 #pragma once
 
-#include "Renderer/Memory/Buffer/UniformBuffer.h"
-#include "Renderer/Memory/Buffer/SharedStorageBuffer.h"
+#include "Renderer/Device/RenderResource.h"
 
 namespace Lucy {
 
@@ -10,32 +9,30 @@ namespace Lucy {
 
 	struct DescriptorSetCreateInfo {
 		uint32_t SetIndex = 0;
-		bool Bindless = false;
-		Ref<void> InternalInfo = nullptr;
+		std::vector<ShaderUniformBlock> ShaderUniformBlocks;
 	};
 
-	class DescriptorSet {
+	class DescriptorSet : public RenderResource {
 	public:
-		static Ref<DescriptorSet> Create(const DescriptorSetCreateInfo& createInfo);
-
 		DescriptorSet(const DescriptorSetCreateInfo& createInfo);
 		virtual ~DescriptorSet() = default;
 		
-		virtual void Update() = 0;
+		virtual void RTUpdate() = 0;
 
-		void AddBuffer(const Ref<UniformBuffer>& buffer);
-		void AddBuffer(const Ref<SharedStorageBuffer>& buffer);
-		void Destroy();
+		void AddUniformBuffer(const std::string& name, RenderResourceHandle bufferHandle);
+		void AddSharedStorageBuffer(const std::string& name, RenderResourceHandle bufferHandle);
 
-		inline uint32_t GetSetIndex() { return m_CreateInfo.SetIndex; }
+		inline uint32_t GetSetIndex() const { return m_CreateInfo.SetIndex; }
 
-		inline const std::vector<Ref<UniformBuffer>>& GetAllUniformBuffers() const { return m_UniformBuffers; }
-		inline const std::vector<Ref<SharedStorageBuffer>>& GetAllSharedStorageBuffers() const { return m_SharedStorageBuffers; }
+		inline const auto& GetAllUniformBufferHandles() const { return m_UniformBufferHandles; }
+		inline const auto& GetAllSharedStorageBufferHandles() const { return m_SharedStorageBufferHandles; }
 	protected:
-		DescriptorSetCreateInfo m_CreateInfo;
+		virtual void RTDestroyResource() = 0;
 
-		std::vector<Ref<UniformBuffer>> m_UniformBuffers;
-		std::vector<Ref<SharedStorageBuffer>> m_SharedStorageBuffers;
+		DescriptorSetCreateInfo m_CreateInfo;
+	private:
+		std::unordered_map<std::string, RenderResourceHandle> m_UniformBufferHandles;
+		std::unordered_map<std::string, RenderResourceHandle> m_SharedStorageBufferHandles;
 	};
 }
 

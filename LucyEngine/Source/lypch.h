@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <functional>
 #include <set>
+#include <ranges>
 
 #include <string>
 #include <sstream>

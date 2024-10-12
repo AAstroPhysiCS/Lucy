@@ -5,7 +5,7 @@
 
 namespace Lucy {
 
-	const char* RendererAPICodesToString(int32_t errorCode) {
+	const char* RendererBackendCodesToString(int32_t errorCode) {
 		if (Renderer::GetRenderArchitecture() != RenderArchitecture::Vulkan)
 			return "Rendering API not supported!";
 		switch ((RenderContextResultCodes)errorCode) {

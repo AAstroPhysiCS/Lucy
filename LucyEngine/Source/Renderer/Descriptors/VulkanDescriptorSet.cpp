@@ -3,26 +3,121 @@
 
 #include "Renderer/Memory/Buffer/Vulkan/VulkanUniformBuffer.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanSharedStorageBuffer.h"
-#include "Renderer/Context/VulkanContextDevice.h"
+
+#include "Renderer/Shader/VulkanUniformImageSampler.h"
 
 #include "Renderer/Renderer.h"
+#include "Renderer/Device/VulkanRenderDevice.h"
 
 namespace Lucy {
 
-	VulkanDescriptorSet::VulkanDescriptorSet(const DescriptorSetCreateInfo& createInfo)
-		: DescriptorSet(createInfo) {
-		Create();
+	VulkanDescriptorSet::VulkanDescriptorSet(const DescriptorSetCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device)
+		: DescriptorSet(createInfo), m_VulkanDevice(device) {
+		RTCreate();
 	}
 
-	void VulkanDescriptorSet::Create() {
-		const auto& internalInfo = m_CreateInfo.InternalInfo.As<VulkanDescriptorSetCreateInfo>();
+	void VulkanDescriptorSet::RTCreate() {
+		LUCY_ASSERT(Renderer::IsOnRenderThread());
+		
+		for (const auto& block : m_CreateInfo.ShaderUniformBlocks) {
+			switch (block.Type) {
+				using enum Lucy::DescriptorType;
+				case SSBODynamic:
+				case SSBO: {
+					SharedStorageBufferCreateInfo createInfo;
+					createInfo.Name = block.Name;
+					createInfo.Binding = block.Binding;
+					createInfo.Type = block.Type;
+					createInfo.BufferSize = MAX_DYNAMICALLY_ALLOCATED_BUFFER_SIZE;
+					createInfo.ArraySize = block.ArraySize;
+					createInfo.ShaderMemberVariables = block.Members;
 
+					AddSharedStorageBuffer(createInfo.Name, m_VulkanDevice->CreateSharedStorageBuffer(createInfo));
+					break;
+				}
+				case SampledImage:
+				case Sampler:
+				case CombinedImageSampler:
+				case StorageImage: {
+					m_UniformImageSamplers.try_emplace(block.Name, Memory::CreateRef<VulkanUniformImageSampler>(block.Binding, block.Name, block.Type));
+					break;
+				}
+				case Buffer:
+				case DynamicBuffer: {
+					UniformBufferCreateInfo createInfo;
+					createInfo.Name = block.Name;
+					createInfo.Binding = block.Binding;
+					createInfo.Type = block.Type;
+					createInfo.BufferSize = block.BufferSize;
+					createInfo.ArraySize = block.ArraySize;
+					createInfo.ShaderMemberVariables = block.Members;
+
+					AddUniformBuffer(createInfo.Name, m_VulkanDevice->CreateUniformBuffer(createInfo));
+					break;
+				}
+				default: LUCY_ASSERT(false);
+			}
+		}
+	}
+
+	void VulkanDescriptorSet::RTBind(const VulkanDescriptorSetBindInfo& bindInfo) {
+		LUCY_ASSERT(Renderer::IsOnRenderThread());
+		vkCmdBindDescriptorSets(bindInfo.CommandBuffer, bindInfo.PipelineBindPoint, bindInfo.PipelineLayout, m_CreateInfo.SetIndex, 1, &m_DescriptorSets[Renderer::GetCurrentFrameIndex()], 0, nullptr);
+	}
+
+	void VulkanDescriptorSet::RTBake(const Ref<VulkanDescriptorPool>& descriptorPool) {
+		LUCY_ASSERT(Renderer::IsOnRenderThread());
+		
 		const uint32_t maxFramesInFlight = Renderer::GetMaxFramesInFlight();
-		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
+		VkDevice device = m_VulkanDevice->GetLogicalDevice();
 
-		std::vector<VkDescriptorSetLayout> layouts(maxFramesInFlight, internalInfo->Layout);
+		std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
+		std::vector<bool> isBindlessVector;
 
-		VkDescriptorSetAllocateInfo allocInfo = VulkanAPI::DescriptorSetAllocateInfo(maxFramesInFlight, layouts.data(), internalInfo->Pool->GetVulkanHandle());
+		for (auto& buffer : m_CreateInfo.ShaderUniformBlocks) {
+			VkDescriptorSetLayoutBinding binding = VulkanAPI::DescriptorSetLayoutBinding(buffer.Binding, buffer.ArraySize == 0 ? 1 : buffer.ArraySize, buffer.Type, buffer.StageFlag);
+			isBindlessVector.push_back(buffer.DynamicallyAllocated); //the set is bindless if true
+
+			if (buffer.DynamicallyAllocated) {
+				buffer.ArraySize = MAX_DYNAMIC_DESCRIPTOR_COUNT;
+				binding.descriptorCount = buffer.ArraySize;
+			}
+
+			layoutBindings.push_back(binding);
+		}
+
+		VkDescriptorSetLayoutCreateInfo descriptorLayoutInfo = VulkanAPI::DescriptorSetCreateInfo((uint32_t)layoutBindings.size(), layoutBindings.data());
+
+		/*
+		* indicates that this is a variable-sized descriptor binding whose size will be specified when a descriptor set is allocated using this layout.
+		* The value of descriptorCount is treated as an upper bound on the size of the binding.
+		*/
+
+		std::vector<VkDescriptorBindingFlags> bindlessDescriptorFlags;
+
+		for (uint32_t i = 0; i < isBindlessVector.size(); i++) {
+			if (isBindlessVector[i]) {
+				bindlessDescriptorFlags.push_back(VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT | VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT);
+				continue;
+			}
+			bindlessDescriptorFlags.push_back(0); //yes, we really need the 0.
+		}
+
+		VkDescriptorSetLayoutBindingFlagsCreateInfo extendedLayoutInfo = VulkanAPI::DescriptorSetLayoutBindingFlagsCreateInfo((uint32_t)layoutBindings.size(), bindlessDescriptorFlags.data());
+		descriptorLayoutInfo.pNext = &extendedLayoutInfo;
+
+		LUCY_VK_ASSERT(vkCreateDescriptorSetLayout(device, &descriptorLayoutInfo, nullptr, &m_DescriptorSetLayout));
+
+		/*
+		* if any of the bindings are bindless.
+		* we are assuming that the set is being used ONLY for bindless descriptors
+		* which means, we can't mix a binding which DOESN'T use bindless with a binding that USES bindless
+		*/
+		bool bindless = std::ranges::any_of(isBindlessVector.begin(), isBindlessVector.end(), [](bool out) { return out; });
+
+		std::vector<VkDescriptorSetLayout> layouts(maxFramesInFlight, m_DescriptorSetLayout);
+
+		VkDescriptorSetAllocateInfo allocInfo = VulkanAPI::DescriptorSetAllocateInfo(maxFramesInFlight, layouts.data(), descriptorPool->GetVulkanHandle());
 
 		/*
 		* cant summarize these since these are stack allocated
@@ -33,63 +128,43 @@ namespace Lucy {
 		std::vector<uint32_t> variableDescCount(allocInfo.descriptorSetCount, MAX_DYNAMIC_DESCRIPTOR_COUNT);
 		VkDescriptorSetVariableDescriptorCountAllocateInfo variableCountAllocInfo = VulkanAPI::DescriptorSetVariableDescriptorCountAllocateInfo(allocInfo.descriptorSetCount, variableDescCount.data());
 
-		if (m_CreateInfo.Bindless)
+		if (bindless)
 			allocInfo.pNext = &variableCountAllocInfo;
 
 		m_DescriptorSets.resize(maxFramesInFlight);
 		LUCY_VK_ASSERT(vkAllocateDescriptorSets(device, &allocInfo, m_DescriptorSets.data()));
 	}
 
-	void VulkanDescriptorSet::Bind(const VulkanDescriptorSetBindInfo& bindInfo) {
-		vkCmdBindDescriptorSets(bindInfo.CommandBuffer, bindInfo.PipelineBindPoint, bindInfo.PipelineLayout, m_CreateInfo.SetIndex, 1, &m_DescriptorSets[Renderer::GetCurrentFrameIndex()], 0, nullptr);
-	}
+	void VulkanDescriptorSet::RTUpdate() {
+		LUCY_ASSERT(Renderer::IsOnRenderThread());
 
-	void VulkanDescriptorSet::Update() {
+		LUCY_ASSERT(!m_DescriptorSets.empty());
 		LUCY_PROFILE_NEW_EVENT("VulkanDescriptorSet::Update");
 
-		for (Ref<UniformBuffer>& buffer : m_UniformBuffers)
-			buffer->LoadToGPU();
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 
-		for (Ref<SharedStorageBuffer>& buffer : m_SharedStorageBuffers)
-			buffer->LoadToGPU();
+		VkDevice device = m_VulkanDevice->GetLogicalDevice();
 
-		const uint32_t index = Renderer::GetCurrentFrameIndex();
+		for (RenderResourceHandle bufferHandle : GetAllUniformBufferHandles() | std::views::values) {
+			const auto& buffer = Renderer::AccessResource<UniformBuffer>(bufferHandle);
+			if (!buffer)
+				continue;
+			buffer->RTLoadToDevice();
 
-		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
-
-		for (Ref<UniformBuffer> buffer : m_UniformBuffers) {
 			DescriptorType descriptorType = buffer->GetDescriptorType();
-
 			switch (descriptorType) {
 				case DescriptorType::DynamicBuffer:
 				case DescriptorType::Buffer: {
-					const auto& uniformBuffer = buffer.As<VulkanUniformBuffer>();
+					const auto& uniformBuffer = buffer->As<VulkanUniformBuffer>();
 					const uint32_t arraySize = buffer->GetArraySize();
 
-					VkDescriptorBufferInfo bufferInfo = VulkanAPI::DescriptorBufferInfo(uniformBuffer->GetVulkanBufferHandle(index), 0, VK_WHOLE_SIZE);
-					VkWriteDescriptorSet setWrite = VulkanAPI::WriteDescriptorSet(m_DescriptorSets[index], 0, buffer->GetBinding(), arraySize == 0 ? 1 : arraySize, (VkDescriptorType)ConvertDescriptorType(descriptorType), 
+					VkDescriptorBufferInfo bufferInfo = VulkanAPI::DescriptorBufferInfo(uniformBuffer->GetVulkanBufferHandle(frameIndex), 0, VK_WHOLE_SIZE);
+					VkWriteDescriptorSet setWrite = VulkanAPI::WriteDescriptorSet(m_DescriptorSets[frameIndex], 0, buffer->GetBinding(), arraySize == 0 ? 1 : arraySize, (VkDescriptorType)ConvertDescriptorType(descriptorType),
 																				  &bufferInfo);
 
 					vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr);
 
 					uniformBuffer->Clear();
-					break;
-				}
-				case DescriptorType::StorageImage:
-				case DescriptorType::Sampler:
-				case DescriptorType::SampledImage:
-				case DescriptorType::CombinedImageSampler: {
-					const auto& uniformImageBuffer = buffer.As<VulkanUniformImageBuffer>();
-					auto& imageInfos = uniformImageBuffer->GetImageInfos();
-
-					if (imageInfos.size() == 0)
-						break;
-
-					VkWriteDescriptorSet setWrite = VulkanAPI::WriteDescriptorSet(m_DescriptorSets[index], 0, buffer->GetBinding(), (uint32_t)imageInfos.size(), (VkDescriptorType)ConvertDescriptorType(descriptorType),
-																				  nullptr, imageInfos.data());
-					vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr);
-					//cant summarize buffer and combinedimagesampler together since i need to clear the cache
-					uniformImageBuffer->Clear();
 					break;
 				}
 				case DescriptorType::Undefined:
@@ -98,15 +173,17 @@ namespace Lucy {
 			}
 		}
 
-		for (Ref<SharedStorageBuffer> buffer : m_SharedStorageBuffers) {
-			const auto& ssbo = buffer.As<VulkanSharedStorageBuffer>();
-			const uint32_t arraySize = buffer->GetArraySize();
+		for (RenderResourceHandle bufferHandle : GetAllSharedStorageBufferHandles() | std::views::values) {
+			const auto& ssbo = m_VulkanDevice->AccessResource<SharedStorageBuffer>(bufferHandle)->As<VulkanSharedStorageBuffer>();
+			ssbo->RTLoadToDevice();
 
-			VkDescriptorBufferInfo bufferInfo = VulkanAPI::DescriptorBufferInfo(ssbo->GetVulkanBufferHandle(index), 0, VK_WHOLE_SIZE);
+			const uint32_t arraySize = ssbo->GetArraySize();
 
-			VkWriteDescriptorSet setWrite = VulkanAPI::WriteDescriptorSet(m_DescriptorSets[index], 0, buffer->GetBinding(), arraySize == 0 ? 1 : arraySize, VK_DESCRIPTOR_TYPE_MAX_ENUM,
+			VkDescriptorBufferInfo bufferInfo = VulkanAPI::DescriptorBufferInfo(ssbo->GetVulkanBufferHandle(frameIndex), 0, VK_WHOLE_SIZE);
+
+			VkWriteDescriptorSet setWrite = VulkanAPI::WriteDescriptorSet(m_DescriptorSets[frameIndex], 0, ssbo->GetBinding(), arraySize == 0 ? 1 : arraySize, VK_DESCRIPTOR_TYPE_MAX_ENUM,
 																		  &bufferInfo);
-			switch (buffer->GetDescriptorType()) {
+			switch (ssbo->GetDescriptorType()) {
 				case DescriptorType::SSBO:
 					setWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 					break;
@@ -120,7 +197,39 @@ namespace Lucy {
 			}
 
 			vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr);
-			buffer->Clear();
+			ssbo->Clear();
 		}
+
+		if (m_UniformImageSamplers.empty())
+			return;
+
+		for (const Ref<VulkanUniformImageSampler>& sampler : m_UniformImageSamplers | std::views::values) {
+			const auto& imageInfos = sampler->ImageInfos;
+			if (imageInfos.empty())
+				break;
+
+			VkWriteDescriptorSet setWrite = VulkanAPI::WriteDescriptorSet(m_DescriptorSets[frameIndex], 0, sampler->Binding, (uint32_t)imageInfos.size(), (VkDescriptorType)ConvertDescriptorType(sampler->DescriptorType),
+																		  nullptr, imageInfos.data());
+			vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr);
+
+			sampler->ImageInfos.clear();
+		}
+	}
+
+	Ref<VulkanUniformImageSampler> VulkanDescriptorSet::GetVulkanImageSampler(const std::string& imageBufferName) {
+		if (!m_UniformImageSamplers.contains(imageBufferName))
+			return nullptr;
+		return m_UniformImageSamplers.at(imageBufferName);
+	}
+
+	void VulkanDescriptorSet::RTDestroyResource() {
+		LUCY_ASSERT(Renderer::IsOnRenderThread());
+
+		for (auto bufferHandle : GetAllUniformBufferHandles() | std::views::values)
+			m_VulkanDevice->RTDestroyResource(bufferHandle);
+		for (auto bufferHandle : GetAllSharedStorageBufferHandles() | std::views::values)
+			m_VulkanDevice->RTDestroyResource(bufferHandle);
+
+		vkDestroyDescriptorSetLayout(m_VulkanDevice->GetLogicalDevice(), m_DescriptorSetLayout, nullptr);
 	}
 }

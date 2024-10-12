@@ -2,6 +2,8 @@
 
 #include "vulkan/vulkan.h"
 
+#include "Renderer/Device/RenderResource.h"
+
 namespace Lucy {
 
 	enum class ImageFormat;
@@ -10,17 +12,22 @@ namespace Lucy {
 		float r = 0.0f, g = 0.0f, b = 0.0f, a = 0.0f;
 	};
 
-	enum class RenderPassStoreOp {
-		Store,
-		DontCare,
-		None
-	};
+	enum class RenderPassLoadStoreAttachments : uint8_t {
+		NoneNone,
+		NoneDontCare,
+		NoneStore,
 
-	enum class RenderPassLoadOp {
-		Load,
-		Clear,
-		DontCare,
-		None
+		ClearNone,
+		ClearDontCare,
+		ClearStore,
+
+		LoadNone,
+		LoadDontCare,
+		LoadStore,
+
+		DontCareNone,
+		DontCareDontCare,
+		DontCareStore
 	};
 
 	using RenderPassInternalLayout = uint32_t;
@@ -33,10 +40,8 @@ namespace Lucy {
 		struct Attachment {
 			ImageFormat Format;
 			uint32_t Samples = 1;
-			RenderPassLoadOp LoadOp = RenderPassLoadOp::None;
-			RenderPassStoreOp StoreOp = RenderPassStoreOp::None;
-			RenderPassLoadOp StencilLoadOp = RenderPassLoadOp::None;
-			RenderPassStoreOp StencilStoreOp = RenderPassStoreOp::None;
+			RenderPassLoadStoreAttachments LoadStoreOperation;
+			RenderPassLoadStoreAttachments StencilLoadStoreOperation;
 
 			RenderPassInternalLayout Initial = 0x7FFFFFFF;
 			RenderPassInternalLayout Final = 0x7FFFFFFF;
@@ -48,7 +53,9 @@ namespace Lucy {
 			}
 		};
 
-		std::vector<Attachment> ColorAttachments;
+		using Attachments = std::vector<Attachment>;
+
+		Attachments ColorAttachments;
 		Attachment DepthAttachment;
 	};
 
@@ -58,16 +65,16 @@ namespace Lucy {
 				Bit mask that specifies which view rendering is broadcast to
 				For example; 0011 = Broadcast to first and second view (layer)
 			*/
-			uint32_t ViewMask = 0x7FFFFFFF;
+			uint32_t ViewMask = 0x7FFFFFFFu;
 
 			/*
 				Bit mask that specifies correlation between views
 				An implementation may use this for optimizations (concurrent render)
 			*/
-			uint32_t CorrelationMask = 0x7FFFFFFF;
+			uint32_t CorrelationMask = 0x7FFFFFFFu;
 
 			inline bool IsValid() const {
-				return ViewMask != 0x7FFFFFFF && CorrelationMask != 0x7FFFFFFF;
+				return ViewMask != 0x7FFFFFFFu && CorrelationMask != 0x7FFFFFFFu;
 			}
 		};
 
@@ -76,12 +83,9 @@ namespace Lucy {
 		Multiview Multiview;
 	};
 
-	class RenderPass {
+	class RenderPass : public RenderResource {
 	public:
-		static Ref<RenderPass> Create(const RenderPassCreateInfo& createInfo);
-
-		virtual void Recreate() = 0;
-		virtual void Destroy() = 0;
+		virtual void RTRecreate() = 0;
 
 		inline bool IsDepthBuffered() const { return m_DepthBuffered; }
 		inline const RenderPassLayout& GetLayout() const { return m_CreateInfo.Layout; }
@@ -96,6 +100,5 @@ namespace Lucy {
 		bool m_DepthBuffered = false;
 	};
 
-	uint32_t GetAPILoadOp(RenderPassLoadOp loadOp);
-	uint32_t GetAPIStoreOp(RenderPassStoreOp storeOp);
+	std::array<uint32_t, 2> GetAPILoadStoreAttachments(RenderPassLoadStoreAttachments loadStoreOp);
 }

@@ -14,7 +14,11 @@ int main(int argc, char** argv) {
 
 	Lucy::ApplicationCreateInfo applicationCreateInfo;
 	applicationCreateInfo.WindowCreateInfo = windowCreateInfo;
-	applicationCreateInfo.RenderArchitecture = Lucy::RenderArchitecture::Vulkan;
+	applicationCreateInfo.RendererConfiguration = {
+		.RenderArchitecture = Lucy::RenderArchitecture::Vulkan,
+		.RenderType = Lucy::RenderType::Rasterizer,
+		.ThreadingPolicy = Lucy::ThreadingPolicy::Singlethreaded
+	};
 
 	Lucy::Application* lucyApplication = Lucy::CreateApplication({ argc, argv }, applicationCreateInfo);
 	lucyApplication->Run();

@@ -29,5 +29,5 @@ namespace Lucy {
 		ERROR_VALIDATION_FAILED_EXT = -1000011001,
 	};
 	
-	const char* RendererAPICodesToString(int32_t errorCode);
+	const char* RendererBackendCodesToString(int32_t errorCode);
 }

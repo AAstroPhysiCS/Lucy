@@ -6,11 +6,11 @@ namespace Lucy {
 
 	class ComputeShader : public Shader {
 	public:
-		ComputeShader(const std::string& name, const std::string& path);
+		ComputeShader(const std::string& name, const std::filesystem::path& path);
 		virtual ~ComputeShader() = default;
 	protected:
-		void Load() final override;
+		void RTLoad(const Ref<RenderDevice>& device, bool forceReloadFromDisk = false) final override;
 
-		virtual void LoadInternal(const std::vector<uint32_t>& dataCompute) = 0;
+		virtual void LoadInternal(const Ref<RenderDevice>& device, const std::vector<uint32_t>& dataCompute) = 0;
 	};
 }

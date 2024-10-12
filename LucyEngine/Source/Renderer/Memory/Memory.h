@@ -2,14 +2,58 @@
 
 #include "Core/Logger.h"
 
+#include <type_traits>
+#include <memory>
+
 namespace Lucy {
 
+#ifndef CUSTOM_MEMORY_MANAGING
+	template <typename T>
+	using Ref = std::shared_ptr<T>;
+
+	template <typename T>
+	using Unique = std::unique_ptr<T>;
+
+	class MemoryTrackable : public std::enable_shared_from_this<MemoryTrackable> {
+	private:
+		template <std::derived_from<MemoryTrackable> TCasted>
+		struct AsProxy final {
+			Ref<MemoryTrackable> thisObj;
+
+			inline operator Ref<TCasted>() && { return std::dynamic_pointer_cast<TCasted>(thisObj); }
+			inline operator Unique<TCasted>() && = delete;
+		};
+	public:
+		virtual ~MemoryTrackable() = default;
+
+		template <std::derived_from<MemoryTrackable> TCasted>
+		inline Ref<TCasted> As() {
+			return AsProxy<TCasted>{ .thisObj = shared_from_this() };
+		}
+	protected:
+		MemoryTrackable() = default;
+	};
+
+	//TODO: Abstract this more
+	class Memory final {
+	public:
+		template <typename TType, typename ... TArgs>
+		static Ref<TType> CreateRef(TArgs&& ... args) {
+			return std::make_shared<TType>(std::forward<TArgs>(args)...);
+		}
+
+		template <typename TType, typename ... TArgs>
+		static Unique<TType> CreateUnique(TArgs&& ... args) {
+			return std::make_unique<TType>(std::forward<TArgs>(args)...);
+		}
+	};
+#else
 	//Lucy wrapper class for std::shared_ptr
 	template <typename T>
 	class Ref final {
 	public:
+		using ValueType = T;
 		Ref() = default;
-
 		Ref(T* ptr)
 			: m_Count(new uint32_t(1)),
 			m_Ptr(ptr) {
@@ -20,6 +64,9 @@ namespace Lucy {
 				__debugbreak();
 #endif
 			}
+
+
+			std::enable_shared_from_this < ()
 		}
 
 		~Ref() {
@@ -55,8 +102,8 @@ namespace Lucy {
 		}
 
 		//Copy constructor with implicit casting
-		template <typename Casted>
-		Ref(const Ref<Casted>& other)
+		template <typename TCasted>
+		Ref(const Ref<TCasted>& other)
 			: m_Count(other.m_Count),
 			m_Ptr(static_cast<T*>(other.m_Ptr)) {
 			IncRef();
@@ -68,9 +115,9 @@ namespace Lucy {
 		}
 
 		//Move constructor with implicit casting
-		template <typename Casted>
-		Ref(Ref<Casted>&& other) noexcept {
-			Move<Casted>(std::move(other));
+		template <typename TCasted>
+		Ref(Ref<TCasted>&& other) noexcept {
+			Move<TCasted>(std::move(other));
 		}
 
 		//Copy assignment operator
@@ -80,33 +127,39 @@ namespace Lucy {
 		}
 
 		//Copy assignment operator with implicit casting
-		template <typename Casted>
-		inline Ref& operator=(const Ref<Casted>& other) noexcept {
-			Copy<Casted>(other);
+		template <typename TCasted>
+		inline Ref& operator=(const Ref<TCasted>& other) noexcept {
+			Copy<TCasted>(other);
 			return *this;
 		}
 
 		//Move assignment operator
 		inline Ref& operator=(Ref&& other) noexcept {
+			if (this == &other)
+				return *this;
 			Move<T>(std::move(other));
 			return *this;
 		}
 
 		//Move assignment operator with implicit casting
-		template <typename Casted>
-		inline Ref& operator=(Ref<Casted>&& other) noexcept {
-			Move<Casted>(std::move(other));
+		template <typename TCasted>
+		inline Ref& operator=(Ref<TCasted>&& other) noexcept {
+			if (this == &other)
+				return *this;
+			Move<TCasted>(std::move(other));
 			return *this;
 		}
 
 		inline bool operator==(const Ref& other) { return m_Ptr == other.m_Ptr && m_Count == other.m_Count; }
 		inline bool operator!=(const Ref& other) { return !(*this == other); }
 
+		inline T& operator*() { return *m_Ptr; }
+
 		explicit inline operator bool() const { return m_Ptr; }
 
 		//Explicit casting function
-		template <typename Casted>
-		Ref<Casted> As() const {
+		template <typename TCasted>
+		Ref<TCasted> As() const {
 			if (!m_Ptr) {
 				Lucy::Logger::LogCritical("Trying to cast a nullptr!");
 #ifdef LUCY_WINDOWS
@@ -114,7 +167,7 @@ namespace Lucy {
 #endif
 			}
 
-			Casted* castedPtr = static_cast<Casted*>(m_Ptr);
+			TCasted* castedPtr = static_cast<TCasted*>(m_Ptr);
 			if (!castedPtr) {
 				Lucy::Logger::LogCritical("Pointer casting failed!");
 #ifdef LUCY_WINDOWS
@@ -122,9 +175,14 @@ namespace Lucy {
 #endif
 			}
 
-			Ref<Casted> castedRef(std::move(*this));
+			Ref<TCasted> castedRef(std::move(*this));
 			castedRef.m_Ptr = castedPtr;
 			return castedRef;
+		}
+
+		template <typename TCasted>
+		bool InstanceOf() const {
+			return typeid(T) == typeid(TCasted);
 		}
 
 		inline T* Get() { return m_Ptr; }
@@ -132,6 +190,12 @@ namespace Lucy {
 
 		inline T* operator->() { return m_Ptr; }
 		inline T* operator->() const { return m_Ptr; }
+
+		template <typename ... TArgs>
+		inline Ref& operator+=(TArgs... args) {
+			ValueType::operator+=(std::forward<TArgs>(args...));
+			return *this;
+		}
 
 		inline uint32_t GetCount() { return *m_Count; }
 		inline uint32_t GetCount() const { return *m_Count; }
@@ -188,8 +252,8 @@ namespace Lucy {
 	template <typename T>
 	class Unique final {
 	public:
+		using ValueType = T;
 		Unique() = default;
-
 		Unique(T* ptr)
 			: m_Ptr(ptr) {
 
@@ -209,9 +273,9 @@ namespace Lucy {
 			Move(other);
 		}
 
-		template <typename Casted>
-		Unique(Unique<Casted>&& other) noexcept {
-			Move<Casted>(other);
+		template <typename TCasted>
+		Unique(Unique<TCasted>&& other) noexcept {
+			Move<TCasted>(other);
 		}
 
 		inline Unique& operator=(std::nullptr_t) {
@@ -222,60 +286,38 @@ namespace Lucy {
 		inline Unique& operator=(const Unique& other) = delete;
 
 		inline Unique& operator=(Unique&& other) noexcept {
-			delete m_Ptr;
+			if (this == &other)
+				return *this;
 			Move(other);
-		
 			return *this;
 		}
 
-		template <typename Casted>
-		inline Unique& operator=(Unique<Casted>&& other) noexcept {
-			delete m_Ptr;
-			Move<Casted>(other);
-			
+		template <typename TCasted>
+		inline Unique& operator=(Unique<TCasted>&& other) noexcept {
+			if (this == &other)
+				return *this;
+			Move<TCasted>(other);
 			return *this;
 		}
 
 		inline bool operator==(const Unique& other) { return m_Ptr == other.m_Ptr; }
 		inline bool operator!=(const Unique& other) { return !(*this == other); }
 
+		inline T& operator*() { return *m_Ptr; }
+
 		explicit inline operator bool() const { return m_Ptr; }
-
-		template <typename Casted>
-		inline Unique<Casted> As() const { 
-			if (!m_Ptr) {
-				Lucy::Logger::LogCritical("Trying to cast a nullptr!");
-#ifdef LUCY_WINDOWS
-				__debugbreak();
-#endif
-			}
-
-			Casted* castedPtr = static_cast<Casted*>(m_Ptr);
-			if (!castedPtr) {
-				Lucy::Logger::LogCritical("Pointer casting failed!");
-#ifdef LUCY_WINDOWS
-				__debugbreak();
-#endif
-			}
-
-			Unique<Casted> castedRef(castedPtr);
-			return castedRef;
-		}
-
-		template <typename U>
-		void Move(Unique<U>&& other) {
-			m_Ptr = static_cast<T*>(other.m_Ptr);
-			other.m_Ptr = nullptr;
-
-			//or
-			//std::swap(m_Ptr, other.m_Ptr)
-		}
 
 		inline T* Get() { return m_Ptr; }
 		inline T* Get() const { return m_Ptr; }
 
 		inline T* operator->() { return m_Ptr; }
 		inline T* operator->() const { return m_Ptr; }
+
+		template <typename ... TArgs>
+		inline Unique& operator+=(TArgs... args) {
+			ValueType::operator+=(std::forward<TArgs>(args...));
+			return *this;
+		}
 	private:
 		T* m_Ptr = nullptr;
 
@@ -288,19 +330,5 @@ namespace Lucy {
 			//std::swap(m_Ptr, other.m_Ptr)
 		}
 	};
-
-	namespace Memory {
-
-		template <typename T, typename ... Args>
-		inline Unique<T> CreateUnique(Args && ... args) {
-			T* obj = new T(args...);
-			return Unique<T>(obj);
-		}
-
-		template <typename T, typename ... Args>
-		inline Ref<T> CreateRef(Args&& ... args) {
-			T* obj = new T(args...);
-			return Ref<T>(obj);
-		}
-	}
+#endif
 }

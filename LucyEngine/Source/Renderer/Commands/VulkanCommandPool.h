@@ -1,6 +1,7 @@
 #pragma once
 
 #include "vulkan/vulkan.h"
+
 #include "CommandPool.h"
 
 namespace Lucy {
@@ -10,22 +11,29 @@ namespace Lucy {
 		VulkanCommandPool(const CommandPoolCreateInfo& createInfo);
 		virtual ~VulkanCommandPool() = default;
 
-		inline VkCommandBuffer GetCommandBuffer(size_t index) { return m_CommandBuffers[index]; }
-		inline size_t GetCommandBufferSize() { return m_CommandBuffers.size(); }
+		inline void* GetCurrentFrameCommandBuffer() { return m_CommandBuffers[Renderer::GetCurrentFrameIndex()]; }
 
 		void Destroy() final override;
 		void Recreate() final override;
-	private:
-		void Allocate() final override;
+	protected:
 		void FreeCommandBuffers(uint32_t commandBufferCount, size_t commandBufferStartIndex);
 
-		VkCommandBuffer BeginSingleTimeCommand();
-		void EndSingleTimeCommand();
+		inline VkCommandBuffer GetCommandBuffer(size_t index) { return m_CommandBuffers[index]; }
+		inline size_t GetCommandBufferSize() const { return m_CommandBuffers.size(); }
 
 		VkCommandPool m_CommandPool = VK_NULL_HANDLE;
 		std::vector<VkCommandBuffer> m_CommandBuffers;
+	};
 
-		friend class VulkanCommandQueue; //for singletime commands
+	class VulkanTransientCommandPool final : private VulkanCommandPool {
+	public:
+		VulkanTransientCommandPool(const Ref<VulkanRenderDevice>& vulkanDevice);
+		virtual ~VulkanTransientCommandPool() = default;
+
+		VkCommandBuffer BeginSingleTimeCommand(VkDevice logicalDevice);
+		void EndSingleTimeCommand();
+
+		inline VkCommandBuffer GetTransientCommandBuffer() const { return m_CommandBuffers[m_CommandBuffers.size() - 1]; }
 	};
 }
 

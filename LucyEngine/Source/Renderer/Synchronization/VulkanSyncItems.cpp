@@ -1,28 +1,41 @@
 #include "lypch.h"
 
 #include "VulkanSyncItems.h"
-#include "Renderer/Context/VulkanContextDevice.h"
+#include "Renderer/Renderer.h"
 
 #include "Renderer/Image/VulkanImage2D.h"
+#include "Renderer/Device/VulkanRenderDevice.h"
 
 namespace Lucy {
 
 	Semaphore::Semaphore() {
-		VkSemaphoreCreateInfo createInfo = VulkanAPI::SemaphoreCreateInfo();
-		LUCY_VK_ASSERT(vkCreateSemaphore(VulkanContextDevice::Get().GetLogicalDevice(), &createInfo, nullptr, &m_Handle));
+		Renderer::EnqueueToRenderThread([&](const Ref<RenderDevice>& device) {
+			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+			VkSemaphoreCreateInfo createInfo = VulkanAPI::SemaphoreCreateInfo();
+			LUCY_VK_ASSERT(vkCreateSemaphore(vulkanDevice->GetLogicalDevice(), &createInfo, nullptr, &m_Handle));
+		});
 	}
 
 	void Semaphore::Destroy() {
-		vkDestroySemaphore(VulkanContextDevice::Get().GetLogicalDevice(), m_Handle, nullptr);
+		Renderer::EnqueueToRenderThread([&](const Ref<RenderDevice>& device) {
+			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+			vkDestroySemaphore(vulkanDevice->GetLogicalDevice(), m_Handle, nullptr);
+		});
 	}
 
 	Fence::Fence() {
-		VkFenceCreateInfo createInfo = VulkanAPI::FenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
-		LUCY_VK_ASSERT(vkCreateFence(VulkanContextDevice::Get().GetLogicalDevice(), &createInfo, nullptr, &m_Handle));
+		Renderer::EnqueueToRenderThread([&](const Ref<RenderDevice>& device) {
+			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+			VkFenceCreateInfo createInfo = VulkanAPI::FenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
+			LUCY_VK_ASSERT(vkCreateFence(vulkanDevice->GetLogicalDevice(), &createInfo, nullptr, &m_Handle));
+		});
 	}
 
 	void Fence::Destroy() {
-		vkDestroyFence(VulkanContextDevice::Get().GetLogicalDevice(), m_Handle, nullptr);
+		Renderer::EnqueueToRenderThread([&](const Ref<RenderDevice>& device) {
+			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+			vkDestroyFence(vulkanDevice->GetLogicalDevice(), m_Handle, nullptr);
+		});
 	}
 
 	ImageMemoryBarrier::ImageMemoryBarrier(const ImageMemoryBarrierCreateInfo& createInfo)

@@ -1,22 +1,26 @@
 #pragma once
 
+#include "Base.h"
 #include "Window.h"
-#include "ModuleStack.h"
-#include "Metrics.h"
+#include "ApplicationMetrics.h"
 
-#include "InputHandler.h"
-#include "FileSystem.h"
-#include "JobSystem.h"
+#include "Overlay.h"
 
-#include "Renderer/RenderArchitecture.h"
+#include "Threading/RunnableThreadScheduler.h"
+#include "Threading/TaskScheduler.h"
+
+#include "Scene/Scene.h"
+
+#include "Renderer/RendererConfiguration.h"
+#include "Renderer/RenderThread.h"
+
+#include "Core/RenderPipeline.h"
 
 #ifdef LUCY_WINDOWS
 extern int main(int argc, char** argv);
 #endif
 
 namespace Lucy {
-
-	struct Metrics;
 
 	struct ApplicationArgs {
 		int32_t Argc;
@@ -25,46 +29,50 @@ namespace Lucy {
 
 	struct ApplicationCreateInfo {
 		WindowCreateInfo WindowCreateInfo;
-		RenderArchitecture RenderArchitecture;
-	};
-
-	class ApplicationThreadScheduler {
-		ApplicationThreadScheduler() = default;
-		~ApplicationThreadScheduler() = default;
-
-		friend class Application;
-	public:
+		RendererConfiguration RendererConfiguration;
 	};
 
 	class Application {
 	public:
-		static Application*& Get();
-
 		Application(const ApplicationArgs& args, const ApplicationCreateInfo& createInfo);
 		virtual ~Application();
 
-		inline static Metrics& GetApplicationMetrics() { return s_Metrics; }
+		void Run();
+		virtual void OnEvent(Event& e);
+
 		inline ApplicationArgs GetProgramArguments() const { return m_Args; }
 
-		inline InputHandler& GetInputHandler() { return m_InputHandler; }
-		inline FileSystem& GetFileSystem() { return m_FileSystem; }
-		inline JobSystem& GetJobSystem() { return m_JobSystem; }
+		inline static ApplicationMetrics& GetApplicationMetrics() { return s_Metrics; }
+		inline static auto GetRunnableThreadScheduler() { return s_RunnableThreadScheduler; }
+		inline static auto GetTaskScheduler() { return s_TaskScheduler; }
 	protected:
-		virtual void Run() = 0;
-		virtual void OnEvent(Event* e) = 0;
+		void SetScene(Ref<Scene> scene);
+		void SetRenderType(RenderType renderType);
+		void PushOverlay(Ref<Overlay> overlay);
 
+		inline const Ref<Window>& GetWindow() const { return m_Window; }
+	private:
+		void Init();
+
+		Ref<Scene> m_Scene = nullptr;
 		Ref<Window> m_Window = nullptr;
+		std::vector<Ref<Overlay>> m_Overlays;
+
+		RendererConfiguration m_RendererConfiguration;
+		Ref<RenderPipeline> m_RenderPipeline = nullptr;
 
 		ApplicationArgs m_Args;
 		ApplicationCreateInfo m_CreateInfo;
-		ModuleStack m_ModuleStack;
-		static Metrics s_Metrics;
+		static inline ApplicationMetrics s_Metrics;
 
-		InputHandler m_InputHandler;
-		FileSystem m_FileSystem;
-		JobSystem m_JobSystem;
-
-		ApplicationThreadScheduler m_ThreadScheduler;
+		static inline auto s_RunnableThreadScheduler = new RunnableThreadScheduler<RenderThread>({
+			RunnableThreadCreateInfo {
+			   .Name = "LucyRenderThread",
+			   .Affinity = ThreadApplicationAffinityIncremental,
+			   .Priority = ThreadPriority::Highest
+			},
+		});
+		static inline auto s_TaskScheduler = new TaskScheduler(TaskSchedulerCreateInfo{ .FromThreadIndex = s_RunnableThreadScheduler->GetThreadExtent() });
 
 		friend int ::main(int argc, char** argv);
 	};

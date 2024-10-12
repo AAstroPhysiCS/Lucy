@@ -1,16 +1,21 @@
 #pragma once
 
-#include "glm/gtc/integer.hpp"
+#include "Renderer/Device/RenderResource.h"
 
 namespace Lucy {
 
 	enum class ImageType {
+		//Image2D
 		Type2DDepth,
+		Type2DArrayDepth,
+
 		Type2DColor,
 		Type2DArrayColor,
 
+		//Image3D
 		Type3DColor,
 
+		//ImageCube
 		TypeCubeColor
 	};
 
@@ -26,6 +31,8 @@ namespace Lucy {
 	};
 
 	enum class ImageFormat {
+		Unknown = -1,
+
 		R8G8B8A8_UNORM,
 		R8G8B8A8_UINT,
 		R8G8B8A8_SRGB,
@@ -46,9 +53,7 @@ namespace Lucy {
 		R32G32B32_SFLOAT,
 
 		R32_SFLOAT,
-		R32_UINT,
-
-		Unknown = -1
+		R32_UINT
 	};
 
 	//to be implemented by CLIENT
@@ -65,15 +70,8 @@ namespace Lucy {
 
 	using ImageFlags = uint32_t;
 
-	//Helper struct for materials
-	struct MaterialImageType {
-		uint32_t Type;
-		std::string Name;
-		uint32_t Index;
-	};
-
 	struct ImageCreateInfo {
-		int32_t Width = 0, Height = 0; //gets replaced if path is available
+		uint32_t Width = 0, Height = 0; //gets replaced if path is available
 		ImageType ImageType;
 		ImageFormat Format;
 		ImageParameter Parameter;
@@ -82,57 +80,49 @@ namespace Lucy {
 		uint32_t Samples = 1;
 		uint32_t Layers = 1;
 		
-		bool ImGuiUsage = false;
 		bool GenerateSampler = false;
 		bool GenerateMipmap = false;
+		bool ImGuiUsage = false;
 	};
 
 	//Vulkan: Descriptor Set
 	using ImageImGuiID = void*;
 
-	class VulkanImage2D; //for copy constructor
-
-	class Image {
+	class Image : public RenderResource {
 	public:
 		virtual ~Image() = default;
 
-		static Ref<Image> Create(const std::string& path, ImageCreateInfo& createInfo);
-		static Ref<Image> Create(const Ref<VulkanImage2D>& other);
-		static Ref<Image> Create(ImageCreateInfo& createInfo);
+		inline const std::filesystem::path& GetPath() const { return m_Path; }
+		inline int32_t GetChannels() const { return m_Channels; }
+		inline int32_t GetWidth() const { return m_CreateInfo.Width; }
+		inline int32_t GetHeight() const { return m_CreateInfo.Height; }
 
-		static Ref<Image> CreateCube(const std::string& path, ImageCreateInfo& createInfo);
-		static Ref<Image> CreateCube(ImageCreateInfo& createInfo);
+		inline ImageFormat GetFormat() const { return m_CreateInfo.Format; }
+		inline uint32_t GetSamples() const { return m_CreateInfo.Samples; }
 
-		static Ref<Image>& GetBlankCube();
-
-		virtual void Destroy() = 0;
-
-		inline const std::string& GetPath() const { return m_Path; }
-		inline const int32_t& GetChannels() const { return m_Channels; }
-		inline const int32_t& GetWidth() const { return m_Width; }
-		inline const int32_t& GetHeight() const { return m_Height; }
-
-		inline const uint32_t GetLayerCount() const { return m_LayerCount; }
-		inline const uint32_t GetMaxMipLevel() const { return m_MaxMipLevel; }
+		inline uint32_t GetLayerCount() const { return m_CreateInfo.Layers; }
+		inline uint32_t GetMaxMipLevel() const { return m_MaxMipLevel; }
 
 		ImageImGuiID GetImGuiID() const { return m_ImGuiID; }
 	protected:
-		//Loads an asset
-		Image(const std::string& path, ImageCreateInfo& createInfo);
 		//Creates an empty image
-		Image(ImageCreateInfo& createInfo);
+		Image(const ImageCreateInfo& createInfo)
+			: RenderResource("Image"), m_CreateInfo(createInfo) {
+			if (m_CreateInfo.GenerateMipmap)
+				m_MaxMipLevel = (uint32_t)glm::floor(glm::log2(glm::max(m_CreateInfo.Width, m_CreateInfo.Height))) + 1u;
+		}
+
+		//Loads an asset
+		Image(const std::filesystem::path& path, const ImageCreateInfo& createInfo)
+			: RenderResource("Image"), m_CreateInfo(createInfo), m_Path(path) {
+		}
 
 		ImageCreateInfo m_CreateInfo;
 		int32_t m_Channels = 0;
-		int32_t m_Width = 0;
-		int32_t m_Height = 0;
-
-		uint32_t m_LayerCount = 1;
+		uint32_t m_MaxMipLevel = 1;
 
 		ImageImGuiID m_ImGuiID = 0;
 
-		uint32_t m_MaxMipLevel = 1;
-
-		std::string m_Path;
+		std::filesystem::path m_Path;
 	};
 }

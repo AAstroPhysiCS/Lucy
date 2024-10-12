@@ -11,20 +11,22 @@ namespace Lucy {
 
 	class VulkanIndexBuffer : public IndexBuffer {
 	public:
-		VulkanIndexBuffer(size_t size);
+		VulkanIndexBuffer(size_t size, const Ref<VulkanRenderDevice>& device);
 		virtual ~VulkanIndexBuffer() = default;
 		
-		void Bind(const VulkanIndexBindInfo& info);
-		void LoadToGPU() final override;
-		void DestroyHandle() final override;
+		void RTBind(const VulkanIndexBindInfo& info);
+		void RTLoadToDevice() final override;
 	private:
-		void Create(size_t size = 0);
+		void RTCreate(size_t size = 0);
+		void RTDestroyResource() final override;
 
 		VkBuffer m_BufferHandle = VK_NULL_HANDLE;
 		VmaAllocation m_BufferVma = VK_NULL_HANDLE;
 
 		VkBuffer m_StagingBufferHandle = VK_NULL_HANDLE;
 		VmaAllocation m_StagingBufferVma = VK_NULL_HANDLE;
+
+		Ref<VulkanRenderDevice> m_VulkanDevice = nullptr;
 	};
 }
 

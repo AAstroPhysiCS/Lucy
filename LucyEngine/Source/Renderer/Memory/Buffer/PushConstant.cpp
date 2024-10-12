@@ -14,7 +14,7 @@ namespace Lucy {
 		Resize(m_Size);
 	}
 
-	void VulkanPushConstant::Bind(VkCommandBuffer commandBuffer, VkPipelineLayout layout) const {
+	void VulkanPushConstant::RTBind(VkCommandBuffer commandBuffer, VkPipelineLayout layout) const {
 		vkCmdPushConstants(commandBuffer, layout, m_ShaderStage, m_Offset, m_Size, m_Data.data());
 	}
 }

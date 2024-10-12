@@ -5,11 +5,10 @@
 
 namespace Lucy {
 
-	class DetailsPanel : public Panel
-	{
+	class DetailsPanel : public Panel {
 	public:
 		static DetailsPanel& GetInstance();
-	private:
+
 		DetailsPanel();
 		virtual ~DetailsPanel() = default;
 
@@ -22,8 +21,7 @@ namespace Lucy {
 				func(e.GetComponent<T>());
 		}
 
-		//relevant for DetailsPanel, since I cant render a nullptr vulkan descriptor set.
-		inline static Ref<Image> s_CheckerBoardTexture = nullptr;
+		inline static RenderResourceHandle s_CheckerBoardTextureHandle = InvalidRenderResourceHandle;
 	};
 }
 

@@ -3,11 +3,10 @@
 #include "Entity.h"
 #include "Scene.h"
 #include "Components.h"
-
-#include "Renderer/Renderer.h"
+#include "Events/EventHandler.h"
 
 namespace Lucy {
-
+	
 	Entity Scene::CreateMesh(std::string& path) {
 		Entity e = CreateEntity();
 		e.AddComponent<MeshComponent>(path);
@@ -42,6 +41,8 @@ namespace Lucy {
 			Entity e{ this, entity };
 			MeshComponent& meshComponent = e.GetComponent<MeshComponent>();
 			const Ref<Mesh>& mesh = meshComponent.GetMesh();
+			if (!mesh)
+				continue;
 			const glm::vec3& meshIDValue = mesh->GetMeshID();
 
 			if (meshIDValue == meshID)
@@ -51,32 +52,33 @@ namespace Lucy {
 		return {};
 	}
 
-	void Scene::Update(int32_t viewportWidth, int32_t viewportHeight) {
+	void Scene::Update() {
 		LUCY_PROFILE_NEW_EVENT("Scene::Update");
-
-		m_Camera.SetViewportSize(viewportWidth, viewportHeight);
 		m_Camera.Update();
 	}
 
+	void Scene::UpdateCamera(int32_t viewportWidth, int32_t viewportHeight) {
+		m_Camera.SetAspectRatio((float)viewportWidth / viewportHeight);
+		m_Camera.Update();
+	}
+
+	void Scene::OnEvent(Event& e) {
+		EventHandler::AddListener<ViewportAreaResizeEvent>(e, [this](const ViewportAreaResizeEvent& evt) {
+			UpdateCamera(evt.GetWidth(), evt.GetHeight());
+		});
+
+		EventHandler::AddListener<CursorPosEvent>(e, [this](const CursorPosEvent& evt) {
+			m_Camera.Update();
+		});
+	}
+
 	void Scene::Destroy() {
-		const auto& meshView = View<MeshComponent>();
-		for (auto entity : meshView) {
-			Entity e{ this, entity };
-			MeshComponent meshComponent = e.GetComponent<MeshComponent>();
-			if (!meshComponent.IsValid()) 
-				continue;
-
+		ViewForEach<MeshComponent>([](MeshComponent& meshComponent) {
 			meshComponent.GetMesh()->Destroy();
-		}
+		});
 
-		const auto& cubemapView = View<HDRCubemapComponent>();
-		for (auto entity : cubemapView) {
-			Entity e{ this, entity };
-			HDRCubemapComponent cubemapComponent = e.GetComponent<HDRCubemapComponent>();
-			if (!cubemapComponent.IsValid()) 
-				continue;
-
-			cubemapComponent.GetCubemapImage()->Destroy();
-		}
+		ViewForEach<HDRCubemapComponent>([&](HDRCubemapComponent& cubemapComponent) {
+			cubemapComponent.Destroy();
+		});
 	}
 }

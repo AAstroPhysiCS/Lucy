@@ -1,68 +1,84 @@
 #include "lypch.h"
+
 #include "CommandQueue.h"
-#include "VulkanCommandQueue.h"
-
-#include "Renderer/Context/GraphicsPipeline.h"
-
-#include "Renderer/Renderer.h"
+#include "Renderer/Device/VulkanRenderDevice.h"
 
 namespace Lucy {
 
-	Ref<CommandQueue> CommandQueue::Create() {
-		switch (Renderer::GetRenderArchitecture()) {
-			case RenderArchitecture::Vulkan:
-				return Memory::CreateRef<VulkanCommandQueue>();
-				break;
-		}
-		return nullptr;
+	//TODO: for now, we will select the 0. index command list and execute only that (in the future, multithread this with JobSystem)
+	static inline constexpr const uint32_t commandListIndex = 0;
+
+	CommandQueue::CommandQueue(const CommandQueueCreateInfo& createInfo)
+		: m_CreateInfo(createInfo) {
+		LUCY_ASSERT(m_CreateInfo.CommandListParallelCount == 1, "Multithreaded command list generation will be supported in the future!");
 	}
 
-	CommandResourceHandle CommandQueue::CreateCommandResource(Ref<ContextPipeline> pipeline, CommandFunc&& func) {
-		LUCY_PROFILE_NEW_EVENT("CommandQueue::CreateCommandResource");
-		CommandResourceHandle uniqueHandle = CommandResource::CreateUniqueHandle();
-		CommandResource commandResource = CommandResource(pipeline, std::move(func));
-		m_CommandResourceMap.emplace(uniqueHandle, commandResource);
-
-		return uniqueHandle;
-	}
-
-	CommandResourceHandle CommandQueue::CreateChildCommandResource(CommandResourceHandle parentResourceHandle, Ref<GraphicsPipeline> childPipeline, CommandFunc&& func) {
-		LUCY_PROFILE_NEW_EVENT("CommandQueue::CreateChildCommandResource");
-		CommandResource& parentCommandResource = m_CommandResourceMap[parentResourceHandle];
-
-		const Ref<GraphicsPipeline>& parentPipeline = parentCommandResource.GetTargetPipeline().As<GraphicsPipeline>();
-		LUCY_ASSERT(parentPipeline->GetRenderPass() == childPipeline->GetRenderPass() || parentPipeline->GetFrameBuffer() == childPipeline->GetFrameBuffer(),
-					"This configuration cannot be processed!\n Child pipeline must have the same renderpass and framebuffer as the parent pipeline.");
-
-		CommandResourceHandle childUniqueHandle = CommandResource::CreateUniqueHandle();
-		CommandResource childCommandResource = CommandResource(childPipeline, std::move(func), true);
-		parentCommandResource.m_ChildCommandResourceHandles.push_back(childUniqueHandle);
-
-		m_CommandResourceMap.emplace(childUniqueHandle, childCommandResource);
-
-		return childUniqueHandle;
-	}
-
-	void CommandQueue::DeleteCommandResource(CommandResourceHandle commandHandle) {
-		LUCY_ASSERT(m_CommandResourceMap.find(commandHandle) != m_CommandResourceMap.end(), "Could not find a handle for a given command resource");
-		m_CommandResourceMap.erase(commandHandle);
-	}
-
-	void CommandQueue::EnqueueCommand(CommandResourceHandle resourceHandle, const Ref<RenderCommand>& command) {
-		LUCY_PROFILE_NEW_EVENT("CommandQueue::EnqueueCommand");
-		m_CommandResourceMap[resourceHandle].EnqueueCommand(command);
+	void CommandQueue::Init() {
+		for (uint32_t i = 0; i < m_CreateInfo.CommandListParallelCount; i++)
+			m_CommandLists.emplace_back(m_CreateInfo.RenderDevice);
 	}
 
 	void CommandQueue::Recreate() {
-		m_CommandPool->Recreate();
+		LUCY_PROFILE_NEW_EVENT("CommandQueue::Recreate");
+		for (auto& cmdList : m_CommandLists)
+			cmdList.Recreate();
 	}
 
-	void CommandQueue::Free() {
-		m_CommandPool->Destroy();
-		Clear();
+	void CommandQueue::FlushCommandQueue() {
+		LUCY_PROFILE_NEW_EVENT("CommandQueue::FlushCommandQueue");
+		/*	For it to support, nested command/submit function lambdas
+			Nested lambda functions are being run in the second iteration.
+		*/
+		size_t oldCommandSize = m_RenderCommandQueue.size();
+		for (size_t i = 0; i < oldCommandSize; i++)
+			m_RenderCommandQueue[i](m_CreateInfo.RenderDevice);
+
+		m_RenderCommandQueue.erase(m_RenderCommandQueue.begin(), m_RenderCommandQueue.begin() + oldCommandSize);
+	}
+
+	void CommandQueue::FlushSubmitQueue(CommandQueueMetricsOutput& output) {
+		LUCY_PROFILE_NEW_EVENT("CommandQueue::FlushSubmitQueue");
+
+		const auto& device = m_CreateInfo.RenderDevice;
+		auto& cmdList = m_CommandLists[commandListIndex];
+		const auto& primaryCommandPool = cmdList.GetPrimaryCommandPool();
+
+		device->BeginCommandBuffer(primaryCommandPool);
+		device->ResetTimestampQuery(primaryCommandPool);
+		device->ResetPipelineQuery(primaryCommandPool);
+		m_BeginTimestampIndex = device->BeginTimestamp(primaryCommandPool);
+
+		size_t oldSubmitCommandSize = m_RenderSubmitQueue.size();
+		for (size_t i = 0; i < oldSubmitCommandSize; i++)
+			m_RenderSubmitQueue[i](cmdList);
+
+		m_EndTimestampIndex = device->EndTimestamp(primaryCommandPool);
+		auto renderTimes = device->GetQueryResults(RenderDeviceQueryType::Timestamp);
+		device->EndCommandBuffer(primaryCommandPool);
+
+		m_RenderSubmitQueue.erase(m_RenderSubmitQueue.begin(), m_RenderSubmitQueue.begin() + oldSubmitCommandSize);
+
+		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan) {
+			double timestampPeriod = device->As<VulkanRenderDevice>()->GetTimestampPeriod();
+			for (const auto& [name, cmd] : cmdList.m_RenderCommands) {
+				double renderTime = cmd.GetRenderTime(renderTimes) * timestampPeriod / 1000000.0;
+				const auto& [it, success] = output.RenderTimeOfPasses.try_emplace(name, renderTime);
+				if (!success)
+					output.RenderTimeOfPasses.at(name) = renderTime;
+			}
+
+			output.RenderTime = (double)(renderTimes[m_EndTimestampIndex] - renderTimes[m_BeginTimestampIndex]) * timestampPeriod / 1000000.0;
+		}
 	}
 
 	void CommandQueue::Clear() {
-		m_CommandResourceMap.clear();
+		m_RenderSubmitQueue.clear();
+		m_RenderCommandQueue.clear();
+	}
+
+	void CommandQueue::Free() {
+		Clear();
+		for (auto& cmdList : m_CommandLists)
+			cmdList.Destroy();
 	}
 }

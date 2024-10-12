@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Renderer/Device/RenderResource.h"
+
 namespace Lucy {
 
 	class RenderPass;
@@ -7,33 +9,28 @@ namespace Lucy {
 	class Image;
 
 	struct FrameBufferCreateInfo {
-		
-		int32_t	Width = 0, Height = 0;
+		uint32_t Width = 0, Height = 0;
 		bool MultiSampled = false;
 		bool IsInFlight = false;
 		
-		Ref<RenderPass> RenderPass = nullptr;
-		std::vector<Ref<Image>> ImageBuffers;
+		RenderResourceHandle RenderPassHandle = InvalidRenderResourceHandle;
+		std::vector<RenderResourceHandle> ImageBufferHandles;
 
-		Ref<Image> DepthImage = nullptr;
-
-		//Vulkan only: only for swapchain (use ImageBuffer)
-		std::vector<VulkanImageView> ImageViews;
+		RenderResourceHandle DepthImageHandle = InvalidRenderResourceHandle;
 	};
 
-	class FrameBuffer {
+	class FrameBuffer : public RenderResource {
 	public:
 		virtual ~FrameBuffer() = default;
 
-		static Ref<FrameBuffer> Create(FrameBufferCreateInfo& createInfo);
-		virtual void Recreate(uint32_t width, uint32_t height) = 0;
-		virtual void Destroy() = 0;
+		virtual void RTRecreate(uint32_t width, uint32_t height) = 0;
 
-		inline uint32_t GetWidth() { return m_CreateInfo.Width; }
-		inline uint32_t GetHeight() { return m_CreateInfo.Height; }
+		inline uint32_t GetWidth() const { return m_CreateInfo.Width; }
+		inline uint32_t GetHeight() const { return m_CreateInfo.Height; }
 	protected:
-		FrameBuffer(FrameBufferCreateInfo& m_CreateInfo);
-
+		FrameBuffer(const FrameBufferCreateInfo& createInfo)
+			: RenderResource("FrameBuffer"), m_CreateInfo(createInfo) {
+		}
 		FrameBufferCreateInfo m_CreateInfo;
 	};
 }

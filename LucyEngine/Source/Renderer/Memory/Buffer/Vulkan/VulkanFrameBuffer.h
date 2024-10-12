@@ -6,33 +6,64 @@
 #include "Renderer/VulkanRenderPass.h"
 #include "Renderer/Image/VulkanImage2D.h"
 
+#include "Renderer/Device/VulkanRenderDevice.h"
+
 namespace Lucy {
 
 	class VulkanFrameBuffer : public FrameBuffer {
 	public:
-		VulkanFrameBuffer(FrameBufferCreateInfo& createInfo);
+		VulkanFrameBuffer(const FrameBufferCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device);
 		virtual ~VulkanFrameBuffer() = default;
 		
-		void Destroy() final override;
-
 		inline const std::vector<VkFramebuffer>& GetVulkanHandles() const { return m_FrameBufferHandles; }
-		inline const std::vector<Ref<VulkanImage2D>>& GetImages() const { return m_Images; }
+		inline const std::vector<RenderResourceHandle>& GetImageHandles() const { return m_ImageHandles; }
 		inline bool IsInFlight() const { return m_CreateInfo.IsInFlight; }
 
-		void Recreate(uint32_t width, uint32_t height) final override;
-		void Recreate(uint32_t width, uint32_t height, const std::vector<VulkanImageView>& swapChainImageViews = { });
+		void RTRecreate(uint32_t width, uint32_t height) final override;
 	private:
-		void Create();
-		//should only be used for swapchain imageviews
-		void CreateForSwapChain();
+		void RTCreate();
+		void RTDestroyResource() final override;
+		void DestroyHandles();
+
+		//Helper functions
+		Ref<VulkanImage2D> GetImage(uint32_t index);
+		Ref<VulkanImage2D> GetDepthImage();
+		Ref<VulkanRenderPass> GetRenderPass();
 
 		std::vector<VkFramebuffer> m_FrameBufferHandles;
-		std::vector<Ref<VulkanImage2D>> m_Images;
-		Ref<VulkanImage2D> m_DepthImage = nullptr;
+		std::vector<RenderResourceHandle> m_ImageHandles;
+		RenderResourceHandle m_DepthImageHandle = InvalidRenderResourceHandle;
 
 		bool m_CreatedInFlightFrameBufferImages = false;
 
-		Ref<VulkanRenderPass> m_RenderPass = nullptr;
+		Ref<VulkanRenderDevice> m_VulkanDevice = nullptr;
+	};
+
+	class VulkanSwapChainFrameBuffer : private FrameBuffer {
+	public:
+		VulkanSwapChainFrameBuffer(const Ref<VulkanRenderDevice>& vulkanDevice, const VkExtent2D& extent, const std::vector<VulkanImageView>& swapChainImageViews, const Ref<VulkanRenderPass>& renderPass);
+		virtual ~VulkanSwapChainFrameBuffer() = default;
+
+		inline const std::vector<VkFramebuffer>& GetVulkanHandles() const { return m_FrameBufferHandles; }
+
+		inline uint32_t GetWidth() const { return m_CreateInfo.Width; }
+		inline uint32_t GetHeight() const { return m_CreateInfo.Height; }
+
+		void RTDestroyResource() final override;
+	private:
+		void CreateForSwapChain();
+
+		void RTRecreate(uint32_t width, uint32_t height) final override;
+
+		inline Ref<VulkanRenderPass> GetRenderPass() { return m_RenderPass; }
+
+		const std::vector<VulkanImageView>& m_SwapChainImageViews;
+		const Ref<VulkanRenderPass>& m_RenderPass = nullptr;
+
+		std::vector<VkFramebuffer> m_FrameBufferHandles;
+		Ref<VulkanRenderDevice> m_VulkanDevice = nullptr;
+
+		friend class VulkanSwapChain;
 	};
 }
 

@@ -1,8 +1,5 @@
 #pragma once
 
-#include <map>
-
-#include "vulkan/vulkan.h"
 #include "spirv_cross/spirv_cross.hpp"
 #include "spirv_cross/spirv_glsl.hpp"
 
@@ -43,7 +40,7 @@ namespace Lucy {
 		AccelerationStructure,
 		RayQuery
 	};
-	
+
 	struct ShaderMemberVariable {
 		std::string Name = "Unknown";
 		uint32_t Size = 0;
@@ -63,6 +60,15 @@ namespace Lucy {
 		std::vector<ShaderMemberVariable> Members;
 	};
 
+	struct VertexShaderLayoutElement {
+		std::string Name = "Unknown Input";
+		int32_t Location = -1;
+		ShaderMemberType Type = ShaderMemberType::Unknown;
+		uint32_t ShaderDataSize;
+	};
+
+	using VertexShaderLayout = std::vector<VertexShaderLayoutElement>;
+
 	class ShaderReflect {
 	public:
 		~ShaderReflect() = default;
@@ -72,12 +78,16 @@ namespace Lucy {
 		inline std::vector<ShaderUniformBlock>& GetShaderPushConstants() { return m_ShaderPushConstants; }
 		inline std::unordered_multimap<uint32_t, std::vector<ShaderUniformBlock>>& GetShaderUniformBlockMap() { return m_ShaderUniformBlockMap; }
 
-		void Info(std::string& path, std::vector<uint32_t>& data, VkShaderStageFlags stageFlag);
+		inline const VertexShaderLayout& GetVertexShaderLayout() const { return m_VertexShaderLayout; }
+
+		void DestroyCachedData();
+		void Info(const std::filesystem::path& path, const std::vector<uint32_t>& data, VkShaderStageFlags stageFlag);
 	private:
 		ShaderReflect() = default;
 
 		void SearchFor(spirv_cross::CompilerGLSL* compiler, const spirv_cross::SmallVector<spirv_cross::Resource>& resource,
 									 VkShaderStageFlags stageFlag, VkDescriptorType descriptorType);
+		void ParseShaderInput(spirv_cross::CompilerGLSL* compiler, const spirv_cross::SmallVector<spirv_cross::Resource>& shaderInputs);
 		void ParseStructMemberRecursive(spirv_cross::CompilerGLSL* compiler, spirv_cross::SPIRType parentType, std::vector<ShaderMemberVariable>& out);
 
 		//Push constants get their own function, since their implementation is a bit different than other uniform buffer types
@@ -89,6 +99,8 @@ namespace Lucy {
 		//value = uniform blocks
 		std::vector<ShaderUniformBlock> m_ShaderPushConstants;
 		std::unordered_multimap<uint32_t, std::vector<ShaderUniformBlock>> m_ShaderUniformBlockMap;
+
+		VertexShaderLayout m_VertexShaderLayout;
 
 		ShaderStageInfo m_ShaderStageInfo;
 

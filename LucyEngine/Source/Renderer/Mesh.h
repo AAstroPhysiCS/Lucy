@@ -1,17 +1,14 @@
 #pragma once
 
-#include "Memory/Buffer/VertexBuffer.h"
-#include "Memory/Buffer/IndexBuffer.h"
-
-#include "assimp/Importer.hpp"
 #include "assimp/scene.h"
-#include "assimp/postprocess.h"
 
 #include "Material/Material.h"
 
-#include "glm/glm.hpp"
+#include "Device/RenderResource.h"
 
 namespace Lucy {
+
+	class RenderDevice;
 
 	struct Submesh {
 		std::vector<glm::vec3> Vertices;
@@ -21,9 +18,9 @@ namespace Lucy {
 		std::vector<glm::vec2> TextureCoords;
 
 		std::vector<uint32_t> Faces;
+		MaterialID MaterialID;
 
 		glm::mat4 Transform = glm::mat4(1.0f);
-		uint32_t MaterialIndex = 0;
 
 		uint32_t VertexCount = 0;
 		uint32_t IndexCount = 0;
@@ -51,28 +48,28 @@ namespace Lucy {
 		~Mesh() = default;
 
 		inline std::vector<Submesh>& GetSubmeshes() { return m_Submeshes; }
-		inline std::vector<Ref<Material>>& GetMaterials() { return m_Materials; }
-		
+
 		inline std::string& GetName() { return m_Name; }
 		inline const glm::vec3& GetMeshID() const { return m_MeshID; }
 		inline std::string& GetPath() { return m_Path; }
 
-		inline Ref<VertexBuffer> GetVertexBuffer() { return m_VertexBuffer; }
-		inline Ref<IndexBuffer> GetIndexBuffer() { return m_IndexBuffer; }
+		inline RenderResourceHandle GetVertexBufferHandle() { return m_VertexBufferHandle; }
+		inline RenderResourceHandle GetIndexBufferHandle() { return m_IndexBufferHandle; }
 
-		inline MetadataInfo GetMetadataInfo() { return m_MetadataInfo; }
+		inline MetadataInfo GetMetadataInfo() const { return m_MetadataInfo; }
 
 		void Destroy();
 	private:
+		void Load(Ref<RenderDevice>& device, const std::vector<float>& vertices, const std::vector<uint32_t>& indices);
+		void Load();
+
 		void LoadData(const aiScene* scene);
-		void LoadMaterials(const aiScene* scene, const aiMesh* mesh);
 		void TraverseHierarchy(const aiNode* node, const glm::mat4& parentTransform);
 
-		Ref<VertexBuffer> m_VertexBuffer;
-		Ref<IndexBuffer> m_IndexBuffer;
+		RenderResourceHandle m_VertexBufferHandle = InvalidRenderResourceHandle;
+		RenderResourceHandle m_IndexBufferHandle = InvalidRenderResourceHandle;
 
 		std::vector<Submesh> m_Submeshes;
-		std::vector<Ref<Material>> m_Materials;
 		std::string m_Path;
 		std::string m_Name;
 

@@ -3,11 +3,18 @@
 #include "entt/entt.hpp"
 #include "Camera.h"
 
+#include <ranges>
+
 namespace Lucy {
 
 	class Entity;
 
-	class Scene {
+	template <typename TComponent>
+	concept IsComponent = requires(TComponent&& component) {
+		{ component.IsValid() } -> std::same_as<bool>;
+	};
+
+	class Scene final {
 	public:
 		Scene() = default;
 		~Scene() = default;
@@ -20,16 +27,51 @@ namespace Lucy {
 
 		inline EditorCamera& GetEditorCamera() { return m_Camera; }
 
-		void Update(int32_t viewportWidth, int32_t viewportHeight);
+		void OnEvent(Event& e);
+		void Update();
 		void Destroy();
 
-		template <typename ... T>
-		inline auto View() { return m_Registry.view<T...>(); }
+		template <typename ... TComponents>
+		inline decltype(auto) View() { return m_Registry.view<TComponents...>(); }
+
+		template<typename ... TComponents>
+		inline bool CheckForComponentValidity(TComponents&& ... components) const {
+			bool success = true;
+			((success &= components.IsValid()) && ...);
+			return success;
+		}
+
+		template <IsComponent ... TComponents, typename TFunc>
+		inline void ViewRForEach(TFunc func) {
+			auto view = m_Registry.view<TComponents...>();
+			for (auto entity : view | std::views::reverse) {
+				auto allComponents = view.get(entity);
+				std::apply([&](TComponents&... components) {
+					if (!CheckForComponentValidity(components...))
+						return;
+					func(components...);
+				}, allComponents);
+			}
+		}
+
+		template <IsComponent ... TComponents, typename TFunc>
+		inline void ViewForEach(TFunc func) {
+			auto view = m_Registry.view<TComponents...>();
+			for (auto entity : view) {
+				auto allComponents = view.get(entity);
+				std::apply([&](TComponents&... components) {
+					if (!CheckForComponentValidity(components...))
+						return;
+					func(components...);
+				}, allComponents);
+			}
+		}
 	private:
+		void UpdateCamera(int32_t viewportWidth, int32_t viewportHeight);
+
 		entt::registry m_Registry;
-		EditorCamera m_Camera;
+		EditorCamera m_Camera { 0.1f, 1000.0f, 90.0f };
 
 		friend class Entity;
 	};
 }
-

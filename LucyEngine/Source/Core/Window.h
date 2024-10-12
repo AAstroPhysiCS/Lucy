@@ -10,7 +10,7 @@
 
 namespace Lucy {
 
-	enum class RenderArchitecture;
+	enum class RenderArchitecture : uint8_t;
 
 	enum class WindowMode {
 		FULLSCREEN, WINDOWED
@@ -25,6 +25,7 @@ namespace Lucy {
 
 	class Window {
 	public:
+		Window() = default;
 		virtual ~Window() = default;
 
 		virtual void PollEvents() = 0;
@@ -33,8 +34,8 @@ namespace Lucy {
 		virtual void DestroyVulkanSurface(VkInstance instance) = 0; //leaving to child class, to destroy it's contents.
 		virtual void Destroy() = 0; //leaving to child class, to destroy it's contents.
 		virtual void WaitEventsIfMinimized() = 0;
+		virtual void SetEventCallback(const std::function<void(Event&)>& eventCallbackFunc) = 0;
 
-		void SetEventCallback(std::function<void(Event*)>);
 		GLFWwindow* Raw();
 
 		inline int32_t GetWidth() const { return m_CreateInfo.Width; }
@@ -50,20 +51,27 @@ namespace Lucy {
 		WindowCreateInfo m_CreateInfo;
 		GLFWwindow* m_Window = nullptr;
 
-		static std::function<void(Event*)> s_EventFunc;
+		static inline std::function<void(Event&)> s_EventFunc;
 
 		VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
 	};
 
 	class WinWindow : public Window {
 	public:
+		WinWindow() = default;
 		virtual ~WinWindow() = default;
 	private:
 		void PollEvents() final override;
+		
 		void Init(RenderArchitecture architecture) final override;
 		void InitVulkanSurface(VkInstance instance) final override;
+		
 		void DestroyVulkanSurface(VkInstance instance) final override;
 		void Destroy() final override;
+
+		void SetEventCallback(const std::function<void(Event&)>& eventCallbackFunc) final override;
 		void WaitEventsIfMinimized() final override;
+
+		inline static bool s_WasMinimized = false;
 	};
 }

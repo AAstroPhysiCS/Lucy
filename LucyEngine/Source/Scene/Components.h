@@ -1,17 +1,14 @@
 #pragma once
 
-#include "glm/glm.hpp"
-#include "glm/gtx/quaternion.hpp"
-
-#include "Utils/UUID.h"
+#include "Utilities/UUID.h"
 #include "Renderer/Mesh.h"
-#include "Renderer/Material/Material.h"
+#include "Renderer/Renderer.h"
 
 namespace Lucy {
 
 	struct TransformComponent {
 		TransformComponent() = default;
-		TransformComponent(glm::mat4& mat)
+		TransformComponent(const glm::mat4& mat)
 			: m_Mat(mat) {
 		}
 		TransformComponent(const TransformComponent& other) = default;
@@ -21,11 +18,9 @@ namespace Lucy {
 		inline glm::vec3& GetRotation() { return m_Rotation; }
 		inline glm::vec3& GetScale() { return m_Scale; }
 
-		void CalculateMatrix() {
-			m_Mat = glm::translate(glm::mat4(1.0f), m_Position)
-				* glm::toMat4(glm::quat(glm::radians(m_Rotation)))
-				* glm::scale(glm::mat4(1.0f), m_Scale);
-		}
+		void CalculateMatrix();
+
+		inline bool IsValid() const { return true; }
 	private:
 		glm::mat4 m_Mat = glm::mat4(1.0f);
 		glm::vec3 m_Position = glm::vec3();
@@ -35,36 +30,35 @@ namespace Lucy {
 
 	struct MeshComponent {
 		MeshComponent() = default;
-		MeshComponent(std::string& path)
+		MeshComponent(const std::string& path)
 			: m_Mesh(Mesh::Create(path)) {
 		}
 		MeshComponent(const MeshComponent& other) = default;
 
-		void SetMesh(Ref<Mesh>&& mesh) { 
-			m_Mesh = std::move(mesh);
-		}
+		void SetMesh(Ref<Mesh> mesh);
 
 		inline Ref<Mesh> GetMesh() { return m_Mesh; }
-		inline bool IsValid() { return m_Mesh.Get() != nullptr && m_Mesh->GetSubmeshes().size() != 0; }
+		inline bool IsValid() { return m_Mesh.get() != nullptr && !m_Mesh->GetSubmeshes().empty(); }
 	private:
 		Ref<Mesh> m_Mesh = nullptr;
 	};
 
 	struct UUIDComponent {
 		UUIDComponent() = default;
-		UUIDComponent(UUID& uuid)
+		UUIDComponent(const UUID& uuid)
 			: m_UUID(uuid) {
 		}
 		UUIDComponent(const UUIDComponent& other) = default;
 
-		inline std::string GetUUID() { return m_UUID.m_UUIDAsString; }
+		inline std::string GetUUID() const { return m_UUID.GetID(); }
+		inline bool IsValid() const { return m_UUID != "0"; }
 	private:
 		UUID m_UUID;
 	};
 
 	struct TagComponent {
 		TagComponent() = default;
-		TagComponent(std::string& tag)
+		TagComponent(const std::string& tag)
 			: m_Tag(tag) {
 		}
 		TagComponent(const char* tag)
@@ -72,9 +66,11 @@ namespace Lucy {
 		}
 		TagComponent(const TagComponent& other) = default;
 
-		inline const std::string& GetTag() { return m_Tag; }
+		inline const std::string& GetTag() const { return m_Tag; }
 		inline void SetTag(const std::string& tag) { m_Tag = tag; }
-		inline void SetTag(char* tag) { m_Tag = tag; }
+		inline void SetTag(const char* tag) { m_Tag = tag; }
+
+		inline bool IsValid() const { return m_Tag != "Empty Entity"; }
 	private:
 		std::string m_Tag = "Empty Entity";
 	};
@@ -88,43 +84,29 @@ namespace Lucy {
 
 		inline glm::vec3& GetDirection() { return m_Direction; }
 		inline glm::vec3& GetColor() { return m_Color; }
+
+		inline bool IsValid() const { return true; }
 	private:
-		glm::vec3 m_Direction = glm::vec3(0.0f);
+		glm::vec3 m_Direction = glm::vec3(1.0f);
 		[[maybe_unused]] float _padding0 = 0.0f;
-		glm::vec3 m_Color = glm::vec3(0.0f);
+		glm::vec3 m_Color = glm::vec3(1.0f);
 		[[maybe_unused]] float _padding1 = 0.0f;
 	};
 
 	struct HDRCubemapComponent {
 		HDRCubemapComponent() = default;
-		HDRCubemapComponent(Ref<Image> cubemapImage)
-			: m_CubemapImage(cubemapImage) {
-		}
 		HDRCubemapComponent(const HDRCubemapComponent& other) = default;
 
-		void LoadCubemap(const std::string& path) {
-			ImageCreateInfo hdrCreateInfo;
-			hdrCreateInfo.Format = ImageFormat::R32G32B32A32_SFLOAT;
-			hdrCreateInfo.ImageType = ImageType::TypeCubeColor;
-			hdrCreateInfo.Parameter.U = ImageAddressMode::REPEAT;
-			hdrCreateInfo.Parameter.V = ImageAddressMode::REPEAT;
-			hdrCreateInfo.Parameter.W = ImageAddressMode::REPEAT;
-			hdrCreateInfo.Parameter.Mag = ImageFilterMode::LINEAR;
-			hdrCreateInfo.Parameter.Min = ImageFilterMode::LINEAR;
-			hdrCreateInfo.Flags = VK_IMAGE_USAGE_STORAGE_BIT;
-			hdrCreateInfo.GenerateSampler = true;
-			hdrCreateInfo.GenerateMipmap = false; //does not support it yet
-
-			if (m_CubemapImage)
-				m_CubemapImage->Destroy();
-			m_CubemapImage = Image::CreateCube(path, hdrCreateInfo);
-		}
+		void LoadCubemap(const std::filesystem::path& path);
 		
 		bool IsPrimary = false;
 
-		inline bool IsValid() { return m_CubemapImage.Get() != nullptr && m_CubemapImage->GetWidth() > 0 && m_CubemapImage->GetHeight() > 0; }
-		inline const Ref<Image>& GetCubemapImage() { return m_CubemapImage; }
+		inline bool IsValid() const { return Renderer::IsValidRenderResource(m_CubemapImageHandle); /* && m_CubemapImage->GetWidth() > 0 && m_CubemapImage->GetHeight() > 0*/ }
+		inline Ref<Image> GetIrradianceImage() const { return Renderer::AccessResource<Image>(m_IrradianceImageHandle); }
+		inline Ref<Image> GetCubemapImage() const { return Renderer::AccessResource<Image>(m_CubemapImageHandle); }
+		inline void Destroy() { Renderer::EnqueueResourceDestroy(m_CubemapImageHandle); }
 	private:
-		Ref<Image> m_CubemapImage = nullptr;
+		RenderResourceHandle m_CubemapImageHandle = InvalidRenderResourceHandle;
+		RenderResourceHandle m_IrradianceImageHandle = InvalidRenderResourceHandle;
 	};
 }

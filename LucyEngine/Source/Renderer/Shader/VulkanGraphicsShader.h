@@ -2,20 +2,20 @@
 
 #include "GraphicsShader.h"
 
-#include "../Context/VulkanContextDevice.h"
-
 namespace Lucy {
+
+	class VulkanRenderDevice;
 
 	class VulkanGraphicsShader final : public GraphicsShader {
 	public:
-		VulkanGraphicsShader(const std::string& path, const std::string& name);
+		VulkanGraphicsShader(const std::string& name, const std::filesystem::path& path, Ref<RenderDevice> device);
 		virtual ~VulkanGraphicsShader() = default;
 
-		void Destroy() final override;
+		void RTDestroyResource(const Ref<RenderDevice>& device) final override;
 
 		inline VkPipelineShaderStageCreateInfo* GetShaderStageInfos() { return m_ShaderStageInfos; }
 	private:
-		void LoadInternal(const std::vector<uint32_t>& dataVertex, const std::vector<uint32_t>& dataFragment) override;
+		void LoadInternal(const Ref<RenderDevice>& device, const std::vector<uint32_t>& dataVertex, const std::vector<uint32_t>& dataFragment) final override;
 
 		VkPipelineShaderStageCreateInfo m_ShaderStageInfos[2] = { {}, {} };
 

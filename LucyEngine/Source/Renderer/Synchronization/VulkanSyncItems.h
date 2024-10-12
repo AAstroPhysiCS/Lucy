@@ -16,7 +16,7 @@ namespace Lucy {
 
 		inline const VkSemaphore& GetSemaphore() const { return m_Handle; }
 	private:
-		VkSemaphore m_Handle;
+		VkSemaphore m_Handle = VK_NULL_HANDLE;
 	};
 
 	class Fence final {
@@ -28,11 +28,11 @@ namespace Lucy {
 
 		inline const VkFence& GetFence() const { return m_Handle; }
 	private:
-		VkFence m_Handle;
+		VkFence m_Handle = VK_NULL_HANDLE;
 	};
 
 	struct ImageMemoryBarrierCreateInfo {
-		VkImage ImageHandle;
+		VkImage ImageHandle = VK_NULL_HANDLE;
 
 		//abstracted this, since we need this when we do mipmapping
 		VkImageSubresourceRange SubResourceRange;
@@ -41,7 +41,7 @@ namespace Lucy {
 		VkImageLayout NewLayout;
 	};
 
-	void DefineMasksByLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags& srcAccessMask, VkAccessFlags& destAccessMask,
+	extern void DefineMasksByLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkAccessFlags& srcAccessMask, VkAccessFlags& destAccessMask,
 							 VkPipelineStageFlags& sourceStage, VkPipelineStageFlags& destStage);
 
 	//for image layout transitions

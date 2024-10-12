@@ -1,24 +1,18 @@
 #include "lypch.h"
 #include "VulkanAllocator.h"
 
-#include "Renderer/Context/VulkanContextDevice.h"
-
 #define VMA_IMPLEMENTATION
 
 namespace Lucy {
 	
-	VulkanAllocator& VulkanAllocator::Get() {
-		static VulkanAllocator s_Instance;
-		return s_Instance;
-	}
-
-	void VulkanAllocator::Init(VkInstance instance) {
-		VulkanContextDevice& device = VulkanContextDevice::Get();
+	void VulkanAllocator::Init(VkInstance instance, VkDevice logicalDevice, VkPhysicalDevice physicalDevice, uint32_t apiVersion) {
+		m_LogicalDevice = logicalDevice;
+		m_PhysicalDevice = physicalDevice;
 
 		VmaAllocatorCreateInfo createInfo{};
-		createInfo.vulkanApiVersion = VK_API_VERSION_1_3;
-		createInfo.physicalDevice = device.GetPhysicalDevice();
-		createInfo.device = device.GetLogicalDevice();
+		createInfo.vulkanApiVersion = apiVersion;
+		createInfo.physicalDevice = m_PhysicalDevice;
+		createInfo.device = m_LogicalDevice;
 		createInfo.instance = instance;
 
 		LUCY_VK_ASSERT(vmaCreateAllocator(&createInfo, &m_Allocator));
@@ -46,29 +40,25 @@ namespace Lucy {
 
 	void VulkanAllocator::CreateVulkanBuffer(uint32_t size, VkBufferUsageFlags usage, VkSharingMode sharingMode,
 											   uint32_t memProperties, VkBuffer& bufferHandle, VkDeviceMemory& memory) {
-		VkDevice device = VulkanContextDevice::Get().GetLogicalDevice();
-
 		VkBufferCreateInfo bufferInfo = VulkanAPI::BufferCreateInfo(size, usage, sharingMode);
-		LUCY_VK_ASSERT(vkCreateBuffer(device, &bufferInfo, nullptr, &bufferHandle));
+		LUCY_VK_ASSERT(vkCreateBuffer(m_LogicalDevice, &bufferInfo, nullptr, &bufferHandle));
 
 		VkMemoryRequirements memoryRequirements{};
-		vkGetBufferMemoryRequirements(device, bufferHandle, &memoryRequirements);
+		vkGetBufferMemoryRequirements(m_LogicalDevice, bufferHandle, &memoryRequirements);
 
 		VkMemoryAllocateInfo memoryAllocInfo{};
 		memoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		memoryAllocInfo.allocationSize = memoryRequirements.size;
 		memoryAllocInfo.memoryTypeIndex = FindMemoryType(memoryRequirements.memoryTypeBits, memProperties);
 
-		LUCY_VK_ASSERT(vkAllocateMemory(device, &memoryAllocInfo, nullptr, &memory));
+		LUCY_VK_ASSERT(vkAllocateMemory(m_LogicalDevice, &memoryAllocInfo, nullptr, &memory));
 
-		vkBindBufferMemory(device, bufferHandle, memory, 0);
+		vkBindBufferMemory(m_LogicalDevice, bufferHandle, memory, 0);
 	}
 
 	uint32_t VulkanAllocator::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags propertyFlags) {
-		VkPhysicalDevice physicalDevice = VulkanContextDevice::Get().GetPhysicalDevice();
-
 		VkPhysicalDeviceMemoryProperties memProperties;
-		vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+		vkGetPhysicalDeviceMemoryProperties(m_PhysicalDevice, &memProperties);
 
 		for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
 			bool suitableMemoryType = typeFilter & (1 << i);

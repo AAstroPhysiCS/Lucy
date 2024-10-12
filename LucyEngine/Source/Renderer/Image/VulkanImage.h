@@ -23,69 +23,72 @@ namespace Lucy {
 
 	class VulkanImageView {
 	public:
-		VulkanImageView(const ImageViewCreateInfo& createInfo);
+		VulkanImageView(const ImageViewCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device);
 		~VulkanImageView() = default;
 
 		inline VkImageView GetVulkanHandle() const { return m_ImageView; }
 		inline VkSampler GetSampler() const { return m_Sampler; }
 
-		void Recreate(const ImageViewCreateInfo& createInfo);
-		void Destroy();
+		void RTRecreate(const ImageViewCreateInfo& createInfo);
+		void RTDestroyResource();	
 	private:
 		VulkanImageView() = default; //so that we can initialize it as member
 
-		void CreateView();
-		void CreateSampler();
+		void RTCreateView();
+		void RTCreateSampler();
 
 		VkImageView m_ImageView = VK_NULL_HANDLE;
 		VkSampler m_Sampler = VK_NULL_HANDLE;
 		ImageViewCreateInfo m_CreateInfo;
 
+		Ref<VulkanRenderDevice> m_VulkanDevice = nullptr;
+
 		friend class VulkanImage;
+		friend class VulkanImage2D;
 		friend class VulkanImageCube; //for irradiance (can't really reinstantiate the class again, since that would invoke it endlessly)
 	};
 
 	class VulkanImage : public Image {
 	public:
 		//Loads an asset
-		VulkanImage(const std::string& path, ImageCreateInfo& createInfo);
+		VulkanImage(const std::filesystem::path& path, const ImageCreateInfo& createInfo);
 		//Creates an empty image
-		VulkanImage(ImageCreateInfo& createInfo);
+		VulkanImage(const ImageCreateInfo& createInfo);
 		virtual ~VulkanImage() = default;
 
 		inline VkImageLayout GetCurrentLayout() const { return m_CurrentLayout; }
 		inline VkImage GetVulkanHandle() const { return m_Image; }
 		inline const VulkanImageView& GetImageView() const { return m_ImageView; }
 
-		void SetLayout(VkImageLayout newLayout);
-		void SetLayout(VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount);
+		void SetLayout(VkCommandBuffer commandBuffer, VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount);
+		void CopyImageToImage(VkCommandBuffer commandBuffer, const Ref<VulkanImage>& destImage, const std::vector<VkImageCopy>& imageCopyRegions);
 
-		void CopyImageToImage(const Ref<VulkanImage>& imageToCopy, const std::vector<VkImageCopy>& imageCopyRegions);
-		void CopyImageToImage(const VulkanImage* imageToCopy, const std::vector<VkImageCopy>& imageCopyRegions);
-
-		void CopyImageToBuffer(const VkBuffer& bufferToCopy, uint32_t layerCount = 1);
-		void CopyBufferToImage(const VkBuffer& bufferToCopy, uint32_t layerCount = 1);
-
-		void CopyImageToBuffer(const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& imageCopyRegions);
-		void CopyBufferToImage(const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& bufferCopyRegions);
+		void SetLayoutImmediate(VkImageLayout newLayout);
+		void CopyImageToBufferImmediate(const VkBuffer& bufferToCopy, uint32_t layerCount = 1);
 	protected:
-		void CopyImageToImage(VkImage image, VkImageLayout layout, const std::vector<VkImageCopy>& regions);
+		void SetLayoutImmediate(VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount);
 
-		void CopyImageToBuffer(VkImage image, const VkBuffer& bufferToCopy, uint32_t layerCount = 1);
-		void CopyBufferToImage(VkImage image, const VkBuffer& bufferToCopy, uint32_t layerCount = 1);
+		void CopyImageToImageImmediate(const Ref<VulkanImage>& destImage, const std::vector<VkImageCopy>& imageCopyRegions);
+		void CopyImageToImageImmediate(const VulkanImage* destImage, const std::vector<VkImageCopy>& imageCopyRegions);
+		void CopyImageToImageImmediate(VkImage image, VkImageLayout layout, const std::vector<VkImageCopy>& regions);
 
-		void CopyImageToBuffer(VkImage image, const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& imageCopyRegions);
-		void CopyBufferToImage(VkImage image, const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& bufferCopyRegions);
+		void CopyImageToBufferImmediate(const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& imageCopyRegions);
+		void CopyImageToBufferImmediate(VkImage image, const VkBuffer& bufferToCopy, uint32_t layerCount = 1);
+		void CopyImageToBufferImmediate(VkImage image, const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& imageCopyRegions);
 
-		void CreateVulkanImageViewHandle();
-		void CreateVulkanImageViewHandle(VulkanImageView& imageView, VkImage image);
+		void CopyBufferToImageImmediate(const VkBuffer& bufferToCopy, uint32_t layerCount = 1);
+		void CopyBufferToImageImmediate(const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& bufferCopyRegions);
+		void CopyBufferToImageImmediate(VkImage image, const VkBuffer& bufferToCopy, uint32_t layerCount = 1);
+		void CopyBufferToImageImmediate(VkImage image, const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& bufferCopyRegions);
 
-		void GenerateMipmaps();
-		void GenerateMipmaps(VkImage image);
+		void GenerateMipmapsImmediate();
 
-		void TransitionImageLayout(VkImage image, VkImageLayout newLayout, uint32_t baseMipLevel = 0, uint32_t baseArrayLayer = 0, uint32_t levelCount = 1, uint32_t layerCount = 1);
-		void TransitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel = 0, uint32_t baseArrayLayer = 0, uint32_t levelCount = 1, uint32_t layerCount = 1);
+		void TransitionImageLayoutImmediate(VkImage image, VkImageLayout newLayout, uint32_t baseMipLevel = 0, uint32_t baseArrayLayer = 0, uint32_t levelCount = 1, uint32_t layerCount = 1);
+		void TransitionImageLayoutImmediate(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel = 0, uint32_t baseArrayLayer = 0, uint32_t levelCount = 1, uint32_t layerCount = 1);
 		void TransitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel = 0, uint32_t baseArrayLayer = 0, uint32_t levelCount = 1, uint32_t layerCount = 1);
+
+		void RTCreateVulkanImageViewHandle(const Ref<VulkanRenderDevice>& device);
+		void RTCreateVulkanImageViewHandle(const Ref<VulkanRenderDevice>& device, VulkanImageView& imageView, VkImage image);
 
 		VkImage m_Image = VK_NULL_HANDLE;
 		VmaAllocation m_ImageVma = VK_NULL_HANDLE;

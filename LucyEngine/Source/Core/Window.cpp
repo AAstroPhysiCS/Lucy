@@ -9,8 +9,6 @@
 
 namespace Lucy {
 
-	std::function<void(Event*)> Window::s_EventFunc;
-
 	Ref<Window> Window::Create(const WindowCreateInfo& createInfo) {
 #ifdef  LUCY_WINDOWS
 		Ref<Window> window = Memory::CreateRef<WinWindow>();
@@ -65,8 +63,45 @@ namespace Lucy {
 		vkDestroySurfaceKHR(instance, m_Surface, nullptr);
 	}
 
-	void Window::SetEventCallback(std::function<void(Event*)> func) {
-		s_EventFunc = func;
+	void WinWindow::SetEventCallback(const std::function<void(Event&)>& eventCallbackFunc) {
+		s_EventFunc = eventCallbackFunc;
+
+		glfwSetWindowSizeCallback(m_Window, [](GLFWwindow* window, int32_t width, int32_t height) {
+			if (width == 0 || height == 0)
+				return;
+			auto evt = WindowResizeEvent{ window, width, height };
+			s_EventFunc(evt);
+		});
+
+		glfwSetWindowCloseCallback(m_Window, [](GLFWwindow* window) {
+			auto evt = WindowCloseEvent{ window };
+			s_EventFunc(evt);
+		});
+
+		glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int32_t key, int32_t scanCode, int32_t action, int32_t mods) {
+			auto evt = KeyEvent{ window, key, scanCode, action, mods };
+			s_EventFunc(evt);
+		});
+
+		glfwSetCharCallback(m_Window, [](GLFWwindow* window, uint32_t codePoint) {
+			auto evt = CharCallbackEvent{ window, codePoint };
+			s_EventFunc(evt);
+		});
+
+		glfwSetScrollCallback(m_Window, [](GLFWwindow* window, double xOffset, double yOffset) {
+			auto evt = ScrollEvent{ window, xOffset, yOffset };
+			s_EventFunc(evt);
+		});
+
+		glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xPos, double yPos) {
+			auto evt = CursorPosEvent{ window, xPos, yPos };
+			s_EventFunc(evt);
+		});
+
+		glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int32_t button, int32_t action, int32_t mods) {
+			auto evt = MouseEvent{ window, button, action, mods };
+			s_EventFunc(evt);
+		});
 	}
 
 	void Window::SetTitle(const char* title) {
@@ -89,42 +124,6 @@ namespace Lucy {
 
 	void WinWindow::PollEvents() {
 		glfwPollEvents();
-
-		//Adding events
-		glfwSetWindowSizeCallback(m_Window, [](GLFWwindow* window, int32_t width, int32_t height) {
-			WindowResizeEvent evt{ window, width, height };
-			s_EventFunc(&evt);
-		});
-
-		glfwSetWindowCloseCallback(m_Window, [](GLFWwindow* window) {
-			WindowCloseEvent evt{ window };
-			s_EventFunc(&evt);
-		});
-
-		glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int32_t key, int32_t scanCode, int32_t action, int32_t mods) {
-			KeyEvent evt{ window, key, scanCode, action, mods };
-			s_EventFunc(&evt);
-		});
-
-		glfwSetCharCallback(m_Window, [](GLFWwindow* window, uint32_t codePoint) {
-			CharCallbackEvent evt{ window, codePoint };
-			s_EventFunc(&evt);
-		});
-
-		glfwSetScrollCallback(m_Window, [](GLFWwindow* window, double xOffset, double yOffset) {
-			ScrollEvent evt{ window, xOffset, yOffset };
-			s_EventFunc(&evt);
-		});
-
-		glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xPos, double yPos) {
-			CursorPosEvent evt{ window, xPos, yPos };
-			s_EventFunc(&evt);
-		});
-
-		glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int32_t button, int32_t action, int32_t mods) {
-			MouseEvent evt{ window, button, action, mods };
-			s_EventFunc(&evt);
-		});
 	}
 
 	void WinWindow::Destroy() {

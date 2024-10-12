@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Core/Base.h"
+#include "Core/Base.h"
 #include "Components.h"
 #include "Scene.h"
 
@@ -11,36 +11,42 @@ namespace Lucy {
 	class Entity {
 	public:
 		Entity() = default;
-		Entity(Scene* scene, const entt::entity& entity);
+		Entity(Scene* scene, entt::entity entity)
+			: m_Entity(entity), m_Scene(scene) {
+		}
 		~Entity() = default;
 
-		bool operator==(Entity& other) {
+		inline bool operator==(Entity& other) {
 			return GetComponent<UUIDComponent>().GetUUID() == other.GetComponent<UUIDComponent>().GetUUID();
 		}
 
-		template <typename ... T>
-		bool HasComponent() {
+		template <typename ... TComponent>
+		inline bool HasComponent() {
 			LUCY_ASSERT(IsValid());
-			return m_Scene->m_Registry.all_of<T...>(m_Entity);
+			return m_Scene->m_Registry.all_of<TComponent...>(m_Entity);
 		}
 
-		bool IsValid() {
+		inline bool IsValid() {
 			if ((ENTT_ID_TYPE)m_Entity == std::numeric_limits<ENTT_ID_TYPE>::max()) return false;
 			return m_Scene->m_Registry.valid(m_Entity);
 		}
 
-		template <typename T, typename ... Args>
-		T& AddComponent(Args&& ... args) {
-			if (HasComponent<T>()) return m_Scene->m_Registry.replace<T>(m_Entity, std::forward<Args>(args)...);
-			return m_Scene->m_Registry.emplace<T>(m_Entity, std::forward<Args>(args)...);
+		template <typename ... Args>
+		void function(Args&& ... args) {
+
 		}
 
-		template <typename T>
-		T& GetComponent() {
+		template <typename TComponent, typename ... Args>
+		inline TComponent& AddComponent(Args&& ... args) {
+			if (HasComponent<TComponent>()) return m_Scene->m_Registry.replace<TComponent>(m_Entity, std::forward<Args>(args)...);
+			return m_Scene->m_Registry.emplace<TComponent>(m_Entity, std::forward<Args>(args)...);
+		}
+
+		template <typename TComponent>
+		inline TComponent& GetComponent() {
 			LUCY_ASSERT(IsValid());
-			return m_Scene->m_Registry.get<T>(m_Entity);
+			return m_Scene->m_Registry.get<TComponent>(m_Entity);
 		}
-
 	private:
 		entt::entity m_Entity = (entt::entity) std::numeric_limits<uint32_t>::max();
 		Scene* m_Scene = nullptr;

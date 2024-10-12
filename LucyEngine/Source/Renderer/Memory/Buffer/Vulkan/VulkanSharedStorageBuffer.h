@@ -9,16 +9,19 @@ namespace Lucy {
 
 	class VulkanSharedStorageBuffer : public SharedStorageBuffer {
 	public:
-		VulkanSharedStorageBuffer(const SharedStorageBufferCreateInfo& createInfo);
+		VulkanSharedStorageBuffer(const SharedStorageBufferCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device);
 		virtual ~VulkanSharedStorageBuffer() = default;
 
-		void LoadToGPU() final override;
-		void DestroyHandle() final override;
+		void RTLoadToDevice() final override;
 
 		inline VkBuffer GetVulkanBufferHandle(const uint32_t index) { return m_Buffers[index]; }
 	private:
+		void RTDestroyResource() final override;
+
 		std::vector<VkBuffer> m_Buffers;
 		std::vector<VmaAllocation> m_BufferVma;
+
+		Ref<VulkanRenderDevice> m_VulkanDevice = nullptr;
 	};
 }
 

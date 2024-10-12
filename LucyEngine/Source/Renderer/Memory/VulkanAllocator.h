@@ -31,11 +31,6 @@ namespace Lucy {
 
 	class VulkanAllocator {
 	public:
-		static VulkanAllocator& Get();
-		
-		void Init(VkInstance instance);
-		void Destroy();
-		
 		void CreateVulkanBufferVma(VulkanBufferUsage lucyBufferUsage, VkDeviceSize size,
 								   VkBufferUsageFlags usage, VkBuffer& bufferHandle, VmaAllocation& vmaAllocation);
 
@@ -55,6 +50,13 @@ namespace Lucy {
 		void CreateVulkanBuffer(uint32_t size, VkBufferUsageFlags usage, VkSharingMode sharingMode, uint32_t memProperties, VkBuffer& bufferHandle, VkDeviceMemory& memory);
 		uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags propertyFlags);
 
+		void Init(VkInstance instance, VkDevice logicalDevice, VkPhysicalDevice physicalDevice, uint32_t apiVersion);
+		void Destroy();
+
 		VmaAllocator m_Allocator;
+		VkDevice m_LogicalDevice = VK_NULL_HANDLE;
+		VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
+
+		friend class VulkanRenderDevice;
 	};
 }

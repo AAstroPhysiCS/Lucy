@@ -3,20 +3,20 @@
 #include "Core/Base.h"
 #include "Buffer.h"
 
-#include "vulkan/vulkan.h"
+#include "Renderer/Device/RenderResource.h"
 
 namespace Lucy {
 
-	class IndexBuffer : public Buffer<uint32_t> {
+	class IndexBuffer : public IntBuffer, public RenderResource {
 	public:
-		static Ref<IndexBuffer> Create(size_t size);
-
 		virtual ~IndexBuffer() = default;
 
-		virtual void LoadToGPU() = 0;
-		virtual void DestroyHandle() = 0;
+		virtual void RTLoadToDevice() = 0;
 	protected:
-		IndexBuffer(size_t size);
+		IndexBuffer(size_t size) 
+			: RenderResource("Index Buffer") {
+			Resize(size); //internal std::vector allocation
+		}
 	};
 }
 

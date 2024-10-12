@@ -1,8 +1,7 @@
 #pragma once
 
 #include "RenderContext.h"
-
-#include "vulkan/vulkan.h"
+#include "VulkanSwapChain.h"
 
 namespace Lucy {
 
@@ -14,20 +13,33 @@ namespace Lucy {
 		static void ImGui_DebugCallback(VkResult result);
 	};
 
+	class VulkanExternalFuncLinkage final {
+		VulkanExternalFuncLinkage() = delete;
+		~VulkanExternalFuncLinkage() = delete;
+
+		inline static PFN_vkCmdBeginDebugUtilsLabelEXT vkCmdBeginDebugUtilsLabelEXT{ nullptr };
+		inline static PFN_vkCmdEndDebugUtilsLabelEXT vkCmdEndDebugUtilsLabelEXT{ nullptr };
+		inline static PFN_vkCmdInsertDebugUtilsLabelEXT vkCmdInsertDebugUtilsLabelEXT{ nullptr }; //not used for now
+
+		friend class VulkanRenderDevice;
+		friend class VulkanContext;
+	};
+
 	class VulkanContext : public RenderContext {
 	public:
-		VulkanContext(Ref<Window>& window);
+		VulkanContext(const Ref<Window>& window);
 		virtual ~VulkanContext() = default;
 
-		inline VkInstance GetVulkanInstance() { return m_Instance; };
+		inline VulkanSwapChain& GetSwapChain() { return m_SwapChain; }
+		inline VkInstance GetVulkanInstance() const { return m_Instance; };
 	private:
 		void Destroy() final override;
 		void PrintInfo() final override;
 		void Init() final override;
 		
-		void CheckValidationSupport();
-		void SetupMessageCallback();
-		void DestroyMessageCallback();
+		void CheckValidationSupport() const;
+		void SetupDebugLabels();
+		void DestroyDebugCallbacks();
 
 		std::vector<const char*> m_ValidationLayers = {
 			"VK_LAYER_KHRONOS_validation"
@@ -37,8 +49,9 @@ namespace Lucy {
 			VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 		};
 
+		VulkanSwapChain m_SwapChain;
+
 		VkInstance m_Instance;
 		VkDebugUtilsMessengerEXT m_DebugMessenger{};
-		VkDebugReportCallbackEXT m_DebugReport{};
 	};
 }

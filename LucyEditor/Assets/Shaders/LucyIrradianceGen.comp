@@ -1,7 +1,7 @@
 //type compute
 #version 450
 
-layout (local_size_x = 32, local_size_y = 32) in;
+layout (local_size_x = 8, local_size_y = 8) in;
 
 layout (set = 0, binding = 0, rgba32f) readonly uniform imageCube u_EnvironmentMap;
 layout (set = 0, binding = 1, rgba16f) writeonly uniform imageCube u_EnvironmentIrradianceMap;
@@ -10,37 +10,32 @@ layout (set = 0, binding = 1, rgba16f) writeonly uniform imageCube u_Environment
 #define TWO_PI 6.283185307179586476925286766559f
 #define HALF_PI 1.57079632679489661923132169163975f
 
-/*
-    Helper function
-*/
+vec3 threadIDToSamplingPos(uvec3 threadID, const vec2 cubemapSize) {
+    vec2 uv = vec2(threadID.xy) / vec2(cubemapSize);
+    uv = uv * 2.0 - 1.0; // -1 ... 1
+    //https://www.khronos.org/opengl/wiki/File:CubeMapAxes.png
+    switch(threadID.z) {
+        case 0:
+            return vec3(1.0, -uv.y, -uv.x);
+        case 1:
+            return vec3(-1.0, -uv.y, uv.x);
+        case 2:
+            return vec3(uv.x, 1.0, uv.y);
+        case 3:
+            return vec3(uv.x, -1.0, -uv.y);
+        case 4:
+            return vec3(uv.x, -uv.y, 1.0f);
+        case 5:
+            return vec3(-uv.x, -uv.y, -1.0f);
+    }
+    return vec3(0.0, 0.0, 0.0);
+}
+
 float max3(vec3 v) {
     return max(max(v.x, v.y), v.z);
 }
 
-/*
-    Thanks to Alin for these conversion functions
-*/
-vec3 cubeCoordToWorld(ivec3 cubeCoord, vec2 cubemapSize) {
-    vec2 texCoord = vec2(cubeCoord.xy) / cubemapSize;
-    texCoord = texCoord  * 2.0 - 1.0;
-    switch(cubeCoord.z) {
-        case 0: 
-            return vec3(1.0, -texCoord.yx); // +x
-        case 1: 
-            return vec3(-1.0, -texCoord.y, texCoord.x); //-x
-        case 2: 
-            return vec3(texCoord.x, 1.0, texCoord.y); //+y
-        case 3: 
-            return vec3(texCoord.x, -1.0, -texCoord.y); //-y
-        case 4: 
-            return vec3(texCoord.x, -texCoord.y, 1.0); //+z
-        case 5: 
-            return vec3(-texCoord.xy, -1.0); //-z
-    }
-    return vec3(0.0);
-}
-
-ivec3 texCoordToCube(vec3 texCoord, vec2 cubemapSize) {
+ivec3 texCoordToCube(vec3 texCoord, const vec2 cubemapSize) {
     vec3 abst = abs(texCoord);
     texCoord /= max3(abst);
 
@@ -69,24 +64,122 @@ ivec3 texCoordToCube(vec3 texCoord, vec2 cubemapSize) {
     return ivec3(ivec2(uvCoord), int(cubeFace));
 }
 
+//https://en.wikipedia.org/wiki/Cube_mapping
+ivec3 sampleVectorToCubeUV(vec3 sampleVector, const vec2 cubemapSize) {
+    
+    float absX = abs(sampleVector.x);
+    float absY = abs(sampleVector.y);
+    float absZ = abs(sampleVector.z);
+
+    int cubeFace;
+
+    bool isXPositive = sampleVector.x > 0;
+    bool isYPositive = sampleVector.y > 0;
+    bool isZPositive = sampleVector.z > 0;
+
+    vec2 uv = vec2(0.0, 0.0);
+    float maxAxis;
+
+    // POSITIVE X
+    if (isXPositive && absX >= absY && absX >= absZ) {
+      maxAxis = absX;
+      uv.x = -sampleVector.z;
+      uv.y = sampleVector.y;
+      cubeFace = 0;
+
+      // Convert range from -1 to 1 to 0 to 1
+      uv.x = 0.5 * (uv.x / maxAxis + 1.0);
+      uv.y = 0.5 * (uv.y / maxAxis + 1.0);
+      
+      return ivec3(ivec2(uv * cubemapSize), cubeFace);
+    }
+    // NEGATIVE X
+    else if (!isXPositive && absX >= absY && absX >= absZ) {
+      maxAxis = absX;
+      uv.x = sampleVector.z;
+      uv.y = sampleVector.y;
+      cubeFace = 1;
+      
+      // Convert range from -1 to 1 to 0 to 1
+      uv.x = 0.5 * (uv.x / maxAxis + 1.0);
+      uv.y = 0.5 * (uv.y / maxAxis + 1.0);
+      
+      return ivec3(ivec2(uv * cubemapSize), cubeFace);
+    }
+    // POSITIVE Y
+    else if (isYPositive && absY >= absX && absY >= absZ) {
+      maxAxis = absY;
+      uv.x = sampleVector.x;
+      uv.y = -sampleVector.z;
+      cubeFace = 2;
+      
+      // Convert range from -1 to 1 to 0 to 1
+      uv.x = 0.5 * (uv.x / maxAxis + 1.0);
+      uv.y = 0.5 * (uv.y / maxAxis + 1.0);
+      
+      return ivec3(ivec2(uv * cubemapSize), cubeFace);
+    }
+    // NEGATIVE Y
+    else if (!isYPositive && absY >= absX && absY >= absZ) {
+      maxAxis = absY;
+      uv.x = sampleVector.x;
+      uv.y = sampleVector.z;
+      cubeFace = 3;
+      
+      // Convert range from -1 to 1 to 0 to 1
+      uv.x = 0.5 * (uv.x / maxAxis + 1.0);
+      uv.y = 0.5 * (uv.y / maxAxis + 1.0);
+      
+      return ivec3(ivec2(uv * cubemapSize), cubeFace);
+    }
+    // POSITIVE Z
+    else if (isZPositive && absZ >= absX && absZ >= absY) {
+      maxAxis = absZ;
+      uv.x = sampleVector.x;
+      uv.y = sampleVector.y;
+      cubeFace = 4;
+      
+      // Convert range from -1 to 1 to 0 to 1
+      uv.x = 0.5 * (uv.x / maxAxis + 1.0);
+      uv.y = 0.5 * (uv.y / maxAxis + 1.0);
+      
+      return ivec3(ivec2(uv * cubemapSize), cubeFace);
+    }
+    // NEGATIVE Z
+    else if (!isZPositive && absZ >= absX && absZ >= absY) {
+      maxAxis = absZ;
+      uv.x = -sampleVector.x;
+      uv.y = sampleVector.y;
+      cubeFace = 5;
+      
+      // Convert range from -1 to 1 to 0 to 1
+      uv.x = 0.5 * (uv.x / maxAxis + 1.0);
+      uv.y = 0.5 * (uv.y / maxAxis + 1.0);
+      
+      return ivec3(ivec2(uv * cubemapSize), cubeFace);
+    }
+
+    return ivec3(0.0);
+}
+
 void main() {
-    //TODO: make this dynamic
-    const vec2 cubemapSize = vec2(1024, 1024);
+    const vec2 cubemapSize = vec2(imageSize(u_EnvironmentMap));
 
-    ivec3 cubeCoord = ivec3(gl_GlobalInvocationID);
-    vec3 worldPos = cubeCoordToWorld(cubeCoord, cubemapSize);
+    uvec3 threadID = gl_GlobalInvocationID;
+    
+    vec3 samplingPos = threadIDToSamplingPos(threadID, cubemapSize);
 
-	vec3 normalVector = normalize(worldPos);
+	vec3 normalVector = normalize(samplingPos);
 	vec3 upVector = vec3(0.0f, 1.0f, 0.0f);
 	vec3 rightVector = normalize(cross(upVector, normalVector));
 	upVector = cross(normalVector, rightVector);
 
 	vec3 irradianceColor = vec3(0.0f);
 
-	const float iterDeltaPhi = 0.025f;
+    const float iterDeltaPhi = 0.025f;
 	const float iterDeltaTheta = 0.025f;
 
-	for (float phi = 0.0f; phi < TWO_PI; phi += iterDeltaPhi) {
+    for (float phi = 0.0f; phi < TWO_PI; phi += iterDeltaPhi) {
         float sinPhi = sin(phi);
         float cosPhi = cos(phi);
 
@@ -102,9 +195,9 @@ void main() {
             irradianceColor += imageLoad(u_EnvironmentMap, sampleCoord).rgb * cosTheta * sinTheta;
 		}
 	}
-
-	float totalSampleCount = (TWO_PI / iterDeltaPhi) * (HALF_PI / iterDeltaTheta);
-
+    
+    float totalSampleCount = (TWO_PI / iterDeltaPhi) * (HALF_PI / iterDeltaTheta);
     irradianceColor *= PI * (1.0f / totalSampleCount);
-	imageStore(u_EnvironmentIrradianceMap, cubeCoord, vec4(irradianceColor, 1.0f));
+	
+    imageStore(u_EnvironmentIrradianceMap, ivec3(threadID), vec4(irradianceColor, 1.0f));
 }

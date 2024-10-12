@@ -18,55 +18,55 @@ namespace Lucy {
 
 	class FileSystem {
 	private:
-		FileSystem() = default;
-		~FileSystem();
-
-		friend class Application;
+		FileSystem() = delete;
+		~FileSystem() = delete;
 	public:
-		void Init();
+		static void Init();
+		static void Destroy();
 
-		std::string GetParentPath(std::string& path);
-		std::string GetParentPath(const std::string& path);
-		std::string GetFileName(std::string& file);
-		std::string GetFileName(const std::string& file);
+		static std::filesystem::path GetParentPath(const std::string& path);
+		static std::filesystem::path GetFileExtension(const std::string& file);
 
-		std::string GetFileExtension(std::string& file);
-		std::string GetFileExtension(const std::string& file);
+		static std::string GetFileName(const std::string& file);
+		static std::string GetFileName(const std::filesystem::path& file);
 
-		template <typename T>
-		inline void WriteToFile(const std::string& path, const std::vector<T>& data, OpenMode mode) {
+		static bool FileExists(const std::string& file);
+		static bool FileExists(const std::filesystem::path& filePath);
+
+		template <typename TData>
+		static inline void WriteToFile(const std::filesystem::path& path, const std::vector<TData>& data, OpenMode mode) {
 			uint16_t flags = 0x02 | mode; //see std::ios::out
 
 			std::ofstream of(path, flags);
-			LUCY_ASSERT(of && of.is_open(), "Writing to {0} failed", path);
+			LUCY_ASSERT(of && of.is_open(), "Writing to {0} failed", path.generic_string());
 
-			of.write((const char*)data.data(), data.size() * sizeof(T));
+			of.write((const char*)data.data(), data.size() * sizeof(TData));
 			of.flush();
 			of.close();
 		}
 
-		void ReadFile(const char* path, std::string& data);
+		static void ReadFile(const std::filesystem::path& path, std::string& data);
 
-		template <typename T>
-		inline void ReadFile(const std::string& path, std::vector<T>& data, OpenMode mode) {
+		template <typename TData>
+		static inline void ReadFile(const std::filesystem::path&path, std::vector<TData>& data, OpenMode mode) {
 			uint16_t flags = 0x01 | mode; //see std::ios::in
 
 			std::ifstream f(path, flags);
-			LUCY_ASSERT(f && f.is_open(), "Error opening the file! Or it can not be found {0}", path);
+			LUCY_ASSERT(f && f.is_open(), "Error opening the file! Or it can not be found {0}", path.generic_string());
 
 			f.seekg(0, std::ios::end);
 			std::size_t size = f.tellg();
 			f.seekg(0, std::ios::beg);
 
-			data.resize(size / sizeof(T));
+			data.resize(size / sizeof(TData));
 			f.read((char*)data.data(), size);
 			f.close();
 		}
 
-		template <typename T>
-		inline void ReadFileLine(const std::string& path, std::vector<T>& data) {
+		template <typename TData>
+		static inline void ReadFileLine(const std::filesystem::path& path, std::vector<TData>& data) {
 			std::ifstream f(path);
-			LUCY_ASSERT(f && f.is_open(), "Error opening the file! Or it can not be found {0}", path);
+			LUCY_ASSERT(f && f.is_open(), "Error opening the file! Or it can not be found {0}", path.generic_string());
 
 			f.seekg(0, std::ios::end);
 			std::size_t size = f.tellg();
@@ -74,13 +74,10 @@ namespace Lucy {
 
 			data.reserve(size);
 
-			T line;
+			TData line;
 			while (std::getline(f, line)) {
 				data.emplace_back(line);
 			}
 		}
-
-		bool FileExists(std::string& file);
-		bool FileExists(const std::string& file);
 	};
 }

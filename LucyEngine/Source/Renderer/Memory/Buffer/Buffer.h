@@ -89,4 +89,8 @@ namespace Lucy {
 	protected:
 		std::vector<T> m_Data;
 	};
+
+	using ByteBuffer = Buffer<uint8_t>;
+	using IntBuffer = Buffer<uint32_t>;
+	using FloatBuffer = Buffer<float>;
 }

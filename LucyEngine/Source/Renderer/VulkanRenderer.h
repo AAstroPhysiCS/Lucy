@@ -1,22 +1,22 @@
 #pragma once
 
-#include "RendererBase.h"
+#include "RendererBackend.h"
 #include "Synchronization/VulkanSyncItems.h"
 
 #include "Memory/VulkanAllocator.h"
 
+#include "ImGuiPass.h"
+
 namespace Lucy {
 
-	class VulkanRenderer : public RendererBase {
+	class VulkanTransientCommandPool;
+
+	class VulkanRenderer : public RendererBackend {
 	public:
-		VulkanRenderer(RenderArchitecture arch, Ref<Window>& window);
+		VulkanRenderer(RendererConfiguration config, const Ref<Window>& window);
 		virtual ~VulkanRenderer() = default;
 
-		void BeginScene(Ref<Scene>& scene) final override;
-		void RenderScene() final override;
-		RenderContextResultCodes EndScene() final override;
-
-		void WaitForDevice() final override;
+		RenderContextResultCodes WaitAndPresent() final override;
 
 		void ExecuteBarrier(void* commandBufferHandle, Ref<Image> image) final override;
 		void ExecuteBarrier(void* commandBufferHandle, void* imageHandle, uint32_t imageLayout, uint32_t layerCount, uint32_t mipCount) final override;
@@ -28,15 +28,28 @@ namespace Lucy {
 
 		void OnWindowResize() final override;
 		void OnViewportResize() final override;
-		Entity OnMousePicking(Ref<Scene>& scene, const Ref<GraphicsPipeline>& idPipeline) final override;
+		glm::vec3 OnMousePicking(const EntityPickedEvent& e, const Ref<Image>& currentFrameBufferImage) final override;
+
+		void InitializeImGui() final override;
+		void RenderImGui() final override;
 	private:
+		void Init() final override;
+
+		void BeginFrame() final override;
+		void RenderFrame() final override;
+		void EndFrame() final override;
+
 		std::vector<Semaphore> m_WaitSemaphores;
 		std::vector<Semaphore> m_SignalSemaphores;
 		std::vector<Fence> m_InFlightFences;
 
-		VkResult m_LastSwapChainResult = VK_NOT_READY;
+		VkResult m_LastSwapChainResult = VK_SUCCESS;
 
-		inline static VkBuffer m_IDBuffer = VK_NULL_HANDLE;
-		inline static VmaAllocation m_IDBufferVma = VK_NULL_HANDLE;
+		Ref<VulkanTransientCommandPool> m_TransientCommandPool = nullptr;
+
+		ImGuiVulkanImpl m_ImGuiPass;
+
+		static inline VkBuffer s_IDBuffer = VK_NULL_HANDLE;
+		static inline VmaAllocation s_IDBufferVma = VK_NULL_HANDLE;
 	};
 }

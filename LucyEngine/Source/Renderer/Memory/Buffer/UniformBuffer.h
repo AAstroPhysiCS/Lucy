@@ -3,6 +3,8 @@
 #include "Buffer.h"
 #include "Renderer/Descriptors/DescriptorType.h"
 
+#include "Renderer/Device/RenderResource.h"
+
 namespace Lucy {
 
 	struct ShaderMemberVariable;
@@ -16,14 +18,11 @@ namespace Lucy {
 		std::vector<ShaderMemberVariable> ShaderMemberVariables;
 	};
 
-	class UniformBuffer : public Buffer<uint8_t> {
+	class UniformBuffer : public ByteBuffer, public RenderResource {
 	public:
 		virtual ~UniformBuffer() = default;
 
-		static Ref<UniformBuffer> Create(UniformBufferCreateInfo& createInfo);
-
-		virtual void LoadToGPU() = 0;
-		virtual void DestroyHandle() = 0;
+		virtual void RTLoadToDevice() = 0;
 
 		inline const std::string& GetName() const { return m_CreateInfo.Name; }
 		inline uint32_t GetBinding() const { return m_CreateInfo.Binding; }
@@ -31,7 +30,10 @@ namespace Lucy {
 		inline uint32_t GetArraySize() const { return m_CreateInfo.ArraySize; }
 		inline DescriptorType GetDescriptorType() const { return m_CreateInfo.Type; }
 	protected:
-		UniformBuffer(UniformBufferCreateInfo& createInfo);
+		UniformBuffer(const UniformBufferCreateInfo& createInfo)
+			: RenderResource("Uniform Buffer"), m_CreateInfo(createInfo) {
+			Reserve(createInfo.BufferSize);
+		}
 
 		UniformBufferCreateInfo m_CreateInfo;
 	};

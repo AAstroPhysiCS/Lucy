@@ -3,6 +3,8 @@
 #include "Buffer.h"
 #include "Renderer/Descriptors/DescriptorType.h"
 
+#include "Renderer/Device/RenderResource.h"
+
 namespace Lucy {
 
 	struct ShaderMemberVariable;
@@ -16,21 +18,21 @@ namespace Lucy {
 		std::vector<ShaderMemberVariable> ShaderMemberVariables;
 	};
 
-	class SharedStorageBuffer : public Buffer<uint8_t> {
+	class SharedStorageBuffer : public ByteBuffer, public RenderResource {
 	public:
-		SharedStorageBuffer(const SharedStorageBufferCreateInfo& createInfo);
+		SharedStorageBuffer(const SharedStorageBufferCreateInfo& createInfo) 
+			: RenderResource("SharedStorageBuffer"), m_CreateInfo(createInfo) {
+			Reserve(m_CreateInfo.BufferSize);
+		}
 		virtual ~SharedStorageBuffer() = default;
 
-		virtual void LoadToGPU() = 0;
-		virtual void DestroyHandle() = 0;
+		virtual void RTLoadToDevice() = 0;
 		
 		inline const std::string& GetName() const { return m_CreateInfo.Name; }
 		inline uint32_t GetBinding() const { return m_CreateInfo.Binding; }
 		inline uint32_t GetSize() const { return m_CreateInfo.BufferSize; }
 		inline uint32_t GetArraySize() const { return m_CreateInfo.ArraySize; }
 		inline DescriptorType GetDescriptorType() const { return m_CreateInfo.Type; }
-
-		static Ref<SharedStorageBuffer> Create(const SharedStorageBufferCreateInfo& createInfo);
 	protected:
 		SharedStorageBufferCreateInfo m_CreateInfo;
 	};

@@ -232,7 +232,7 @@ namespace Lucy::VulkanAPI {
 	}
 
 	VkSwapchainCreateInfoKHR VulkanAPI::SwapchainCreateInfo(const void* swapChainInstance, uint32_t imageCount, VkSwapchainKHR oldSwapChain, VkSurfaceTransformFlagBitsKHR preTransform) {
-		VulkanSwapChain* swapChain = (VulkanSwapChain*)swapChainInstance;
+		const auto* swapChain = (const VulkanSwapChain*)swapChainInstance;
 
 		VkSwapchainCreateInfoKHR createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -292,7 +292,7 @@ namespace Lucy::VulkanAPI {
 	VkCommandBufferBeginInfo VulkanAPI::CommandBufferBeginInfo(uint32_t flags) {
 		VkCommandBufferBeginInfo beginInfo{};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		beginInfo.flags = (VkCommandBufferUsageFlags)flags;
+		beginInfo.flags = flags;
 
 		return beginInfo;
 	}
@@ -675,12 +675,12 @@ namespace Lucy::VulkanAPI {
 		return subpassDependency;
 	}
 
-	VkQueryPoolCreateInfo VulkanAPI::QueryPoolCreateInfo(uint32_t queryCount, VkQueryType queryType) {
+	VkQueryPoolCreateInfo VulkanAPI::QueryPoolCreateInfo(uint32_t queryCount, VkQueryType queryType, VkQueryPipelineStatisticFlags pipelineStatistics) {
 		VkQueryPoolCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
 		createInfo.queryCount = queryCount;
 		createInfo.queryType = queryType;
-
+		createInfo.pipelineStatistics = pipelineStatistics; //pipelineStatistics is ignored if queryType is not VK_QUERY_TYPE_PIPELINE_STATISTICS.
 		return createInfo;
 	}
 

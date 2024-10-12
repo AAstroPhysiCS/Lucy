@@ -1,9 +1,14 @@
 #include "lypch.h"
 #include "Mesh.h"
 
-#include "Shader/ShaderLibrary.h"
+#include "assimp/Importer.hpp"
+#include "assimp/postprocess.h"
 
-#include "Core/Application.h"
+#include "Memory/Buffer/VertexBuffer.h"
+#include "Memory/Buffer/IndexBuffer.h"
+
+#include "Renderer.h"
+
 #include "Core/Timer.h"
 
 namespace Lucy {
@@ -48,22 +53,35 @@ namespace Lucy {
 	}
 
 	Mesh::Mesh(const std::vector<float>& vertices, const std::vector<uint32_t>& indices) {
-		m_VertexBuffer = VertexBuffer::Create(vertices.size());
-		m_IndexBuffer = IndexBuffer::Create(indices.size());
-
-		m_VertexBuffer->SetData(vertices);
-		m_IndexBuffer->SetData(indices);
-
-		m_VertexBuffer->LoadToGPU();
-		m_IndexBuffer->LoadToGPU();
+		Renderer::EnqueueToRenderThread([=](Ref<RenderDevice>& device) {
+			Load(device, vertices, indices);
+		});
 	}
 
 	Mesh::Mesh(const std::string& path)
 		: m_Path(path) {
+		Load();
+	}
+
+	void Mesh::Load(Ref<RenderDevice>& device, const std::vector<float>& vertices, const std::vector<uint32_t>& indices) {
+		m_VertexBufferHandle = device->CreateVertexBuffer(vertices.size());
+		m_IndexBufferHandle = device->CreateIndexBuffer(indices.size());
+
+		const auto& vertexBuffer = Renderer::AccessResource<VertexBuffer>(m_VertexBufferHandle);
+		const auto& indexBuffer = Renderer::AccessResource<IndexBuffer>(m_IndexBufferHandle);
+
+		vertexBuffer->SetData(vertices);
+		indexBuffer->SetData(indices);
+
+		vertexBuffer->RTLoadToDevice();
+		indexBuffer->RTLoadToDevice();
+	}
+
+	void Mesh::Load() {
 		ScopedTimer scopedTimer("Mesh import");
 
 		Assimp::Importer importer;
-		const aiScene* scene = importer.ReadFile(path, ASSIMP_FLAGS);
+		const aiScene* scene = importer.ReadFile(m_Path, ASSIMP_FLAGS);
 
 		if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
 			LUCY_CRITICAL("Mesh could not be imported!");
@@ -76,82 +94,88 @@ namespace Lucy {
 		LoadData(scene);
 		TraverseHierarchy(scene->mRootNode, glm::mat4(1.0f));
 
+		IncreaseMeshCount(this);
+
 		//Getting the size of the buffer
 		for (const Submesh& submesh : m_Submeshes) {
 			m_MetadataInfo.TotalIndicesSize += submesh.IndexCount;
 			m_MetadataInfo.TotalVerticesSize += submesh.VertexCount;
 		}
 
-		m_IndexBuffer = IndexBuffer::Create(m_MetadataInfo.TotalIndicesSize);
-		m_VertexBuffer = VertexBuffer::Create(m_MetadataInfo.TotalVerticesSize * 17);
-		IncreaseMeshCount(this);
+		Renderer::EnqueueToRenderThread([&](const Ref<RenderDevice>& device) {
+			m_VertexBufferHandle = device->CreateVertexBuffer(m_MetadataInfo.TotalVerticesSize * 17);
+			m_IndexBufferHandle = device->CreateIndexBuffer(m_MetadataInfo.TotalIndicesSize);
 
-		size_t from = 0;
-		for (uint32_t i = 0; i < m_Submeshes.size(); i++) {
-			const Submesh& submesh = m_Submeshes[i];
-			auto& faces = submesh.Faces;
-			m_IndexBuffer->SetData(faces, from);
-			from += faces.size();
-		}
+			const auto& vertexBuffer = Renderer::AccessResource<VertexBuffer>(m_VertexBufferHandle);
+			const auto& indexBuffer = Renderer::AccessResource<IndexBuffer>(m_IndexBufferHandle);
 
-		from = 0;
-
-		for (Submesh& submesh : m_Submeshes) {
-			auto& submeshVertices = submesh.Vertices;
-			auto& submeshTextureCoords = submesh.TextureCoords;
-			auto& submeshNormals = submesh.Normals;
-			auto& submeshTangents = submesh.Tangents;
-			auto& submeshBiTangents = submesh.BiTangents;
-
-			for (uint32_t i = 0; i < submesh.VertexCount; i++) {
-
-				glm::vec2 textureCoords = { 0.0f, 0.0f };
-				if (submeshTextureCoords.size() > 0)
-					textureCoords = { submeshTextureCoords[i].x, submeshTextureCoords[i].y };
-
-				glm::vec3 normals = { 0.0f, 0.0f, 0.0f };
-				if (submeshNormals.size() > 0)
-					normals = { submeshNormals[i].x, submeshNormals[i].y, submeshNormals[i].z };
-
-				glm::vec3 tangents = { 0.0f, 0.0f, 0.0f };
-				if (submeshTangents.size() > 0)
-					tangents = { submeshTangents[i].x, submeshTangents[i].y, submeshTangents[i].z };
-
-				glm::vec3 biTangents = { 0.0f, 0.0f, 0.0f };
-				if (submeshBiTangents.size() > 0)
-					biTangents = { submeshBiTangents[i].x, submeshBiTangents[i].y, submeshBiTangents[i].z };
-
-				std::vector<float> vertex = {
-					submeshVertices[i].x,
-					submeshVertices[i].y,
-					submeshVertices[i].z,
-
-					textureCoords.x,
-					textureCoords.y,
-
-					(float)MESH_ID_COUNT_X,
-					(float)MESH_ID_COUNT_Y,
-					(float)MESH_ID_COUNT_Z,
-
-					normals.x,
-					normals.y,
-					normals.z,
-
-					tangents.x,
-					tangents.y,
-					tangents.z,
-
-					biTangents.x,
-					biTangents.y,
-					biTangents.z
-				};
-				m_VertexBuffer->SetData(vertex, from);
-				from += vertex.size();
+			size_t from = 0;
+			for (uint32_t i = 0; i < m_Submeshes.size(); i++) {
+				const Submesh& submesh = m_Submeshes[i];
+				auto& faces = submesh.Faces;
+				indexBuffer->SetData(faces, from);
+				from += faces.size();
 			}
-		}
 
-		m_VertexBuffer->LoadToGPU();
-		m_IndexBuffer->LoadToGPU();
+			from = 0;
+
+			for (Submesh& submesh : m_Submeshes) {
+				auto& submeshVertices = submesh.Vertices;
+				auto& submeshTextureCoords = submesh.TextureCoords;
+				auto& submeshNormals = submesh.Normals;
+				auto& submeshTangents = submesh.Tangents;
+				auto& submeshBiTangents = submesh.BiTangents;
+
+				for (uint32_t i = 0; i < submesh.VertexCount; i++) {
+
+					glm::vec2 textureCoords = { 0.0f, 0.0f };
+					if (!submeshTextureCoords.empty())
+						textureCoords = { submeshTextureCoords[i].x, submeshTextureCoords[i].y };
+
+					glm::vec3 normals = { 0.0f, 0.0f, 0.0f };
+					if (!submeshNormals.empty())
+						normals = { submeshNormals[i].x, submeshNormals[i].y, submeshNormals[i].z };
+
+					glm::vec3 tangents = { 0.0f, 0.0f, 0.0f };
+					if (!submeshTangents.empty())
+						tangents = { submeshTangents[i].x, submeshTangents[i].y, submeshTangents[i].z };
+
+					glm::vec3 biTangents = { 0.0f, 0.0f, 0.0f };
+					if (!submeshBiTangents.empty())
+						biTangents = { submeshBiTangents[i].x, submeshBiTangents[i].y, submeshBiTangents[i].z };
+
+					std::vector<float> vertex = {
+						submeshVertices[i].x,
+						submeshVertices[i].y,
+						submeshVertices[i].z,
+
+						(float)MESH_ID_COUNT_X,
+						(float)MESH_ID_COUNT_Y,
+						(float)MESH_ID_COUNT_Z,
+
+						textureCoords.x,
+						textureCoords.y,
+
+						normals.x,
+						normals.y,
+						normals.z,
+
+						tangents.x,
+						tangents.y,
+						tangents.z,
+
+						biTangents.x,
+						biTangents.y,
+						biTangents.z
+					};
+					vertexBuffer->SetData(vertex, from);
+					from += vertex.size();
+				}
+			}
+
+			vertexBuffer->RTLoadToDevice();
+			indexBuffer->RTLoadToDevice();
+		});
 	}
 
 	void Mesh::LoadData(const aiScene* scene) {
@@ -163,8 +187,6 @@ namespace Lucy {
 		uint32_t baseVertexCount = 0;
 		uint32_t baseIndexCount = 0;
 
-		m_Materials.resize(scene->mNumMaterials);
-
 		for (uint32_t i = 0; i < meshCount; i++) {
 			aiMesh* mesh = meshes[i];
 			Submesh submesh;
@@ -172,12 +194,9 @@ namespace Lucy {
 			submesh.BaseIndexCount = baseIndexCount;
 			submesh.VertexCount = mesh->mNumVertices;
 			submesh.IndexCount = mesh->mNumFaces * 3;
-			submesh.MaterialIndex = mesh->mMaterialIndex;
 
 			baseVertexCount += submesh.VertexCount;
 			baseIndexCount += submesh.IndexCount;
-
-			LoadMaterials(scene, mesh);
 
 			uint32_t sizeVertices = submesh.VertexCount;
 
@@ -223,12 +242,10 @@ namespace Lucy {
 
 			//TODO: Animation
 
+			submesh.MaterialID = Renderer::GetMaterialManager()->CreateMaterialByPath(MaterialType::PBR, 
+				scene->mMaterials[mesh->mMaterialIndex], m_Path);
 			m_Submeshes.push_back(submesh);
 		}
-	}
-
-	void Mesh::LoadMaterials(const aiScene* scene, const aiMesh* mesh) {
-		m_Materials[mesh->mMaterialIndex] = Material::Create(ShaderLibrary::Get().GetShader("LucyPBR"), scene->mMaterials[mesh->mMaterialIndex], mesh->mName.data, m_Path);
 	}
 
 	void Mesh::TraverseHierarchy(const aiNode* node, const glm::mat4& parentTransform) {
@@ -247,10 +264,9 @@ namespace Lucy {
 	}
 
 	void Mesh::Destroy() {
-		for (Ref<Material> material : m_Materials)
-			material->Destroy();
-
-		m_VertexBuffer->DestroyHandle();
-		m_IndexBuffer->DestroyHandle();
+		for (Submesh& submesh : m_Submeshes)
+			Renderer::GetMaterialManager()->RTDestroyMaterial(submesh.MaterialID);
+		Renderer::EnqueueResourceDestroy(m_VertexBufferHandle);
+		Renderer::EnqueueResourceDestroy(m_IndexBufferHandle);
 	}
 }

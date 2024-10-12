@@ -2,11 +2,11 @@
 #version 450
 
 layout (location = 0) in vec3 a_Pos;
-layout (location = 1) in vec2 a_TextureCoords;
-layout (location = 2) in vec4 a_ID;
+layout (location = 1) in vec3 a_ID;
+layout (location = 2) in vec2 a_TextureCoords;
 layout (location = 3) in vec3 a_Normals;
 layout (location = 4) in vec3 a_Tangents;
-layout (location = 5) in vec3 a_BiTangents;
+layout (location = 5) in vec3 a_Bitangents;
 
 layout (location = 0) out vec3 a_PosOut;
 layout (location = 1) out vec2 a_TextureCoordsOut;
@@ -15,7 +15,7 @@ layout (location = 2) out vec3 a_NormalsOut;
 layout (set = 0, binding = 0) uniform LucyCamera {
 	mat4 u_ViewMatrix;
 	mat4 u_ProjMatrix;
-	vec3 u_CamPos;
+	vec4 u_CamPos;
 };
 
 layout (push_constant) uniform LocalPushConstant {
@@ -34,6 +34,7 @@ void main() {
 //type fragment
 #version 450
 #extension GL_EXT_nonuniform_qualifier : require
+#extension GL_EXT_debug_printf : enable
 
 layout (location = 0) in vec3 a_Pos;
 layout (location = 1) in vec2 a_TextureCoords;
@@ -48,6 +49,16 @@ const uint AO_MASK = 0x00000004u;
 #define PI 3.1415926535897932384626433832795f
 
 #define NULL_TEXTURE_SLOT -1
+#define NUM_CASCADES 4
+
+#define DEBUG_CASCADED_SHADOW_MAPS 1
+
+const vec4 DEBUG_CASCADE_COLORS[NUM_CASCADES] = {
+	vec4 (1.0f, 0.0f, 0.5f, 1.0f),
+	vec4 (0.0f, 1.0f, 0.5f, 1.0f),
+	vec4 (0.0f, 0.5f, 1.0f, 1.0f),
+	vec4 (1.0f, 0.5f, 0.0f, 1.0f),
+};
 
 struct MaterialAttributes {
 	float AlbedoSlot;
@@ -67,6 +78,8 @@ struct DirectionalLight {
 	float _padding0;
 	vec3 Color;
 	float _padding1;
+	mat4 DirLightShadowMatrices[NUM_CASCADES];
+	float DirLightShadowFarPlanes[NUM_CASCADES];
 };
 
 layout (push_constant) uniform LocalPushConstant {
@@ -75,7 +88,7 @@ layout (push_constant) uniform LocalPushConstant {
 };
 
 layout (set = 0, binding = 0) uniform LucyCamera {
-	layout (offset = 128) vec3 u_CamPos;
+	layout (offset = 128) vec4 u_CamPos;
 };
 
 layout (set = 0, binding = 1) uniform LucyLightningValues {
@@ -87,6 +100,7 @@ layout (set = 0, binding = 2) readonly buffer LucyMaterialAttributes {
 };
 
 layout (set = 0, binding = 3) uniform samplerCube u_IrradianceMap;
+layout (set = 0, binding = 4) uniform sampler2DArray u_ShadowMap;
 
 layout (set = 1, binding = 0) uniform sampler2D u_Textures[];
 
@@ -193,7 +207,47 @@ vec3 BRDF(vec3 L, vec3 V, vec3 N, vec3 F0, float metallic, float roughness, vec3
 	return color;
 }
 
+float isInShadow(vec3 modelWorldPos) {
+	for (uint i = 0; i < NUM_CASCADES; i++) {
+		uint cascadeIndex = i + 1;
+		
+		mat4 lightMatrix = u_DirectionalLight.DirLightShadowMatrices[cascadeIndex];
+
+		vec4 posInShadowSpace = lightMatrix * vec4(modelWorldPos, 1.0f);
+		posInShadowSpace = vec4(posInShadowSpace.xyz / posInShadowSpace.w, 1.0f);
+		posInShadowSpace = posInShadowSpace * 0.5f + 0.5f;
+		
+		float farPlane = u_DirectionalLight.DirLightShadowFarPlanes[cascadeIndex];
+
+		if (farPlane > abs(posInShadowSpace.z)) {
+			float dirLightDepthValue = texture(u_ShadowMap, vec3(posInShadowSpace.xy, cascadeIndex)).r;
+			return posInShadowSpace.z < dirLightDepthValue ? 0.0f : 1.0f;
+		}
+	}
+}
+
+void DebugCascadedShadowMaps(inout vec4 colorOut, vec3 modelWorldPos) {
+	for (uint i = 0; i < NUM_CASCADES - 1; i++) {
+		uint cascadeIndex = i + 1;
+
+		mat4 lightMatrix = u_DirectionalLight.DirLightShadowMatrices[cascadeIndex];
+		float farPlane = u_DirectionalLight.DirLightShadowFarPlanes[cascadeIndex];
+
+		vec4 posInShadowSpace = lightMatrix * vec4(modelWorldPos, 1.0f);
+		posInShadowSpace = vec4(posInShadowSpace.xyz / posInShadowSpace.w, 1.0f);
+		posInShadowSpace = posInShadowSpace * 0.5f + 0.5f;
+
+		debugPrintfEXT("%d, %f", cascadeIndex, farPlane);
+
+		if (farPlane > abs(posInShadowSpace.z)) {
+			colorOut *= DEBUG_CASCADE_COLORS[cascadeIndex];
+			return;
+		}
+	}
+}
+
 void main() {
+
 	float alpha = 1.0f;
 	MaterialAttributes attributes = b_MaterialAttributes[int(u_MaterialID)];
 
@@ -219,7 +273,7 @@ void main() {
 
 	vec3 modelWorldPos = vec3(mat3(u_ModelMatrix) * a_Pos);
 	vec3 modelNormalNormalized = normalize(mat3(u_ModelMatrix) * a_Normals);
-	vec3 viewDirCamera = normalize(u_CamPos - modelWorldPos);
+	vec3 viewDirCamera = normalize(u_CamPos.xyz - modelWorldPos);
 
 	vec3 F0 = vec3(0.04f);
 	F0 = mix(F0, albedoColor.xyz, metallicValue);
@@ -230,12 +284,14 @@ void main() {
 	
 	vec3 ambientContribution = texture(u_IrradianceMap, normalize(a_Normals)).rgb;
 
-	vec3 outputColor = albedoColor.rgb * ambientContribution;
-	outputColor += specularContribution;
+	vec3 outputColor = (ambientContribution + (1.0 - isInShadow(modelWorldPos)) * albedoColor.rgb + specularContribution) * albedoColor.rgb;
 
 	// Gamma correction
 	const float gamma = 2.2f;
 	outputColor = pow(outputColor, vec3(1.0f / gamma));
 
 	a_Color = vec4(outputColor, alpha);
+	
+	if (DEBUG_CASCADED_SHADOW_MAPS == 1)
+		DebugCascadedShadowMaps(a_Color, modelWorldPos);
 }

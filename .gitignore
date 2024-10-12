@@ -5,6 +5,8 @@ bin-obj/
 *.vert
 *.cached_vulkan.comp
 
+*.hint
+
 .vs/
 **.sln
 **.vcxproj

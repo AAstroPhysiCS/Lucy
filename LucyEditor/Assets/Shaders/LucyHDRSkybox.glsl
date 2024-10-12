@@ -8,7 +8,7 @@ layout (location = 0) out vec3 a_PosOut;
 layout (set = 0, binding = 0) uniform LucyCamera {
 	mat4 u_ViewMatrix;
 	mat4 u_ProjMatrix;
-	vec3 u_CamPos;
+	vec4 u_CamPos;
 };
 
 void main() {
@@ -20,8 +20,9 @@ void main() {
 //type fragment
 #version 450
 
-layout (location = 0) out vec4 a_Color;
 layout (location = 0) in vec3 a_Pos;
+
+layout (location = 0) out vec4 a_Color;
 
 layout (set = 0, binding = 1) uniform samplerCube u_EnvironmentMap;
 

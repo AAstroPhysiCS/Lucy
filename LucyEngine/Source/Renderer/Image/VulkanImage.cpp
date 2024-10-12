@@ -3,133 +3,137 @@
 
 #include "Renderer/Renderer.h"
 #include "Renderer/Synchronization/VulkanSyncItems.h"
-#include "Renderer/Context/VulkanContextDevice.h"
+#include "Renderer/Device/VulkanRenderDevice.h"
 
 #include "../ThirdParty/ImGui/imgui_impl_vulkan.h"
 
 namespace Lucy {
 
-	VulkanImage::VulkanImage(const std::string& path, ImageCreateInfo& createInfo)
+	VulkanImage::VulkanImage(const std::filesystem::path& path, const ImageCreateInfo& createInfo)
 		: Image(path, createInfo) {
 	}
 
-	VulkanImage::VulkanImage(ImageCreateInfo& createInfo)
+	VulkanImage::VulkanImage(const ImageCreateInfo& createInfo)
 		: Image(createInfo) {
 	}
 
-	void VulkanImage::CopyImageToImage(VkImage image, VkImageLayout layout, const std::vector<VkImageCopy>& regions) {
+	void VulkanImage::CopyImageToImageImmediate(const Ref<VulkanImage>& destImage, const std::vector<VkImageCopy>& imageCopyRegions) {
+		CopyImageToImageImmediate(destImage->GetVulkanHandle(), destImage->GetCurrentLayout(), imageCopyRegions);
+	}
+
+	void VulkanImage::CopyImageToImageImmediate(const VulkanImage* destImage, const std::vector<VkImageCopy>& imageCopyRegions) {
+		CopyImageToImageImmediate(destImage->GetVulkanHandle(), destImage->GetCurrentLayout(), imageCopyRegions);
+	}
+
+	void VulkanImage::CopyImageToImage(VkCommandBuffer commandBuffer, const Ref<VulkanImage>& destImage, const std::vector<VkImageCopy>& imageCopyRegions) {
+		vkCmdCopyImage(commandBuffer, m_Image, m_CurrentLayout, destImage->GetVulkanHandle(), destImage->GetCurrentLayout(), (uint32_t)imageCopyRegions.size(), imageCopyRegions.data());
+	}
+
+	void VulkanImage::CopyImageToImageImmediate(VkImage image, VkImageLayout layout, const std::vector<VkImageCopy>& regions) {
 		Renderer::SubmitImmediateCommand([=](VkCommandBuffer commandBuffer) {
 			vkCmdCopyImage(commandBuffer, m_Image, m_CurrentLayout, image, layout, (uint32_t)regions.size(), regions.data());
 		});
 	}
 
-	void VulkanImage::CopyImageToBuffer(VkImage image, const VkBuffer& bufferToCopy, uint32_t layerCount) {
+	void VulkanImage::CopyImageToBufferImmediate(VkImage image, const VkBuffer& bufferToCopy, uint32_t layerCount) {
 		VkImageSubresourceLayers imageSubresource = VulkanAPI::ImageSubresourceLayers(VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, layerCount);
-		VkBufferImageCopy region = VulkanAPI::BufferImageCopy(0, 0, 0, imageSubresource, { 0, 0, 0 }, { (uint32_t)m_Width, (uint32_t)m_Height, 1 });
+		VkBufferImageCopy region = VulkanAPI::BufferImageCopy(0, 0, 0, imageSubresource, { 0, 0, 0 }, { (uint32_t)m_CreateInfo.Width, (uint32_t)m_CreateInfo.Height, 1 });
 
-		CopyImageToBuffer(image, bufferToCopy, { region });
+		CopyImageToBufferImmediate(image, bufferToCopy, { region });
 	}
 
-	void VulkanImage::CopyBufferToImage(VkImage image, const VkBuffer& bufferToCopy, uint32_t layerCount) {
-		VkImageSubresourceLayers imageSubresource = VulkanAPI::ImageSubresourceLayers(VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, layerCount);
-		VkBufferImageCopy region = VulkanAPI::BufferImageCopy(0, 0, 0, imageSubresource, { 0, 0, 0 }, { (uint32_t)m_Width, (uint32_t)m_Height, 1 });
-
-		CopyBufferToImage(image, bufferToCopy, { region });
+	void VulkanImage::CopyImageToBufferImmediate(const VkBuffer& bufferToCopy, uint32_t layerCount) {
+		CopyImageToBufferImmediate(m_Image, bufferToCopy, layerCount);
 	}
 
-	void VulkanImage::CopyImageToBuffer(const VkBuffer& bufferToCopy, uint32_t layerCount) {
-		CopyImageToBuffer(m_Image, bufferToCopy, layerCount);
+	void VulkanImage::CopyImageToBufferImmediate(const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& imageCopyRegions) {
+		CopyImageToBufferImmediate(m_Image, bufferToCopy, imageCopyRegions);
 	}
 
-	void VulkanImage::CopyBufferToImage(const VkBuffer& bufferToCopy, uint32_t layerCount) {
-		CopyBufferToImage(m_Image, bufferToCopy, layerCount);
-	}
-
-	void VulkanImage::CopyImageToBuffer(const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& imageCopyRegions) {
-		CopyImageToBuffer(m_Image, bufferToCopy, imageCopyRegions);
-	}
-
-	void VulkanImage::CopyBufferToImage(const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& bufferCopyRegions) {
-		CopyBufferToImage(m_Image, bufferToCopy, bufferCopyRegions);
-	}
-
-	void VulkanImage::CopyImageToBuffer(VkImage image, const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& imageCopyRegions) {
+	void VulkanImage::CopyImageToBufferImmediate(VkImage image, const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& imageCopyRegions) {
 		Renderer::SubmitImmediateCommand([=](VkCommandBuffer commandBuffer) {
 			vkCmdCopyImageToBuffer(commandBuffer, image, m_CurrentLayout, bufferToCopy, (uint32_t)imageCopyRegions.size(), imageCopyRegions.data());
 		});
 	}
 
-	void VulkanImage::CopyBufferToImage(VkImage image, const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& bufferCopyRegions) {
+	void VulkanImage::CopyBufferToImageImmediate(VkImage image, const VkBuffer& bufferToCopy, uint32_t layerCount) {
+		VkImageSubresourceLayers imageSubresource = VulkanAPI::ImageSubresourceLayers(VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, layerCount);
+		VkBufferImageCopy region = VulkanAPI::BufferImageCopy(0, 0, 0, imageSubresource, { 0, 0, 0 }, { (uint32_t)m_CreateInfo.Width, (uint32_t)m_CreateInfo.Height, 1 });
+
+		CopyBufferToImageImmediate(image, bufferToCopy, { region });
+	}
+
+	void VulkanImage::CopyBufferToImageImmediate(const VkBuffer& bufferToCopy, uint32_t layerCount) {
+		CopyBufferToImageImmediate(m_Image, bufferToCopy, layerCount);
+	}
+
+	void VulkanImage::CopyBufferToImageImmediate(const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& bufferCopyRegions) {
+		CopyBufferToImageImmediate(m_Image, bufferToCopy, bufferCopyRegions);
+	}
+
+	void VulkanImage::CopyBufferToImageImmediate(VkImage image, const VkBuffer& bufferToCopy, const std::vector<VkBufferImageCopy>& bufferCopyRegions) {
 		Renderer::SubmitImmediateCommand([=](VkCommandBuffer commandBuffer) {
 			vkCmdCopyBufferToImage(commandBuffer, bufferToCopy, image, m_CurrentLayout, (uint32_t)bufferCopyRegions.size(), bufferCopyRegions.data());
 		});
 	}
 
-	void VulkanImage::GenerateMipmaps() {
-		GenerateMipmaps(m_Image);
-	}
-
-	void VulkanImage::GenerateMipmaps(VkImage image) {
+	void VulkanImage::GenerateMipmapsImmediate() {
 		//Transfering first mip of all the layers (if it has any) to "src optimal" for read during vkCmdBlit
-		TransitionImageLayout(image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0, 1, m_LayerCount);
+		TransitionImageLayoutImmediate(m_Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0, 1, m_CreateInfo.Layers);
 
 		//Generate the mip chain
 		//Copying down the whole mip chain doing a blit from mip-1 to mip
 		Renderer::SubmitImmediateCommand([&](VkCommandBuffer commandBuffer) {
 			for (uint32_t mip = 1; mip < m_MaxMipLevel; mip++) {
-				for (uint32_t face = 0; face < m_LayerCount; face++) {
-					VkImageSubresourceLayers srcSubresource = VulkanAPI::ImageSubresourceLayers(m_CreateInfo.ImageType == ImageType::Type2DDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT, mip - 1, face, 1);
+				for (uint32_t face = 0; face < m_CreateInfo.Layers; face++) {
+					VkImageSubresourceLayers srcSubresource = VulkanAPI::ImageSubresourceLayers(m_CreateInfo.ImageType == ImageType::Type2DDepth || m_CreateInfo.ImageType == ImageType::Type2DArrayDepth
+						? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT, mip - 1, face, 1);
 					VkImageSubresourceLayers dstSubresource = VulkanAPI::ImageSubresourceLayers(srcSubresource.aspectMask, mip, face, 1);
 
 					VkOffset3D srcOffsets[2] = { {}, {} };
-					srcOffsets[1].x = (m_Width >> (mip - 1));
-					srcOffsets[1].y = (m_Height >> (mip - 1));
+					srcOffsets[1].x = (m_CreateInfo.Width >> (mip - 1));
+					srcOffsets[1].y = (m_CreateInfo.Height >> (mip - 1));
 					srcOffsets[1].z = 1;
 
 					VkOffset3D dstOffsets[2] = { {}, {} };
-					dstOffsets[1].x = (m_Width >> mip);
-					dstOffsets[1].y = (m_Height >> mip);
+					dstOffsets[1].x = (m_CreateInfo.Width >> mip);
+					dstOffsets[1].y = (m_CreateInfo.Height >> mip);
 					dstOffsets[1].z = 1;
 
 					VkImageBlit blit = VulkanAPI::ImageBlit(srcSubresource, srcOffsets, dstSubresource, dstOffsets);
 
 					// Prepare current mip level as image blit destination
-					TransitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mip, face, 1, 1);
+					TransitionImageLayout(commandBuffer, m_Image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mip, face, 1, 1);
 
 					// Blit from previous level
-					vkCmdBlitImage(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+					vkCmdBlitImage(commandBuffer, m_Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
 
 					// Prepare current mip level as image blit source for next level
-					TransitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, mip, face, 1, 1);
+					TransitionImageLayout(commandBuffer, m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, mip, face, 1, 1);
 				}
 			}
-
-		// After the loop, all mip layers are in TRANSFER_SRC layout, so transition all to SHADER_READ
-		TransitionImageLayout(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, m_MaxMipLevel, m_LayerCount);
+			// After the loop, all mip layers are in TRANSFER_SRC layout, so transition all to SHADER_READ
+			TransitionImageLayout(commandBuffer, m_Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, m_MaxMipLevel, m_CreateInfo.Layers);
 		});
 	}
 
-	void VulkanImage::SetLayout(VkImageLayout newLayout) {
-		TransitionImageLayout(m_Image, newLayout);
+	void VulkanImage::SetLayout(VkCommandBuffer commandBuffer, VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {
+		TransitionImageLayout(commandBuffer, m_Image, m_CurrentLayout, newLayout, baseMipLevel, baseArrayLayer, levelCount, layerCount);
 	}
 
-	void VulkanImage::SetLayout(VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {
-		TransitionImageLayout(m_Image, newLayout, baseMipLevel, baseArrayLayer, levelCount, layerCount);
+	void VulkanImage::SetLayoutImmediate(VkImageLayout newLayout) {
+		TransitionImageLayoutImmediate(m_Image, newLayout);
 	}
 
-	void VulkanImage::CopyImageToImage(const Ref<VulkanImage>& imageToCopy, const std::vector<VkImageCopy>& imageCopyRegions) {
-		CopyImageToImage(imageToCopy->GetVulkanHandle(), imageToCopy->GetCurrentLayout(), imageCopyRegions);
+	void VulkanImage::SetLayoutImmediate(VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {
+		TransitionImageLayoutImmediate(m_Image, newLayout, baseMipLevel, baseArrayLayer, levelCount, layerCount);
 	}
 
-	void VulkanImage::CopyImageToImage(const VulkanImage* imageToCopy, const std::vector<VkImageCopy>& imageCopyRegions) {
-		CopyImageToImage(imageToCopy->GetVulkanHandle(), imageToCopy->GetCurrentLayout(), imageCopyRegions);
+	void VulkanImage::TransitionImageLayoutImmediate(VkImage image, VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {
+		TransitionImageLayoutImmediate(image, m_CurrentLayout, newLayout, baseMipLevel, baseArrayLayer, levelCount, layerCount);
 	}
 
-	void VulkanImage::TransitionImageLayout(VkImage image, VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {
-		return TransitionImageLayout(image, m_CurrentLayout, newLayout, baseMipLevel, baseArrayLayer, levelCount, layerCount);
-	}
-
-	void VulkanImage::TransitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {
+	void VulkanImage::TransitionImageLayoutImmediate(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {
 		Renderer::SubmitImmediateCommand([&](VkCommandBuffer commandBuffer) {
 			TransitionImageLayout(commandBuffer, image, oldLayout, newLayout, baseMipLevel, baseArrayLayer, levelCount, layerCount);
 		});
@@ -153,12 +157,12 @@ namespace Lucy {
 		m_CurrentLayout = newLayout;
 	}
 
-	void VulkanImage::CreateVulkanImageViewHandle() {
-		CreateVulkanImageViewHandle(m_ImageView, m_Image);
+	void VulkanImage::RTCreateVulkanImageViewHandle(const Ref<VulkanRenderDevice>& vulkanDevice) {
+		RTCreateVulkanImageViewHandle(vulkanDevice, m_ImageView, m_Image);
 
 		if (m_CreateInfo.ImGuiUsage) {
 			if (!m_ImGuiID) {
-				Renderer::EnqueueToRenderThread([&]() {
+				Renderer::EnqueueToRenderThread([&]([[maybe_unused]] const Ref<RenderDevice>& device) {
 					m_ImGuiID = ImGui_ImplVulkan_AddTexture(m_ImageView.GetSampler(), m_ImageView.GetVulkanHandle(), m_CurrentLayout);
 				});
 			} else {
@@ -167,7 +171,7 @@ namespace Lucy {
 		}
 	}
 
-	void VulkanImage::CreateVulkanImageViewHandle(VulkanImageView& imageView, VkImage image) {
+	void VulkanImage::RTCreateVulkanImageViewHandle(const Ref<VulkanRenderDevice>& vulkanDevice, VulkanImageView& imageView, VkImage image) {
 		auto GetImageFilter = [](ImageFilterMode mode) {
 			switch (mode) {
 				case ImageFilterMode::LINEAR:
@@ -204,25 +208,26 @@ namespace Lucy {
 			.MinFilter = GetImageFilter(m_CreateInfo.Parameter.Min),
 			.ModeU = GetImageAddressMode(m_CreateInfo.Parameter.U),
 			.ModeV = GetImageAddressMode(m_CreateInfo.Parameter.V),
-			.ModeW = GetImageAddressMode(m_CreateInfo.Parameter.W)
+			.ModeW = GetImageAddressMode(m_CreateInfo.Parameter.W),
 		};
 
-		imageView = VulkanImageView(imageViewCreateInfo);
+		imageView = VulkanImageView(imageViewCreateInfo, vulkanDevice);
 	}
 
-	VulkanImageView::VulkanImageView(const ImageViewCreateInfo& createInfo)
-		: m_CreateInfo(createInfo) {
-		CreateView();
+	VulkanImageView::VulkanImageView(const ImageViewCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device)
+		: m_CreateInfo(createInfo), m_VulkanDevice(device) {
+		RTCreateView();
 		if (m_CreateInfo.GenerateSampler)
-			CreateSampler();
+			RTCreateSampler();
 	}
 
-	void VulkanImageView::CreateView() {
+	void VulkanImageView::RTCreateView() {
 		auto GetImageType = [](ImageType type) {
 			switch (type) {
 				case ImageType::Type2DDepth:
 				case ImageType::Type2DColor:
 					return VK_IMAGE_VIEW_TYPE_2D;
+				case ImageType::Type2DArrayDepth:
 				case ImageType::Type2DArrayColor:
 					return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
 				case ImageType::Type3DColor:
@@ -239,6 +244,7 @@ namespace Lucy {
 				case ImageType::Type2DDepth:
 				case ImageType::Type2DColor:
 					return 1u;
+				case ImageType::Type2DArrayDepth:
 				case ImageType::Type2DArrayColor:
 					return m_CreateInfo.Layers;
 				case ImageType::Type3DColor:
@@ -249,42 +255,44 @@ namespace Lucy {
 					return 1u;
 			}
 		};
-
-		const VulkanContextDevice& device = VulkanContextDevice::Get();
-
-		VkImageSubresourceRange subresourceRange = VulkanAPI::ImageSubresourceRange(m_CreateInfo.ImageType == ImageType::Type2DDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
+		
+		VkImageSubresourceRange subresourceRange = VulkanAPI::ImageSubresourceRange(m_CreateInfo.ImageType == ImageType::Type2DDepth || m_CreateInfo.ImageType == ImageType::Type2DArrayDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
 																					0, 0, m_CreateInfo.MipmapLevel, GetLayerCount(m_CreateInfo.ImageType));
 		VkComponentMapping components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
 			VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
 		VkImageViewCreateInfo createInfo = VulkanAPI::ImageViewCreateInfo(m_CreateInfo.Image, GetImageType(m_CreateInfo.ImageType), m_CreateInfo.Format, subresourceRange, components);
 
-		LUCY_VK_ASSERT(vkCreateImageView(device.GetLogicalDevice(), &createInfo, nullptr, &m_ImageView));
+		LUCY_VK_ASSERT(vkCreateImageView(m_VulkanDevice->GetLogicalDevice(), &createInfo, nullptr, &m_ImageView));
 	}
 
-	void VulkanImageView::CreateSampler() {
-		const VulkanContextDevice& device = VulkanContextDevice::Get();
-		
+	void VulkanImageView::RTCreateSampler() {
 		VkPhysicalDeviceProperties properties{};
-		vkGetPhysicalDeviceProperties(device.GetPhysicalDevice(), &properties);
+		vkGetPhysicalDeviceProperties(m_VulkanDevice->GetPhysicalDevice(), &properties);
 
 		VkSamplerCreateInfo createInfo = VulkanAPI::SamplerCreateInfo(m_CreateInfo.MagFilter, m_CreateInfo.MinFilter, m_CreateInfo.ModeU, m_CreateInfo.ModeV, m_CreateInfo.ModeW, VK_TRUE,
 																	  properties.limits.maxSamplerAnisotropy, VK_BORDER_COLOR_INT_OPAQUE_BLACK, VK_FALSE, VK_FALSE, VK_COMPARE_OP_ALWAYS, VK_SAMPLER_MIPMAP_MODE_LINEAR,
 																	  0.0f, 0.0f, m_CreateInfo.GenerateMipmap ? (float)m_CreateInfo.MipmapLevel : 0.0f);
-		LUCY_VK_ASSERT(vkCreateSampler(device.GetLogicalDevice(), &createInfo, nullptr, &m_Sampler));
+		LUCY_VK_ASSERT(vkCreateSampler(m_VulkanDevice->GetLogicalDevice(), &createInfo, nullptr, &m_Sampler));
 	}
 
-	void VulkanImageView::Recreate(const ImageViewCreateInfo& createInfo) {
+	void VulkanImageView::RTRecreate(const ImageViewCreateInfo& createInfo) {
 		m_CreateInfo = createInfo;
-		Destroy();
-		CreateView();
+		RTDestroyResource();
+		RTCreateView();
 		if (m_CreateInfo.GenerateSampler)
-			CreateSampler();
+			RTCreateSampler();
 	}
 
-	void VulkanImageView::Destroy() {
-		vkDestroyImageView(VulkanContextDevice::Get().GetLogicalDevice(), m_ImageView, nullptr);
+	void VulkanImageView::RTDestroyResource() {
+		if (!m_ImageView || !m_Sampler)
+			return;
+
+		vkDestroyImageView(m_VulkanDevice->GetLogicalDevice(), m_ImageView, nullptr);
 		if (m_CreateInfo.GenerateSampler)
-			vkDestroySampler(VulkanContextDevice::Get().GetLogicalDevice(), m_Sampler, nullptr);
+			vkDestroySampler(m_VulkanDevice->GetLogicalDevice(), m_Sampler, nullptr);
+
+		m_ImageView = VK_NULL_HANDLE;
+		m_Sampler = VK_NULL_HANDLE;
 	}
 
 	uint32_t GetAPIImageFormat(ImageFormat format) {

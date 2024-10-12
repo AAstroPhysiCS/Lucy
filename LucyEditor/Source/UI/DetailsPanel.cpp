@@ -1,36 +1,42 @@
 #include "DetailsPanel.h"
 #include "SceneExplorerPanel.h"
 
-#include "Utils/Utils.h"
+#include "Renderer/Image/Image.h"
+#include "Renderer/Renderer.h"
+#include "Renderer/Material/PBRMaterial.h"
+
+#include "Utilities/Utilities.h"
 
 #include "imgui.h"
 
 namespace Lucy {
-
+	
 	DetailsPanel& DetailsPanel::GetInstance() {
 		static DetailsPanel s_Instance;
 		return s_Instance;
 	}
 
 	DetailsPanel::DetailsPanel() {
-		ImageCreateInfo createInfo;
-		createInfo.Format = ImageFormat::R8G8B8A8_UNORM;
-		createInfo.ImageType = ImageType::Type2DColor;
-		createInfo.Parameter.Mag = ImageFilterMode::LINEAR;
-		createInfo.Parameter.Min = ImageFilterMode::LINEAR;
-		createInfo.Parameter.U = ImageAddressMode::REPEAT;
-		createInfo.Parameter.V = ImageAddressMode::REPEAT;
-		createInfo.Parameter.W = ImageAddressMode::REPEAT;
-		createInfo.GenerateSampler = true;
-		createInfo.ImGuiUsage = true;
+		Renderer::EnqueueToRenderThread([](const Ref<RenderDevice>& device) {
+			ImageCreateInfo createInfo;
+			createInfo.Format = ImageFormat::R8G8B8A8_UNORM;
+			createInfo.ImageType = ImageType::Type2DColor;
+			createInfo.Parameter.Mag = ImageFilterMode::LINEAR;
+			createInfo.Parameter.Min = ImageFilterMode::LINEAR;
+			createInfo.Parameter.U = ImageAddressMode::REPEAT;
+			createInfo.Parameter.V = ImageAddressMode::REPEAT;
+			createInfo.Parameter.W = ImageAddressMode::REPEAT;
+			createInfo.GenerateSampler = true;
+			createInfo.ImGuiUsage = true;
 
-		s_CheckerBoardTexture = Image::Create("Assets/Textures/Checkerboard.png", createInfo);
+			s_CheckerBoardTextureHandle = device->CreateImage("Assets/Textures/Checkerboard.png", createInfo);
+		});
 	}
 
 	void DetailsPanel::Render() {
 		LUCY_PROFILE_NEW_EVENT("DetailsPanel::Render");
 		
-		ImGui::Begin("Details", 0, ImGuiWindowFlags_NoBringToFrontOnFocus);
+		ImGui::Begin("Details", nullptr, ImGuiWindowFlags_NoBringToFrontOnFocus);
 
 		Entity& entityContext = SceneExplorerPanel::GetInstance().GetEntityContext();
 		if (!entityContext.IsValid()) {
@@ -111,7 +117,7 @@ namespace Lucy {
 					ImGui::Text("Translation");
 					ImGui::SameLine();
 					ImGui::TableSetColumnIndex(1);
-					UIUtils::TransformControl("Translation Control", pos.x, pos.y, pos.z, 0.0f, 0.1f);
+					UI::TransformControl("Translation Control", pos.x, pos.y, pos.z, 0.0f, 0.1f);
 
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
@@ -119,7 +125,7 @@ namespace Lucy {
 					ImGui::Text("Rotation");
 					ImGui::SameLine();
 					ImGui::TableSetColumnIndex(1);
-					UIUtils::TransformControl("Rotation Control", rot.x, rot.y, rot.z, 0.0f, 0.1f);
+					UI::TransformControl("Rotation Control", rot.x, rot.y, rot.z, 0.0f, 0.1f);
 
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
@@ -127,7 +133,7 @@ namespace Lucy {
 					ImGui::Text("Scale");
 					ImGui::SameLine();
 					ImGui::TableSetColumnIndex(1);
-					UIUtils::TransformControl("Scale Control", scale.x, scale.y, scale.z, 1.0f, 0.1f);
+					UI::TransformControl("Scale Control", scale.x, scale.y, scale.z, 1.0f, 0.1f);
 
 					t.CalculateMatrix();
 
@@ -138,7 +144,7 @@ namespace Lucy {
 
 		DrawComponentPanel<DirectionalLightComponent>(entityContext, [&](DirectionalLightComponent& lightComponent) {
 			if (ImGui::CollapsingHeader("Directional Light", ImGuiTreeNodeFlags_DefaultOpen)) {
-				auto& dir = entityContext.GetComponent<TransformComponent>().GetRotation();
+				const auto& dir = entityContext.GetComponent<TransformComponent>().GetRotation();
 				auto& color = lightComponent.GetColor();
 				//TODO: the color should be the material color
 				ImGui::Text("Color");
@@ -150,7 +156,7 @@ namespace Lucy {
 		});
 
 		DrawComponentPanel<MeshComponent>(entityContext, [&](MeshComponent& c) {
-			const Ref<Mesh> mesh = c.GetMesh();
+			Ref<Mesh> mesh = c.GetMesh();
 
 			if (ImGui::CollapsingHeader("Mesh Renderer", ImGuiTreeNodeFlags_DefaultOpen)) {
 
@@ -158,7 +164,7 @@ namespace Lucy {
 				memset(buf, 0, sizeof(buf));
 
 				if (mesh) {
-					std::string& path = mesh->GetPath();
+					const std::string& path = mesh->GetPath();
 					strncpy_s(buf, path.c_str(), sizeof(buf));
 				}
 
@@ -183,32 +189,37 @@ namespace Lucy {
 			}
 
 			if (mesh) {
+				const auto& materialManager = Renderer::GetMaterialManager();
+
 				if (ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_DefaultOpen)) {
 					static int32_t selectedMaterial = -1;
 
 					for (uint32_t i = 0; i < mesh->GetSubmeshes().size(); i++) {
 						ImGui::PushID(i);
 
-						Submesh& submesh = mesh->GetSubmeshes()[i];
-						Ref<Material> m = mesh->GetMaterials()[submesh.MaterialIndex];
+						const Submesh& submesh = mesh->GetSubmeshes()[i];
+						auto materialID = submesh.MaterialID;
+						auto material = materialManager->GetMaterialByID(materialID)->As<PBRMaterial>();
 
-						void* textureID = 0;
-
-						if (m->HasImage(Material::ALBEDO_TYPE))
-							textureID = m->GetImage(Material::ALBEDO_TYPE)->GetImGuiID();
+						void* textureID = nullptr;
+						if (material->HasImage(PBRMaterial::ALBEDO_TYPE))
+							textureID = material->GetImage(PBRMaterial::ALBEDO_TYPE)->GetImGuiID();
 						else
-							textureID = s_CheckerBoardTexture->GetImGuiID();
+							textureID = Renderer::AccessResource<Image>(s_CheckerBoardTextureHandle)->GetImGuiID();
 
-						ImGui::ImageButton((ImTextureID)textureID, { 64.0f, 64.0f }, { 0.0f, 0.0f }, { 1.0f, 1.0f }, 0);
+						if (textureID) //could be that the checker board texture isnt ready
+							ImGui::ImageButton(textureID, { 64.0f, 64.0f }, { 0.0f, 0.0f }, { 1.0f, 1.0f }, 0);
 						ImGui::SameLine();
 
-						if (ImGui::BeginCombo("##hideLabel combo", m->GetName().c_str())) {
+						if (ImGui::BeginCombo("##hideLabel combo", std::to_string(materialID).c_str())) {
 							for (uint32_t j = 0; j < mesh->GetSubmeshes().size(); j++) {
+								Submesh& submeshInner = mesh->GetSubmeshes()[i];
+
 								ImGui::PushID(j);
-								Ref<Material> comboMaterial = mesh->GetMaterials()[j];
-								if (ImGui::Selectable(comboMaterial->GetName().c_str())) {
+								Ref<Material> comboMaterial = materialManager->GetMaterialByID(submeshInner.MaterialID);
+								if (ImGui::Selectable(std::to_string(j).c_str())) {
 									selectedMaterial = j;
-									submesh.MaterialIndex = j;
+									submeshInner.MaterialID = j;
 								}
 								if (selectedMaterial == j)
 									ImGui::SetItemDefaultFocus();
@@ -217,9 +228,9 @@ namespace Lucy {
 							ImGui::EndCombo();
 						}
 
-						float& roughness = m->GetRoughnessValue();
-						float& metallic = m->GetMetallicValue();
-						float& ao = m->GetAOContribution();
+						float& roughness = material->GetRoughnessValue();
+						float& metallic = material->GetMetallicValue();
+						float& ao = material->GetAOContribution();
 
 						ImGui::Text("Roughness");
 						ImGui::SameLine();
@@ -239,13 +250,14 @@ namespace Lucy {
 		});
 
 		DrawComponentPanel<HDRCubemapComponent>(entityContext, [](HDRCubemapComponent& component) {
-			Ref<Image> cubemap = component.GetCubemapImage();
+			auto cubemapImage = component.GetCubemapImage();
+
 			if (ImGui::CollapsingHeader("Cubemap", ImGuiTreeNodeFlags_DefaultOpen)) {
 				char buf[1024];
 				memset(buf, 0, sizeof(buf));
 
-				if (cubemap) {
-					const std::string& path = cubemap->GetPath();
+				if (cubemapImage) {
+					const std::string& path = cubemapImage->GetPath().string();
 					strncpy_s(buf, path.c_str(), sizeof(buf));
 				}
 
@@ -277,6 +289,6 @@ namespace Lucy {
 	}
 
 	void DetailsPanel::OnDestroy() {
-		s_CheckerBoardTexture->Destroy();
+		Renderer::EnqueueResourceDestroy(s_CheckerBoardTextureHandle);
 	}
 }

@@ -1,19 +1,30 @@
 #pragma once
 
 namespace Lucy {
-
+	
 	enum class EventType {
-		MouseEvent, KeyEvent, CharCallbackEvent, ScrollEvent, CursorPosEvent,
-		WindowResizeEvent, WindowCloseEvent, CustomEvent, Unknown
+		Unknown,
+		KeyEvent,
+		MouseEvent,
+		CharCallbackEvent,
+		ScrollEvent,
+		CursorPosEvent,
+		EntityPickedEvent,
+
+		WindowResizeEvent,
+		WindowCloseEvent,
+		SwapChainResizeEvent,
+		ViewportAreaResizeEvent
 	};
 
-	class Event {
-	public:
-		Event() = default;
+	struct Event {
+		Event(EventType type)
+			: m_EventType(type) {
+		}
 		virtual ~Event() = default;
 
-		EventType GetType() { return m_Type; }
-	protected:
-		EventType m_Type = EventType::Unknown;
+		inline EventType GetEventType() const { return m_EventType; }
+	private:
+		EventType m_EventType = EventType::Unknown;
 	};
 }

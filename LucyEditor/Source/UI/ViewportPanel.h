@@ -7,6 +7,7 @@
 
 namespace Lucy {
 
+	class RenderPipeline;
 	class GraphicsPipeline;
 
 	class ViewportPanel : public Panel
@@ -20,12 +21,14 @@ namespace Lucy {
 		float SnapValue = 1.0f;
 		bool UseSnap = false;
 
-		bool IsViewportHovered();
-		bool IsViewportActive();
-		bool IsOverAnyGizmo();
+		bool IsViewportHovered() const;
+		bool IsViewportActive() const;
+		bool IsOverAnyGizmo() const;
 
-		void SetOnViewportResizeCallback(std::function<void()>&& callback);
-		void SetViewportOutputPipeline(Ref<GraphicsPipeline> pipeline);
+		void SetRenderPipeline(Ref<RenderPipeline> renderPipeline);
+
+		inline float GetViewportMouseX() const { return m_ViewportMouseX; }
+		inline float GetViewportMouseY() const { return m_ViewportMouseY; }
 
 		void OnEvent(Event& e) final override;
 	private:
@@ -38,15 +41,16 @@ namespace Lucy {
 		bool m_IsViewportActive = false;
 		bool m_IsOverAnyGizmo = false;
 
-		bool IsOverTranslateGizmo();
-		bool IsOverRotateGizmo();
-		bool IsOverScaleGizmo();
-		bool IsOverAnyGizmoM();
+		bool IsOverTranslateGizmo() const;
+		bool IsOverRotateGizmo() const;
+		bool IsOverScaleGizmo() const;
+		bool IsOverAnyGizmoM() const;
 
 		ImVec2 m_Size;
 
-		Ref<GraphicsPipeline> m_ViewportOutputPipeline = nullptr;
-		std::function<void()> m_RendererModuleOnViewportResize;
+		Ref<RenderPipeline> m_RenderPipeline = nullptr;
+
+		float m_ViewportMouseX = 0, m_ViewportMouseY = 0;
 	};
 }
 

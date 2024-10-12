@@ -5,14 +5,14 @@
 
 void* __cdecl operator new(size_t size) {
 	using namespace Lucy;
-	Metrics& metrics = Application::GetApplicationMetrics();
+	ApplicationMetrics& metrics = Application::GetApplicationMetrics();
 
 	if (void* ptr = malloc(size)) {
-		metrics.MemTracker.m_TotalAllocated += size;
+		metrics.m_TotalMemAllocated += size;
 		return ptr;
 	}
 
-	Logger::LogCritical("Operator new failed to allocate memory!");
+	LUCY_CRITICAL("Operator new failed to allocate memory!");
 #ifdef LUCY_WINDOWS
 	__debugbreak();
 #endif
@@ -21,8 +21,8 @@ void* __cdecl operator new(size_t size) {
 
 void operator delete(void* o, size_t size) {
 	using namespace Lucy;
-	Metrics& metrics = Application::GetApplicationMetrics();
+	ApplicationMetrics& metrics = Application::GetApplicationMetrics();
 
-	metrics.MemTracker.m_TotalFreed += size;
+	metrics.m_TotalMemFreed += size;
 	free(o);
 }

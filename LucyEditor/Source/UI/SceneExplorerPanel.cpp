@@ -1,10 +1,7 @@
 #include "SceneExplorerPanel.h"
 #include "ViewportPanel.h"
 
-#include "Core/Application.h"
-#include "Events/MouseCode.h"
-
-#include "Renderer/Renderer.h"
+#include "Events/EventHandler.h"
 
 namespace Lucy {
 
@@ -14,25 +11,20 @@ namespace Lucy {
 	}
 
 	void SceneExplorerPanel::OnEvent(Event& e) {
-		auto& inputHandler = Application::Get()->GetInputHandler();
-
-		inputHandler.Dispatch<MouseEvent>(e, EventType::MouseEvent, [&](const MouseEvent& e) {
+		EventHandler::AddListener<MouseEvent>(e, [&](const MouseEvent& e) {
 			ViewportPanel& viewportPanel = ViewportPanel::GetInstance();
 			if (viewportPanel.IsOverAnyGizmo() || !viewportPanel.IsViewportActive()) return;
 
 			if (e == MouseCode::Button0) {
-				Entity e = Renderer::OnMousePicking(m_IDPipeline);
-				e.IsValid() ? SetEntityContext(e) : SetEntityContext({});
+				Entity entity{};
+				EventHandler::DispatchImmediateEvent<EntityPickedEvent>(entity, m_Scene.get(), viewportPanel.GetViewportMouseX(), viewportPanel.GetViewportMouseY());
+				SetEntityContext(entity);
 			}
 		});
 	}
 
 	void SceneExplorerPanel::SetEntityContext(Entity e) {
 		m_EntityContext = e;
-	}
-
-	void SceneExplorerPanel::SetIDPipeline(Ref<GraphicsPipeline> pipeline) {
-		m_IDPipeline = pipeline;
 	}
 
 	void SceneExplorerPanel::SetScene(Ref<Scene> scene) {
@@ -42,14 +34,14 @@ namespace Lucy {
 	void SceneExplorerPanel::Render() {
 		LUCY_PROFILE_NEW_EVENT("SceneExplorerPanel::Render");
 		
-		ImGui::Begin("Scene Explorer", 0, ImGuiWindowFlags_NoBringToFrontOnFocus);
+		ImGui::Begin("Scene Explorer", nullptr, ImGuiWindowFlags_NoBringToFrontOnFocus);
 
 		const auto& view = m_Scene->View<UUIDComponent, TagComponent>();
 
 		uint32_t id = 0;
 		for (const auto entity : view) {
-			Entity e = { m_Scene.Get(), entity};
-			TagComponent& tag = e.GetComponent<TagComponent>();
+			Entity e = { m_Scene.get(), entity};
+			const TagComponent& tag = e.GetComponent<TagComponent>();
 			const std::string& name = tag.GetTag();
 
 			ImGui::PushID(id);

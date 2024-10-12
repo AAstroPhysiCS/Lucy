@@ -4,7 +4,7 @@
 
 #include "Descriptors/DescriptorType.h"
 
-#include "Context/GraphicsPipeline.h"
+#include "Pipeline/GraphicsPipeline.h"
 #include "Shader/VulkanGraphicsShader.h"
 #include "VulkanRenderPass.h"
 
@@ -109,7 +109,7 @@ namespace Lucy::VulkanAPI {
 										  VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask, VkDependencyFlags dependencyFlags);
 
 
-	VkQueryPoolCreateInfo QueryPoolCreateInfo(uint32_t queryCount, VkQueryType queryType);
+	VkQueryPoolCreateInfo QueryPoolCreateInfo(uint32_t queryCount, VkQueryType queryType, VkQueryPipelineStatisticFlags pipelineStatistics);
 	VkSubmitInfo QueueSubmitInfo(uint32_t commandBufferCount, const VkCommandBuffer* const commandBuffers,
 								 uint32_t waitSemaphoreCount, const VkSemaphore* const waitSemaphores, VkPipelineStageFlags* waitStages,
 								 uint32_t signalSemaphoreCount, const VkSemaphore* const signalSemaphores);

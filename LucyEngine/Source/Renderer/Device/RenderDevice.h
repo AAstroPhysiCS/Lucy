@@ -1,77 +1,135 @@
 #pragma once
 
-#include "Renderer/Commands/CommandQueue.h"
+#include <filesystem>
+
+#include "RenderDeviceResourceManager.h"
+
+#include "Renderer/Synchronization/VulkanSyncItems.h"
+#include "RenderDeviceQueries.h"
 
 namespace Lucy {
 
+	struct GraphicsPipelineCreateInfo;
+	struct ComputePipelineCreateInfo;
+	struct RenderPassCreateInfo;
+	struct FrameBufferCreateInfo;
+	struct ImageCreateInfo;
+
+	struct DescriptorSetCreateInfo;
+	struct SharedStorageBufferCreateInfo;
+	struct UniformBufferCreateInfo;
+
+	class FrameBuffer;
+	class VertexBuffer;
+	class IndexBuffer;
+	class VulkanImage2D;
+
+	class RenderPass;
+
+	class Mesh;
+
+	class GraphicsPipeline;
 	class ComputePipeline;
-	/*
-	struct RenderDeviceResource {
-		virtual void Destroy() = 0;
+
+	class CommandQueue;
+	class CommandPool;
+
+	class VulkanPushConstant;
+
+	class PipelineManager;
+
+	enum class TargetQueueFamily : uint8_t {
+		Graphics,
+		Compute,
+		Transfer,
 	};
-	*/
-	class RenderDevice {
+
+	class RenderDevice : public MemoryTrackable {
 	public:
-		static Ref<RenderDevice> Create();
+		RenderDevice() = default;
+		virtual ~RenderDevice() = default;
+#pragma region ResourceManager
+		RenderResourceHandle CreateGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo);
+		RenderResourceHandle CreateComputePipeline(const ComputePipelineCreateInfo& createInfo);
+		RenderResourceHandle CreateRenderPass(const RenderPassCreateInfo& createInfo);
 
-		virtual void Init();
-		void Recreate();
-		void EnqueueToRenderThread(EnqueueFunc&& func);
+		RenderResourceHandle CreateFrameBuffer(const FrameBufferCreateInfo& createInfo);
+		RenderResourceHandle CreateVertexBuffer(size_t size);
+		RenderResourceHandle CreateIndexBuffer(size_t size);
 
-		/*
-		virtual Ref<GraphicsPipeline> CreateGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo) = 0;
-		virtual Ref<ComputePipeline> CreateComputePipeline(const ComputePipelineCreateInfo& createInfo) = 0;
-		virtual Ref<RenderPass> CreateRenderPass(const RenderPassCreateInfo& createInfo) = 0;
-		virtual Ref<Image> CreateImage(const ImageCreateInfo& createInfo);
-		virtual Ref<FrameBuffer> CreateFrameBuffer(const FrameBufferCreateInfo& createInfo) = 0;
-		virtual Ref<VertexBuffer> CreateVertexBuffer(uint32_t size) = 0;
-		virtual Ref<IndexBuffer> CreateIndexBuffer(uint32_t size) = 0;
-		*/
+		RenderResourceHandle CreateDescriptorSet(const DescriptorSetCreateInfo& createInfo);
+		RenderResourceHandle CreateSharedStorageBuffer(const SharedStorageBufferCreateInfo& createInfo);
+		RenderResourceHandle CreateUniformBuffer(const UniformBufferCreateInfo& createInfo);
 
-		CommandResourceHandle CreateCommandResource(Ref<ContextPipeline> pipeline, CommandFunc&& func);
-		CommandResourceHandle CreateChildCommandResource(CommandResourceHandle parentResourceHandle, Ref<GraphicsPipeline> childPipeline, CommandFunc&& func);
+		RenderResourceHandle CreateImage(const std::filesystem::path& path, ImageCreateInfo& createInfo);
+		RenderResourceHandle CreateImage(const ImageCreateInfo& createInfo);
+		RenderResourceHandle CreateImage(const Ref<VulkanImage2D>& other);
+
+		template <typename TResource> requires IsRenderResource<TResource>
+		inline Ref<TResource> AccessResource(RenderResourceHandle handle) {
+			return m_ResourceManager.GetResource(handle)->As<TResource>();
+		}
+		bool IsValidResource(RenderResourceHandle handle) const;
+		void RTDestroyResource(RenderResourceHandle& handle);
+#pragma endregion ResourceManager
+		void CreateDeviceQueries(size_t pipelineCount, size_t passCount);
+
+		uint32_t BeginTimestamp(Ref<CommandPool> cmdPool);
+		uint32_t EndTimestamp(Ref<CommandPool> cmdPool);
+		void ResetTimestampQuery(Ref<CommandPool> cmdPool);
+
+		uint32_t BeginPipelineQuery(Ref<CommandPool> cmdPool);
+		uint32_t EndPipelineQuery(Ref<CommandPool> cmdPool);
+		void ResetPipelineQuery(Ref<CommandPool> cmdPool);
+
+		std::vector<uint64_t> GetQueryResults(RenderDeviceQueryType type);
 
 		/// <param name="currentFrameWaitSemaphore: image is available, image is renderable"></param>
 		/// <param name="currentFrameSignalSemaphore: rendering finished, signal it"></param>
-		void SubmitWorkToGPU(void* queueHandle, const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore);
+		virtual void SubmitWorkToGPU(TargetQueueFamily queueFamily, Ref<CommandPool> cmdPool,
+							 const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) = 0;
+		virtual void SubmitWorkToGPU(TargetQueueFamily queueFamily, std::vector<Ref<CommandPool>>& cmdPools,
+									 const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) = 0;
+		virtual void WaitForDevice() = 0;
+		virtual void WaitForQueue(TargetQueueFamily queueFamily) = 0;
 
-		template <typename Command, typename ... Args>
-		inline void EnqueueCommand(CommandResourceHandle resourceHandle, Args&&... args) {
-			LUCY_PROFILE_NEW_EVENT("RenderDevice::EnqueueCommand");
-			m_CommandQueue->EnqueueCommand(resourceHandle, Memory::CreateRef<Command>(args...));
-		}
+		virtual void BeginCommandBuffer(Ref<CommandPool> cmdPool) = 0;
+		virtual void EndCommandBuffer(Ref<CommandPool> cmdPool) = 0;
 
-		void EnqueueCommandResourceFree(CommandResourceHandle resourceHandle);
-		void EnqueueResourceFree(EnqueueFunc&& func);
+		virtual void BindBuffers(Ref<CommandPool> cmdPool, Ref<Mesh> mesh) = 0;
+		virtual void BindBuffers(Ref<CommandPool> cmdPool, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) = 0;
 
-		void DispatchCommands();
-		void ExecuteCommandQueue();
+		virtual void BindPushConstant(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline, const VulkanPushConstant& pushConstant) = 0;
+		virtual void BindPushConstant(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline, const VulkanPushConstant& pushConstant) = 0;
 
-		//commandBufferHandle is the handle of the commandBuffer
-		//Vulkan: VkCommandBuffer
-		virtual void BindBuffers(void* commandBufferHandle, Ref<Mesh> mesh) = 0;
-		virtual void BindPushConstant(void* commandBufferHandle, Ref<ContextPipeline> pipeline, const VulkanPushConstant& pushConstant) = 0;
-		virtual void BindPipeline(void* commandBufferHandle, Ref<ContextPipeline> pipeline) = 0;
-		virtual void UpdateDescriptorSets(Ref<ContextPipeline> pipeline) = 0;
-		virtual void BindAllDescriptorSets(void* commandBufferHandle, Ref<ContextPipeline> pipeline) = 0;
-		virtual void BindDescriptorSet(void* commandBufferHandle, Ref<ContextPipeline> pipeline, uint32_t setIndex) = 0;
-		virtual void BindBuffers(void* commandBufferHandle, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) = 0;
-		virtual void DrawIndexed(void* commandBufferHandle, uint32_t indexCount, uint32_t instanceCount,
+		virtual void BindPipeline(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline) = 0;
+		virtual void BindPipeline(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline) = 0;
+		
+		virtual void UpdateDescriptorSets(Ref<GraphicsPipeline> pipeline) = 0;
+		virtual void UpdateDescriptorSets(Ref<ComputePipeline> pipeline) = 0;
+
+		virtual void BindAllDescriptorSets(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline) = 0;
+		virtual void BindDescriptorSet(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline, uint32_t setIndex) = 0;
+		
+		virtual void BindAllDescriptorSets(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline) = 0;
+		virtual void BindDescriptorSet(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline, uint32_t setIndex) = 0;
+
+		virtual void DrawIndexed(Ref<CommandPool> cmdPool, uint32_t indexCount, uint32_t instanceCount,
 								 uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) = 0;
-		virtual void DispatchCompute(void* commandBufferHandle, Ref<ComputePipeline> computePipeline, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) = 0;
+		virtual void DispatchCompute(Ref<CommandPool> cmdPool, Ref<ComputePipeline> computePipeline, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) = 0;
 
-		virtual void BeginRenderPass(void* commandBufferHandle, Ref<GraphicsPipeline> pipeline) = 0;
-		virtual void EndRenderPass(Ref<GraphicsPipeline> pipeline) = 0;
+		virtual void BeginRenderPass(Ref<RenderPass> renderPass, Ref<FrameBuffer> frameBuffer, Ref<CommandPool> cmdPool) = 0;
+		virtual void EndRenderPass(Ref<RenderPass> renderPass) = 0;
 
-		virtual void BeginTimestamp(void* commandBufferHandle) = 0;
-		virtual void EndTimestamp(void* commandBufferHandle) = 0;
-		virtual double GetTimestampResults() = 0;
+		virtual void BeginDebugMarker(Ref<CommandPool> cmdPool, const char* labelName) = 0;
+		virtual void EndDebugMarker(Ref<CommandPool> cmdPool) = 0;
 
-		virtual void Destroy();
-	protected:
-		std::vector<EnqueueFunc> m_RenderFunctionQueue;
-		std::vector<EnqueueFunc> m_DeletionQueue;
-		Ref<CommandQueue> m_CommandQueue = nullptr;
+		virtual void Destroy() = 0;
+	private:
+		RenderDeviceResourceManager m_ResourceManager;
+
+		Unique<RenderDeviceQuery> m_RenderDeviceTimestampQuery = nullptr; //initialized after we call CreateDeviceQueries
+		Unique<RenderDeviceQuery> m_RenderDevicePipelineQuery = nullptr;
 	};
 }
 
