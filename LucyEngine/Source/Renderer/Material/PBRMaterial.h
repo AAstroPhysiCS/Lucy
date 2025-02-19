@@ -8,7 +8,7 @@ namespace Lucy {
 
 	struct PBRMaterialData {
 		glm::vec3 Diffuse = glm::vec3();
-		float Metallic = 0.0f, Roughness = 0.0f, AOContribution = 0.0f;
+		float Metallic = 0.0f, Roughness = 0.0f, AOContribution = 1.0f;
 		std::vector<RenderResourceHandle> TextureHandles;
 
 		PBRMaterialData(glm::vec3 diffuse, float metallic, float roughness, float aoContribution)
@@ -26,7 +26,7 @@ namespace Lucy {
 		glm::vec4 BaseDiffuseColor = glm::vec4(0.0f);
 		float BaseRoughnessValue = 0.0f;
 		float BaseMetallicValue = 0.0f;
-		float BaseAOValue = 0.0f;
+		float BaseAOValue = 1.0f;
 		float AOSlot = -1.0f;
 	};
 

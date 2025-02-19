@@ -8,6 +8,23 @@ namespace Utils {
 	};
 
 	std::vector<std::string> Split(const std::string& s, const std::string& delimiter);
+
+	template <typename Iter = std::vector<std::string>::iterator>
+	std::string CombineDataToSingleBuffer(std::vector<std::string>& lines, const Iter& from, const Iter& to) {
+		std::string buffer;
+		if (lines.end() != from) {
+			for (auto i = from; i != to; i++) {
+				buffer += *i + "\n";
+			}
+		}
+		return buffer;
+	}
+
+	template <typename Iter = std::vector<std::string>::iterator>
+	std::string CombineDataToSingleBuffer(std::vector<std::string>& lines) {
+		return CombineDataToSingleBuffer(lines, lines.begin(), lines.end());
+	}
+
 	Attribute ReadAttributeFromIni(const char* windowName, const char* attributeName);
 
 	struct DialogFilter {
@@ -39,6 +56,8 @@ namespace Maths {
 		glm::vec3 Origin;
 		glm::vec3 Dir;
 	};
+
+	glm::vec3 EulerDegreesToLightDirection(const glm::vec3& eulerDegrees);
 
 	bool RayTriangleIntersection(const Ray& r, const glm::vec3& v0, const glm::vec3& v1, const glm::vec3& v2, float& t, float& u, float& v);
 }

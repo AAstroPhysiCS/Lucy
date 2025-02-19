@@ -30,7 +30,7 @@ namespace Lucy {
 		PushShader(Shader::Create("LucyID", "Assets/Shaders/LucyID.glsl", device));
 		PushShader(Shader::Create("LucyHDRSkybox", "Assets/Shaders/LucyHDRSkybox.glsl", device));
 		PushShader(Shader::Create("LucyImageToHDRConverter", "Assets/Shaders/LucyImageToHDRConverter.glsl", device));
-		PushShader(Shader::Create("LucyDepthOnly", "Assets/Shaders/LucyDepthOnly.glsl", device));
+		PushShader(Shader::Create("LucyVSM", "Assets/Shaders/LucyVSM.glsl", device));
 
 #if USE_COMPUTE_FOR_CUBEMAP_GEN
 		PushShader(Shader::Create("LucyIrradianceGen", "Assets/Shaders/LucyIrradianceGen.comp", device));
@@ -168,7 +168,7 @@ namespace Lucy {
 			uint32_t correlationMask = maxLayerCount == 1 ? 0x7FFFFFFFu : (1u << 2) - 1;
 
 			RenderPassCreateInfo passCreateInfo {
-				.ClearColor = { 0.0f, 0.0f, 0.0f, 1.0f },
+				.ClearColor = currentPass->GetClearColor(),
 				.Layout = passLayout,
 				.Multiview = {
 					.ViewMask = viewMask,
@@ -219,7 +219,8 @@ namespace Lucy {
 			return device->CreateFrameBuffer(frameBufferCreateInfo);
 		};
 
-		const auto CreateGraphicsPipeline = [](const char* shaderName, const char* passName, const char* pipelineName, Rasterization rasterizationConfig = {}, DepthConfiguration depthConfig = {}) {
+		const auto CreateGraphicsPipeline = [](const char* shaderName, const char* passName, const char* pipelineName, 
+			Rasterization rasterizationConfig = {}, DepthConfiguration depthConfig = {}, BlendConfiguration blendConfig = {}) {
 			if (!s_Shaders.contains(shaderName)) {
 				LUCY_WARN("Shader '{0}' cannot be found while creating graphics pipeline '{1}' for pass '{2}'!",
 					shaderName, pipelineName, passName);
@@ -235,6 +236,7 @@ namespace Lucy {
 			s_PipelineManager->CreateGraphicsPipeline(pipelineName, GraphicsPipelineCreateInfo{
 				.Rasterization = rasterizationConfig,
 				.DepthConfiguration = depthConfig,
+				.BlendConfiguration = blendConfig,
 				.VertexShaderLayout = shader->GetVertexShaderLayout(),
 				.RenderPassHandle = renderPassHandle,
 				.Shader = shader,
@@ -276,7 +278,10 @@ namespace Lucy {
 		CreateGraphicsPipeline("LucyID", "IDPass", "IDPipeline");
 		CreateGraphicsPipeline("LucyHDRSkybox", "CubemapPass", "SkyboxPipeline", Rasterization{ .DisableBackCulling = true, .CullingMode = CullingMode::None }, DepthConfiguration{ .DepthCompareOp = DepthCompareOp::LessOrEqual });
 		CreateGraphicsPipeline("LucyImageToHDRConverter", "HDRImageToLayeredImage", "HDRImageToLayeredImageConvertPipeline");
-		CreateGraphicsPipeline("LucyDepthOnly", "DepthOnlyPass", "DepthOnlyPipeline", Rasterization{ .DisableBackCulling = true, .CullingMode = CullingMode::None }, DepthConfiguration{ .DepthClampEnable = true, .DepthCompareOp = DepthCompareOp::LessOrEqual });
+		CreateGraphicsPipeline("LucyVSM", "VSMPass", "VSMPipeline", 
+			Rasterization{ .DisableBackCulling = true, .CullingMode = CullingMode::None }, 
+			DepthConfiguration{ .DepthClipEnable = VK_FALSE, .DepthCompareOp = DepthCompareOp::LessOrEqual },
+			BlendConfiguration{ .BlendEnable = VK_FALSE });
 		CreateComputePipeline("LucyIrradianceGen", "IrradianceComputePipeline");
 
 		GetRenderDevice()->CreateDeviceQueries(s_PipelineManager->GetAllPipelineCount(), s_RenderGraph->GetPassCount());
@@ -450,7 +455,9 @@ namespace Lucy {
 
 	void Renderer::PushShader(Ref<Shader> shader) {
 		const auto& name = shader->GetName();
-		LUCY_ASSERT(!s_Shaders.contains(name), "Creating shader that already exists!");
+		//LUCY_ASSERT(!s_Shaders.contains(name), "Creating shader that already exists!");
+		if (s_Shaders.contains(name))
+			return;
 		s_Shaders.try_emplace(name, shader);
 	}
 

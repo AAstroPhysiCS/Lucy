@@ -70,7 +70,7 @@ namespace Lucy {
 		void UpdateCamera(int32_t viewportWidth, int32_t viewportHeight);
 
 		entt::registry m_Registry;
-		EditorCamera m_Camera { 0.1f, 1000.0f, 90.0f };
+		EditorCamera m_Camera { 0.25f, 250.0f, 90.0f };
 
 		friend class Entity;
 	};

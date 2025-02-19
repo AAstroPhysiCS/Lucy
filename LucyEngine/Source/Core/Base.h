@@ -13,10 +13,6 @@
 #include "Logger.h"
 #include "Optick/optick.h"
 
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#define GLM_ENABLE_EXPERIMENTAL
-
 #include "glm/common.hpp"
 #include "glm/ext/matrix_clip_space.hpp"
 #include "glm/ext/matrix_transform.hpp"

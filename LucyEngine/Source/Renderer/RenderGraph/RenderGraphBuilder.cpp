@@ -21,6 +21,10 @@ namespace Lucy {
 		m_RenderGraphPass->SetInFlightMode(mode);
 	}
 
+	void RenderGraphBuilder::SetClearColor(ClearColor clearColor) {
+		m_RenderGraphPass->SetClearColor(clearColor);
+	}
+
 	void RenderGraphBuilder::DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp) {
 		m_RenderGraph->DeclareImage(rgResource, createInfo, loadStoreAccessOp);
 	}

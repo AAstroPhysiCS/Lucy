@@ -59,6 +59,9 @@ namespace Lucy {
 		void SetAspectRatio(float aspectRatio);
 
 		void Update() final override;
+
+	protected:
+		glm::quat m_Orientation;
 	private:
 		void UpdateProjection();
 

@@ -7,6 +7,8 @@
 
 #include "Core/FileSystem.h"
 
+#include "Utilities/Utilities.h"
+
 #include "shaderc/shaderc.hpp"
 
 #include "Renderer/Renderer.h"
@@ -110,17 +112,6 @@ namespace Lucy {
 							   shaderc_shader_kind kind) {
 		using Iter = std::vector<std::string>::iterator;
 
-		auto LoadData = [](std::vector<std::string>& lines, const Iter& from, const Iter& to) {
-			std::string buffer;
-			if (lines.end() != from) {
-				for (auto i = from; i != to; i++) {
-					buffer += *i + "\n";
-				}
-			}
-
-			return buffer;
-		};
-
 		std::vector<std::string> lines;
 		FileSystem::ReadFileLine<std::string>(path, lines);
 
@@ -144,7 +135,7 @@ namespace Lucy {
 				break;
 		}
 
-		std::string data = LoadData(lines, from, to);
+		std::string data = Utils::CombineDataToSingleBuffer(lines, from, to);
 
 		shaderc::SpvCompilationResult result = compiler.CompileGlslToSpv(data, kind, FileSystem::GetFileName(path).c_str(), options);
 		uint32_t status = result.GetCompilationStatus();
@@ -158,5 +149,60 @@ namespace Lucy {
 		std::vector<uint32_t> data;
 		FileSystem::ReadFile<uint32_t>(cachedFilePath, data, OpenMode::Binary);
 		return data;
+	}
+
+	CustomShaderIncluder::CustomShaderIncluder(Ref<RenderDevice> renderDevice) 
+		: m_RenderDevice(renderDevice) {
+	}
+
+	shaderc_include_result* CustomShaderIncluder::GetInclude(const char* requested_source, shaderc_include_type type, const char* requesting_source, size_t include_depth) {
+		shaderc_include_result* result = new shaderc_include_result();
+
+		std::string requestedSourceNoExtension = requested_source;
+		requestedSourceNoExtension = requestedSourceNoExtension.substr(0, requestedSourceNoExtension.find_first_of('.', 0));
+
+		//Ref<Shader> requestedShader = Renderer::GetShader(requestedSourceNoExtension);
+		//if (!requestedShader) { //means that we do not have that shader loaded yet
+			//requestedShader = Shader::Create(requestedSourceNoExtension, "Assets/Shaders/" + std::string(requested_source), m_RenderDevice);
+			//Renderer::PushShader(requestedShader);
+		//}
+		const auto& path = "Assets/Shaders/" + std::string(requested_source);
+
+		std::vector<std::string> m_LinesBuffer;
+		FileSystem::ReadFileLine<std::string>(path, m_LinesBuffer);
+
+		//using Iter = std::vector<std::string>::iterator;
+		//
+		//Iter from, to;
+		//switch (type) {
+		//	case shaderc_shader_kind::shaderc_vertex_shader:
+		//		from = std::find(m_LinesBuffer.begin(), m_LinesBuffer.end(), "//type vertex");
+		//		to = std::find(m_LinesBuffer.begin(), m_LinesBuffer.end(), "//type fragment");
+		//		break;
+		//	case shaderc_shader_kind::shaderc_fragment_shader:
+		//		from = std::find(m_LinesBuffer.begin(), m_LinesBuffer.end(), "//type fragment");
+		//		to = m_LinesBuffer.end();
+		//		break;
+		//	case shaderc_shader_kind::shaderc_compute_shader:
+		//		from = m_LinesBuffer.begin();
+		//		to = m_LinesBuffer.end();
+		//		break;
+		//}
+
+		m_DataBuffer = new std::string(Utils::CombineDataToSingleBuffer(m_LinesBuffer));
+
+		std::string* test = new std::string(requested_source);
+
+		result->content = m_DataBuffer->data();
+		result->content_length = m_DataBuffer->size();
+		result->source_name = test->c_str();
+		result->source_name_length = test->size();
+		result->user_data = nullptr;
+		return result;
+	}
+
+	void CustomShaderIncluder::ReleaseInclude(shaderc_include_result* data) {
+		delete m_DataBuffer;
+		delete data;
 	}
 }

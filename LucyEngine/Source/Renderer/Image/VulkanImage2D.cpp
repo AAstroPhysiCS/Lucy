@@ -152,11 +152,26 @@ namespace Lucy {
 	void VulkanImage2D::RTCreateDepthImage() {
 		LUCY_ASSERT(m_CreateInfo.Width > 0 && m_CreateInfo.Height > 0, "Width or height of the image is less than zero.");
 
-		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
-		allocator.CreateVulkanImageVma(m_CreateInfo.Width, m_CreateInfo.Height, 1, (VkFormat)GetAPIImageFormat(m_CreateInfo.Format), m_CurrentLayout,
-									   VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TYPE_2D, m_Image, m_ImageVma, 0U, m_CreateInfo.Layers);
+		if (m_CreateInfo.GenerateMipmap)
+			m_MaxMipLevel = (uint32_t)glm::floor(glm::log2(glm::max(m_CreateInfo.Width, m_CreateInfo.Height))) + 1u;
 
-		m_CurrentLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+		VkImageUsageFlags flags = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+		if (m_CreateInfo.GenerateSampler)
+			flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
+
+		if (m_CreateInfo.GenerateMipmap)
+			flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
+		allocator.CreateVulkanImageVma(m_CreateInfo.Width, m_CreateInfo.Height, 1, (VkFormat)GetAPIImageFormat(m_CreateInfo.Format), m_CurrentLayout, 
+			flags, VK_IMAGE_TYPE_2D, m_Image, m_ImageVma, 0U, m_CreateInfo.Layers);
+
+		if (m_CreateInfo.GenerateMipmap)
+			GenerateMipmapsImmediate();
+		else
+			SetLayoutImmediate(VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+
 		RTCreateVulkanImageViewHandle(m_VulkanDevice);
 	}
 

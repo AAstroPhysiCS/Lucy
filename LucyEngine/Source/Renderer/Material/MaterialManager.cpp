@@ -47,7 +47,7 @@ namespace Lucy {
 
 	MaterialID MaterialManager::CreatePBRMaterial(aiMaterial* aiMaterial, const std::string& importedFilePath) {
 		aiColor3D diffuse;
-		float shininess = 0.0f, metallic = 0.0f, roughness = 0.0f, aoContribution = 0.0f;
+		float shininess = 0.0f, metallic = 0.0f, roughness = 0.0f, aoContribution = 1.0f;
 
 		aiMaterial->Get(AI_MATKEY_COLOR_DIFFUSE, diffuse);
 		aiMaterial->Get(AI_MATKEY_SHININESS, shininess);

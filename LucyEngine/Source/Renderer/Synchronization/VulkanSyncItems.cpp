@@ -94,6 +94,10 @@ namespace Lucy {
 				destAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
 				destStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 				break;
+			case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
+				destAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+				destStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+				break;
 			default:
 				LUCY_ASSERT(false);
 		}

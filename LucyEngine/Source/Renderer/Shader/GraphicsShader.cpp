@@ -17,6 +17,8 @@ namespace Lucy {
 		shaderc::Compiler compiler;
 		shaderc::CompileOptions options;
 
+		options.SetIncluder(std::make_unique<CustomShaderIncluder>(device));
+
 		options.SetOptimizationLevel(shaderc_optimization_level::shaderc_optimization_level_zero);
 		options.SetGenerateDebugInfo();
 

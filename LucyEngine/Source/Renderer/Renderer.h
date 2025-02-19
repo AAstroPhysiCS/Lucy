@@ -77,6 +77,7 @@ namespace Lucy {
 		static inline const CommandQueueMetricsOutput& GetCommandQueueMetrics() { return s_Renderer->GetCommandQueueMetrics(); }
 
 		static void RTReloadShader(const std::string& name);
+		static inline const Ref<Shader>& GetShader(const std::string& name) { return s_Shaders[name]; }
 		static inline const std::unordered_map<std::string, Ref<Shader>>& GetAllShaders() { return s_Shaders; }
 
 		static inline Unique<PipelineManager>& GetPipelineManager() { return s_PipelineManager; }
@@ -128,5 +129,7 @@ namespace Lucy {
 
 		friend class Application; //for Init etc.
 		friend class RenderGraph; //for CreateImage etc.
+
+		friend class CustomShaderIncluder; //for ShaderIncluder
 	};
 }

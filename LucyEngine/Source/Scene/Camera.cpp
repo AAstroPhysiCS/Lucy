@@ -32,7 +32,7 @@ namespace Lucy {
 		CameraViewProjection mvp;
 		mvp.View = m_ViewMatrix;
 		mvp.Proj = m_Projection;
-		mvp.CamPos = glm::vec4(m_Position, 1.0f);
+		mvp.CamPos = glm::vec4(m_Position, 1.0f) * glm::vec4(-1.0f, 1.0f, -1.0f, 1.0f);
 
 		return mvp;
 	}
@@ -119,39 +119,42 @@ namespace Lucy {
 			m_Rotation.y = glm::clamp(m_Rotation.y, -90.0f, 90.0f);
 		}
 
-		float rad90 = glm::radians(m_Rotation.x + 90);
-		float rad = glm::radians(m_Rotation.x);
+		glm::vec3 forward = glm::rotate(glm::inverse(m_Orientation), glm::vec3(0, 0, 1));
+		glm::vec3 right = glm::rotate(glm::inverse(m_Orientation), glm::vec3(1, 0, 0));
+		glm::vec3 up = glm::cross(forward, right);
 
-		if (Input::IsKeyPressed(KeyCode::W)) {
-			m_Position.x -= glm::cos(rad90) * m_CameraSpeed;
-			m_Position.z -= glm::sin(rad90) * m_CameraSpeed;
-		}
-		if (Input::IsKeyPressed(KeyCode::S)) {
-			m_Position.x += glm::cos(rad90) * m_CameraSpeed;
-			m_Position.z += glm::sin(rad90) * m_CameraSpeed;
-		}
-		if (Input::IsKeyPressed(KeyCode::D)) {
-			m_Position.x += glm::cos(rad) * m_CameraSpeed;
-			m_Position.z += glm::sin(rad) * m_CameraSpeed;
-		}
-		if (Input::IsKeyPressed(KeyCode::A)) {
-			m_Position.x -= glm::cos(rad) * m_CameraSpeed;
-			m_Position.z -= glm::sin(rad) * m_CameraSpeed;
-		}
+		if (Input::IsKeyPressed(KeyCode::W))
+			m_Position -= forward * m_CameraSpeed;
+		if (Input::IsKeyPressed(KeyCode::S))
+			m_Position += forward * m_CameraSpeed;
+		if (Input::IsKeyPressed(KeyCode::D))
+			m_Position += right * m_CameraSpeed;
+		if (Input::IsKeyPressed(KeyCode::A))
+			m_Position -= right * m_CameraSpeed;
 
-		if (Input::IsKeyPressed(KeyCode::LeftShift)) {
-			m_Position.y -= m_CameraSpeed;
-		} else if (Input::IsKeyPressed(KeyCode::Space)) {
-			m_Position.y += m_CameraSpeed;
-		}
+		if (Input::IsKeyPressed(KeyCode::LeftShift))
+			m_Position -= up * m_CameraSpeed;
+		if (Input::IsKeyPressed(KeyCode::Space))
+			m_Position += up * m_CameraSpeed;
 	}
 
 	void EditorCamera::UpdateView() {
 		UpdateMovement();
 
 		m_ViewMatrix = glm::mat4(1.0f);
-		m_ViewMatrix = glm::rotate(m_ViewMatrix, glm::radians(m_Rotation.y), glm::vec3(1.0f, 0.0f, 0.0f));
-		m_ViewMatrix = glm::rotate(m_ViewMatrix, glm::radians(m_Rotation.x), glm::vec3(0.0f, 1.0f, 0.0f));
-		m_ViewMatrix = glm::translate(m_ViewMatrix, -m_Position);
+
+		glm::quat qPitch = glm::angleAxis(glm::radians(m_Rotation.y), glm::vec3(1, 0, 0));
+		glm::quat qYaw = glm::angleAxis(glm::radians(m_Rotation.x), glm::vec3(0, 1, 0));
+		glm::quat qRoll = glm::angleAxis(glm::radians(m_Rotation.z), glm::vec3(0, 0, 1));
+
+		//For a FPS camera we can omit roll
+		glm::quat orientation = qPitch * qYaw;
+		m_Orientation = glm::normalize(orientation);
+
+		glm::mat4 rotation = glm::mat4_cast(m_Orientation);
+		glm::mat4 translation = glm::mat4(1.0f);
+		translation = glm::translate(translation, -m_Position);
+
+		m_ViewMatrix = rotation * translation;
 	}
 }

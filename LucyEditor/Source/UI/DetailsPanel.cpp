@@ -151,7 +151,7 @@ namespace Lucy {
 				ImGui::SameLine();
 				ImGui::DragFloat3("##hidelabel color", (float*)&color, 0.01f, 0.0f, 100.0f, nullptr, 1.0f);
 
-				lightComponent.GetDirection() = dir;
+				lightComponent.GetDirection() = -glm::normalize(Maths::EulerDegreesToLightDirection(dir));
 			}
 		});
 

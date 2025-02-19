@@ -135,6 +135,23 @@ namespace UI {
 }
 
 namespace Maths {
+	
+	//own implementation
+	glm::vec3 EulerDegreesToLightDirection(const glm::vec3& eulerDegrees) {
+		glm::vec3 eulerRadians = glm::radians(eulerDegrees);
+
+		// (order: pitch -> yaw -> roll)
+		glm::quat qPitch = glm::angleAxis(eulerRadians.y, glm::vec3(1.0f, 0.0f, 0.0f)); //Y!!
+		glm::quat qYaw = glm::angleAxis(eulerRadians.x, glm::vec3(0.0f, 1.0f, 0.0f)); //X!!
+		glm::quat qRoll = glm::angleAxis(eulerRadians.z, glm::vec3(0.0f, 0.0f, 1.0f)); //Z
+
+		glm::quat finalOrientation = qYaw * qPitch * qRoll;
+
+		// Define the default forward direction
+		glm::vec3 baseDirection = glm::vec3(0.0f, 0.0f, -1.0f);
+
+		return finalOrientation * baseDirection;
+	}
 
 	//From: https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection
 	bool RayTriangleIntersection(const Ray& r, const glm::vec3& v0, const glm::vec3& v1, const glm::vec3& v2, float& t, float& u, float& v) {

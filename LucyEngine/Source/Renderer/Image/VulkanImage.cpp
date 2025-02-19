@@ -144,7 +144,7 @@ namespace Lucy {
 		ImageMemoryBarrierCreateInfo createInfo;
 		createInfo.ImageHandle = image;
 
-		VkImageSubresourceRange subresourceRange = VulkanAPI::ImageSubresourceRange(m_CreateInfo.ImageType == ImageType::Type2DDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT, 
+		VkImageSubresourceRange subresourceRange = VulkanAPI::ImageSubresourceRange(m_CreateInfo.ImageType == ImageType::Type2DDepth || m_CreateInfo.ImageType == ImageType::Type2DArrayDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
 																					baseMipLevel, baseArrayLayer, levelCount, layerCount);
 
 		createInfo.SubResourceRange = subresourceRange;
@@ -315,6 +315,8 @@ namespace Lucy {
 				return VK_FORMAT_B8G8R8A8_UNORM;
 			case ImageFormat::D32_SFLOAT:
 				return VK_FORMAT_D32_SFLOAT;
+			case ImageFormat::R16G16_SFLOAT:
+				return VK_FORMAT_R16G16_SFLOAT;
 			case ImageFormat::R16G16B16A16_SFLOAT:
 				return VK_FORMAT_R16G16B16A16_SFLOAT;
 			case ImageFormat::R16G16B16A16_UINT:
@@ -327,6 +329,8 @@ namespace Lucy {
 				return VK_FORMAT_R32G32B32A32_UINT;
 			case ImageFormat::R32G32B32_SFLOAT:
 				return VK_FORMAT_R32G32B32_SFLOAT;
+			case ImageFormat::R32G32_SFLOAT:
+				return VK_FORMAT_R32G32_SFLOAT;
 			case ImageFormat::R32_SFLOAT:
 				return VK_FORMAT_R32_SFLOAT;
 			case ImageFormat::R32_UINT:
@@ -356,6 +360,8 @@ namespace Lucy {
 				return ImageFormat::B8G8R8A8_UNORM;
 			case VK_FORMAT_D32_SFLOAT:
 				return ImageFormat::D32_SFLOAT;
+			case VK_FORMAT_R16G16_SFLOAT:
+				return ImageFormat::R16G16_SFLOAT;
 			case VK_FORMAT_R16G16B16A16_SFLOAT:
 				return ImageFormat::R16G16B16A16_SFLOAT;
 			case VK_FORMAT_R16G16B16A16_UINT:
@@ -368,6 +374,8 @@ namespace Lucy {
 				return ImageFormat::R32G32B32A32_UINT;
 			case VK_FORMAT_R32G32B32_SFLOAT:
 				return ImageFormat::R32G32B32_SFLOAT;
+			case VK_FORMAT_R32G32_SFLOAT:
+				return ImageFormat::R32G32_SFLOAT;
 			case VK_FORMAT_R32_SFLOAT:
 				return ImageFormat::R32_SFLOAT;
 			case VK_FORMAT_R32_UINT:

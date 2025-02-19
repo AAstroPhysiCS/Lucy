@@ -21,7 +21,7 @@ namespace Lucy {
 
 		Renderer::AddRendererPass<ForwardPBRPass>(scene, viewportWidth, viewportHeight);
 		Renderer::AddRendererPass<CubemapPass>(scene, viewportWidth, viewportHeight);
-		Renderer::AddRendererPass<ShadowPass>(scene, 4096, 4096);
+		Renderer::AddRendererPass<ShadowPass>(scene, 2048);
 	}
 
 	void ViewportRenderPipeline::BeginFrame() {

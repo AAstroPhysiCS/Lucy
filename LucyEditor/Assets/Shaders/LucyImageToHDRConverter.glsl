@@ -3,6 +3,8 @@
 #extension GL_ARB_shader_viewport_layer_array : require
 #extension GL_EXT_multiview : require
 
+#include "LucyIBLUtilities.glsl"
+
 layout (location = 0) in vec3 a_Pos;
 
 layout (location = 0) out vec3 a_PosOut;
@@ -10,32 +12,6 @@ layout (location = 0) out vec3 a_PosOut;
 layout (push_constant) uniform LucyCameraPushConstants {
     //proj will be imported as a uniform, since we want to control the "lense" of the camera in certain situations
     mat4 u_ProjMatrix;
-};
-
-mat4 LookAt(vec3 eye, vec3 at, vec3 up) {
-  vec3 zaxis = normalize(at - eye);    
-  vec3 xaxis = normalize(cross(zaxis, up));
-  vec3 yaxis = cross(xaxis, zaxis);
-
-  zaxis = -zaxis;
-
-  mat4 viewMatrix = {
-    vec4(xaxis.x, xaxis.y, xaxis.z, -dot(xaxis, eye)),
-    vec4(yaxis.x, yaxis.y, yaxis.z, -dot(yaxis, eye)),
-    vec4(zaxis.x, zaxis.y, zaxis.z, -dot(zaxis, eye)),
-    vec4(0, 0, 0, 1)
-  };
-
-  return viewMatrix;
-}
-
-mat4 CaptureViews[6] = {
-    LookAt(vec3(0.0f, 0.0f, 0.0f), vec3(1.0f,  0.0f,  0.0f), vec3(0.0f, -1.0f,  0.0f)),
-    LookAt(vec3(0.0f, 0.0f, 0.0f), vec3(-1.0f,  0.0f,  0.0f),vec3(0.0f, -1.0f,  0.0f)),
-    LookAt(vec3(0.0f, 0.0f, 0.0f), vec3(0.0f,  1.0f,  0.0f), vec3(0.0f,  0.0f,  1.0f)),
-    LookAt(vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, -1.0f,  0.0f), vec3(0.0f,  0.0f, -1.0f)),
-    LookAt(vec3(0.0f, 0.0f, 0.0f), vec3(0.0f,  0.0f,  1.0f), vec3(0.0f, -1.0f,  0.0f)),
-    LookAt(vec3(0.0f, 0.0f, 0.0f), vec3(0.0f,  0.0f, -1.0f), vec3(0.0f, -1.0f,  0.0f))
 };
 
 void main() {

@@ -71,10 +71,20 @@ namespace Lucy::VulkanAPI {
 		return viewportState;
 	}
 
+	VkPipelineRasterizationDepthClipStateCreateInfoEXT PipelineRasterizationDepthClipStateCreateInfo(VkBool32 depthClipEnable, VkPipelineRasterizationDepthClipStateCreateFlagsEXT flags) {
+		VkPipelineRasterizationDepthClipStateCreateInfoEXT clipState{};
+		clipState.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_DEPTH_CLIP_STATE_CREATE_INFO_EXT;
+		clipState.depthClipEnable = depthClipEnable;
+		clipState.flags = flags;
+		clipState.pNext = VK_NULL_HANDLE;
+
+		return clipState;
+	}
+
 	VkPipelineRasterizationStateCreateInfo VulkanAPI::PipelineRasterizationStateCreateInfo(VkFrontFace frontFace, float lineWidth,
-																						   PolygonMode polygonMode, CullingMode cullingMode,
-																						   VkBool32 depthClampEnable, VkBool32 rasterizerDiscardEnable,
-																						   VkBool32 depthBiasEnable, float depthBiasConstantFactor, float depthBiasClamp, float depthBiasSlopeFactor) {
+		PolygonMode polygonMode, CullingMode cullingMode, VkBool32 depthClampEnable, VkBool32 rasterizerDiscardEnable,
+		VkBool32 depthBiasEnable, float depthBiasConstantFactor, float depthBiasClamp, float depthBiasSlopeFactor,
+		const void* pNext) {
 		VkPipelineRasterizationStateCreateInfo rasterizationCreateInfo{};
 		rasterizationCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 		rasterizationCreateInfo.depthClampEnable = depthClampEnable;
@@ -113,6 +123,7 @@ namespace Lucy::VulkanAPI {
 		rasterizationCreateInfo.depthBiasConstantFactor = depthBiasConstantFactor;
 		rasterizationCreateInfo.depthBiasClamp = depthBiasClamp;
 		rasterizationCreateInfo.depthBiasSlopeFactor = depthBiasSlopeFactor;
+		rasterizationCreateInfo.pNext = pNext;
 
 		return rasterizationCreateInfo;
 	}

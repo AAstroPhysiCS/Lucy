@@ -40,10 +40,13 @@ namespace Lucy {
 
 		void SetInFlightMode(bool mode);
 		void SetState(RenderGraphPassState state);
+		void SetClearColor(ClearColor clearColor);
 
 		inline bool operator==(const RenderGraphPass& other) const { return m_CreateInfo.Name.compare(other.m_CreateInfo.Name) == 0; }
 
 		inline const RGRenderTargetElements& GetRenderTargets() const { return m_RenderTargets; }
+
+		inline ClearColor GetClearColor() { return m_ClearColor; }
 
 		inline auto GetViewportArea() const {
 			struct Area {
@@ -70,5 +73,7 @@ namespace Lucy {
 		uint32_t m_ViewportHeight = 0;
 
 		bool m_PassIsInFlightMode = false;
+
+		ClearColor m_ClearColor;
 	};
 }

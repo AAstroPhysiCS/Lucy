@@ -12,6 +12,8 @@
 
 #include "Scene/Components.h"
 
+#include "glm/gtx/euler_angles.hpp"
+
 namespace Lucy {
 
 	/*
@@ -48,6 +50,7 @@ namespace Lucy {
 				.Height = m_Height,
 				.ImageType = ImageType::Type2DDepth,
 				.Format = ImageFormat::D32_SFLOAT,
+				.GenerateSampler = true,
 			}, RenderPassLoadStoreAttachments::ClearStore);
 
 			build.ReadImage(RGResource(ShadowImages));
@@ -62,20 +65,22 @@ namespace Lucy {
 					const auto& lightningAttributes = pbrShader->GetUniformBufferIfExists("LucyLightningValues");
 					lightningAttributes->SetData((uint8_t*)&lightComponent, sizeof(DirectionalLightComponent));
 
-					static float shadowCameraFarPlanes[ShadowPass::NUM_CASCADES];
+					glm::vec4 shadowCameraFarPlanes;
+
+					ShadowCamera::ResetSplit();
 
 					auto& shadowCameras = ShadowPass::GetShadowCameras();
 					for (size_t i = 0; ShadowCamera& shadowCamera : shadowCameras) {
 						shadowCamera.SetRotation(lightComponent.GetDirection());
 
-						shadowCameraFarPlanes[i++] = shadowCamera.GetFarPlane();
+						shadowCameraFarPlanes[i++] = shadowCamera.GetCascadeSplitDepth();
 
 						const auto& vp = shadowCamera.GetCameraViewProjection();
 						glm::mat4 shadowCameraMatrix = vp.Proj * vp.View;
 						lightningAttributes->Append((uint8_t*)&shadowCameraMatrix, sizeof(glm::mat4));
 					}
 
-					lightningAttributes->Append((uint8_t*)&shadowCameraFarPlanes, sizeof(shadowCameraFarPlanes));
+					lightningAttributes->Append((uint8_t*)&shadowCameraFarPlanes, sizeof(glm::vec4));
 
 					pbrShader->BindImageHandleTo("u_ShadowMap", registry.GetImage(RGResource(ShadowImages)));
 				});
@@ -127,6 +132,7 @@ namespace Lucy {
 				.Height = m_Height,
 				.ImageType = ImageType::Type2DDepth,
 				.Format = ImageFormat::D32_SFLOAT,
+				.GenerateSampler = true,
 			}, RenderPassLoadStoreAttachments::ClearStore);
 
 			build.BindRenderTarget(RGResource(IDPassImage), RGResource(IDPassDepthImage));
@@ -158,35 +164,44 @@ namespace Lucy {
 
 #pragma region ShadowPass
 
-	ShadowPass::ShadowPass(Ref<Scene> scene, uint32_t width, uint32_t height)
-		: m_Scene(scene), m_Width(width), m_Height(height) {
+	ShadowPass::ShadowPass(Ref<Scene> scene, uint32_t size)
+		: m_Scene(scene), m_ShadowMapSize(size) {
 	}
 
 	void ShadowPass::AddPass(const Ref<RenderGraph>& renderGraph) {
 
-		renderGraph->AddPass("DepthOnlyPass", [=, *this](RenderGraphBuilder& build) {
-			build.SetViewportArea(m_Width, m_Height);
+		renderGraph->AddPass("VSMPass", [=, *this](RenderGraphBuilder& build) {
+			build.SetViewportArea(m_ShadowMapSize, m_ShadowMapSize);
+			build.SetClearColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 
 			build.DeclareImage(RGResource(ShadowImages), {
-				.Width = m_Width,
-				.Height = m_Height,
+				.Width = m_ShadowMapSize,
+				.Height = m_ShadowMapSize,
+				.ImageType = ImageType::Type2DArrayColor,
+				.Format = ImageFormat::R16G16_SFLOAT,
+				.Layers = ShadowPass::NUM_CASCADES,
+				.GenerateSampler = true,
+			}, RenderPassLoadStoreAttachments::ClearStore, 
+				RGResource(VSMDepth), {
+				.Width = m_ShadowMapSize,
+				.Height = m_ShadowMapSize,
 				.ImageType = ImageType::Type2DArrayDepth,
 				.Format = ImageFormat::D32_SFLOAT,
-				.Flags = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 				.Layers = ShadowPass::NUM_CASCADES,
 				.GenerateSampler = true,
 			}, RenderPassLoadStoreAttachments::ClearStore);
 
-			build.BindRenderTarget(RGResource(ShadowImages));
+			build.BindRenderTarget(RGResource(ShadowImages), RGResource(VSMDepth));
 
 			const auto& editorCamera = m_Scene->GetEditorCamera();
-			InitializeShadowCameras(editorCamera);
+			InitializeShadowCameras(m_ShadowMapSize, editorCamera);
 
 			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
-				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("DepthOnlyPipeline");
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("VSMPipeline");
 				const auto& depthShader = pipeline->GetShader();
 				
 				if (auto cameraBuffer = depthShader->GetUniformBufferIfExists("LucyCamera")) {
+					ShadowCamera::ResetSplit();
 					for (ShadowCamera& shadowCamera : s_ShadowCameras) {
 						shadowCamera.Update();
 						
@@ -195,7 +210,7 @@ namespace Lucy {
 					}
 				}
 
-				RenderCommand& draw = cmdList.BeginRenderCommand("Depth Only Draw");
+				RenderCommand& draw = cmdList.BeginRenderCommand("VSM Draw");
 				draw.BindPipeline(pipeline);
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
@@ -207,59 +222,103 @@ namespace Lucy {
 				cmdList.EndRenderCommand();
 			};
 		});
+
+		/*
+		renderGraph->AddPass("VSMBlurCompute", [=, *this](RenderGraphBuilder& build) {
+
+			build.BindRenderTarget(RGResource(ShadowImages), RGResource(VSMDepth));
+
+			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+				const auto& horPipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("VSMBlurHorizontalComputePipeline");
+				const auto& verPipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("VSMBlurHorizontalComputePipeline");
+
+				Ref<Image> shadowImages = registry.GetImage(RGResource(ShadowImages));
+				RenderCommand& horCmd = cmdList.BeginRenderCommand("VSMBlurHorizontalCompute");
+				//draw.DownsampleImage(shadowImages, 8.0f);
+
+				horCmd.BindPipeline(horPipeline);
+
+				horCmd.UpdateDescriptorSets();
+				horCmd.BindAllDescriptorSets();
+				//horCmd.DispatchCompute();
+
+				cmdList.EndRenderCommand();
+
+				RenderCommand& verCmd = cmdList.BeginRenderCommand("VSMBlurVerticalCompute");
+
+				verCmd.BindPipeline(verPipeline);
+
+				//verCmd.UpsampleImage(shadowImages, 8.0f);
+				cmdList.EndRenderCommand();
+			};
+		});
+		*/
 	}
 
 	// The method is explained well here
 	// https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-10-parallel-split-shadow-maps-programmable-gpus
-	void ShadowPass::InitializeShadowCameras(const EditorCamera& editorCamera) const {
+	void ShadowPass::InitializeShadowCameras(uint32_t size, const EditorCamera& editorCamera) const {
 		static constexpr float lambda = 1.0f;
 		static float cascadeSplits[NUM_CASCADES];
 
-		float n = editorCamera.GetNearPlane();
-		float f = editorCamera.GetFarPlane();
+		float n = editorCamera.GetNearPlane() * ShadowCamera::GetNearPlaneFactor();
+		float f = editorCamera.GetFarPlane() * ShadowCamera::GetFarPlaneFactor();
 		float clipRange = f - n;
 
-		// Step 1: Splitting the View Frustum
+		float minZ = n;
+		float maxZ = n + clipRange;
+
+		float range = maxZ - minZ;
+		float ratio = maxZ / minZ;
+
 		for (uint32_t i = 0; i < NUM_CASCADES; i++) {
 			float iDivM = (i + 1) / (float)NUM_CASCADES;
-			float C_iLog = n * std::pow(f / n, iDivM);
-			float C_iUniform = n + clipRange * iDivM;
-			float C_i = (lambda * C_iLog) + ((1 - lambda) * C_iUniform);
+			float C_iLog = n * std::pow(ratio, iDivM);
+			float C_iUniform = minZ + range * iDivM;
+			float C_i = lambda * (C_iLog - C_iUniform) + C_iUniform;
 			cascadeSplits[i] = (C_i - n) / clipRange;
 		}
 
 		for (uint32_t i = 0; i < NUM_CASCADES; i++)
-			s_ShadowCameras.emplace_back(editorCamera, cascadeSplits[i]);
+			s_ShadowCameras.emplace_back(size, editorCamera, cascadeSplits[i]);
 	}
 
-	ShadowCamera::ShadowCamera(const EditorCamera& editorCamera, float nearPlane, float farPlane)
-		: OrthographicCamera(0.0f, 0.0f, 0.0f, 0.0f, nearPlane, farPlane), m_EditorCamera(editorCamera) {
+	ShadowCamera::ShadowCamera(uint32_t size, const EditorCamera& editorCamera, float nearPlane, float farPlane)
+		: OrthographicCamera(0.0f, 0.0f, 0.0f, 0.0f, nearPlane, farPlane), m_ShadowMapSize(size), m_EditorCamera(editorCamera) {
 		UpdateView();
+
+		float n = m_EditorCamera.GetNearPlane() * s_NearPlaneFactor;
+		float f = m_EditorCamera.GetFarPlane() * s_FarPlaneFactor;
+		float clipRange = f - n;
+
+		m_CascadeSplitDepth = n + m_CascadeSplit * clipRange;
 	}
 
-	ShadowCamera::ShadowCamera(const EditorCamera& editorCamera, float cascadeSplit) 
-		: OrthographicCamera(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f), m_EditorCamera(editorCamera), m_CascadeSplit(cascadeSplit) {
+	ShadowCamera::ShadowCamera(uint32_t size, const EditorCamera& editorCamera, float cascadeSplit) 
+		: OrthographicCamera(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f), m_ShadowMapSize(size), m_EditorCamera(editorCamera), m_CascadeSplit(cascadeSplit) {
 		UpdateView();
+
+		float n = m_EditorCamera.GetNearPlane() * s_NearPlaneFactor;
+		float f = m_EditorCamera.GetFarPlane() * s_FarPlaneFactor;
+		float clipRange = f - n;
+
+		m_CascadeSplitDepth = n + m_CascadeSplit * clipRange;
 	}
 
 	void ShadowCamera::UpdateView() {
-		static float lastSplitDist = 0.0f;
-
 		CameraViewProjection editorVp = m_EditorCamera.GetCameraViewProjection();
 		glm::mat4 invVP = glm::inverse(editorVp.Proj * editorVp.View);
 
-		const auto& shadowCamRot = GetRotation();
-
 		static constexpr uint32_t frustumCornerCount = 8;
 		static constexpr glm::vec3 ndcCoordinates[frustumCornerCount] = {
-			glm::vec3(-1.0f,  1.0f, 0.0f),
-			glm::vec3(1.0f,  1.0f, 0.0f),
-			glm::vec3(1.0f, -1.0f, 0.0f),
-			glm::vec3(-1.0f, -1.0f, 0.0f),
-			glm::vec3(-1.0f,  1.0f,  1.0f),
-			glm::vec3(1.0f,  1.0f,  1.0f),
-			glm::vec3(1.0f, -1.0f,  1.0f),
-			glm::vec3(-1.0f, -1.0f,  1.0f),
+			glm::vec3(-1.0f,  1.0f, 0.0f),	//near left bottom
+			glm::vec3(1.0f,  1.0f, 0.0f),	//near right bottom
+			glm::vec3(1.0f, -1.0f, 0.0f),	//near right top
+			glm::vec3(-1.0f, -1.0f, 0.0f),	//near left top
+			glm::vec3(-1.0f,  1.0f,  1.0f),	//far left bottom
+			glm::vec3(1.0f,  1.0f,  1.0f),	//far right bottom
+			glm::vec3(1.0f, -1.0f,  1.0f),	//far right top
+			glm::vec3(-1.0f, -1.0f,  1.0f),	//far left top
 		};
 
 		glm::vec3 frustumCornersWS[frustumCornerCount];
@@ -270,7 +329,7 @@ namespace Lucy {
 
 		for (uint32_t i = 0; i < frustumCornerCount / 2; i++) {
 			glm::vec3 cornerRay = frustumCornersWS[i + 4] - frustumCornersWS[i];
-			glm::vec3 nearCornerRay = cornerRay * lastSplitDist;
+			glm::vec3 nearCornerRay = cornerRay * s_LastSplitDist;
 			glm::vec3 farCornerRay = cornerRay * m_CascadeSplit;
 
 			frustumCornersWS[i + 4] = frustumCornersWS[i] + farCornerRay;
@@ -284,35 +343,50 @@ namespace Lucy {
 
 		// Calculating the frustum based on this method, which incorpartes a circle to approximate the bounds of each frustum.
 		// https://johanmedestrom.wordpress.com/2016/03/18/opengl-cascaded-shadow-maps/
-		float radius = 0.0f;
-		for (uint32_t i = 0; i < frustumCornerCount; i++) {
-			float distance = glm::length(frustumCornersWS[i] - frustumCenter);
-			radius = glm::max(radius, distance);
-		}
-		radius = std::ceil(radius * 16.0f) / 16.0f;
+		//float radius = 0.0f;
+		//for (uint32_t i = 0; i < frustumCornerCount; i++) {
+		//	float distance = glm::length(frustumCornersWS[i] - frustumCenter);
+		//	radius = glm::max(radius, distance);
+		//}
+		//radius = std::ceil(radius * 16.0f) / 16.0f;
+		//
+		//glm::vec3 maxExtents = glm::vec3(radius, radius, radius);
+		//glm::vec3 minExtents = -maxExtents;
 
-		glm::vec3 maxExtents = glm::vec3(radius, radius, radius);
-		glm::vec3 minExtents = -maxExtents;
+		const auto& lightDir = GetRotation();
 
-		glm::vec4 baseLightPos = invVP * glm::vec4(0.0f, 1.0f, 0.0f, 1.0f);
-		float dot = glm::dot(baseLightPos, glm::vec4(shadowCamRot, 1.0f));
-		float mag = glm::length(glm::vec4(shadowCamRot, 1.0f));
-		float scalarProjection = dot / mag;
+		float radiusDistWS = std::ceil((frustumCornersWS[0] - frustumCornersWS[6]).length() * 16.0f) / 2.0f;
 
-		glm::vec3 lightPos = glm::vec3(glm::vec4(shadowCamRot, 1.0f) * scalarProjection);
-		glm::vec3 lightDir = glm::normalize(-glm::vec3(glm::radians(shadowCamRot.x), glm::radians(shadowCamRot.y), glm::radians(shadowCamRot.z)));
+		float texelsPerUnitWS = m_ShadowMapSize / (radiusDistWS * 2.0f);
 
+		glm::mat4 scalarMat = glm::mat4(1.0f);
+		scalarMat = glm::scale(scalarMat, glm::vec3(texelsPerUnitWS));
+
+		glm::mat4 lightLookAt = glm::lookAt(glm::vec3(0.0f), lightDir, s_UpDir);
+		glm::mat4 scaledLightLookAt = scalarMat * lightLookAt;
+
+		glm::vec4 scaledCenter = scaledLightLookAt * glm::vec4(frustumCenter, 1.0f);
+		scaledCenter.x = std::floor(scaledCenter.x);
+		scaledCenter.y = std::floor(scaledCenter.y);
+		glm::vec3 snappedCenter = glm::inverse(scaledLightLookAt) * scaledCenter;
+
+		glm::vec3 eye = snappedCenter - (lightDir * radiusDistWS * 2.0f);
+		
 		m_ViewMatrix = glm::mat4(1.0f);
-		m_ViewMatrix = glm::lookAt(frustumCenter - lightDir * radius, frustumCenter, s_UpDir);
+		m_ViewMatrix = glm::lookAt(eye, snappedCenter, s_UpDir);
 
-		m_Left = -radius;
-		m_Right = radius;
-		m_Bottom = -radius;
-		m_Top = radius;
-		m_NearPlane = 0.0f;
-		m_FarPlane = 2 * radius;
+		m_Left = -radiusDistWS;
+		m_Right = radiusDistWS;
+		m_Bottom = -radiusDistWS;
+		m_Top = radiusDistWS;
+		m_NearPlane = -radiusDistWS * 6.0f;
+		m_FarPlane = radiusDistWS * 6.0f;
 
-		lastSplitDist = m_CascadeSplit;
+		s_LastSplitDist = m_CascadeSplit;
+	}
+
+	void ShadowCamera::ResetSplit() {
+		ShadowCamera::s_LastSplitDist = 0.0f;
 	}
 
 #pragma endregion ShadowPass
@@ -424,8 +498,9 @@ namespace Lucy {
 
 				static constexpr uint32_t layerCount = 6;
 
-				cmdList.SetImageLayout(preparedImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0, 1, layerCount);
-				cmdList.SetImageLayout(cubeImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0, 1, layerCount);
+				RenderCommand& cmd = cmdList.BeginRenderCommand("CopyToSampler2DCube");
+				cmd.SetImageLayout(preparedImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0, 1, layerCount);
+				cmd.SetImageLayout(cubeImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0, 1, layerCount);
 
 				std::vector<VkImageCopy> regions;
 				regions.reserve(layerCount);
@@ -455,8 +530,10 @@ namespace Lucy {
 					};
 					regions.push_back(region);
 				}
-				cmdList.CopyImageToImage(preparedImage, cubeImage, regions);
-				cmdList.SetImageLayout(cubeImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, 1, layerCount);
+				cmd.CopyImageToImage(preparedImage, cubeImage, regions);
+				cmd.SetImageLayout(cubeImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, 1, layerCount);
+
+				cmdList.EndRenderCommand();
 			};
 		});
 
@@ -477,21 +554,21 @@ namespace Lucy {
 				const auto& cubeImage = registry.GetExternalImage(RGResource(HDRCubeImage));
 				const auto& irradianceImage = registry.GetExternalImage(RGResource(IrradianceImage));
 
-				cmdList.SetImageLayout(cubeImage, VK_IMAGE_LAYOUT_GENERAL, 0, 0, 1, layerCount);
-				cmdList.SetImageLayout(irradianceImage, VK_IMAGE_LAYOUT_GENERAL, 0, 0, 1, layerCount);
-
 				shader->BindImageHandleTo("u_EnvironmentMap", cubeImage);
 				shader->BindImageHandleTo("u_EnvironmentIrradianceMap", irradianceImage);
 
 				RenderCommand& draw = cmdList.BeginRenderCommand("Irradiance Compute");
+
+				draw.SetImageLayout(cubeImage, VK_IMAGE_LAYOUT_GENERAL, 0, 0, 1, layerCount);
+				draw.SetImageLayout(irradianceImage, VK_IMAGE_LAYOUT_GENERAL, 0, 0, 1, layerCount);
 
 				draw.BindPipeline(pipeline);
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
 				draw.DispatchCompute(HDRImageWidth / workGroupSize, HDRImageHeight / workGroupSize, layerCount);
 
-				cmdList.SetImageLayout(cubeImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, 1, layerCount);
-				cmdList.SetImageLayout(irradianceImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, 1, layerCount);
+				draw.SetImageLayout(cubeImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, 1, layerCount);
+				draw.SetImageLayout(irradianceImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, 1, layerCount);
 
 				cmdList.EndRenderCommand();
 			};

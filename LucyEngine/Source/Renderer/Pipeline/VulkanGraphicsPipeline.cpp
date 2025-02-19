@@ -41,12 +41,18 @@ namespace Lucy {
 		VkPipelineVertexInputStateCreateInfo vertexInputInfo = VulkanAPI::PipelineVertexInputStateCreateInfo((uint32_t)attributeDescriptor.size(), attributeDescriptor.data(), 1, &bindingDescriptor);
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo = VulkanAPI::PipelineInputAssemblyStateCreateInfo(m_CreateInfo.Topology);
 		VkPipelineViewportStateCreateInfo viewportState = VulkanAPI::PipelineViewportStateCreateInfo(1, nullptr, 1, nullptr);
-		VkPipelineRasterizationStateCreateInfo rasterizationCreateInfo = VulkanAPI::PipelineRasterizationStateCreateInfo(VK_FRONT_FACE_COUNTER_CLOCKWISE, m_CreateInfo.Rasterization.LineWidth,
-																														 m_CreateInfo.Rasterization.PolygonMode, m_CreateInfo.Rasterization.CullingMode, m_CreateInfo.DepthConfiguration.DepthClampEnable);
+		VkPipelineRasterizationDepthClipStateCreateInfoEXT rasterizationDepthClipStateCreateInfo = VulkanAPI::PipelineRasterizationDepthClipStateCreateInfo(m_CreateInfo.DepthConfiguration.DepthClipEnable);
+		VkPipelineRasterizationStateCreateInfo rasterizationCreateInfo = VulkanAPI::PipelineRasterizationStateCreateInfo(
+			VK_FRONT_FACE_COUNTER_CLOCKWISE, m_CreateInfo.Rasterization.LineWidth,
+			m_CreateInfo.Rasterization.PolygonMode, m_CreateInfo.Rasterization.CullingMode, m_CreateInfo.DepthConfiguration.DepthClampEnable, VK_FALSE, VK_FALSE, 0.0f, 0.0f, 0.0f, 
+			(const void*)&rasterizationDepthClipStateCreateInfo);
 
 		VkPipelineMultisampleStateCreateInfo multisamplingCreateInfo = VulkanAPI::PipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT);
-		VkPipelineColorBlendAttachmentState colorBlendAttachment = VulkanAPI::PipelineColorBlendAttachmentState(VK_TRUE, VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD,
-																												VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD);
+
+		VkPipelineColorBlendAttachmentState colorBlendAttachment = 
+			VulkanAPI::PipelineColorBlendAttachmentState(m_CreateInfo.BlendConfiguration.BlendEnable,
+			m_CreateInfo.BlendConfiguration.SrcColorBlendFactor, m_CreateInfo.BlendConfiguration.DstColorBlendFactor, m_CreateInfo.BlendConfiguration.ColorBlendOp,
+			m_CreateInfo.BlendConfiguration.SrcAlphaBlendFactor, m_CreateInfo.BlendConfiguration.DstAlphaBlendFactor, m_CreateInfo.BlendConfiguration.AlphaBlendOp);
 
 		std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments(renderPass->GetColorAttachmentCount(), colorBlendAttachment);
 

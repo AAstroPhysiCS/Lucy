@@ -202,7 +202,8 @@ namespace Lucy {
 		rawData.SetData((uint8_t*)rawDataMapped, imageSize);
 		allocator.UnmapMemory(s_IDBufferVma);
 
-		uint32_t bufferPos = (uint32_t) (4 * ((viewportMouseY * imageWidth) + viewportMouseX));
+		uint32_t flippedY = imageHeight - 1 - (uint32_t)(viewportMouseY);
+		uint32_t bufferPos = (uint32_t) (4 * ((flippedY * imageWidth) + viewportMouseX));
 		glm::vec3 meshID = glm::vec3(rawData[bufferPos], rawData[bufferPos + 1], rawData[bufferPos + 2]);
 
 		image->SetLayoutImmediate(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);

@@ -36,31 +36,7 @@ namespace Lucy {
 		}
 	}
 
-	void RenderCommandList::SetImageLayout(Ref<Image> image, uint32_t newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {
-		if (Renderer::GetRenderArchitecture() != RenderArchitecture::Vulkan)
-			return;
-		const auto& vulkanImage = image->As<VulkanImage>();
-		vulkanImage->SetLayout((VkCommandBuffer)m_PrimaryCommandPool->GetCurrentFrameCommandBuffer(), 
-			(VkImageLayout)newLayout, baseMipLevel, baseArrayLayer, levelCount, layerCount);
-	}
-
-	void RenderCommandList::CopyImageToImage(Ref<Image> srcImage, Ref<Image> destImage, const std::vector<VkImageCopy>& regions) {
-		if (Renderer::GetRenderArchitecture() != RenderArchitecture::Vulkan)
-			return;
-		const auto& srcVulkanImage = srcImage->As<VulkanImage>();
-		const auto& destVulkanImage = destImage->As<VulkanImage>();
-		srcVulkanImage->CopyImageToImage((VkCommandBuffer)m_PrimaryCommandPool->GetCurrentFrameCommandBuffer(), destVulkanImage, regions);
-	}
-
-	void RenderCommandList::CopyBufferToImage(Ref<ByteBuffer> srcBuffer, Ref<Image> destImage) {
-		//TODO:
-		LUCY_ASSERT(false);
-	}
-
-	void RenderCommandList::CopyImageToBuffer(Ref<Image> srcImage, Ref<ByteBuffer> destBuffer) {
-		//TODO:
-		LUCY_ASSERT(false);
-	}
+	
 
 	RenderCommand& RenderCommandList::BeginRenderCommand(const std::string& nameOfDraw) {
 		LUCY_ASSERT(!s_CurrentActiveRenderCommand, "There is an active ongoing render command that needs to be closed!");

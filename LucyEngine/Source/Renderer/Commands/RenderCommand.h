@@ -3,11 +3,15 @@
 #include "Renderer/Pipeline/PipelineConfigurations.h"
 #include "Renderer/RenderPass.h"
 
+#include "Renderer/Memory/Buffer/Buffer.h"
+
 namespace Lucy {
 	
 	class RenderDevice;
 	class Shader;
 	class CommandPool;
+
+	class Image;
 
 	class Mesh;
 
@@ -19,19 +23,28 @@ namespace Lucy {
 		~RenderCommand() = default;
 		//TODO: Dynamic raster and depth configuration
 #pragma region Rasterization
-		constexpr void DisableBackCulling(bool backCullingDisable);
-		constexpr void SetCullingMode(CullingMode cullingMode);
-		constexpr void SetLineWidth(float lineWidth);
-		constexpr void SetPolygonMode(PolygonMode polygonMode);
+		void DisableBackCulling(bool backCullingDisable);
+		void SetCullingMode(CullingMode cullingMode);
+		void SetLineWidth(float lineWidth);
+		void SetPolygonMode(PolygonMode polygonMode);
 
-		constexpr void SetClearColor(ClearColor clearColor);
+		void SetClearColor(ClearColor clearColor);
 #pragma endregion Rasterization
 #pragma region DepthConfiguration
-		constexpr void SetDepthWriteEnable(bool depthWriteEnable);
-		constexpr void SetDepthTestEnable(bool depthTestEnable);
-		constexpr void SetDepthCompareOp(DepthCompareOp depthCompareOp);
-		constexpr void SetStencilTestEnable(bool stencilTestEnable);
+		void SetDepthWriteEnable(bool depthWriteEnable);
+		void SetDepthTestEnable(bool depthTestEnable);
+		void SetDepthCompareOp(DepthCompareOp depthCompareOp);
+		void SetStencilTestEnable(bool stencilTestEnable);
 #pragma endregion DepthConfiguration
+#pragma region Image
+		void SetImageLayout(Ref<Image> image, uint32_t newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount);
+
+		void CopyImageToImage(Ref<Image> srcImage, Ref<Image> destImage, const std::vector<VkImageCopy>& regions);
+
+		void CopyBufferToImage(Ref<ByteBuffer> srcBuffer, Ref<Image> destImage);
+		void CopyImageToBuffer(Ref<Image> srcImage, Ref<ByteBuffer> destBuffer);
+#pragma endregion Image
+
 		void BindBuffers(Ref<Mesh> mesh);
 		void BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer);
 		

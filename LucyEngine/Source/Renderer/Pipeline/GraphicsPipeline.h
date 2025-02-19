@@ -11,6 +11,7 @@ namespace Lucy {
 		Topology Topology = Topology::TRIANGLES;
 		Rasterization Rasterization;
 		DepthConfiguration DepthConfiguration;
+		BlendConfiguration BlendConfiguration;
 		VertexShaderLayout VertexShaderLayout;
 
 		RenderResourceHandle RenderPassHandle;

@@ -121,7 +121,8 @@ namespace Lucy {
 
 		std::vector<const char*> m_DeviceExtensions = {
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME, 
-			VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME
+			VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
+			VK_EXT_DEPTH_CLIP_ENABLE_EXTENSION_NAME
 		};
 
 		std::vector<VkFormat> m_DeviceFormatSupportToCheck = {

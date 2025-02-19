@@ -42,7 +42,7 @@ namespace Lucy {
 			if (to == 0)
 				to = data.size();
 			
-			if (to > data.size() || m_Data.size() < data.size()) {
+			if (to > data.size() || from + to > m_Data.size()) {
 				LUCY_CRITICAL("Index out of bounds");
 				LUCY_ASSERT(false);
 			}
@@ -62,7 +62,7 @@ namespace Lucy {
 			SetData(other.m_Data);
 		}
 
-		inline T* Data() { return m_Data.data(); }
+		inline T* operator&() const { return m_Data.data(); }
 
 		inline void Append(const std::vector<T>& data) {
 			m_Data.insert(m_Data.end(), data.begin(), data.end());
@@ -73,7 +73,13 @@ namespace Lucy {
 		}
 
 		inline void Append(T* data, size_t size) {
+			InsertPadding(alignof(T));
 			m_Data.insert(m_Data.end(), data, data + size);
+		}
+
+		inline void AppendMove(T* data, size_t size) {
+			InsertPadding(alignof(T));
+			m_Data.insert(m_Data.end(), std::make_move_iterator(data), std::make_move_iterator(data + size));
 		}
 
 		inline void Clear() {
@@ -88,6 +94,13 @@ namespace Lucy {
 		inline size_t GetCapacity() const { return m_Data.capacity(); }
 	protected:
 		std::vector<T> m_Data;
+
+	private:
+		inline void InsertPadding(size_t alignment) {
+			size_t offset = m_Data.size();
+			size_t padding = (alignment - (offset % alignment)) % alignment;
+			m_Data.insert(m_Data.end(), padding, 0);
+		}
 	};
 
 	using ByteBuffer = Buffer<uint8_t>;

@@ -9,6 +9,8 @@
 #include "Renderer/Pipeline/GraphicsPipeline.h"
 #include "Renderer/Pipeline/ComputePipeline.h"
 
+#include "Renderer/Image/VulkanImage.h"
+
 namespace Lucy {
 
 	RenderCommand::RenderCommand(const std::string& nameOfDraw, const Ref<RenderDevice>& renderDevice, const Ref<CommandPool>& primaryCmdPool)
@@ -182,39 +184,65 @@ namespace Lucy {
 		m_RenderDevice->DispatchCompute(m_PrimaryCommandPool, m_BoundedComputePipeline, groupCountX, groupCountY, groupCountZ);
 	}
 
-	constexpr void RenderCommand::DisableBackCulling(bool backCullingDisable) {
+	void RenderCommand::SetImageLayout(Ref<Image> image, uint32_t newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {
+		if (Renderer::GetRenderArchitecture() != RenderArchitecture::Vulkan)
+			return;
+		const auto& vulkanImage = image->As<VulkanImage>();
+		vulkanImage->SetLayout((VkCommandBuffer)m_PrimaryCommandPool->GetCurrentFrameCommandBuffer(),
+			(VkImageLayout)newLayout, baseMipLevel, baseArrayLayer, levelCount, layerCount);
+	}
+
+	void RenderCommand::CopyImageToImage(Ref<Image> srcImage, Ref<Image> destImage, const std::vector<VkImageCopy>& regions) {
+		if (Renderer::GetRenderArchitecture() != RenderArchitecture::Vulkan)
+			return;
+		const auto& srcVulkanImage = srcImage->As<VulkanImage>();
+		const auto& destVulkanImage = destImage->As<VulkanImage>();
+		srcVulkanImage->CopyImageToImage((VkCommandBuffer)m_PrimaryCommandPool->GetCurrentFrameCommandBuffer(), destVulkanImage, regions);
+	}
+
+	void RenderCommand::CopyBufferToImage(Ref<ByteBuffer> srcBuffer, Ref<Image> destImage) {
+		//TODO:
+		LUCY_ASSERT(false);
+	}
+
+	void RenderCommand::CopyImageToBuffer(Ref<Image> srcImage, Ref<ByteBuffer> destBuffer) {
+		//TODO:
+		LUCY_ASSERT(false);
+	}
+
+	void RenderCommand::DisableBackCulling(bool backCullingDisable) {
 		m_DynamicRasterizationConfig.DisableBackCulling = backCullingDisable;
 	}
 
-	constexpr void RenderCommand::SetCullingMode(CullingMode cullingMode) {
+	void RenderCommand::SetCullingMode(CullingMode cullingMode) {
 		m_DynamicRasterizationConfig.CullingMode = cullingMode;
 	}
 
-	constexpr void RenderCommand::SetLineWidth(float lineWidth) {
+	void RenderCommand::SetLineWidth(float lineWidth) {
 		m_DynamicRasterizationConfig.LineWidth = lineWidth;
 	}
 
-	constexpr void RenderCommand::SetPolygonMode(PolygonMode polygonMode) {
+	void RenderCommand::SetPolygonMode(PolygonMode polygonMode) {
 		m_DynamicRasterizationConfig.PolygonMode = polygonMode;
 	}
 
-	constexpr void RenderCommand::SetClearColor(ClearColor clearColor) {
+	void RenderCommand::SetClearColor(ClearColor clearColor) {
 		m_DynamicClearColor = clearColor;
 	}
 
-	constexpr void RenderCommand::SetDepthWriteEnable(bool depthWriteEnable) {
+	void RenderCommand::SetDepthWriteEnable(bool depthWriteEnable) {
 		m_DynamicDepthConfig.DepthWriteEnable = depthWriteEnable;
 	}
 
-	constexpr void RenderCommand::SetDepthTestEnable(bool depthTestEnable) {
+	void RenderCommand::SetDepthTestEnable(bool depthTestEnable) {
 		m_DynamicDepthConfig.DepthTestEnable = depthTestEnable;
 	}
 
-	constexpr void RenderCommand::SetDepthCompareOp(DepthCompareOp depthCompareOp) {
+	void RenderCommand::SetDepthCompareOp(DepthCompareOp depthCompareOp) {
 		m_DynamicDepthConfig.DepthCompareOp = depthCompareOp;
 	}
 
-	constexpr void RenderCommand::SetStencilTestEnable(bool stencilTestEnable) {
+	void RenderCommand::SetStencilTestEnable(bool stencilTestEnable) {
 		m_DynamicDepthConfig.StencilTestEnable = stencilTestEnable;
 	}
 }

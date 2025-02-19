@@ -15,6 +15,7 @@ namespace Lucy {
 
 		void SetViewportArea(uint32_t width, uint32_t height);
 		void SetInFlightMode(bool mode);
+		void SetClearColor(ClearColor clearColor);
 
 		void DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp);
 		void DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp,

@@ -23,10 +23,12 @@ namespace Lucy::VulkanAPI {
 	VkComputePipelineCreateInfo ComputePipelineCreateInfo(VkPipelineLayout pipelineLayout, VkPipelineShaderStageCreateInfo stage);
 	VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo(uint32_t setLayoutCount, const VkDescriptorSetLayout* const descriptorSetLayouts, uint32_t pushConstantRangeCount, const VkPushConstantRange* const pushConstantRanges);
 	VkPipelineViewportStateCreateInfo PipelineViewportStateCreateInfo(uint32_t viewportCount, const VkViewport* const viewports, uint32_t scissorCount, const VkRect2D* const scissors);
+	VkPipelineRasterizationDepthClipStateCreateInfoEXT PipelineRasterizationDepthClipStateCreateInfo(VkBool32 depthClipEnable, VkPipelineRasterizationDepthClipStateCreateFlagsEXT flags = 0);
 	VkPipelineRasterizationStateCreateInfo PipelineRasterizationStateCreateInfo(VkFrontFace frontFace, float lineWidth,
-																				PolygonMode polygonMode, CullingMode cullingMode,
-																				VkBool32 depthClampEnable = VK_FALSE, VkBool32 rasterizerDiscardEnable = VK_FALSE,
-																				VkBool32 depthBiasEnable = VK_FALSE, float depthBiasConstantFactor = 0.0f, float depthBiasClamp = 0.0f, float depthBiasSlopeFactor = 0.0f);
+		PolygonMode polygonMode, CullingMode cullingMode,
+		VkBool32 depthClampEnable = VK_FALSE, VkBool32 rasterizerDiscardEnable = VK_FALSE,
+		VkBool32 depthBiasEnable = VK_FALSE, float depthBiasConstantFactor = 0.0f, 
+		float depthBiasClamp = 0.0f, float depthBiasSlopeFactor = 0.0f, const void* pNext = VK_NULL_HANDLE);
 	VkPipelineMultisampleStateCreateInfo PipelineMultisampleStateCreateInfo(VkSampleCountFlagBits rasterizationSamples,
 																			VkBool32 alphaToCoverageEnable = VK_FALSE, VkBool32 alphaToOneEnable = VK_FALSE,
 																			VkBool32 sampleShadingEnable = VK_FALSE, float minSampleShading = 0.0f, const VkSampleMask* sampleMask = nullptr);

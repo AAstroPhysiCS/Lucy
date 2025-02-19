@@ -13,6 +13,25 @@ namespace Lucy {
 
 	class VulkanDescriptorPool;
 
+	class CustomShaderIncluder final : public shaderc::CompileOptions::IncluderInterface {
+	public:
+		CustomShaderIncluder(Ref<RenderDevice> renderDevice);
+		virtual ~CustomShaderIncluder() = default;
+
+		// Handles shaderc_include_resolver_fn callbacks.
+		shaderc_include_result* GetInclude(const char* requested_source,
+			shaderc_include_type type,
+			const char* requesting_source,
+			size_t include_depth) final override;
+
+		// Handles shaderc_include_result_release_fn callbacks.
+		void ReleaseInclude(shaderc_include_result* data) final override;
+	private:
+		Ref<RenderDevice> m_RenderDevice = nullptr;
+
+		std::string* m_DataBuffer = nullptr;
+	};
+
 	class Shader : public MemoryTrackable {
 	public:
 		static Ref<Shader> Create(const std::string& name, const std::filesystem::path& path, Ref<RenderDevice> device);

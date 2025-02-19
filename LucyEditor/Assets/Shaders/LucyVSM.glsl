@@ -36,6 +36,19 @@ void main() {
 //type fragment
 #version 450
 
-void main() {
+layout (location = 0) out vec2 a_Color;
 
+vec2 ComputeMoments(float depth) {
+	float squaredDepth = depth * depth;
+	vec2 moments;
+	float dx = dFdx(depth);
+	float dy = dFdy(depth);
+	moments.x = depth;
+	moments.y = squaredDepth + 0.25 * (dx * dx + dy * dy);
+	return moments;
+}
+
+void main() {
+	vec2 moments = ComputeMoments(gl_FragCoord.z);
+	a_Color = moments;
 }

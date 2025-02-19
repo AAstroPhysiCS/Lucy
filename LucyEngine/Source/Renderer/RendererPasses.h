@@ -23,33 +23,47 @@ namespace Lucy {
 #pragma region ShadowPass
 	
 	struct ShadowCamera : public OrthographicCamera {
-		ShadowCamera(const EditorCamera& editorCamera, float nearPlane, float farPlane);
-		ShadowCamera(const EditorCamera& editorCamera, float cascadeSplit);
+		ShadowCamera(uint32_t size, const EditorCamera& editorCamera, float nearPlane, float farPlane);
+		ShadowCamera(uint32_t size, const EditorCamera& editorCamera, float cascadeSplit);
 		virtual ~ShadowCamera() = default;
 
 		void UpdateView() final override;
+
+		inline float GetCascadeSplitDepth() const { return m_CascadeSplitDepth; }
+
+		inline static constexpr float GetNearPlaneFactor() { return s_NearPlaneFactor; }
+		inline static constexpr float GetFarPlaneFactor() { return s_FarPlaneFactor; }
+
+		static void ResetSplit();
 	private:
 		const EditorCamera& m_EditorCamera;
+		uint32_t m_ShadowMapSize;
+
 		float m_CascadeSplit = 0.0f;
+		float m_CascadeSplitDepth = 0.0f;
+
+		inline static float s_LastSplitDist = 0.0f;
+
+		inline static constexpr float s_NearPlaneFactor = 1.0f;
+		inline static constexpr float s_FarPlaneFactor = 1.0f;
 	};
 
 	struct ShadowPass final {
 		static constexpr const uint32_t NUM_CASCADES = 4;
 
-		ShadowPass(Ref<Scene> scene, uint32_t width, uint32_t height);
+		ShadowPass(Ref<Scene> scene, uint32_t size);
 		~ShadowPass() = default;
 
 		void AddPass(const Ref<RenderGraph>& renderGraph);
 
 		static inline std::vector<ShadowCamera>& GetShadowCameras() { return s_ShadowCameras; }
 	private:
-		void InitializeShadowCameras(const EditorCamera& editorCamera) const;
+		void InitializeShadowCameras(uint32_t size, const EditorCamera& editorCamera) const;
 		
 		static inline std::vector<ShadowCamera> s_ShadowCameras;
 
 		Ref<Scene> m_Scene;
-		uint32_t m_Width;
-		uint32_t m_Height;
+		uint32_t m_ShadowMapSize;
 	};
 #pragma endregion ShadowPass
 

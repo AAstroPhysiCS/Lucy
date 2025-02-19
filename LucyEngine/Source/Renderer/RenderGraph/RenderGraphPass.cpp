@@ -36,4 +36,8 @@ namespace Lucy {
 	void RenderGraphPass::SetState(RenderGraphPassState state) {
 		m_State = state;
 	}
+
+	void RenderGraphPass::SetClearColor(ClearColor clearColor) {
+		m_ClearColor = clearColor;
+	}
 }
