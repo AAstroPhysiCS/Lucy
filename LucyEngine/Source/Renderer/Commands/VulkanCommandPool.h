@@ -13,7 +13,7 @@ namespace Lucy {
 
 		inline void* GetCurrentFrameCommandBuffer() { return m_CommandBuffers[Renderer::GetCurrentFrameIndex()]; }
 
-		void Destroy() final override;
+		void Destroy();
 		void Recreate() final override;
 	protected:
 		void FreeCommandBuffers(uint32_t commandBufferCount, size_t commandBufferStartIndex);
@@ -32,6 +32,7 @@ namespace Lucy {
 
 		VkCommandBuffer BeginSingleTimeCommand(VkDevice logicalDevice);
 		void EndSingleTimeCommand();
+		void Destroy();
 
 		inline VkCommandBuffer GetTransientCommandBuffer() const { return m_CommandBuffers[m_CommandBuffers.size() - 1]; }
 	};

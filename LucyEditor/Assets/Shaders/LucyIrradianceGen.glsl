@@ -3,7 +3,7 @@
 #extension GL_ARB_shader_viewport_layer_array : require
 #extension GL_EXT_multiview : require
 
-#include "LucyIBLUtilities.glsl"
+#include "LucyIBLUtilities"
 
 layout (location = 0) in vec3 a_Pos;
 
@@ -16,22 +16,19 @@ layout (push_constant) uniform LucyCameraPushConstants {
 
 void main() {
 	a_PosOut = a_Pos;
-    gl_Layer = gl_ViewIndex;
     gl_Position = u_ProjMatrix * inverse(CaptureViews[gl_ViewIndex]) * vec4(a_Pos, 1.0f);
 }
 
 //type fragment
 #version 450
 
+#include "LucySamplingUtilities"
+
 layout (location = 0) in vec3 a_Pos;
 
 layout (location = 0) out vec4 a_LayeredColorAttachments; //6 layers
 
 layout (set = 0, binding = 0) uniform samplerCube u_EnvironmentMap;
-
-#define PI 3.1415926535897932384626433832795f
-#define TWO_PI 6.283185307179586476925286766559f
-#define HALF_PI 1.57079632679489661923132169163975f
 
 void main() {
 	vec3 normalVector = normalize(a_Pos);

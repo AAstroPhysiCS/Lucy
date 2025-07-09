@@ -42,14 +42,14 @@ namespace Lucy {
 					break;
 			}
 
-			LUCY_INFO(fmt::format("------{0} Shader {1}------", shaderType, path.string()));
-			LUCY_INFO(fmt::format("{0} uniform buffers", stageInfo.UniformCount));
-			LUCY_INFO(fmt::format("{0} sampled images", stageInfo.SampledImagesCount));
-			LUCY_INFO(fmt::format("{0} storage images", stageInfo.StorageImageCount));
-			LUCY_INFO(fmt::format("{0} storage buffers", stageInfo.StorageBufferCount));
-			LUCY_INFO(fmt::format("{0} push constant buffers", stageInfo.PushConstantBufferCount));
-			LUCY_INFO(fmt::format("{0} stage inputs", stageInfo.StageInputCount));
-			LUCY_INFO(fmt::format("{0} stage outputs", stageInfo.StageOutputCount));
+			LUCY_INFO(std::format("------{0} Shader {1}------", shaderType, path.string()));
+			LUCY_INFO(std::format("{0} uniform buffers", stageInfo.UniformCount));
+			LUCY_INFO(std::format("{0} sampled images", stageInfo.SampledImagesCount));
+			LUCY_INFO(std::format("{0} storage images", stageInfo.StorageImageCount));
+			LUCY_INFO(std::format("{0} storage buffers", stageInfo.StorageBufferCount));
+			LUCY_INFO(std::format("{0} push constant buffers", stageInfo.PushConstantBufferCount));
+			LUCY_INFO(std::format("{0} stage inputs", stageInfo.StageInputCount));
+			LUCY_INFO(std::format("{0} stage outputs", stageInfo.StageOutputCount));
 
 			if (stageFlag == VK_SHADER_STAGE_VERTEX_BIT)
 				ParseShaderInput(compiler, resource.stage_inputs);
@@ -172,18 +172,18 @@ namespace Lucy {
 				it->second.push_back(uniformBlock);
 			}
 
-			LUCY_INFO(fmt::format("Name = '{0}'", uniformBlock.Name));
-			LUCY_INFO(fmt::format("Set = {0}", set));
-			LUCY_INFO(fmt::format("IsArray = {0}", (bool)dimension));
+			LUCY_INFO(std::format("Name = '{0}'", uniformBlock.Name));
+			LUCY_INFO(std::format("Set = {0}", set));
+			LUCY_INFO(std::format("IsArray = {0}", (bool)dimension));
 
 			if (dimension) {
-				LUCY_INFO(fmt::format("Array Size = {0}", arr[0]));
-				LUCY_INFO(fmt::format("Is Dynamically Allocated = {0}", uniformBlock.DynamicallyAllocated));
+				LUCY_INFO(std::format("Array Size = {0}", arr[0]));
+				LUCY_INFO(std::format("Is Dynamically Allocated = {0}", uniformBlock.DynamicallyAllocated));
 			}
 
-			LUCY_INFO(fmt::format("Size = {0}", bufferSize));
-			LUCY_INFO(fmt::format("Binding = {0}", binding));
-			LUCY_INFO(fmt::format("Members = {0}", memberCount));
+			LUCY_INFO(std::format("Size = {0}", bufferSize));
+			LUCY_INFO(std::format("Binding = {0}", binding));
+			LUCY_INFO(std::format("Members = {0}", memberCount));
 		}
 	}
 
@@ -207,9 +207,9 @@ namespace Lucy {
 			size_t memberCount = type.member_types.size();
 			uint32_t bufferSize = (uint32_t)compiler->get_declared_struct_size(type);
 
-			LUCY_INFO(fmt::format("Name = '{0}'", uniformBlock.Name));
-			LUCY_INFO(fmt::format("Members = {0}", memberCount));
-			LUCY_INFO(fmt::format("Size = {0}", bufferSize));
+			LUCY_INFO(std::format("Name = '{0}'", uniformBlock.Name));
+			LUCY_INFO(std::format("Members = {0}", memberCount));
+			LUCY_INFO(std::format("Size = {0}", bufferSize));
 
 			uniformBlock.StageFlag = stageFlag;
 			uniformBlock.BufferSize = bufferSize;

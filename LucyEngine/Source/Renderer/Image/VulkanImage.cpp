@@ -86,7 +86,7 @@ namespace Lucy {
 		Renderer::SubmitImmediateCommand([&](VkCommandBuffer commandBuffer) {
 			for (uint32_t mip = 1; mip < m_MaxMipLevel; mip++) {
 				for (uint32_t face = 0; face < m_CreateInfo.Layers; face++) {
-					VkImageSubresourceLayers srcSubresource = VulkanAPI::ImageSubresourceLayers(m_CreateInfo.ImageType == ImageType::Type2DDepth || m_CreateInfo.ImageType == ImageType::Type2DArrayDepth
+					VkImageSubresourceLayers srcSubresource = VulkanAPI::ImageSubresourceLayers(m_CreateInfo.ImageUsage == ImageUsage::AsDepthAttachment
 						? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT, mip - 1, face, 1);
 					VkImageSubresourceLayers dstSubresource = VulkanAPI::ImageSubresourceLayers(srcSubresource.aspectMask, mip, face, 1);
 
@@ -144,7 +144,7 @@ namespace Lucy {
 		ImageMemoryBarrierCreateInfo createInfo;
 		createInfo.ImageHandle = image;
 
-		VkImageSubresourceRange subresourceRange = VulkanAPI::ImageSubresourceRange(m_CreateInfo.ImageType == ImageType::Type2DDepth || m_CreateInfo.ImageType == ImageType::Type2DArrayDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
+		VkImageSubresourceRange subresourceRange = VulkanAPI::ImageSubresourceRange(m_CreateInfo.ImageUsage == ImageUsage::AsDepthAttachment ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
 																					baseMipLevel, baseArrayLayer, levelCount, layerCount);
 
 		createInfo.SubResourceRange = subresourceRange;
@@ -162,7 +162,7 @@ namespace Lucy {
 
 		if (m_CreateInfo.ImGuiUsage) {
 			if (!m_ImGuiID) {
-				Renderer::EnqueueToRenderThread([&]([[maybe_unused]] const Ref<RenderDevice>& device) {
+				Renderer::EnqueueToRenderCommandQueue([&]([[maybe_unused]] const Ref<RenderDevice>& device) {
 					m_ImGuiID = ImGui_ImplVulkan_AddTexture(m_ImageView.GetSampler(), m_ImageView.GetVulkanHandle(), m_CurrentLayout);
 				});
 			} else {
@@ -199,6 +199,7 @@ namespace Lucy {
 		ImageViewCreateInfo imageViewCreateInfo{
 			.Image = image,
 			.ImageType = m_CreateInfo.ImageType,
+			.ImageUsage = m_CreateInfo.ImageUsage,
 			.Format = (VkFormat)GetAPIImageFormat(m_CreateInfo.Format),
 			.GenerateSampler = m_CreateInfo.GenerateSampler,
 			.GenerateMipmap = m_CreateInfo.GenerateMipmap,
@@ -222,17 +223,16 @@ namespace Lucy {
 	}
 
 	void VulkanImageView::RTCreateView() {
-		auto GetImageType = [](ImageType type) {
+		auto GetImageType = [&](ImageType type) {
 			switch (type) {
-				case ImageType::Type2DDepth:
-				case ImageType::Type2DColor:
+				case ImageType::Type2D: {
+					if (m_CreateInfo.Layers > 1)
+						return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
 					return VK_IMAGE_VIEW_TYPE_2D;
-				case ImageType::Type2DArrayDepth:
-				case ImageType::Type2DArrayColor:
-					return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-				case ImageType::Type3DColor:
+				}
+				case ImageType::Type3D:
 					return VK_IMAGE_VIEW_TYPE_3D;
-				case ImageType::TypeCubeColor:
+				case ImageType::TypeCube:
 					return VK_IMAGE_VIEW_TYPE_CUBE;
 				default:
 					return VK_IMAGE_VIEW_TYPE_MAX_ENUM;
@@ -241,22 +241,18 @@ namespace Lucy {
 
 		auto GetLayerCount = [this](ImageType type) {
 			switch (type) {
-				case ImageType::Type2DDepth:
-				case ImageType::Type2DColor:
-					return 1u;
-				case ImageType::Type2DArrayDepth:
-				case ImageType::Type2DArrayColor:
+				case ImageType::Type2D:
 					return m_CreateInfo.Layers;
-				case ImageType::Type3DColor:
+				case ImageType::Type3D:
 					return 3u;
-				case ImageType::TypeCubeColor:
+				case ImageType::TypeCube:
 					return 6u;
 				default:
 					return 1u;
 			}
 		};
 		
-		VkImageSubresourceRange subresourceRange = VulkanAPI::ImageSubresourceRange(m_CreateInfo.ImageType == ImageType::Type2DDepth || m_CreateInfo.ImageType == ImageType::Type2DArrayDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
+		VkImageSubresourceRange subresourceRange = VulkanAPI::ImageSubresourceRange(m_CreateInfo.ImageUsage == ImageUsage::AsDepthAttachment ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
 																					0, 0, m_CreateInfo.MipmapLevel, GetLayerCount(m_CreateInfo.ImageType));
 		VkComponentMapping components = { VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
 			VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY };
@@ -293,6 +289,36 @@ namespace Lucy {
 
 		m_ImageView = VK_NULL_HANDLE;
 		m_Sampler = VK_NULL_HANDLE;
+	}
+
+	VkImageUsageFlags VulkanImage::GetImageFlagsBasedOnUsage() {
+		VkImageUsageFlags flags = 0;
+
+		switch (m_CreateInfo.ImageUsage) {
+			case ImageUsage::AsColorAttachment:
+				flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+				break;
+			case ImageUsage::AsColorTransferAttachment:
+				flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+				break;
+			case ImageUsage::AsDepthAttachment:
+				flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+				break;
+			case ImageUsage::AsColorStorageTransferAttachment:
+				flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+				break;
+			case ImageUsage::AsTransientColorAttachment:
+				flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+				break;
+		}
+
+		if (m_CreateInfo.GenerateSampler)
+			flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
+
+		if (m_CreateInfo.GenerateMipmap)
+			flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+		return flags;
 	}
 
 	uint32_t GetAPIImageFormat(ImageFormat format) {

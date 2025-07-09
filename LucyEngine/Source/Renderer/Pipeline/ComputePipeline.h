@@ -22,5 +22,6 @@ namespace Lucy {
 		virtual void RTDispatch(void* commandBufferHandle, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) = 0;
 	protected:
 		ComputePipelineCreateInfo m_CreateInfo;
+
 	};
 }

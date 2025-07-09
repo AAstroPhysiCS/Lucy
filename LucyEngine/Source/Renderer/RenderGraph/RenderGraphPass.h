@@ -21,6 +21,7 @@ namespace Lucy {
 	struct RenderGraphPassCreateInfo {
 		RenderGraphSetupFunc SetupFunc;
 		RenderGraphRegistry& Registry;
+		TargetQueueFamily TargetQueueFamily;
 		std::string Name = "Unnamed RenderGraphPass";
 	};
 
@@ -58,6 +59,8 @@ namespace Lucy {
 			return Area{ m_ViewportWidth, m_ViewportHeight };
 		}
 		inline bool IsInFlightMode() const { return m_PassIsInFlightMode; }
+
+		inline TargetQueueFamily GetTargetQueueFamily() const { return m_CreateInfo.TargetQueueFamily; }
 
 		inline RenderGraphPassState GetCurrentState() const { return m_State; }
 		inline const std::string& GetName() const { return m_CreateInfo.Name; }

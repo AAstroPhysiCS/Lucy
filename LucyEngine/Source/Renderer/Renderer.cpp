@@ -1,5 +1,8 @@
 #include "lypch.h"
-#include <bitset>
+#include <array>
+#include <future>
+
+#include "Core/Timer.h"
 
 #include "Renderer.h"
 #include "Renderer/VulkanRenderer.h"
@@ -22,34 +25,86 @@ namespace Lucy {
 	void Renderer::Init(RendererConfiguration config, const Ref<Window>& window) {
 		s_Config = config;
 
-		s_Renderer = RendererBackend::Create(config, window);
-		s_Renderer->Init();
+		if (config.ThreadingPolicy == ThreadingPolicy::Multithreaded) {
+			static std::promise<void> renderThreadInitPromise;
+			static auto renderThreadInitFuture = renderThreadInitPromise.get_future();
+
+			s_RenderThread = new RenderThread(
+				RunnableThreadCreateInfo{
+				   .Name = "LucyRenderThread",
+				   .Affinity = ThreadApplicationAffinityIncremental,
+				   .Priority = ThreadPriority::Highest
+				},
+				RenderThreadCreateInfo{
+					.Window = window,
+					.Config = config,
+					.InitPromise = renderThreadInitPromise,
+				}
+			);
+
+			s_RenderThread->Start();
+
+			renderThreadInitFuture.wait();
+		} else {
+			s_Backend = RendererBackend::Create(config, window);
+			s_Backend->Init();
+		}
+
+		LUCY_ASSERT(s_Backend, "RendererBackend is nullptr!");
+
+		constexpr size_t graphicsShaderCount = 5;
+		constexpr size_t computeShaderCount = 2;
+
+		constexpr const std::array<const char*, graphicsShaderCount> graphicsShaders = {
+			"LucyPBR",
+			"LucyID",
+			"LucyHDRSkybox",
+			"LucyImageToHDRConverter",
+			"LucyVSM",
+		};
+
+		constexpr const std::array<const char*, computeShaderCount> computeShaders = {
+			"LucyIrradianceGen",
+			"LucyPrefilterGen",
+		};
 
 		const auto& device = GetRenderDevice();
-		PushShader(Shader::Create("LucyPBR", "Assets/Shaders/LucyPBR.glsl", device));
-		PushShader(Shader::Create("LucyID", "Assets/Shaders/LucyID.glsl", device));
-		PushShader(Shader::Create("LucyHDRSkybox", "Assets/Shaders/LucyHDRSkybox.glsl", device));
-		PushShader(Shader::Create("LucyImageToHDRConverter", "Assets/Shaders/LucyImageToHDRConverter.glsl", device));
-		PushShader(Shader::Create("LucyVSM", "Assets/Shaders/LucyVSM.glsl", device));
+		const auto& shaderFolder = Shader::GetShaderFolder();
+		
+		static std::mutex shaderCompilationMutex;
 
+		TaskScheduler* taskScheduler = Application::GetTaskScheduler();
+		{
+			ScopedTimer timer("Shader Compilation");
+
+			const auto ScheduleShaderCompilationBatch = [&]<typename T>(const T& shaderArray, const char* extension, size_t count) {
+				taskScheduler->ScheduleBatch(TaskScheduler::Launch::Async, TaskPriority::High, [=](const TaskArgs& args, const TaskBatchArgs& batchArgs) {
+					const std::string& shaderName = shaderArray[batchArgs.BatchIndex];
+					auto shader = Shader::Create(shaderName, shaderFolder / (shaderName + extension), device);
+					std::unique_lock lock(shaderCompilationMutex);
+					PushShader(shader);
+				}, count, 1);
+			};
+			ScheduleShaderCompilationBatch(graphicsShaders, ".glsl", graphicsShaderCount);
 #if USE_COMPUTE_FOR_CUBEMAP_GEN
-		PushShader(Shader::Create("LucyIrradianceGen", "Assets/Shaders/LucyIrradianceGen.comp", device));
-		PushShader(Shader::Create("LucyPrefilterGen", "Assets/Shaders/LucyPrefilterGen.comp", device));
+			ScheduleShaderCompilationBatch(computeShaders, ".comp", computeShaderCount);
 #else
-		PushShader(Shader::Create("LucyIrradianceGen", "Assets/Shaders/LucyIrradianceGen.glsl", device));
-		PushShader(Shader::Create("LucyPrefilterGen", "Assets/Shaders/LucyPrefilterGen.glsl", device));
+			ScheduleShaderCompilationBatch(computeShaders, ".glsl", computeShaderCount);
 #endif
+
+		}
 
 		s_RenderGraph = Memory::CreateRef<RenderGraph>();
 		s_PipelineManager = Memory::CreateUnique<PipelineManager>(GetRenderDevice());
 		s_MaterialManager = Memory::CreateUnique<MaterialManager>(s_Shaders);
 
-		EnqueueToRenderThread([](const Ref<RenderDevice>& device) {
+		EnqueueToRenderCommandQueue([](const Ref<RenderDevice>& device) {
 			static ImageCreateInfo blankCubeCreateInfo;
 			blankCubeCreateInfo.Width = 1024;
 			blankCubeCreateInfo.Height = 1024;
 			blankCubeCreateInfo.Format = ImageFormat::R32G32B32A32_SFLOAT;
-			blankCubeCreateInfo.ImageType = ImageType::TypeCubeColor;
+			blankCubeCreateInfo.ImageType = ImageType::TypeCube;
+			blankCubeCreateInfo.ImageUsage = ImageUsage::AsColorTransferAttachment;
 			blankCubeCreateInfo.Parameter.U = ImageAddressMode::REPEAT;
 			blankCubeCreateInfo.Parameter.V = ImageAddressMode::REPEAT;
 			blankCubeCreateInfo.Parameter.W = ImageAddressMode::REPEAT;
@@ -111,7 +166,10 @@ namespace Lucy {
 
 		s_CubeMesh = Mesh::Create(vertices, indices);
 
-		s_Renderer->FlushCommandQueue();
+		taskScheduler->WaitForAllTasks();
+
+		if (config.ThreadingPolicy == ThreadingPolicy::Singlethreaded)
+			s_Backend->FlushCommandQueue();
 	}
 
 	void Renderer::CompileRenderGraph() {
@@ -259,8 +317,10 @@ namespace Lucy {
 			RenderGraphPass* pass = node.Pass;
 			auto [viewportWidth, viewportHeight] = pass->GetViewportArea();
 
-			if (viewportWidth == 0 && viewportHeight == 0)
+			if (viewportWidth == 0 && viewportHeight == 0) {
+				LUCY_WARN("Viewport area of pass '{0}' is 0, skipping...", pass->GetName());
 				continue;
+			}
 
 			const RGRenderTargetElements& rgRenderTargets = pass->GetRenderTargets();
 			auto& maxLayeredRGRenderTarget = *std::ranges::max_element(rgRenderTargets, [&](const RenderGraphResource& a, const RenderGraphResource& b) {
@@ -274,17 +334,106 @@ namespace Lucy {
 			s_RenderFrameHandleMap.try_emplace(pass->GetName(), RenderFrameHandles{ renderPassHandle, frameBufferHandle });
 		}
 
-		CreateGraphicsPipeline("LucyPBR", "PBRGeometryPass", "PBRGeometryPipeline", Rasterization{ .DisableBackCulling = true, .CullingMode = CullingMode::None });
-		CreateGraphicsPipeline("LucyID", "IDPass", "IDPipeline");
-		CreateGraphicsPipeline("LucyHDRSkybox", "CubemapPass", "SkyboxPipeline", Rasterization{ .DisableBackCulling = true, .CullingMode = CullingMode::None }, DepthConfiguration{ .DepthCompareOp = DepthCompareOp::LessOrEqual });
-		CreateGraphicsPipeline("LucyImageToHDRConverter", "HDRImageToLayeredImage", "HDRImageToLayeredImageConvertPipeline");
-		CreateGraphicsPipeline("LucyVSM", "VSMPass", "VSMPipeline", 
-			Rasterization{ .DisableBackCulling = true, .CullingMode = CullingMode::None }, 
-			DepthConfiguration{ .DepthClipEnable = VK_FALSE, .DepthCompareOp = DepthCompareOp::LessOrEqual },
-			BlendConfiguration{ .BlendEnable = VK_FALSE });
-		CreateComputePipeline("LucyIrradianceGen", "IrradianceComputePipeline");
+		TaskScheduler* taskScheduler = Application::GetTaskScheduler();
+		{
+			ScopedTimer timer("Pipeline Creation");
 
-		GetRenderDevice()->CreateDeviceQueries(s_PipelineManager->GetAllPipelineCount(), s_RenderGraph->GetPassCount());
+			struct RenderGraphPipelineCreateInfo {
+				const char* ShaderName;
+				const char* PassName;
+				const char* PipelineName;
+				Rasterization RasterizationConfig = {};
+				DepthConfiguration DepthConfig = {};
+				BlendConfiguration BlendConfig = {};
+			};
+
+#if !USE_COMPUTE_FOR_CUBEMAP_GEN
+			constexpr size_t graphicsPipelineCount = 7;
+#else
+			constexpr size_t graphicsPipelineCount = 5;
+#endif
+			constexpr const std::array<RenderGraphPipelineCreateInfo, graphicsPipelineCount> graphicsPipelineCreateInfos = {
+				// PBR Geometry Pipeline
+				RenderGraphPipelineCreateInfo {
+					.ShaderName = "LucyPBR",
+					.PassName = "PBRGeometryPass",
+					.PipelineName = "PBRGeometryPipeline",
+					.RasterizationConfig = {.DisableBackCulling = true, .CullingMode = CullingMode::None}
+				},
+				// ID Pipeline
+				{
+					.ShaderName = "LucyID",
+					.PassName = "IDPass",
+					.PipelineName = "IDPipeline"
+				},
+				// Skybox Pipeline
+				{
+					.ShaderName = "LucyHDRSkybox",
+					.PassName = "CubemapPass",
+					.PipelineName = "SkyboxPipeline",
+					.RasterizationConfig = {.DisableBackCulling = true, .CullingMode = CullingMode::None},
+					.DepthConfig = {.DepthCompareOp = DepthCompareOp::LessOrEqual}
+				},
+				// HDR Converter Pipeline
+				{
+					.ShaderName = "LucyImageToHDRConverter",
+					.PassName = "HDRImageToLayeredImage",
+					.PipelineName = "HDRImageToLayeredImageConvertPipeline"
+				},
+				// VSM Pipeline
+				{
+					.ShaderName = "LucyVSM",
+					.PassName = "VSMPass",
+					.PipelineName = "VSMPipeline",
+					.RasterizationConfig = {.DisableBackCulling = true, .CullingMode = CullingMode::None},
+					.DepthConfig = {.DepthClipEnable = VK_FALSE, .DepthCompareOp = DepthCompareOp::LessOrEqual},
+					.BlendConfig = {.BlendEnable = VK_FALSE}
+				},
+#if !USE_COMPUTE_FOR_CUBEMAP_GEN
+				{
+					.ShaderName = "LucyIrradianceGen",
+					.PassName = "IrradiancePass",
+					.PipelineName = "IrradiancePipeline",
+				},
+				{
+					.ShaderName = "LucyPrefilterGen",
+					.PassName = "PrefilterPass",
+					.PipelineName = "PrefilterPipeline",
+				},
+#endif
+			};
+
+			constexpr size_t computePipelineCount = 2;
+			constexpr const std::array<RenderGraphPipelineCreateInfo, computePipelineCount> computePipelineCreateInfos = {
+				RenderGraphPipelineCreateInfo {
+					.ShaderName = "LucyIrradianceGen",
+					.PipelineName = "IrradianceComputePipeline"
+				},
+				{
+					.ShaderName = "LucyPrefilterGen",
+					.PipelineName = "PrefilterComputePipeline"
+				},
+			};
+
+			static std::mutex pipelineMutex;
+
+			taskScheduler->ScheduleBatch(TaskScheduler::Launch::Async, TaskPriority::High, [&](const TaskArgs& args, const TaskBatchArgs& batchArgs) {
+				const auto& createInfo = graphicsPipelineCreateInfos[batchArgs.BatchIndex];
+				std::unique_lock lock(pipelineMutex);
+				CreateGraphicsPipeline(createInfo.ShaderName, createInfo.PassName, createInfo.PipelineName, createInfo.RasterizationConfig, createInfo.DepthConfig, createInfo.BlendConfig);
+			}, graphicsPipelineCount, 1);
+
+			taskScheduler->ScheduleBatch(TaskScheduler::Launch::Async, TaskPriority::High, [&](const TaskArgs& args, const TaskBatchArgs& batchArgs) {
+				const auto& createInfo = computePipelineCreateInfos[batchArgs.BatchIndex];
+				std::unique_lock lock(pipelineMutex);
+				CreateComputePipeline(createInfo.ShaderName, createInfo.PipelineName);
+			}, computePipelineCount, 1);
+
+			taskScheduler->WaitForAllTasks();
+		}
+
+		device->CreatePipelineDeviceQueries(s_PipelineManager->GetGraphicsPipelineCount());
+		device->CreateTimestampDeviceQueries(s_RenderGraph->GetPassCount());
 	}
 
 	void Renderer::ImportExternalRenderGraphResource(const RenderGraphResource& renderGraphResource, RenderResourceHandle renderResourceHandle) {
@@ -310,34 +459,66 @@ namespace Lucy {
 	RenderContextResultCodes Renderer::WaitAndPresent() {
 		LUCY_PROFILE_NEW_EVENT("Renderer::WaitAndPresent");
 		s_MaterialManager->UpdateMaterialsIfNecessary();
-		return s_Renderer->WaitAndPresent();
+		return s_Backend->WaitAndPresent();
 	}
 
 	void Renderer::Destroy() {
+		WaitForDevice();
+
 		EnqueueResourceDestroy(s_BlankCubeHandle);
 
-		for (auto& [renderPassHandle, frameBufferHandle] : s_RenderFrameHandleMap | std::views::values) {
-			EnqueueResourceDestroy(renderPassHandle);
-			EnqueueResourceDestroy(frameBufferHandle);
+		/*
+		* Have to do this, since some passes can be utilizing the framebuffer of other passes, so before i delete them, i have to
+		* exclude those passes out, in order to not delete the same resource twice.
+		*/
+
+		std::unordered_set<RenderResourceHandle> distinctRenderPassHandles;
+		std::unordered_set<RenderResourceHandle> distinctFrameBufferHandles;
+		distinctRenderPassHandles.reserve(s_RenderFrameHandleMap.size());
+		distinctFrameBufferHandles.reserve(s_RenderFrameHandleMap.size());
+
+		for (auto&& [rp, fb] : s_RenderFrameHandleMap | std::views::values) {
+			distinctRenderPassHandles.insert(rp);
+			distinctFrameBufferHandles.insert(fb);
 		}
-		
-		s_PipelineManager->RTDestroyAll();
-		s_MaterialManager->RTDestroyAll();
+
+		auto destroyResources = [](const auto& resourceSet) {
+			for (auto resource : resourceSet) {
+				EnqueueResourceDestroy(resource);
+			}
+		};
+
+		destroyResources(distinctRenderPassHandles);
+		destroyResources(distinctFrameBufferHandles);
+
+		s_PipelineManager->DestroyAll();
+		s_MaterialManager->DestroyAll();
 
 		s_CubeMesh->Destroy();
 		DestroyAllShaders();
-		s_Renderer->Destroy();
+
+		if (s_Config.ThreadingPolicy == ThreadingPolicy::Singlethreaded)
+			s_Backend->Destroy();
+		else
+			s_RenderThread->SignalToShutdown();
+
+		s_RenderThread->WaitToShutdown();
+		delete s_RenderThread;
 	}
 
 	void Renderer::WaitForDevice() {
-		GetRenderDevice()->WaitForDevice();
+		s_Backend->GetRenderDevice()->WaitForDevice();
 	}
 
 	bool Renderer::IsOnRenderThread() {
-		auto renderThread = s_Renderer->GetRenderThread();
-		if (!renderThread) //threading policy is single-threaded
+		if (s_Config.ThreadingPolicy == ThreadingPolicy::Singlethreaded)
 			return true;
-		return renderThread->IsOnRenderThread();
+		return s_RenderThread->IsOnRenderThread();
+	}
+
+	void Renderer::RTSetBackend(Ref<RendererBackend> backend) {
+		LUCY_ASSERT(IsOnRenderThread(), "RTSetBackend is being called from the main thread!");
+		s_Backend = backend;
 	}
 
 	Ref<Image> Renderer::GetOutputOfPass(const char* name) {
@@ -351,28 +532,29 @@ namespace Lucy {
 		return nullptr;
 	}
 
-	void Renderer::DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size) {
-		s_Renderer->As<VulkanRenderer>()->DirectCopyBuffer(stagingBuffer, buffer, size);
+	void Renderer::RTDirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size) {
+		LUCY_ASSERT(IsOnRenderThread(), "RTDirectCopyBuffer is being called from the main thread!");
+		s_Backend->As<VulkanRenderer>()->RTDirectCopyBuffer(stagingBuffer, buffer, size);
 	}
 
 	void Renderer::SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func) {
-		s_Renderer->As<VulkanRenderer>()->SubmitImmediateCommand(std::move(func));
+		s_Backend->As<VulkanRenderer>()->SubmitImmediateCommand(std::move(func));
 	}
 
-	void Renderer::EnqueueToRenderThread(RenderCommandFunc&& func) {
-		s_Renderer->EnqueueToRenderThread(std::move(func));
+	void Renderer::EnqueueToRenderCommandQueue(RenderCommandFunc&& func) {
+		s_Backend->EnqueueToRenderCommandQueue(std::move(func));
 	}
 
 	void Renderer::EnqueueResourceDestroy(RenderResourceHandle& handle) {
-		s_Renderer->EnqueueResourceDestroy(handle);
+		s_Backend->EnqueueResourceDestroy(handle);
 	}
 
 	void Renderer::InitializeImGui() {
-		s_Renderer->InitializeImGui();
+		s_Backend->InitializeImGui();
 	}
 
 	void Renderer::RenderImGui() {
-		s_Renderer->RenderImGui();
+		s_Backend->RTRenderImGui();
 	}
 
 	bool Renderer::IsValidRenderResource(RenderResourceHandle handle) {
@@ -381,24 +563,40 @@ namespace Lucy {
 		return isValid;
 	}
 
-	void Renderer::RTReloadShader(const std::string& name) {
-		const auto& device = GetRenderDevice();
-		device->WaitForQueue(TargetQueueFamily::Graphics);
+	void Renderer::ReloadShader(const std::string& name) {
+		EnqueueToRenderCommandQueue([name](const auto& device) {
+			LUCY_ASSERT(IsOnRenderThread(), "ReloadShader is being called from the main thread!");
+			device->WaitForQueue(TargetQueueFamily::Graphics);
+			device->WaitForQueue(TargetQueueFamily::Compute);
+
+			const Ref<Shader>& shader = s_Shaders.at(name);
+			shader->RTDestroyResource(device);
+			shader->RTLoad(device, true);
+		});
 
 		const Ref<Shader>& shader = s_Shaders.at(name);
-		shader->RTDestroyResource(device);
-		shader->RTLoad(device, true);
-
 		s_PipelineManager->RTRecreateAllPipelinesDependentOnShader(shader);
 	}
 
 	void Renderer::SubmitToRender(RenderGraphPass& pass) {
-		if (!s_RenderFrameHandleMap.contains(pass.GetName())) {
-			s_Renderer->SubmitToCompute(pass);
-			return;
+		switch (pass.GetTargetQueueFamily()) {
+			case TargetQueueFamily::Compute: {
+				s_Backend->SubmitToCompute(pass);
+				break;
+			}
+			case TargetQueueFamily::Graphics: {
+				const auto& [renderPassHandle, frameBufferHandle] = s_RenderFrameHandleMap.at(pass.GetName());
+				s_Backend->SubmitToRender(pass, renderPassHandle, frameBufferHandle);
+				break;
+			}
+			case TargetQueueFamily::Transfer: {
+				LUCY_ASSERT(false);
+				break;
+			}
+			default:
+				LUCY_ASSERT(false);
+				break;
 		}
-		const auto& [renderPassHandle, frameBufferHandle] = s_RenderFrameHandleMap.at(pass.GetName());
-		s_Renderer->SubmitToRender(pass, renderPassHandle, frameBufferHandle);
 	}
 
 	void Renderer::OnEvent(Event& evt) {
@@ -435,21 +633,22 @@ namespace Lucy {
 
 	void Renderer::OnWindowResize() {
 		LUCY_PROFILE_NEW_EVENT("Renderer::OnWindowResize");
-		s_Renderer->OnWindowResize();
+		s_Backend->OnWindowResize();
 	}
 
 	void Renderer::OnViewportResize() {
 		LUCY_PROFILE_NEW_EVENT("Renderer::OnViewportResize");
-		s_Renderer->OnViewportResize();
+		s_Backend->OnViewportResize();
 	}
 
 	glm::vec3 Renderer::OnMousePicking(const EntityPickedEvent& e) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::OnMousePicking");
+
 		const auto& device = GetRenderDevice();
 		auto frameBufferHandle = s_RenderFrameHandleMap.at("IDPass").FrameBufferHandle;
 		const auto& frameBuffer = device->AccessResource<FrameBuffer>(frameBufferHandle);
 		if (GetRenderArchitecture() == RenderArchitecture::Vulkan)
-			return s_Renderer->OnMousePicking(e, device->AccessResource<Image>(frameBuffer->As<VulkanFrameBuffer>()->GetImageHandles()[GetCurrentFrameIndex()]));
+			return s_Backend->OnMousePicking(e, device->AccessResource<Image>(frameBuffer->As<VulkanFrameBuffer>()->GetImageHandles()[GetCurrentFrameIndex()]));
 		return glm::vec3(-1.0f);
 	}
 
@@ -462,7 +661,11 @@ namespace Lucy {
 	}
 
 	void Renderer::DestroyAllShaders() {
-		for (const auto& shader : s_Shaders | std::views::values)
-			shader->RTDestroyResource(GetRenderDevice());
+		EnqueueToRenderCommandQueue([](const auto& device){
+			LUCY_ASSERT(IsOnRenderThread(), "DestroyAllShaders is being called from the main thread!");
+
+			for (const auto& shader : s_Shaders | std::views::values)
+				shader->RTDestroyResource(device);
+		});
 	}
 }

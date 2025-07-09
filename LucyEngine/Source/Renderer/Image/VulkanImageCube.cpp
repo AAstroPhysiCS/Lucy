@@ -5,6 +5,7 @@
 #include "Renderer/Device/VulkanRenderDevice.h"
 
 #include "stb/stb_image.h"
+#include "../../../ThirdParty/ImGui/imgui_impl_vulkan.h"
 
 namespace Lucy {
 
@@ -12,7 +13,7 @@ namespace Lucy {
 		: VulkanImage(path, createInfo), m_VulkanDevice(device) {
 		m_CreateInfo.Layers = 6;
 
-		LUCY_ASSERT(m_CreateInfo.ImageType == ImageType::TypeCubeColor);
+		LUCY_ASSERT(m_CreateInfo.ImageType == ImageType::TypeCube);
 		LUCY_ASSERT(stbi_is_hdr(m_Path.generic_string().c_str()), "The texture isnt HDR. Texture path: {0}", m_Path.generic_string().c_str());
 
 		RTCreateFromPath();
@@ -21,16 +22,12 @@ namespace Lucy {
 	VulkanImageCube::VulkanImageCube(const ImageCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device)
 		: VulkanImage(createInfo), m_VulkanDevice(device) {
 		m_CreateInfo.Layers = 6;
-		LUCY_ASSERT(m_CreateInfo.ImageType == ImageType::TypeCubeColor);
+		LUCY_ASSERT(m_CreateInfo.ImageType == ImageType::TypeCube);
 		RTCreateEmptyImage();
 	}
 
 	void VulkanImageCube::RTCreateFromPath() {
-		//Storage bit is for compute shaders (for irradiance and co.)
-		VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | m_CreateInfo.Flags;
-
-		if (m_CreateInfo.GenerateSampler)
-			flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
+		VkImageUsageFlags flags = GetImageFlagsBasedOnUsage();
 
 		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
 		allocator.CreateVulkanImageVma(m_CreateInfo.Width, m_CreateInfo.Height, m_MaxMipLevel, (VkFormat)GetAPIImageFormat(m_CreateInfo.Format), m_CurrentLayout,
@@ -65,6 +62,9 @@ namespace Lucy {
 	void VulkanImageCube::RTDestroyResource() {
 		if (!m_Image)
 			return;
+
+		//if (m_CreateInfo.ImGuiUsage)
+		//	ImGui_ImplVulkan_RemoveTexture((VkDescriptorSet)m_ImGuiID);
 
 		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
 

@@ -20,7 +20,7 @@
 
 namespace Lucy {
 
-	void VulkanRenderDevice::Init(VkInstance instance, std::vector<const char*>& enabledValidationLayers, VkSurfaceKHR surface, uint32_t apiVersion) {
+	void VulkanRenderDevice::Init(VkInstance instance, const std::vector<const char*>& enabledValidationLayers, VkSurfaceKHR surface, uint32_t apiVersion) {
 		m_Surface = surface;
 
 		uint32_t deviceCount = 0;
@@ -42,13 +42,47 @@ namespace Lucy {
 
 		m_Allocator.Init(instance, m_LogicalDevice, m_PhysicalDevice, apiVersion);
 
-		m_ImmediateCommandFence = Memory::CreateUnique<Fence>();
+		m_ImmediateCommandFence = Memory::CreateUnique<Fence>(this);
 	}
 
 	void VulkanRenderDevice::PickDeviceByRanking(const std::vector<VkPhysicalDevice>& devices) {
 
 		LUCY_INFO("----------Available Devices----------");
+#if USE_INTEGRATED_GRAPHICS
+		for (const auto& device : devices) {
+			VkPhysicalDeviceProperties properties;
+			vkGetPhysicalDeviceProperties(device, &properties);
 
+			VkPhysicalDeviceFeatures features;
+			vkGetPhysicalDeviceFeatures(device, &features);
+
+			if (properties.deviceType != VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
+				continue;
+
+			VulkanDeviceInfo deviceInfo = { properties.deviceName, properties.driverVersion, properties.apiVersion };
+			LUCY_INFO(std::format("Device Name: {0}", deviceInfo.Name));
+			LUCY_INFO(std::format("Device Driver Version: {0}", deviceInfo.DriverVersion));
+			LUCY_INFO(std::format("Device API Version: {0}", deviceInfo.ApiVersion));
+			LUCY_INFO("-------------------------------------");
+			deviceInfo.MinUniformBufferAlignment = (uint32_t)properties.limits.minUniformBufferOffsetAlignment;
+			deviceInfo.TimestampPeriod = properties.limits.timestampPeriod;
+
+			FindQueueFamilies(device);
+
+			bool isDeviceRequirementsCovered = CheckDeviceExtensionSupport(device) && CheckDeviceFormatSupport(device);
+
+			if (features.multiViewport
+				&& features.geometryShader
+				&& features.samplerAnisotropy
+				&& features.tessellationShader
+				&& m_QueueFamilyIndices.IsComplete()
+				&& isDeviceRequirementsCovered) {
+				m_DeviceInfo = deviceInfo;
+				m_PhysicalDevice = device;
+				return;
+			}
+		}
+#else
 		for (const auto& device : devices) {
 			VkPhysicalDeviceProperties properties;
 			vkGetPhysicalDeviceProperties(device, &properties);
@@ -57,9 +91,9 @@ namespace Lucy {
 			vkGetPhysicalDeviceFeatures(device, &features);
 
 			VulkanDeviceInfo deviceInfo = { properties.deviceName, properties.driverVersion, properties.apiVersion };
-			LUCY_INFO(fmt::format("Device Name: {0}", deviceInfo.Name));
-			LUCY_INFO(fmt::format("Device Driver Version: {0}", deviceInfo.DriverVersion));
-			LUCY_INFO(fmt::format("Device API Version: {0}", deviceInfo.ApiVersion));
+			LUCY_INFO(std::format("Device Name: {0}", deviceInfo.Name));
+			LUCY_INFO(std::format("Device Driver Version: {0}", deviceInfo.DriverVersion));
+			LUCY_INFO(std::format("Device API Version: {0}", deviceInfo.ApiVersion));
 			LUCY_INFO("-------------------------------------");
 			deviceInfo.MinUniformBufferAlignment = (uint32_t)properties.limits.minUniformBufferOffsetAlignment;
 			deviceInfo.TimestampPeriod = properties.limits.timestampPeriod;
@@ -80,11 +114,12 @@ namespace Lucy {
 				return;
 			}
 		}
+#endif
 
 		LUCY_ASSERT(false, "No suitable device found!");
 	}
 
-	void VulkanRenderDevice::CreateLogicalDevice(std::vector<const char*>& enabledValidationLayers) {
+	void VulkanRenderDevice::CreateLogicalDevice(const std::vector<const char*>& enabledValidationLayers) {
 		std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 		std::set<uint32_t> uniqueQueueFamilies = { 
 			m_QueueFamilyIndices.GraphicsFamily, 
@@ -116,12 +151,15 @@ namespace Lucy {
 		vulkan12Features.descriptorBindingPartiallyBound = VK_TRUE;
 		vulkan12Features.descriptorBindingVariableDescriptorCount = VK_TRUE;
 		vulkan12Features.runtimeDescriptorArray = VK_TRUE;
+		//for query pool reset
+		vulkan12Features.hostQueryReset = VK_TRUE;
 		vulkan12Features.pNext = &multiViewFeatures;
 
 		//For compute shaders/pipeline
 		VkPhysicalDeviceVulkan13Features vulkan13Features{};
 		vulkan13Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
 		vulkan13Features.maintenance4 = VK_TRUE;
+		vulkan13Features.synchronization2 = VK_TRUE;
 		vulkan13Features.pNext = &vulkan12Features;
 
 		VkPhysicalDeviceFeatures2 features{};
@@ -160,8 +198,7 @@ namespace Lucy {
 		std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
 		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
-		uint32_t i = 0;
-		for (const auto& queueFamily : queueFamilies) {
+		for (uint32_t i = 0; const auto& queueFamily : queueFamilies) {
 			VkBool32 presentSupport = false;
 			vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_Surface, &presentSupport);
 
@@ -223,7 +260,7 @@ namespace Lucy {
 			LUCY_CRITICAL("Not available extensions");
 			uint32_t i = 0;
 			for (const auto& notAvailableExtensions : requiredExtensions) {
-				LUCY_CRITICAL(fmt::format("Index: {0}, Name: {1}", (i++), notAvailableExtensions));
+				LUCY_CRITICAL(std::format("Index: {0}, Name: {1}", (i++), notAvailableExtensions));
 			}
 			LUCY_ASSERT(false);
 		}
@@ -246,21 +283,33 @@ namespace Lucy {
 		return allFormatIsSupported;
 	}
 
-	void VulkanRenderDevice::SubmitWorkToGPU(VkQueue queueHandle, size_t commandBufferCount, VkCommandBuffer* commandBuffers, const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) const {
+	void VulkanRenderDevice::SubmitWorkToGPU(VkQueue queueHandle, size_t commandBufferCount, VkCommandBuffer* commandBuffers, Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore, Semaphore* currentFrameSignalSemaphore) const {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::SubmitWorkToGPU");
 
 		VkPipelineStageFlags imageWaitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 
-		VkSubmitInfo submitInfo = VulkanAPI::QueueSubmitInfo((uint32_t)commandBufferCount, commandBuffers, 1, &currentFrameWaitSemaphore.GetSemaphore(), imageWaitStages, 1, &currentFrameSignalSemaphore.GetSemaphore());
-		LUCY_VK_ASSERT(vkQueueSubmit(queueHandle, 1, &submitInfo, currentFrameFence.GetFence()));
+		if (queueHandle == m_ComputeQueue) {
+			imageWaitStages[0] = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+		}
+
+		bool noWaiting = currentFrameWaitSemaphore == nullptr;
+		bool noSignaling = currentFrameSignalSemaphore == nullptr;
+
+		bool noSyncNeeded = noWaiting && noSignaling;
+
+		VkSubmitInfo submitInfo = VulkanAPI::QueueSubmitInfo((uint32_t)commandBufferCount, commandBuffers, noSyncNeeded ? 0 : 1, 
+			noSyncNeeded ? nullptr : &currentFrameWaitSemaphore->GetSemaphore(), imageWaitStages, noSyncNeeded ? 0 : 1,
+			noSyncNeeded ? nullptr : &currentFrameSignalSemaphore->GetSemaphore());
+		LUCY_VK_ASSERT(vkQueueSubmit(queueHandle, 1, &submitInfo, currentFrameFence->GetFence()));
 	}
 
-	void VulkanRenderDevice::SubmitWorkToGPU(VkQueue queueHandle, VkCommandBuffer currentCommandBuffer, const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) const {
+	void VulkanRenderDevice::SubmitWorkToGPU(VkQueue queueHandle, VkCommandBuffer currentCommandBuffer, Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore, Semaphore* currentFrameSignalSemaphore) const {
 		SubmitWorkToGPU(queueHandle, 1, &currentCommandBuffer, currentFrameFence, currentFrameWaitSemaphore, currentFrameSignalSemaphore);
 	}
 
 	void VulkanRenderDevice::SubmitWorkToGPU(VkQueue queueHandle, size_t commandBufferCount, void* commandBufferHandles) const {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::SubmitWorkToGPU");
+		LUCY_ASSERT(commandBufferCount != 0);
 
 		VkFence fenceHandle = m_ImmediateCommandFence->GetFence();
 		vkResetFences(m_LogicalDevice, 1, &fenceHandle);
@@ -271,8 +320,10 @@ namespace Lucy {
 	}
 
 	void VulkanRenderDevice::SubmitWorkToGPU(TargetQueueFamily queueFamily, Ref<CommandPool> cmdPool,
-											 const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) {
+											 Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore, Semaphore* currentFrameSignalSemaphore) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::SubmitWorkToGPU");
+		LUCY_ASSERT(cmdPool);
+
 		auto commandBuffer = (VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer();
 		switch (queueFamily) {
 			using enum Lucy::TargetQueueFamily;
@@ -293,13 +344,19 @@ namespace Lucy {
 		}
 	}
 
-	void VulkanRenderDevice::SubmitWorkToGPU(TargetQueueFamily queueFamily, std::vector<Ref<CommandPool>>& cmdPools, const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) {
+	bool VulkanRenderDevice::SubmitWorkToGPU(TargetQueueFamily queueFamily, std::vector<Ref<CommandPool>>& cmdPools, 
+											Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore, Semaphore* currentFrameSignalSemaphore) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::SubmitWorkToGPU");
+		if (cmdPools.empty())
+			return false;
 
 		std::vector<VkCommandBuffer> cmdBufferHandles;
 		cmdBufferHandles.resize(cmdPools.size(), VK_NULL_HANDLE);
 		for (size_t i = 0; const Ref<CommandPool>& cmdPool : cmdPools)
 			cmdBufferHandles[i++] = (VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer();
+
+		if (cmdBufferHandles.empty())
+			return false;
 
 		switch (queueFamily) {
 			using enum Lucy::TargetQueueFamily;
@@ -318,15 +375,22 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false);
 		}
+
+		return true;
+	}
+
+	void VulkanRenderDevice::SubmitWorkToGPU(TargetQueueFamily queueFamily, std::vector<Ref<CommandPool>>& cmdPools, 
+											Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore) {
+		SubmitWorkToGPU(queueFamily, cmdPools, currentFrameFence, currentFrameWaitSemaphore, nullptr);
 	}
 
 	void VulkanRenderDevice::PrintDeviceInfo() {
-		LUCY_INFO(fmt::format("Selected Device: {0}", m_DeviceInfo.Name));
+		LUCY_INFO(std::format("Selected Device: {0}", m_DeviceInfo.Name));
 	}
 
 	void VulkanRenderDevice::Destroy() {
 		LUCY_PROFILE_DESTROY();
-		m_ImmediateCommandFence->Destroy();
+		m_ImmediateCommandFence->Destroy(shared_from_this()->As<RenderDevice>());
 
 		m_Allocator.Destroy();
 		vkDestroyDevice(m_LogicalDevice, nullptr);
@@ -504,14 +568,18 @@ namespace Lucy {
 	}
 
 	void VulkanRenderDevice::BeginDebugMarker(Ref<CommandPool> cmdPool, const char* labelName) {
+#if LUCY_DEBUG
 		VkDebugUtilsLabelEXT labelInfo{};
 		labelInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
 		labelInfo.pLabelName = labelName;
 		VulkanExternalFuncLinkage::vkCmdBeginDebugUtilsLabelEXT((VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer(), &labelInfo);
+#endif
 	}
 
 	void VulkanRenderDevice::EndDebugMarker(Ref<CommandPool> cmdPool) {
+#if LUCY_DEBUG
 		VulkanExternalFuncLinkage::vkCmdEndDebugUtilsLabelEXT((VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer());
+#endif
 	}
 
 	void VulkanRenderDevice::SubmitImmediateCommand(const std::function<void(VkCommandBuffer)>& func, const Ref<VulkanTransientCommandPool>& cmdPool) {

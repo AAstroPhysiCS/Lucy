@@ -210,11 +210,12 @@ namespace Lucy {
 		//TODO: later when serialization is a thing
 	}
 	
-	void RenderGraph::AddPass(const std::string& passName, RenderGraphSetupFunc&& setupFunc) {
+	void RenderGraph::AddPass(TargetQueueFamily targetQueueFamily, const std::string& passName, RenderGraphSetupFunc&& setupFunc) {
 		LUCY_PROFILE_NEW_EVENT("RenderGraph::AddPass");
 		m_Passes.try_emplace(passName, RenderGraphPassCreateInfo{
 			.SetupFunc = std::move(setupFunc),
 			.Registry = m_Registry,
+			.TargetQueueFamily = targetQueueFamily,
 			.Name = passName
 		});
 		auto& pass = m_Passes.at(passName);

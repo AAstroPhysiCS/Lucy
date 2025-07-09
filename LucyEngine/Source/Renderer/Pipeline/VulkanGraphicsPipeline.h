@@ -17,7 +17,7 @@ namespace Lucy {
 		inline VkPipeline GetVulkanHandle() { return m_PipelineHandle; }
 		inline VkPipelineLayout GetPipelineLayout() { return m_PipelineLayoutHandle; }
 	private:
-		void RTCreate();
+		void Create(const Ref<VulkanRenderDevice>& vulkanDevice);
 		void RTDestroyResource() final override;
 
 		VkVertexInputBindingDescription CreateBindingDescription() const;
@@ -28,7 +28,5 @@ namespace Lucy {
 		VkPipelineLayout m_PipelineLayoutHandle = VK_NULL_HANDLE;
 
 		Ref<VulkanDescriptorPool> m_DescriptorPool;
-
-		Ref<VulkanRenderDevice> m_VulkanDeviceRT = nullptr;
 	};
 }

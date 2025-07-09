@@ -26,17 +26,21 @@ namespace Lucy {
 	};
 
 	class VulkanContext : public RenderContext {
+	private:
+		inline static constexpr uint32_t s_APIVersion = VK_API_VERSION_1_3;
 	public:
 		VulkanContext(const Ref<Window>& window);
 		virtual ~VulkanContext() = default;
-
-		inline VulkanSwapChain& GetSwapChain() { return m_SwapChain; }
-		inline VkInstance GetVulkanInstance() const { return m_Instance; };
-	private:
+		
+		void Init() final override;
 		void Destroy() final override;
 		void PrintInfo() final override;
-		void Init() final override;
-		
+
+		inline const std::vector<const char*>& GetValidationLayers() const { return m_ValidationLayers; }
+
+		inline VkInstance GetVulkanInstance() const { return m_Instance; };
+		inline static constexpr uint32_t GetAPIVersion() { return s_APIVersion; };
+	private:
 		void CheckValidationSupport() const;
 		void SetupDebugLabels();
 		void DestroyDebugCallbacks();
@@ -49,9 +53,7 @@ namespace Lucy {
 			VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 		};
 
-		VulkanSwapChain m_SwapChain;
-
-		VkInstance m_Instance;
+		VkInstance m_Instance = VK_NULL_HANDLE;
 		VkDebugUtilsMessengerEXT m_DebugMessenger{};
 	};
 }

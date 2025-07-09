@@ -1,39 +1,44 @@
 #pragma once
 
-#include <mutex>
-#include <condition_variable>
+#include <future>
 
 #include "Threading/RunnableThread.h"
 
 namespace Lucy {
 
 	class Window;
-	class CommandQueue;
+	class RenderCommandQueue;
+
+	struct RenderThreadCreateInfo {
+		Ref<Window> Window = nullptr;
+		RendererConfiguration Config;
+		std::promise<void>& InitPromise;
+	};
 
 	class RenderThread final : public RunnableThread {
 	public:
-		RenderThread(const RunnableThreadCreateInfo& createInfo);
+		RenderThread(const RunnableThreadCreateInfo& createInfo, const RenderThreadCreateInfo& renderThreadCreateInfo);
 		virtual ~RenderThread() = default;
+	public:
+		inline bool IsOnRenderThread() const { return GetID() == std::this_thread::get_id(); }
 
-		bool OnInit(uint32_t threadIndex) final override;
+		void SignalToShutdown();
+		void WaitToShutdown();
+
+		inline const Ref<RendererBackend>& GetBackend() const { return m_Backend; }
+	private:
+		bool OnInit() final override;
 		uint32_t OnRun() final override;
 		void OnJoin() final override;
-		void OnStop() final override;
-	public:
-		void SubmitCommandQueue(Ref<CommandQueue> commandQueue);
-		void SignalToPresent();
-		bool IsOnRenderThread() const;
-		
-		inline RenderContextResultCodes GetResultCode() const { return m_LastFrameResultCode; }
-	private:
-		void ExecuteCommands();
 
-		bool m_Running = false;
+		std::atomic_bool m_Running = false;
 
-		Ref<CommandQueue> m_CommandQueue = nullptr;
+		std::atomic_bool m_Finished = false;
+		std::condition_variable m_FinishedCondVar;
 
-		std::condition_variable m_ExecutionVariable;
-		static inline std::mutex m_ExecutionMutex;
-		RenderContextResultCodes m_LastFrameResultCode = RenderContextResultCodes::SUCCESS;
+		std::thread m_ThreadNative;
+
+		RenderThreadCreateInfo m_RenderThreadCreateInfo;
+		Ref<RendererBackend> m_Backend = nullptr;
 	};
 }

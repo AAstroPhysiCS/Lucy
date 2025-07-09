@@ -22,6 +22,26 @@ namespace Lucy {
 		data = buffer.str();
 	}
 
+	bool FileSystem::CreateDir(const std::string& file) {
+		std::error_code ec;
+		bool result = std::filesystem::create_directories(file, ec);
+		return !ec;
+	}
+
+	bool FileSystem::CreateDir(const std::filesystem::path& filePath) {
+		std::error_code ec;
+		bool result = std::filesystem::create_directories(filePath, ec);
+		return !ec; // Returns true if successful or already exists
+	}
+
+	bool FileSystem::DirectoryExists(const std::string& file) {
+		return std::filesystem::is_directory(file);
+	}
+
+	bool FileSystem::DirectoryExists(const std::filesystem::path& filePath) {
+		return std::filesystem::is_directory(filePath);
+	}
+
 	bool FileSystem::FileExists(const std::string& file) {
 		return std::filesystem::exists(file);
 	}

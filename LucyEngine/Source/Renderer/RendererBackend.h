@@ -1,9 +1,9 @@
 #pragma once
 
-#include "Context/RenderContext.h"
-#include "Commands/CommandQueue.h"
+#include <deque>
 
-#include "RenderThread.h"
+#include "Context/RenderContext.h"
+#include "Commands/RenderCommandQueue.h"
 
 namespace Lucy {
 
@@ -12,6 +12,8 @@ namespace Lucy {
 	class VulkanPushConstant;
 	class DescriptorSet;
 
+	class RenderDevice;
+	class SwapChain;
 	class RenderGraphPass;
 
 	struct EntityPickedEvent;
@@ -23,12 +25,13 @@ namespace Lucy {
 		uint32_t m_MaxFramesInFlight = 0;
 		uint32_t m_ImageIndex = 0;
 		uint32_t m_CurrentFrameIndex = 0;
-	public:
+	private:
 		static Ref<RendererBackend> Create(RendererConfiguration config, const Ref<Window>& window);
+	public:
 		virtual ~RendererBackend() = default;
 		
-		void EnqueueToRenderThread(RenderCommandFunc&& func);
-		void EnqueueResourceDestroy(RenderResourceHandle& handle);
+		void EnqueueToRenderCommandQueue(RenderCommandFunc&& func);
+		void EnqueueResourceDestroy(RenderResourceHandle handle);
 
 		void SubmitToRender(RenderGraphPass& pass, RenderResourceHandle renderPassHandle, RenderResourceHandle frameBufferHandle);
 		void SubmitToCompute(RenderGraphPass& pass);
@@ -39,10 +42,9 @@ namespace Lucy {
 
 		virtual void Destroy();
 		
-		inline const Ref<RenderContext>& GetRenderContext() const { return m_RenderContext; }
 		inline const RendererConfiguration& GetRendererConfig() const { return m_RendererConfiguration; }
 
-		inline const CommandQueueMetricsOutput& GetCommandQueueMetrics() const { return m_CommandQueueMetricsOutput; }
+		inline const RenderCommandQueueMetricsOutput& GetCommandQueueMetrics() const { return m_CommandQueueMetricsOutput; }
 
 		inline uint32_t GetCurrentImageIndex() const { return m_ImageIndex; }
 		inline uint32_t GetCurrentFrameIndex() const { return m_CurrentFrameIndex; }
@@ -53,36 +55,44 @@ namespace Lucy {
 		virtual glm::vec3 OnMousePicking(const EntityPickedEvent& e, const Ref<Image>& currentFrameBufferImage) = 0;
 
 		virtual void InitializeImGui() = 0;
-		virtual void RenderImGui() = 0;
+		virtual void RTRenderImGui() = 0;
 	protected:
-		virtual void Init();
+		virtual void Init() = 0;
 
 		virtual void BeginFrame() = 0;
 		virtual void RenderFrame() = 0;
 		virtual void EndFrame() = 0;
 
-		void EnqueueToRenderThread(RenderSubmitFunc&& func);
+		void EnqueueToRenderCommandQueue(RenderSubmitFunc&& func);
 
 		void RecreateCommandQueue();
 		void FlushCommandQueue();
 		void FlushSubmitQueue();
-		void FlushDeletionQueue();
 
-		inline const std::vector<RenderCommandList>& GetCommandLists() const { return m_CommandQueue->GetCommandLists(); }
-		inline const Ref<RenderDevice>& GetRenderDevice() const { return m_RenderContext->GetRenderDevice(); }
-		inline const Ref<RenderThread>& GetRenderThread() const { return m_RenderThread; }
+		virtual void FlushDeletionQueue() = 0;
+
+		inline const Ref<RenderContext>& GetRenderContext() const { return m_Context; }
+		inline const Ref<RenderDevice>& GetRenderDevice() const { return m_RenderDevice; }
+		inline const Ref<SwapChain>& GetSwapChain() const { return m_SwapChain; }
 
 		RendererBackend(RendererConfiguration config, const Ref<Window>& window);
-	private:
-		Ref<RenderContext> m_RenderContext = nullptr;
-		Ref<RenderThread> m_RenderThread = nullptr;
-		Ref<CommandQueue> m_CommandQueue = nullptr;
+
+		std::vector<std::deque<RenderDeletionFunc>> m_ResourceDeletionQueues;
+	protected:
+		Ref<RenderContext> m_Context = nullptr;
+		Ref<RenderDevice> m_RenderDevice = nullptr;
+		Ref<SwapChain> m_SwapChain = nullptr;
+
+		Ref<RenderCommandQueue> m_RenderCommandQueue = nullptr;
+		Ref<RenderCommandQueue> m_RenderComputeCommandQueue = nullptr;
+
 		RendererConfiguration m_RendererConfiguration;
 
-		std::vector<RenderDeletionFunc> m_ResourceDeletionQueue;
-
-		CommandQueueMetricsOutput m_CommandQueueMetricsOutput;
+		RenderCommandQueueMetricsOutput m_CommandQueueMetricsOutput;
+		RenderCommandQueueMetricsOutput m_CommandQueueMetricsOutputCompute;
 
 		friend class Renderer;
+		friend class RenderThread;
+		friend class ImGuiVulkanImpl;
 	};
 }

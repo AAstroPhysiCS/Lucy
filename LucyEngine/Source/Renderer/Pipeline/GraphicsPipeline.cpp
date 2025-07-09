@@ -7,8 +7,8 @@ namespace Lucy {
 		: RenderResource("GraphicsPipeline"), m_CreateInfo(createInfo) {
 	}
 
-	void GraphicsPipeline::Unbind(const GraphicsPipelineStatistics& statistics) {
-		m_Statistics = statistics;
+	void GraphicsPipeline::Unbind(GraphicsPipelineStatistics&& statistics) {
+		m_Statistics = std::move(statistics);
 	}
 
 	uint32_t GraphicsPipeline::CalculateStride(const VertexShaderLayout& vertexLayout) {
@@ -16,5 +16,9 @@ namespace Lucy {
 		for (const auto& [name, location, type, size] : vertexLayout)
 			stride += size;
 		return stride;
+	}
+
+	GraphicsPipelineStatistics::GraphicsPipelineStatistics(std::vector<uint64_t>&& times) 
+		: m_Times(std::move(times)) {
 	}
 }

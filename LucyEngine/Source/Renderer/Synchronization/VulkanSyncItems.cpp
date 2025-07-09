@@ -8,34 +8,33 @@
 
 namespace Lucy {
 
-	Semaphore::Semaphore() {
-		Renderer::EnqueueToRenderThread([&](const Ref<RenderDevice>& device) {
-			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
-			VkSemaphoreCreateInfo createInfo = VulkanAPI::SemaphoreCreateInfo();
-			LUCY_VK_ASSERT(vkCreateSemaphore(vulkanDevice->GetLogicalDevice(), &createInfo, nullptr, &m_Handle));
-		});
+	Semaphore::Semaphore(Ref<RenderDevice> device) {
+		const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+		VkSemaphoreCreateInfo createInfo = VulkanAPI::SemaphoreCreateInfo();
+		LUCY_VK_ASSERT(vkCreateSemaphore(vulkanDevice->GetLogicalDevice(), &createInfo, nullptr, &m_Handle));
 	}
 
-	void Semaphore::Destroy() {
-		Renderer::EnqueueToRenderThread([&](const Ref<RenderDevice>& device) {
-			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
-			vkDestroySemaphore(vulkanDevice->GetLogicalDevice(), m_Handle, nullptr);
-		});
+	void Semaphore::Destroy(Ref<RenderDevice> device) {
+		const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+		vkDestroySemaphore(vulkanDevice->GetLogicalDevice(), m_Handle, nullptr);
 	}
 
-	Fence::Fence() {
-		Renderer::EnqueueToRenderThread([&](const Ref<RenderDevice>& device) {
-			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
-			VkFenceCreateInfo createInfo = VulkanAPI::FenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
-			LUCY_VK_ASSERT(vkCreateFence(vulkanDevice->GetLogicalDevice(), &createInfo, nullptr, &m_Handle));
-		});
+	Fence::Fence(Ref<RenderDevice> device) {
+		const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+		VkFenceCreateInfo createInfo = VulkanAPI::FenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
+		LUCY_VK_ASSERT(vkCreateFence(vulkanDevice->GetLogicalDevice(), &createInfo, nullptr, &m_Handle));
 	}
 
-	void Fence::Destroy() {
-		Renderer::EnqueueToRenderThread([&](const Ref<RenderDevice>& device) {
-			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
-			vkDestroyFence(vulkanDevice->GetLogicalDevice(), m_Handle, nullptr);
-		});
+	Fence::Fence(RenderDevice* device) {
+		const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+		VkFenceCreateInfo createInfo = VulkanAPI::FenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
+		LUCY_VK_ASSERT(vkCreateFence(vulkanDevice->GetLogicalDevice(), &createInfo, nullptr, &m_Handle));
+
+	}
+
+	void Fence::Destroy(Ref<RenderDevice> device) {
+		const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+		vkDestroyFence(vulkanDevice->GetLogicalDevice(), m_Handle, nullptr);
 	}
 
 	ImageMemoryBarrier::ImageMemoryBarrier(const ImageMemoryBarrierCreateInfo& createInfo)

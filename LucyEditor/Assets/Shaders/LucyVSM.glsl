@@ -2,7 +2,6 @@
 #version 450
 
 #extension GL_ARB_shader_viewport_layer_array : require
-#extension GL_NV_viewport_array2 : enable
 #extension GL_EXT_multiview : enable
 
 layout (location = 0) in vec3 a_Pos;
@@ -29,7 +28,6 @@ layout (push_constant) uniform LocalPushConstant {
 };
 
 void main() {
-	gl_Layer = gl_ViewIndex;
 	gl_Position = u_ShadowCameraVPs[gl_ViewIndex].ProjMatrix * u_ShadowCameraVPs[gl_ViewIndex].ViewMatrix * u_ModelMatrix * vec4(a_Pos, 1.0f);
 }
 

@@ -1,8 +1,12 @@
 #pragma once
 
-#include "Renderer/Device/RenderResource.h"
+#include <unordered_map>
+
+#include "Renderer/Device/RenderDevice.h"
 
 namespace Lucy {
+
+	class GraphicsPipelineStatistics;
 
 	class PipelineManager final {
 	public:
@@ -20,10 +24,12 @@ namespace Lucy {
 		inline size_t GetComputePipelineCount() const { return m_ComputePipelines.size(); }
 		inline size_t GetAllPipelineCount() const { return GetGraphicsPipelineCount() + GetComputePipelineCount(); }
 
+		std::unordered_map<std::string, GraphicsPipelineStatistics> GetAllGraphicsPipelineStatistics() const;
+
 		void RTRecreateAllPipelinesDependentOnShader(const Ref<Shader>& shader);
 
 		void DestroyPipeline(const std::string& name);
-		void RTDestroyAll();
+		void DestroyAll();
 
 		void SaveToFileAsPSO();
 		void ReadFromFileAsPSO();

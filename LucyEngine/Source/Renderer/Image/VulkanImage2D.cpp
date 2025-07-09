@@ -7,15 +7,13 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
 
+#include "../../../ThirdParty/ImGui/imgui_impl_vulkan.h"
+
 namespace Lucy {
 
 	VulkanImage2D::VulkanImage2D(const std::filesystem::path& path, const ImageCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device)
 		: VulkanImage(path, createInfo), m_VulkanDevice(device) {
-		if (auto imageType = m_CreateInfo.ImageType; 
-			imageType != ImageType::Type2DColor &&
-			imageType != ImageType::Type2DDepth &&
-			imageType != ImageType::Type2DArrayColor &&
-			imageType != ImageType::Type2DArrayDepth)
+		if (m_CreateInfo.ImageType != ImageType::Type2D)
 			LUCY_ASSERT(false);
 
 		RTCreateFromPath();
@@ -23,16 +21,10 @@ namespace Lucy {
 
 	VulkanImage2D::VulkanImage2D(const ImageCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device)
 		: VulkanImage(createInfo), m_VulkanDevice(device) {
-		auto imageType = m_CreateInfo.ImageType;
-
-		if (imageType != ImageType::Type2DColor &&
-			imageType != ImageType::Type2DDepth &&
-			imageType != ImageType::Type2DArrayColor &&
-			imageType != ImageType::Type2DArrayDepth)
+		if (m_CreateInfo.ImageType != ImageType::Type2D)
 			LUCY_ASSERT(false);
 
-		if (imageType == ImageType::Type2DDepth || 
-			imageType == ImageType::Type2DArrayDepth)
+		if (m_CreateInfo.ImageUsage == ImageUsage::AsDepthAttachment)
 			RTCreateDepthImage();
 		else
 			RTCreateEmptyImage();
@@ -45,12 +37,7 @@ namespace Lucy {
 		m_CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		m_ImGuiID = 0;
 
-		auto imageType = other->m_CreateInfo.ImageType;
-
-		if (imageType != ImageType::Type2DColor &&
-			imageType != ImageType::Type2DDepth &&
-			imageType != ImageType::Type2DArrayColor &&
-			m_CreateInfo.ImageType != ImageType::Type2DArrayDepth)
+		if (m_CreateInfo.ImageType != ImageType::Type2D)
 			LUCY_ASSERT(false);
 
 		if (!other->m_Path.empty()) {
@@ -58,8 +45,7 @@ namespace Lucy {
 			return;
 		}
 
-		if (imageType == ImageType::Type2DDepth ||
-			imageType == ImageType::Type2DArrayDepth)
+		if (m_CreateInfo.ImageUsage == ImageUsage::AsDepthAttachment)
 			RTCreateDepthImage();
 		else
 			RTCreateEmptyImage();
@@ -99,13 +85,7 @@ namespace Lucy {
 
 		stbi_image_free(data);
 
-		VkImageUsageFlags flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT | m_CreateInfo.Flags;
-
-		if (m_CreateInfo.GenerateSampler)
-			flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
-
-		if (m_CreateInfo.GenerateMipmap)
-			flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		VkImageUsageFlags flags = GetImageFlagsBasedOnUsage();
 
 		allocator.CreateVulkanImageVma(m_CreateInfo.Width, m_CreateInfo.Height, m_MaxMipLevel, (VkFormat)GetAPIImageFormat(m_CreateInfo.Format), m_CurrentLayout,
 									   flags, VK_IMAGE_TYPE_2D, m_Image, m_ImageVma);
@@ -129,13 +109,7 @@ namespace Lucy {
 		if (m_CreateInfo.GenerateMipmap)
 			m_MaxMipLevel = (uint32_t)glm::floor(glm::log2(glm::max(m_CreateInfo.Width, m_CreateInfo.Height))) + 1u;
 
-		VkImageUsageFlags flags = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | m_CreateInfo.Flags;
-
-		if (m_CreateInfo.GenerateSampler)
-			flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
-
-		if (m_CreateInfo.GenerateMipmap)
-			flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		VkImageUsageFlags flags = GetImageFlagsBasedOnUsage();
 
 		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
 		allocator.CreateVulkanImageVma(m_CreateInfo.Width, m_CreateInfo.Height, m_MaxMipLevel, (VkFormat)GetAPIImageFormat(m_CreateInfo.Format), m_CurrentLayout,
@@ -154,14 +128,8 @@ namespace Lucy {
 
 		if (m_CreateInfo.GenerateMipmap)
 			m_MaxMipLevel = (uint32_t)glm::floor(glm::log2(glm::max(m_CreateInfo.Width, m_CreateInfo.Height))) + 1u;
-
-		VkImageUsageFlags flags = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-
-		if (m_CreateInfo.GenerateSampler)
-			flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
-
-		if (m_CreateInfo.GenerateMipmap)
-			flags |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		//do the flags
+		VkImageUsageFlags flags = GetImageFlagsBasedOnUsage();
 
 		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
 		allocator.CreateVulkanImageVma(m_CreateInfo.Width, m_CreateInfo.Height, 1, (VkFormat)GetAPIImageFormat(m_CreateInfo.Format), m_CurrentLayout, 
@@ -178,6 +146,9 @@ namespace Lucy {
 	void VulkanImage2D::RTDestroyResource() {
 		if (!m_Image)
 			return;
+
+		//if (m_CreateInfo.ImGuiUsage)
+			//ImGui_ImplVulkan_RemoveTexture((VkDescriptorSet)m_ImGuiID);
 
 		m_ImageView.RTDestroyResource();
 
@@ -196,7 +167,7 @@ namespace Lucy {
 
 		if (!m_Path.empty())
 			RTCreateFromPath();
-		else if (m_CreateInfo.ImageType == ImageType::Type2DDepth || m_CreateInfo.ImageType == ImageType::Type2DArrayDepth)
+		else if (m_CreateInfo.ImageUsage == ImageUsage::AsDepthAttachment)
 			RTCreateDepthImage();
 		else
 			RTCreateEmptyImage();

@@ -8,16 +8,17 @@
 #include "Renderer/Shader/VulkanComputeShader.h"
 #include "Renderer/Memory/Buffer/PushConstant.h"
 
-#include "Utilities/Utilities.h"
-
 namespace Lucy {
 
 	VulkanComputePipeline::VulkanComputePipeline(const ComputePipelineCreateInfo& createInfo, const Ref<VulkanRenderDevice>& vulkanDevice)
-		: ComputePipeline(createInfo), m_VulkanDevice(vulkanDevice) {
-		RTCreate();
+		: ComputePipeline(createInfo) {
+		Renderer::EnqueueToRenderCommandQueue([&](const auto& device) {
+			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+			Create(vulkanDevice);
+		});
 	}
 
-	void VulkanComputePipeline::RTCreate() {
+	void VulkanComputePipeline::Create(const Ref<VulkanRenderDevice>& vulkanDevice) {
 		const std::vector<VkDescriptorPoolSize> poolSizes = {
 			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10 },
 			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10 },
@@ -28,17 +29,17 @@ namespace Lucy {
 		poolCreateInfo.PoolSizesVector = poolSizes;
 		poolCreateInfo.MaxSet = 100;
 		poolCreateInfo.PoolFlags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
-		poolCreateInfo.LogicalDevice = m_VulkanDevice->GetLogicalDevice();
+		poolCreateInfo.LogicalDevice = vulkanDevice->GetLogicalDevice();
 		m_DescriptorPool = Memory::CreateRef<VulkanDescriptorPool>(poolCreateInfo);
 
-		m_CreateInfo.Shader->RTLoadDescriptors(m_VulkanDevice, m_DescriptorPool);
+		m_CreateInfo.Shader->RTLoadDescriptors(vulkanDevice, m_DescriptorPool);
 		const auto& descriptorSetsHandles = m_CreateInfo.Shader->GetDescriptorSetHandles();
 		const auto& pushConstants = m_CreateInfo.Shader->GetPushConstants();
 
 		std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
 		descriptorSetLayouts.reserve(descriptorSetsHandles.size());
 		for (auto handle : descriptorSetsHandles) {
-			const auto& descriptorSet = m_VulkanDevice->AccessResource<VulkanDescriptorSet>(handle);
+			const auto& descriptorSet = vulkanDevice->AccessResource<VulkanDescriptorSet>(handle);
 			descriptorSetLayouts.emplace_back(descriptorSet->GetDescriptorSetLayout());
 		}
 
@@ -48,10 +49,10 @@ namespace Lucy {
 		
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo = VulkanAPI::PipelineLayoutCreateInfo((uint32_t)descriptorSetLayouts.size(), descriptorSetLayouts.data(), (uint32_t)pushConstantRanges.size(), pushConstantRanges.data());
 
-		LUCY_VK_ASSERT(vkCreatePipelineLayout(m_VulkanDevice->GetLogicalDevice(), &pipelineLayoutInfo, nullptr, &m_PipelineLayoutHandle));
+		LUCY_VK_ASSERT(vkCreatePipelineLayout(vulkanDevice->GetLogicalDevice(), &pipelineLayoutInfo, nullptr, &m_PipelineLayoutHandle));
 
 		VkComputePipelineCreateInfo pipelineInfo = VulkanAPI::ComputePipelineCreateInfo(m_PipelineLayoutHandle, m_CreateInfo.Shader->As<VulkanComputeShader>()->GetShaderStageInfo());
-		LUCY_VK_ASSERT(vkCreateComputePipelines(m_VulkanDevice->GetLogicalDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_PipelineHandle));
+		LUCY_VK_ASSERT(vkCreateComputePipelines(vulkanDevice->GetLogicalDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_PipelineHandle));
 #ifdef LUCY_DEBUG
 		LUCY_INFO("Vulkan compute pipeline '{0}' created successfully!", m_CreateInfo.Shader->GetName());
 #endif
@@ -67,12 +68,20 @@ namespace Lucy {
 
 	void VulkanComputePipeline::RTRecreate() {
 		RTDestroyResource();
-		RTCreate();
+		Renderer::EnqueueToRenderCommandQueue([&](const auto& device) {
+			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+			Create(vulkanDevice);
+		});
 	}
 
 	void VulkanComputePipeline::RTDestroyResource() {
-		m_DescriptorPool->RTDestroyResource();
-		vkDestroyPipelineLayout(m_VulkanDevice->GetLogicalDevice(), m_PipelineLayoutHandle, nullptr);
-		vkDestroyPipeline(m_VulkanDevice->GetLogicalDevice(), m_PipelineHandle, nullptr);
+		Renderer::EnqueueToRenderCommandQueue([=](const auto& device) {
+			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+
+			m_DescriptorPool->RTDestroyResource();
+			m_DescriptorPool = nullptr;
+			vkDestroyPipelineLayout(vulkanDevice->GetLogicalDevice(), m_PipelineLayoutHandle, nullptr);
+			vkDestroyPipeline(vulkanDevice->GetLogicalDevice(), m_PipelineHandle, nullptr);
+		});
 	}
 }

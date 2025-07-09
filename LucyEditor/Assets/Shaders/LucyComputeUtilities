@@ -1,0 +1,89 @@
+#define PI 3.1415926535897932384626433832795f
+#define TWO_PI 6.283185307179586476925286766559f
+#define HALF_PI 1.57079632679489661923132169163975f
+
+vec3 threadIDToSamplingPos(uvec2 threadID, int face, vec2 cubemapSize) {
+    vec2 uv = (vec2(threadID) + 0.5) / cubemapSize;
+    uv = uv * 2.0 - 1.0;
+    
+    // Face-dependent math without conditionals
+    const vec3[6] faceUVtoDir = {
+        vec3( 1.0, -uv.y, -uv.x),   // +X
+        vec3(-1.0, -uv.y,  uv.x),   // -X
+        vec3( uv.x,  1.0,  uv.y),   // +Y
+        vec3( uv.x, -1.0, -uv.y),   // -Y
+        vec3( uv.x, -uv.y,  1.0),   // +Z
+        vec3(-uv.x, -uv.y, -1.0)    // -Z
+    };
+    return normalize(faceUVtoDir[face]);
+}
+
+// Precomputed per-face basis vectors
+vec3 getFaceNormal(int face) {
+    const vec3[6] normals = {
+        vec3(1.0f, 0.0f, 0.0f), 
+        vec3(-1.0f, 0.0f, 0.0f), 
+        vec3(0.0f, 1.0f, 0.0f),
+        vec3(0.0f, -1.0f, 0.0f), 
+        vec3(0.0f, 0.0f, 1.0f), 
+        vec3(0.0f, 0.0f, -1.0f)
+    };
+    return normals[face];
+}
+
+vec2 projectToFacePlane(vec3 sampleDir, int face) {
+    // Branchless projection using face index
+    const vec3[6] axisSign = vec3[](
+        vec3( 1.0, -1.0, -1.0), // +X: (x=1, flip zy)
+        vec3(-1.0, -1.0,  1.0), // -X: (x=-1, flip z)
+        vec3( 1.0,  1.0,  1.0), // +Y: (y=1, x/z)
+        vec3( 1.0, -1.0, -1.0), // -Y: (y=-1, flip z)
+        vec3( 1.0, -1.0,  1.0), // +Z: (z=1)
+        vec3(-1.0, -1.0, -1.0)  // -Z: (z=-1, flip x)
+    );
+
+    // Select projection rules based on face
+    vec3 signedDir = sampleDir * axisSign[face];
+
+    // Branchless component selection
+    bvec3 faceMask = bvec3(
+        face < 2,          // X faces
+        face >= 2 && face < 4, // Y faces
+        face >= 4           // Z faces
+    );
+
+    return vec2(
+        dot(vec3(signedDir.z, signedDir.x, signedDir.x), vec3(faceMask)),
+        dot(vec3(-signedDir.y, signedDir.z, -signedDir.y), vec3(faceMask))
+    );
+}
+
+ivec3 sampleVectorToFaceUV(vec3 sampleDir, int srcFace, vec2 cubemapSize) {
+    // Project sampleDir onto source face's plane
+    vec2 uv = projectToFacePlane(sampleDir, srcFace); 
+    uv = (uv * 0.5 + 0.5) * cubemapSize; // [0,size]
+    return ivec3(uv, srcFace);
+}
+
+/*
+    Thanks to Alin for this conversion function
+*/
+vec3 cubeCoordToWorld(ivec3 cubeCoord, vec2 cubemapSize) {
+    vec2 texCoord = vec2(cubeCoord.xy) / cubemapSize;
+    texCoord = texCoord  * 2.0 - 1.0;
+    switch(cubeCoord.z) {
+        case 0: 
+            return vec3(1.0, -texCoord.yx); // +x
+        case 1: 
+            return vec3(-1.0, -texCoord.y, texCoord.x); //-x
+        case 2: 
+            return vec3(texCoord.x, 1.0, texCoord.y); //+y
+        case 3: 
+            return vec3(texCoord.x, -1.0, -texCoord.y); //-y
+        case 4: 
+            return vec3(texCoord.x, -texCoord.y, 1.0); //+z
+        case 5: 
+            return vec3(-texCoord.xy, -1.0); //-z
+    }
+    return vec3(0.0);
+}

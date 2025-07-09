@@ -17,10 +17,11 @@ namespace Lucy {
 	}
 
 	DetailsPanel::DetailsPanel() {
-		Renderer::EnqueueToRenderThread([](const Ref<RenderDevice>& device) {
+		Renderer::EnqueueToRenderCommandQueue([](const Ref<RenderDevice>& device) {
 			ImageCreateInfo createInfo;
 			createInfo.Format = ImageFormat::R8G8B8A8_UNORM;
-			createInfo.ImageType = ImageType::Type2DColor;
+			createInfo.ImageType = ImageType::Type2D;
+			createInfo.ImageUsage = ImageUsage::AsColorTransferAttachment;
 			createInfo.Parameter.Mag = ImageFilterMode::LINEAR;
 			createInfo.Parameter.Min = ImageFilterMode::LINEAR;
 			createInfo.Parameter.U = ImageAddressMode::REPEAT;
@@ -172,7 +173,7 @@ namespace Lucy {
 				ImGui::Text("Path");
 				ImGui::SameLine();
 				if (ImGui::InputText("##hideLabel MeshPath", buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
-					c.SetMesh(Mesh::Create(buf));
+					c.LoadMesh(buf);
 					entityContext.GetComponent<TagComponent>().SetTag(c.GetMesh()->GetName());
 				}
 
@@ -182,7 +183,7 @@ namespace Lucy {
 					std::string outPath;
 					Utils::OpenDialog(outPath, Utils::MeshFilterList, 1, "Assets/");
 					if (!outPath.empty()) {
-						c.SetMesh(Mesh::Create(outPath));
+						c.LoadMesh(outPath);
 						entityContext.GetComponent<TagComponent>().SetTag(c.GetMesh()->GetName());
 					}
 				}
@@ -208,7 +209,7 @@ namespace Lucy {
 							textureID = Renderer::AccessResource<Image>(s_CheckerBoardTextureHandle)->GetImGuiID();
 
 						if (textureID) //could be that the checker board texture isnt ready
-							ImGui::ImageButton(textureID, { 64.0f, 64.0f }, { 0.0f, 0.0f }, { 1.0f, 1.0f }, 0);
+							ImGui::ImageButton("", (ImTextureID)textureID, {64.0f, 64.0f}, {0.0f, 0.0f}, {1.0f, 1.0f});
 						ImGui::SameLine();
 
 						if (ImGui::BeginCombo("##hideLabel combo", std::to_string(materialID).c_str())) {

@@ -18,16 +18,17 @@ namespace Lucy {
 		RenderDeviceQueryType QueryType;
 	};
 
-	class RenderDeviceQuery {
+	class RenderDeviceQuery : public MemoryTrackable {
 	public:
-		static Unique<RenderDeviceQuery> Create(const RenderDeviceQueryCreateInfo& createInfo);
+		static Ref<RenderDeviceQuery> Create(const RenderDeviceQueryCreateInfo& createInfo);
 
 		RenderDeviceQuery(const RenderDeviceQueryCreateInfo& createInfo);
 		virtual ~RenderDeviceQuery() = default;
 
-		virtual uint32_t Begin(Ref<CommandPool> cmdPool) = 0;
-		virtual uint32_t End(Ref<CommandPool> cmdPool) = 0;
-		virtual void ResetPool(Ref<CommandPool> cmdPool) = 0;
+		virtual uint32_t RTBegin(Ref<CommandPool> cmdPool) = 0;
+		virtual uint32_t RTEnd(Ref<CommandPool> cmdPool) = 0;
+		virtual void ResetPoolByIndex(size_t index) = 0;
+		virtual void RTResetPoolByIndex(Ref<CommandPool> commandPool, size_t index) = 0;
 		virtual std::vector<uint64_t> GetQueryResults() = 0;
 		virtual void Destroy() = 0;
 
@@ -41,13 +42,16 @@ namespace Lucy {
 		VulkanRenderDeviceQuery(const RenderDeviceQueryCreateInfo& createInfo);
 		virtual ~VulkanRenderDeviceQuery() = default;
 
-		uint32_t Begin(Ref<CommandPool> cmdPool) final override;
-		uint32_t End(Ref<CommandPool> cmdPool) final override;
-		void ResetPool(Ref<CommandPool> cmdPool) final override;
+		uint32_t RTBegin(Ref<CommandPool> cmdPool) final override;
+		uint32_t RTEnd(Ref<CommandPool> cmdPool) final override;
+		
+		void ResetPoolByIndex(size_t index) final override;
+		void RTResetPoolByIndex(Ref<CommandPool> commandPool, size_t index) final override;
+
 		std::vector<uint64_t> GetQueryResults() final override;
 		void Destroy() final override;
 	private:
 		std::vector<VkQueryPool> m_QueryPools;
-		uint32_t m_ActiveQueryIndex = 0uLL;
+		std::vector<uint32_t> m_ActiveQueryIndex;
 	};
 }

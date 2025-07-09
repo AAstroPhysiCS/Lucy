@@ -53,7 +53,7 @@ namespace Lucy {
 	}
 
 	Mesh::Mesh(const std::vector<float>& vertices, const std::vector<uint32_t>& indices) {
-		Renderer::EnqueueToRenderThread([=](Ref<RenderDevice>& device) {
+		Renderer::EnqueueToRenderCommandQueue([=](Ref<RenderDevice>& device) {
 			Load(device, vertices, indices);
 		});
 	}
@@ -102,8 +102,8 @@ namespace Lucy {
 			m_MetadataInfo.TotalVerticesSize += submesh.VertexCount;
 		}
 
-		Renderer::EnqueueToRenderThread([&](const Ref<RenderDevice>& device) {
-			m_VertexBufferHandle = device->CreateVertexBuffer(m_MetadataInfo.TotalVerticesSize * 17);
+		Renderer::EnqueueToRenderCommandQueue([=](const Ref<RenderDevice>& device) {
+			m_VertexBufferHandle = device->CreateVertexBuffer(m_MetadataInfo.TotalVerticesSize * 17LL);
 			m_IndexBufferHandle = device->CreateIndexBuffer(m_MetadataInfo.TotalIndicesSize);
 
 			const auto& vertexBuffer = Renderer::AccessResource<VertexBuffer>(m_VertexBufferHandle);
@@ -172,14 +172,14 @@ namespace Lucy {
 					from += vertex.size();
 				}
 			}
-
+				
 			vertexBuffer->RTLoadToDevice();
 			indexBuffer->RTLoadToDevice();
 		});
 	}
 
 	void Mesh::LoadData(const aiScene* scene) {
-		ScopedTimer scopedTimer(fmt::format("{0} data parsing", m_Name));
+		ScopedTimer scopedTimer(std::format("{0} data parsing", m_Name));
 
 		aiMesh** meshes = scene->mMeshes;
 		uint32_t meshCount = scene->mNumMeshes;

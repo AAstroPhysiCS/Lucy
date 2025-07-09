@@ -56,11 +56,11 @@ namespace Lucy {
 
 		VkSubpassDependency subpassColorDependency = VulkanAPI::SubpassDependency(VK_SUBPASS_EXTERNAL, 0,
 																				  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-																				  0, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0);
+																				  VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0);
 		VkSubpassDependency subpassDepthDependency = VulkanAPI::SubpassDependency(VK_SUBPASS_EXTERNAL, 0,
 																				  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
 																				  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-																				  0, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, 0);
+																				  VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, 0);
 
 		std::vector<VkSubpassDependency> subpassDependencies = { subpassColorDependency };
 

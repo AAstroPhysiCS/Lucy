@@ -7,13 +7,15 @@
 
 namespace Lucy {
 	
-	ComputeShader::ComputeShader(const std::string& name, const std::filesystem::path& path)
+	ComputeShader::ComputeShader(const std::string& name, const std::filesystem::path& path, Ref<RenderDevice> device)
 		: Shader(name, path) {
 	}
 
 	void ComputeShader::RTLoad(const Ref<RenderDevice>& device, bool forceReloadFromDisk) {
 		shaderc::Compiler compiler;
 		shaderc::CompileOptions options;
+
+		options.SetIncluder(std::make_unique<CustomShaderIncluder>(device));
 
 		options.SetOptimizationLevel(shaderc_optimization_level::shaderc_optimization_level_performance);
 		options.SetGenerateDebugInfo();
@@ -22,7 +24,15 @@ namespace Lucy {
 			options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
 
 		const char* computeFileExtension = ".cached_vulkan.comp";
-		std::filesystem::path cacheComputeFilePath = GetPath().replace_extension(computeFileExtension);
+
+		const auto& cachedFolder = Shader::GetCacheFolder();
+		auto cachedFolderWithName = cachedFolder / (std::filesystem::path(GetName()));
+
+		bool success = FileSystem::CreateDir(cachedFolder);
+		LUCY_ASSERT(success || FileSystem::DirectoryExists(cachedFolder),
+			"Failed to create cache directory");
+
+		std::filesystem::path cacheComputeFilePath = cachedFolderWithName.replace_extension(computeFileExtension);
 
 		std::vector<uint32_t> dataCompute;
 

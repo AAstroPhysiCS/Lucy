@@ -11,7 +11,7 @@
 #include "Renderer/Context/RenderContextResultCodes.h"
 
 #include "Logger.h"
-#include "Optick/optick.h"
+#include "tracy/Tracy.hpp"
 
 #include "glm/common.hpp"
 #include "glm/ext/matrix_clip_space.hpp"
@@ -61,25 +61,13 @@ static void LucyVulkanAssert(int32_t result, const std::source_location& locatio
 #define LUCY_ASSERT(arg, ...)										if (NUMARGS(__VA_ARGS__) == 0) LucyAssert(arg, std::source_location::current()); else LucyAssert((arg), std::source_location::current(), __VA_ARGS__)
 #define LUCY_VK_ASSERT(arg)											LucyVulkanAssert(arg, std::source_location::current())
 
-#ifdef LUCY_DEBUG
-	#define USE_OPTICK (1)
-#else
-	#define USE_OPTICK (0)
-#endif
+#define LUCY_PROFILE_NEW_FRAME(Name)								FrameMarkNamed(Name)
+#define LUCY_PROFILE_NEW_THREAD(Name)								(void)0;
+#define LUCY_PROFILE_NEW_EVENT(Name)								ZoneScopedN(Name)
+#define LUCY_PROFILE_DESTROY()										(void)0;
 
-#define LUCY_PROFILE_NEW_FRAME(Name)								OPTICK_FRAME(Name)
-#define LUCY_PROFILE_NEW_THREAD(Name)								OPTICK_THREAD(Name)
-#define LUCY_PROFILE_NEW_EVENT(Name)								OPTICK_EVENT(Name)
-#define LUCY_PROFILE_NEW_TAG(Name, ...)								OPTICK_TAG(Name, __VA_ARGS__)
-#define LUCY_PROFILE_NEW_CATEGORY(Name, Category)					OPTICK_CATEGORY(Name, Category)
-#define LUCY_PROFILE_DESTROY()										OPTICK_SHUTDOWN()
-
-//not using it, since i will create my own
-#if defined (LUCY_PROFILE_GPU_OPTICK) && defined (LUCY_DEBUG)
-	#define LUCY_PROFILE_GPU_INIT(...)								Optick::InitGpuVulkan(__VA_ARGS__)
-	#define LUCY_PROFILE_GPU_EVENT(Name)							OPTICK_GPU_EVENT(Name)
-	#define LUCY_PROFILE_GPU_FLIP(SwapChainHandle)					OPTICK_GPU_FLIP(SwapChainHandle)
-	#define LUCY_PROFILE_GPU_CONTEXT(...)							OPTICK_GPU_CONTEXT(__VA_ARGS__)
-#endif
+#define IMGUI_DEFINE_MATH_OPERATORS
 
 #define USE_COMPUTE_FOR_CUBEMAP_GEN 1
+
+#define USE_INTEGRATED_GRAPHICS 0

@@ -5,11 +5,12 @@
 #include "Pipeline/PipelineManager.h"
 #include "Material/MaterialManager.h"
 
+#include "Device/RenderDeviceResourceManager.h"
+#include "Device/RenderDevice.h"
+
 #include "Image/Image.h"
 #include "Memory/Buffer/IndexBuffer.h"
 #include "Renderer/Mesh.h"
-
-#include "RenderGraph/RenderGraph.h"
 
 namespace Lucy {
 
@@ -17,6 +18,8 @@ namespace Lucy {
 
 	class RenderGraphPass;
 	class RenderGraphResource;
+
+	class RenderGraph;
 
 	template <typename TRendererPass>
 	concept IsRendererPass = requires(TRendererPass&& rendererPass, const Ref<RenderGraph>& renderGraph){
@@ -59,10 +62,10 @@ namespace Lucy {
 			return device->AccessResource<TResource>(handle);
 		}
 
-		static void DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size);
+		static void RTDirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size);
 		static void SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func);
 
-		static void EnqueueToRenderThread(RenderCommandFunc&& func);
+		static void EnqueueToRenderCommandQueue(RenderCommandFunc&& func);
 		static void EnqueueResourceDestroy(RenderResourceHandle& handle);
 #pragma endregion RenderDevice
 		static void InitializeImGui();
@@ -70,13 +73,13 @@ namespace Lucy {
 
 		static bool IsValidRenderResource(RenderResourceHandle handle);
 
-		static inline uint32_t GetCurrentImageIndex() { return s_Renderer->GetCurrentImageIndex(); }
-		static inline uint32_t GetCurrentFrameIndex() { return s_Renderer->GetCurrentFrameIndex(); }
-		static inline uint32_t GetMaxFramesInFlight() { return s_Renderer->GetMaxFramesInFlight(); }
+		static inline uint32_t GetCurrentImageIndex() { return s_Backend->GetCurrentImageIndex(); }
+		static inline uint32_t GetCurrentFrameIndex() { return s_Backend->GetCurrentFrameIndex(); }
+		static inline uint32_t GetMaxFramesInFlight() { return s_Backend->GetMaxFramesInFlight(); }
 
-		static inline const CommandQueueMetricsOutput& GetCommandQueueMetrics() { return s_Renderer->GetCommandQueueMetrics(); }
+		static inline const RenderCommandQueueMetricsOutput& GetCommandQueueMetrics() { return s_Backend->GetCommandQueueMetrics(); }
 
-		static void RTReloadShader(const std::string& name);
+		static void ReloadShader(const std::string& name);
 		static inline const Ref<Shader>& GetShader(const std::string& name) { return s_Shaders[name]; }
 		static inline const std::unordered_map<std::string, Ref<Shader>>& GetAllShaders() { return s_Shaders; }
 
@@ -95,10 +98,12 @@ namespace Lucy {
 		static void WaitForDevice();
 		static bool IsOnRenderThread();
 
+		static void RTSetBackend(Ref<RendererBackend> backend);
+
 		static void OnEvent(Event& evt);
 	private:
-		static inline const Ref<RenderContext>& GetRenderContext() { return s_Renderer->GetRenderContext(); }
-		static inline const Ref<RenderDevice>& GetRenderDevice() { return GetRenderContext()->GetRenderDevice(); }
+		static inline const Ref<RenderContext>& GetRenderContext() { return s_Backend->GetRenderContext(); }
+		static inline const Ref<RenderDevice>& GetRenderDevice() { return s_Backend->GetRenderDevice(); }
 
 		static void Init(RendererConfiguration config, const Ref<Window>& window);
 		static void Destroy();
@@ -112,13 +117,13 @@ namespace Lucy {
 		static void PushShader(Ref<Shader> shader);
 		static void DestroyAllShaders();
 
+		static inline RendererConfiguration s_Config;
+		static inline RenderThread* s_RenderThread = nullptr;
+		static inline Ref<RendererBackend> s_Backend = nullptr;
 		static inline Ref<RenderGraph> s_RenderGraph = nullptr;
-
+			
 		static inline std::unordered_map<std::string, RenderFrameHandles> s_RenderFrameHandleMap;
 
-		static inline Ref<RendererBackend> s_Renderer = nullptr;
-		static inline RendererConfiguration s_Config;
-		
 		static inline Unique<PipelineManager> s_PipelineManager;
 		static inline Unique<MaterialManager> s_MaterialManager;
 

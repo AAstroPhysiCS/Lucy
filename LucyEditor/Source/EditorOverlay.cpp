@@ -37,22 +37,6 @@ namespace Lucy {
 		sceneExplorerPanel.SetScene(m_Scene);
 
 		viewportPanel.SetRenderPipeline(m_RenderPipeline);
-
-		ImGui::CreateContext();
-
-		ImGuiIO& io = ImGui::GetIO();
-		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-		io.IniFilename = "lucyconfig.ini";
-
-		io.Fonts->AddFontFromFileTTF("Assets/Fonts/ComicMono.ttf", 13);
-
-		int32_t width, height;
-		glfwGetWindowSize(window->Raw(), &width, &height);
-		io.DisplaySize = { (float)width, (float)height };
-
-		Renderer::InitializeImGui();
 	}
 
 	void EditorOverlay::Begin() {

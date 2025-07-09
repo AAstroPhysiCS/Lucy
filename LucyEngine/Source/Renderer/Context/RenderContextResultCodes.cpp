@@ -50,6 +50,56 @@ namespace Lucy {
 				return "The display used by a swapchain does not use the same presentable image layout, or is incompatible in a way that prevents sharing an image.";
 			case RenderContextResultCodes::ERROR_NATIVE_WINDOW_IN_USE_KHR:
 				return "The requested window is already in use by Vulkan or another API in a manner which prevents it from being used again.";
+            case RenderContextResultCodes::ERROR_VALIDATION_FAILED_EXT:
+                return "Validation layer failed.";
+            case RenderContextResultCodes::ERROR_INVALID_SHADER_NV:
+                return "The provided shader is invalid or incompatible.";
+            case RenderContextResultCodes::ERROR_IMAGE_USAGE_NOT_SUPPORTED_KHR:
+                return "The image usage is not supported by the platform or device.";
+            case RenderContextResultCodes::ERROR_VIDEO_PICTURE_LAYOUT_NOT_SUPPORTED_KHR:
+                return "The video picture layout is not supported.";
+            case RenderContextResultCodes::ERROR_VIDEO_PROFILE_OPERATION_NOT_SUPPORTED_KHR:
+                return "The requested video profile operation is not supported.";
+            case RenderContextResultCodes::ERROR_VIDEO_PROFILE_FORMAT_NOT_SUPPORTED_KHR:
+                return "The requested video profile format is not supported.";
+            case RenderContextResultCodes::ERROR_VIDEO_PROFILE_CODEC_NOT_SUPPORTED_KHR:
+                return "The requested video profile codec is not supported.";
+            case RenderContextResultCodes::ERROR_VIDEO_STD_VERSION_NOT_SUPPORTED_KHR:
+                return "The requested video standard version is not supported.";
+            case RenderContextResultCodes::ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT:
+                return "The DRM format modifier plane layout is invalid.";
+            case RenderContextResultCodes::ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT:
+                return "Full-screen exclusive mode has been lost.";
+            case RenderContextResultCodes::THREAD_IDLE_KHR:
+                return "The thread is idle.";
+            case RenderContextResultCodes::THREAD_DONE_KHR:
+                return "The thread has finished its work.";
+            case RenderContextResultCodes::OPERATION_DEFERRED_KHR:
+                return "The operation has been deferred.";
+            case RenderContextResultCodes::OPERATION_NOT_DEFERRED_KHR:
+                return "The operation was not deferred.";
+            case RenderContextResultCodes::ERROR_INVALID_VIDEO_STD_PARAMETERS_KHR:
+                return "Invalid video standard parameters.";
+            case RenderContextResultCodes::ERROR_COMPRESSION_EXHAUSTED_EXT:
+                return "Compression resources have been exhausted.";
+            case RenderContextResultCodes::INCOMPATIBLE_SHADER_BINARY_EXT:
+                return "The shader binary is incompatible.";
+            case RenderContextResultCodes::PIPELINE_BINARY_MISSING_KHR:
+                return "A required pipeline binary is missing.";
+            case RenderContextResultCodes::ERROR_NOT_ENOUGH_SPACE_KHR:
+                return "There is not enough space available for the operation.";
+            case RenderContextResultCodes::ERROR_OUT_OF_POOL_MEMORY:
+                return "Out of pool memory.";
+            case RenderContextResultCodes::ERROR_INVALID_EXTERNAL_HANDLE:
+                return "Invalid external handle.";
+            case RenderContextResultCodes::ERROR_FRAGMENTATION:
+                return "The operation could not be completed due to memory fragmentation.";
+            case RenderContextResultCodes::ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS:
+                return "The opaque capture address is invalid.";
+            case RenderContextResultCodes::PIPELINE_COMPILE_REQUIRED:
+                return "Pipeline compilation is required.";
+            case RenderContextResultCodes::RESULT_MAX_ENUM:
+                return "Maximum enum value reached.";
 			default:
 				return "Validation failed!";
 		}

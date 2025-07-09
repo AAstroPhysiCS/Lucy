@@ -113,6 +113,6 @@ namespace Lucy::VulkanAPI {
 
 	VkQueryPoolCreateInfo QueryPoolCreateInfo(uint32_t queryCount, VkQueryType queryType, VkQueryPipelineStatisticFlags pipelineStatistics);
 	VkSubmitInfo QueueSubmitInfo(uint32_t commandBufferCount, const VkCommandBuffer* const commandBuffers,
-								 uint32_t waitSemaphoreCount, const VkSemaphore* const waitSemaphores, VkPipelineStageFlags* waitStages,
+								 uint32_t waitSemaphoreCount, const VkSemaphore* const waitSemaphores, VkPipelineStageFlags* waitDstStageMask,
 								 uint32_t signalSemaphoreCount, const VkSemaphore* const signalSemaphores);
 }

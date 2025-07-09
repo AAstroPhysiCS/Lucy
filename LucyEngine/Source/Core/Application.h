@@ -6,7 +6,6 @@
 
 #include "Overlay.h"
 
-#include "Threading/RunnableThreadScheduler.h"
 #include "Threading/TaskScheduler.h"
 
 #include "Scene/Scene.h"
@@ -42,9 +41,14 @@ namespace Lucy {
 
 		inline ApplicationArgs GetProgramArguments() const { return m_Args; }
 
-		inline static ApplicationMetrics& GetApplicationMetrics() { return s_Metrics; }
-		inline static auto GetRunnableThreadScheduler() { return s_RunnableThreadScheduler; }
-		inline static auto GetTaskScheduler() { return s_TaskScheduler; }
+		static inline ApplicationMetrics& GetApplicationMetrics() { return s_Metrics; }
+		static inline auto GetTaskScheduler() { return s_TaskScheduler; }
+		
+		static inline std::condition_variable& IsMainThreadReadyCondVar() { return s_MainThreadReadyCondVar; }
+		static inline const std::mutex& IsMainThreadReadyMutex() { return s_MainThreadReadyMutex; }
+		static inline const std::atomic_bool& IsMainThreadReady() { return s_MainThreadReady; }
+
+		static void SetMainThreadReady(bool val);
 	protected:
 		void SetScene(Ref<Scene> scene);
 		void SetRenderType(RenderType renderType);
@@ -58,21 +62,17 @@ namespace Lucy {
 		Ref<Window> m_Window = nullptr;
 		std::vector<Ref<Overlay>> m_Overlays;
 
-		RendererConfiguration m_RendererConfiguration;
 		Ref<RenderPipeline> m_RenderPipeline = nullptr;
 
 		ApplicationArgs m_Args;
 		ApplicationCreateInfo m_CreateInfo;
 		static inline ApplicationMetrics s_Metrics;
 
-		static inline auto s_RunnableThreadScheduler = new RunnableThreadScheduler<RenderThread>({
-			RunnableThreadCreateInfo {
-			   .Name = "LucyRenderThread",
-			   .Affinity = ThreadApplicationAffinityIncremental,
-			   .Priority = ThreadPriority::Highest
-			},
-		});
-		static inline auto s_TaskScheduler = new TaskScheduler(TaskSchedulerCreateInfo{ .FromThreadIndex = s_RunnableThreadScheduler->GetThreadExtent() });
+		static inline auto s_TaskScheduler = new TaskScheduler(TaskSchedulerCreateInfo{ .FromThreadIndex = 1 });
+
+		static inline std::condition_variable s_MainThreadReadyCondVar;
+		static inline std::mutex s_MainThreadReadyMutex;
+		static inline std::atomic_bool s_MainThreadReady = false;
 
 		friend int ::main(int argc, char** argv);
 	};

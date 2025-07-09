@@ -247,7 +247,7 @@ namespace Lucy::VulkanAPI {
 
 		VkSwapchainCreateInfoKHR createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-		createInfo.surface = swapChain->m_Window->GetVulkanSurface();
+		createInfo.surface = swapChain->GetWindow()->GetVulkanSurface();
 		createInfo.minImageCount = imageCount;
 		createInfo.imageFormat = swapChain->m_SelectedFormat.format;
 		createInfo.imageColorSpace = swapChain->m_SelectedFormat.colorSpace;
@@ -696,14 +696,14 @@ namespace Lucy::VulkanAPI {
 	}
 
 	VkSubmitInfo VulkanAPI::QueueSubmitInfo(uint32_t commandBufferCount, const VkCommandBuffer* const commandBuffers,
-											uint32_t waitSemaphoreCount, const VkSemaphore* const waitSemaphores, VkPipelineStageFlags* waitStages,
+											uint32_t waitSemaphoreCount, const VkSemaphore* const waitSemaphores, VkPipelineStageFlags* waitDstStageMask,
 											uint32_t signalSemaphoreCount, const VkSemaphore* const signalSemaphores) {
 		VkSubmitInfo submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
 		submitInfo.waitSemaphoreCount = waitSemaphoreCount;
 		submitInfo.pWaitSemaphores = waitSemaphores;
-		submitInfo.pWaitDstStageMask = waitStages;
+		submitInfo.pWaitDstStageMask = waitDstStageMask;
 
 		submitInfo.commandBufferCount = commandBufferCount;
 		submitInfo.pCommandBuffers = commandBuffers;

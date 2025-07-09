@@ -76,8 +76,16 @@ namespace Lucy {
 		void AddPass(const Ref<RenderGraph>& renderGraph);
 
 		//the resolution of the hdr image. its an arbitrary number (increase it, if necessary)
+#if USE_INTEGRATED_GRAPHICS && USE_COMPUTE_FOR_CUBEMAP_GEN
+		static inline constexpr const uint32_t HDRImageWidth = 256;
+		static inline constexpr const uint32_t HDRImageHeight = 256;
+#elif USE_INTEGRATED_GRAPHICS
+		static inline constexpr const uint32_t HDRImageWidth = 128;
+		static inline constexpr const uint32_t HDRImageHeight = 128;
+#else
 		static inline constexpr const uint32_t HDRImageWidth = 1024;
 		static inline constexpr const uint32_t HDRImageHeight = 1024;
+#endif
 	private:
 		Ref<Scene> m_Scene;
 		uint32_t m_Width = 0;

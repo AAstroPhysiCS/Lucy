@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RendererBackend.h"
+#include "Context/VulkanSwapChain.h"
 #include "Synchronization/VulkanSyncItems.h"
 
 #include "Memory/VulkanAllocator.h"
@@ -23,7 +24,7 @@ namespace Lucy {
 
 		void Destroy() final override;
 
-		void DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size);
+		void RTDirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size);
 		void SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func);
 
 		void OnWindowResize() final override;
@@ -31,7 +32,7 @@ namespace Lucy {
 		glm::vec3 OnMousePicking(const EntityPickedEvent& e, const Ref<Image>& currentFrameBufferImage) final override;
 
 		void InitializeImGui() final override;
-		void RenderImGui() final override;
+		void RTRenderImGui() final override;
 	private:
 		void Init() final override;
 
@@ -39,11 +40,19 @@ namespace Lucy {
 		void RenderFrame() final override;
 		void EndFrame() final override;
 
+		void FlushDeletionQueue() final override;
+
 		std::vector<Semaphore> m_WaitSemaphores;
 		std::vector<Semaphore> m_SignalSemaphores;
 		std::vector<Fence> m_InFlightFences;
 
-		VkResult m_LastSwapChainResult = VK_SUCCESS;
+		std::vector<Semaphore> m_WaitSemaphoresCompute;
+		std::vector<Semaphore> m_SignalSemaphoresCompute;
+		std::vector<Fence> m_InFlightFencesCompute;
+
+		bool m_UseComputeSemaphore = false;
+
+		RenderContextResultCodes m_LastSwapChainResult = RenderContextResultCodes::SUCCESS;
 
 		Ref<VulkanTransientCommandPool> m_TransientCommandPool = nullptr;
 

@@ -146,21 +146,21 @@ namespace Lucy {
 		VkDevice device = m_VulkanDevice->GetLogicalDevice();
 
 		for (RenderResourceHandle bufferHandle : GetAllUniformBufferHandles() | std::views::values) {
-			const auto& buffer = Renderer::AccessResource<UniformBuffer>(bufferHandle);
-			if (!buffer)
+			const auto& uniformBuffer = Renderer::AccessResource<VulkanUniformBuffer>(bufferHandle);
+			if (!uniformBuffer)
 				continue;
-			buffer->RTLoadToDevice();
+			uniformBuffer->RTLoadToDevice();
 
-			DescriptorType descriptorType = buffer->GetDescriptorType();
+			DescriptorType descriptorType = uniformBuffer->GetDescriptorType();
 			switch (descriptorType) {
 				case DescriptorType::DynamicBuffer:
 				case DescriptorType::Buffer: {
-					const auto& uniformBuffer = buffer->As<VulkanUniformBuffer>();
-					const uint32_t arraySize = buffer->GetArraySize();
+					const uint32_t arraySize = uniformBuffer->GetArraySize();
 
 					VkDescriptorBufferInfo bufferInfo = VulkanAPI::DescriptorBufferInfo(uniformBuffer->GetVulkanBufferHandle(frameIndex), 0, VK_WHOLE_SIZE);
-					VkWriteDescriptorSet setWrite = VulkanAPI::WriteDescriptorSet(m_DescriptorSets[frameIndex], 0, buffer->GetBinding(), arraySize == 0 ? 1 : arraySize, (VkDescriptorType)ConvertDescriptorType(descriptorType),
-																				  &bufferInfo);
+					VkWriteDescriptorSet setWrite = VulkanAPI::WriteDescriptorSet(m_DescriptorSets[frameIndex], 0, 
+						uniformBuffer->GetBinding(), arraySize == 0 ? 1 : arraySize, 
+						(VkDescriptorType)ConvertDescriptorType(descriptorType), &bufferInfo);
 
 					vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr);
 
@@ -204,7 +204,7 @@ namespace Lucy {
 			return;
 
 		for (const Ref<VulkanUniformImageSampler>& sampler : m_UniformImageSamplers | std::views::values) {
-			const auto& imageInfos = sampler->ImageInfos;
+			auto& imageInfos = sampler->ImageInfos;
 			if (imageInfos.empty())
 				break;
 
@@ -212,7 +212,7 @@ namespace Lucy {
 																		  nullptr, imageInfos.data());
 			vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr);
 
-			sampler->ImageInfos.clear();
+			imageInfos.clear();
 		}
 	}
 

@@ -38,7 +38,7 @@ namespace Lucy {
 	static int32_t MESH_ID_COUNT_Z = 0;
 	static int32_t MESH_ID_COUNT_W = 0;
 
-	class Mesh {
+	class Mesh : public MemoryTrackable {
 	public:
 		static Ref<Mesh> Create(const std::vector<float>& vertices, const std::vector<uint32_t>& indices);
 		static Ref<Mesh> Create(const std::string& path);
@@ -73,10 +73,10 @@ namespace Lucy {
 		std::string m_Path;
 		std::string m_Name;
 
-		glm::vec3 m_MeshID;
+		glm::vec3 m_MeshID = glm::vec3(-1.0f);
 		MetadataInfo m_MetadataInfo;
 	private:
-		friend static void IncreaseMeshCount(Mesh* m);
+		friend void IncreaseMeshCount(Mesh* m);
 	};
 }
 

@@ -8,12 +8,10 @@
 namespace Lucy {
 	
 	VulkanContext::VulkanContext(const Ref<Window>& window)
-		: RenderContext(window, Memory::CreateRef<VulkanRenderDevice>()) {
+		: RenderContext(window) {
 	}
 
 	void VulkanContext::Destroy() {
-		//RenderDevice is being destroyed on the parent.
-		m_SwapChain.Destroy();
 		const auto& window = GetWindow();
 		window->DestroyVulkanSurface(m_Instance);
 
@@ -25,7 +23,7 @@ namespace Lucy {
 		LUCY_INFO("----------Enabled extensions----------");
 		for (uint32_t i = 0; i < m_InstanceExtensions.size(); i++) {
 			const char* extension = m_InstanceExtensions[i];
-			LUCY_INFO(fmt::format("{0}: {1}", i, extension));
+			LUCY_INFO(std::format("{0}: {1}", i, extension));
 		}
 	}
 
@@ -36,11 +34,23 @@ namespace Lucy {
 		appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
 		appInfo.pEngineName = "LucyEngine";
 		appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-		appInfo.apiVersion = VK_API_VERSION_1_3;
+		appInfo.apiVersion = s_APIVersion;
 
 		VkInstanceCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 		createInfo.pApplicationInfo = &appInfo;
+
+#if LUCY_DEBUG
+		VkValidationFeaturesEXT validationFeatures{};
+		validationFeatures.sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
+		validationFeatures.enabledValidationFeatureCount = 4;
+		VkValidationFeatureEnableEXT enables[] = { VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT, 
+			VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT, VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT, 
+			VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT };
+		validationFeatures.pEnabledValidationFeatures = enables;
+
+		createInfo.pNext = &validationFeatures;
+#endif
 
 		uint32_t glfwExtensionCount = 0;
 		const char** glfwExtensionNames = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
@@ -75,10 +85,9 @@ namespace Lucy {
 		createInfo.ppEnabledExtensionNames = instanceExtensions.data();
 
 		LUCY_VK_ASSERT(vkCreateInstance(&createInfo, nullptr, &m_Instance));
-
-#ifdef LUCY_DEBUG
 		LUCY_INFO("Vulkan successfully initialized");
 
+#ifdef LUCY_DEBUG
 		if (auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(m_Instance, "vkCreateDebugUtilsMessengerEXT"))
 			LUCY_VK_ASSERT(func(m_Instance, &debugForVkInstanceAndDestroy, nullptr, &m_DebugMessenger));
 
@@ -86,11 +95,6 @@ namespace Lucy {
 #endif
 		const Ref<Window>& window = GetWindow();
 		window->InitVulkanSurface(m_Instance);
-		
-		auto vulkanRenderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
-		vulkanRenderDevice->Init(m_Instance, m_ValidationLayers, window->GetVulkanSurface(), appInfo.apiVersion);
-
-		m_SwapChain.Create(window, vulkanRenderDevice);
 	}
 
 	void VulkanContext::CheckValidationSupport() const {
@@ -131,15 +135,15 @@ namespace Lucy {
 		void* pUserData) {
 
 		if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-			LUCY_WARN(fmt::format("Vulkan validation warning {0}", pCallbackData->pMessage));
+			LUCY_WARN(std::format("Vulkan validation warning {0}", pCallbackData->pMessage));
 		} else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-			LUCY_CRITICAL(fmt::format("Vulkan validation error {0}", pCallbackData->pMessage));
+			LUCY_CRITICAL(std::format("Vulkan validation error {0}\n", pCallbackData->pMessage));
 		} else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
-			LUCY_INFO(fmt::format("Vulkan validation verbose {0}", pCallbackData->pMessage));
+			LUCY_INFO(std::format("Vulkan validation verbose {0}", pCallbackData->pMessage));
 		} else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
-			LUCY_INFO(fmt::format("Vulkan validation info {0}", pCallbackData->pMessage));
+			LUCY_INFO(std::format("Vulkan validation info {0}", pCallbackData->pMessage));
 		} else {
-			LUCY_INFO(fmt::format("Unknown vulkan validation {0}", pCallbackData->pMessage));
+			LUCY_INFO(std::format("Unknown vulkan validation {0}", pCallbackData->pMessage));
 		}
 
 		return VK_FALSE;
@@ -147,6 +151,6 @@ namespace Lucy {
 
 	void VulkanMessageCallback::ImGui_DebugCallback(VkResult result) {
 		if (result != VK_SUCCESS) 
-			LUCY_CRITICAL(fmt::format("Vulkan ImGui error {0}", RendererBackendCodesToString(result)));
+			LUCY_CRITICAL(std::format("Vulkan ImGui error {0}\n", RendererBackendCodesToString(result)));
 	}
 }

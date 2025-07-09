@@ -39,6 +39,8 @@ void main() {
 #extension GL_EXT_nonuniform_qualifier : require
 #extension GL_EXT_debug_printf : enable
 
+#include "LucySamplingUtilities"
+
 layout (location = 0) in vec3 a_Pos;
 layout (location = 1) in vec2 a_TextureCoords;
 layout (location = 2) in vec3 a_Normals;
@@ -50,8 +52,6 @@ layout (location = 0) out vec4 a_Color;
 const uint ROUGHNESS_MASK = 0x00000001u;
 const uint METALLIC_MASK = 0x00000002u;
 const uint AO_MASK = 0x00000004u;
-
-#define PI 3.1415926535897932384626433832795f
 
 #define NULL_TEXTURE_SLOT -1
 #define NUM_CASCADES 4
@@ -140,84 +140,6 @@ vec4 LinearizeDepth(in vec4 fragCoord, in mat4 projMat) {
 	vec4 normalizedFrag = fragCoord * 2.0 - 1.0;
 	vec4 unprojected = inverse(projMat) * normalizedFrag;
 	return unprojected / unprojected.w;
-}
-
-/*
-	Normal Distribution function (Distribution of the microfacets)
-*/
-float D_GGX(float dotNH, float roughness) {
-	float alpha = roughness * roughness;
-	float alpha2 = alpha * alpha;
-	float denom = dotNH * dotNH * (alpha2 - 1.0) + 1.0;
-	return (alpha2)/(PI * denom*denom); 
-}
-
-/*
-	Geometric Shadowing function (Microfacets shadowing)
-*/
-float G_SchlicksmithGGX(float dotNL, float dotNV, float roughness) {
-	float r = (roughness + 1.0);
-	float k = (r*r) / 8.0;
-	float GL = dotNL / (dotNL * (1.0 - k) + k);
-	float GV = dotNV / (dotNV * (1.0 - k) + k);
-	return GL * GV;
-}
-
-/*
-	Fresnel function (Reflectance depending on angle of incidence)
-*/
-vec3 F_Schlick(float cosTheta, vec3 F0, float roughness) {
-	return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
-}
-
-/*
-	------------------ BRDF ------------------
-	Cook-Torrance Microfacet BRDF (Bidirectional Reflectance Distribution Function)
-	Specular Contribution
-	BRDF consists of mainly 2 parts:
-	1. Diffuse Part
-	2. Specular Part
-
-	Diffuse Part: Pd / PI
-	Specular Part: F(v, h) * D(h) * G(l, v) / 4.0 * dot(N, L) * dot(N, V)
-
-	We add both of them together and get the wanted BRDF
-
-	V is the view direction
-	L is the light direction
-	n is the surface normal
-	h is the halfway vector
-
-	F(v, h) is the fresnel reflectance
-	D(h) is the normal distribution function
-	G(l, v) is the geometry term
-
-	For these functions, we typically use an "approximation", since those are the fastest to compute
-*/
-vec3 BRDF(vec3 L, vec3 V, vec3 N, vec3 F0, float metallic, float roughness, vec3 albedoColor, vec3 lightColor) {
-	// Precalculation...	
-	vec3 H = normalize (V + L);
-	float dotNV = clamp(dot(N, V), 0.0, 1.0);
-	float dotNL = clamp(dot(N, L), 0.0, 1.0);
-	float dotLH = clamp(dot(L, H), 0.0, 1.0);
-	float dotNH = clamp(dot(N, H), 0.0, 1.0);
-
-	vec3 color = vec3(0.0);
-
-	if (dotNL > 0.0)
-	{
-		float rroughness = max(0.05, roughness);
-		float D = D_GGX(dotNH, roughness); 
-		float G = G_SchlicksmithGGX(dotNL, dotNV, rroughness);
-		vec3 F = F_Schlick(dotNV, F0, roughness);
-
-		vec3 spec = D * F * G / (4.0 * dotNL * dotNV + 0.001);
-		vec3 kD = (vec3(1.0) - F) * (1.0 - metallic);	
-
-		color += (kD * albedoColor / PI + spec) * dotNL * lightColor;
-	}
-
-	return color;
 }
 
 float ChebyshevUpperBound(vec2 moments, float t) {
@@ -355,6 +277,7 @@ void main() {
 	outputColor = pow(outputColor, vec3(1.0f / gamma));
 
 	a_Color = vec4(outputColor, alpha);
+
 	if (DEBUG_CASCADED_SHADOW_MAPS)
 		a_Color = ShadowContribution(modelWorldPos);
 }

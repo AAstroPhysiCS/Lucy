@@ -8,13 +8,14 @@ namespace Lucy {
 
 	static inline RenderCommand* s_CurrentActiveRenderCommand = nullptr;
 
-	RenderCommandList::RenderCommandList(const Ref<RenderDevice>& renderDevice)
-		: m_RenderDevice(renderDevice) {
-		static auto commandPoolCreateInfo = CommandPoolCreateInfo{
+	RenderCommandList::RenderCommandList(const RenderCommandListCreateInfo& createInfo) 
+		: m_CreateInfo(createInfo) {
+		auto commandPoolCreateInfo = CommandPoolCreateInfo{
 			.CommandBufferCount = Renderer::GetMaxFramesInFlight(),
 			.Level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 			.PoolFlags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-			.RenderDevice = renderDevice
+			.RenderDevice = m_CreateInfo.RenderDevice,
+			.TargetQueueFamily = m_CreateInfo.TargetQueueFamily
 		};
 
 		/*
@@ -23,7 +24,7 @@ namespace Lucy {
 			.CommandBufferCount = Renderer::GetMaxFramesInFlight(),
 			.Level = VK_COMMAND_BUFFER_LEVEL_SECONDARY,
 			.PoolFlags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
-			.RenderDevice = renderDevice
+			.RenderDevice = m_CreateInfo.RenderDevice
 		};*/
 
 		switch (Renderer::GetRenderArchitecture()) {
@@ -36,14 +37,12 @@ namespace Lucy {
 		}
 	}
 
-	
-
 	RenderCommand& RenderCommandList::BeginRenderCommand(const std::string& nameOfDraw) {
 		LUCY_ASSERT(!s_CurrentActiveRenderCommand, "There is an active ongoing render command that needs to be closed!");
 		LUCY_PROFILE_NEW_EVENT(std::format("RenderCommandList::BeginRenderCommand {}", nameOfDraw).c_str());
 
 		if (!m_RenderCommands.contains(nameOfDraw))
-			m_RenderCommands.try_emplace(nameOfDraw, nameOfDraw, m_RenderDevice, m_PrimaryCommandPool);
+			m_RenderCommands.try_emplace(nameOfDraw, nameOfDraw, m_CreateInfo.RenderDevice, m_PrimaryCommandPool);
 
 		RenderCommand& cmd = m_RenderCommands.at(nameOfDraw);
 		cmd.BeginTimestamp();

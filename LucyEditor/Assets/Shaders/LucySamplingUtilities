@@ -1,0 +1,119 @@
+#define PI 3.1415926535897932384626433832795f
+#define TWO_PI 6.283185307179586476925286766559f
+#define HALF_PI 1.57079632679489661923132169163975f
+
+// Van Der Corpus sequence
+// @see http://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html
+float VdcSequence(uint bits) {
+     bits = (bits << 16u) | (bits >> 16u);
+     bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
+     bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
+     bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
+     bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
+     return float(bits) * 2.3283064365386963e-10; // / 0x100000000
+}
+
+vec2 Hammersley(uint i, uint N) {
+	return vec2(float(i)/float(N), VdcSequence(i));
+}
+
+vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float roughness) {
+	float a = roughness*roughness;
+	
+	float phi = 2.0 * PI * Xi.x;
+	float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (a*a - 1.0) * Xi.y));
+	float sinTheta = sqrt(1.0 - cosTheta*cosTheta);
+	
+	// from spherical coordinates to cartesian coordinates - halfway vector
+	vec3 H;
+	H.x = cos(phi) * sinTheta;
+	H.y = sin(phi) * sinTheta;
+	H.z = cosTheta;
+	
+	// from tangent-space H vector to world-space sample vector
+	vec3 up = abs(N.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+	vec3 tangent = normalize(cross(up, N));
+	vec3 bitangent = cross(N, tangent);
+	
+	vec3 sampleVec = tangent * H.x + bitangent * H.y + N * H.z;
+	return normalize(sampleVec);
+}
+
+float DistributionGGX(float dotNH, float roughness) {
+    float r2 = roughness * roughness;
+    float dotNH2 = dotNH*dotNH;
+
+    float nom = r2;
+    float denom = (dotNH2 * (r2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+
+    return nom / denom;
+}
+
+/*
+	Geometric Shadowing function (Microfacets shadowing)
+*/
+float G_SchlicksmithGGX(float dotNL, float dotNV, float roughness) {
+	float r = (roughness + 1.0);
+	float k = (r*r) / 8.0;
+	float GL = dotNL / (dotNL * (1.0 - k) + k);
+	float GV = dotNV / (dotNV * (1.0 - k) + k);
+	return GL * GV;
+}
+
+/*
+	Fresnel function (Reflectance depending on angle of incidence)
+*/
+vec3 F_Schlick(float cosTheta, vec3 F0, float roughness) {
+	return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(1.0 - cosTheta, 5.0);
+}
+
+/*
+	------------------ BRDF ------------------
+	Cook-Torrance Microfacet BRDF (Bidirectional Reflectance Distribution Function)
+	Specular Contribution
+	BRDF consists of mainly 2 parts:
+	1. Diffuse Part
+	2. Specular Part
+
+	Diffuse Part: Pd / PI
+	Specular Part: F(v, h) * D(h) * G(l, v) / 4.0 * dot(N, L) * dot(N, V)
+
+	We add both of them together and get the wanted BRDF
+
+	V is the view direction
+	L is the light direction
+	n is the surface normal
+	h is the halfway vector
+
+	F(v, h) is the fresnel reflectance
+	D(h) is the normal distribution function
+	G(l, v) is the geometry term
+
+	For these functions, we typically use an "approximation", since those are the fastest to compute
+*/
+vec3 BRDF(vec3 L, vec3 V, vec3 N, vec3 F0, float metallic, float roughness, vec3 albedoColor, vec3 lightColor) {
+	// Precalculation...	
+	vec3 H = normalize (V + L);
+	float dotNV = clamp(dot(N, V), 0.0, 1.0);
+	float dotNL = clamp(dot(N, L), 0.0, 1.0);
+	float dotLH = clamp(dot(L, H), 0.0, 1.0);
+	float dotNH = clamp(dot(N, H), 0.0, 1.0);
+
+	vec3 color = vec3(0.0);
+
+	if (dotNL > 0.0)
+	{
+		float rroughness = max(0.05, roughness);
+		float D = DistributionGGX(dotNH, roughness); 
+		float G = G_SchlicksmithGGX(dotNL, dotNV, rroughness);
+		vec3 F = F_Schlick(dotNV, F0, roughness);
+
+		vec3 spec = D * F * G / (4.0 * dotNL * dotNV + 0.001);
+		vec3 kD = (vec3(1.0) - F) * (1.0 - metallic);	
+
+		color += (kD * albedoColor / PI + spec) * dotNL * lightColor;
+	}
+
+	return color;
+}

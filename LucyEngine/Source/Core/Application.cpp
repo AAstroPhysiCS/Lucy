@@ -30,10 +30,10 @@ namespace Lucy {
 			overlay->Destroy();
 
 		Renderer::Destroy();
+
 		m_Window->Destroy();
 
 		delete s_TaskScheduler;
-		delete s_RunnableThreadScheduler;
 	}
 
 	void Application::Init() {
@@ -49,10 +49,10 @@ namespace Lucy {
 		FileSystem::Init();
 
 #ifdef LUCY_DEBUG
-		m_Window->SetTitle(fmt::format("{0} - Windows x64 Debug {1}", m_Window->GetTitle(),
+		m_Window->SetTitle(std::format("{0} - Windows x64 Debug {1}", m_Window->GetTitle(),
 						   m_CreateInfo.RendererConfiguration.RenderArchitecture == RenderArchitecture::Vulkan ? "Vulkan" : "D3D12").c_str());
 #else
-		m_Window->SetTitle(fmt::format("{0} - Windows x64 Release {1}", m_Window->GetTitle(),
+		m_Window->SetTitle(std::format("{0} - Windows x64 Release {1}", m_Window->GetTitle(),
 						   m_CreateInfo.RendererConfiguration.RenderArchitecture == RenderArchitecture::Vulkan ? "Vulkan" : "D3D12").c_str());
 #endif
 
@@ -69,9 +69,6 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "Only Rasterizer is supported for now!");
 		}
-
-		if (m_CreateInfo.RendererConfiguration.ThreadingPolicy == ThreadingPolicy::Multithreaded)
-			s_RunnableThreadScheduler->Start();
 	}
 
 	void Application::Run() {
@@ -83,6 +80,8 @@ namespace Lucy {
 			overlay->SetRenderPipeline(m_RenderPipeline);
 			overlay->OnRendererInit(m_Window);
 		}
+		
+		Renderer::InitializeImGui();
 
 		while (!glfwWindowShouldClose(m_Window->Raw())) {
 			LUCY_PROFILE_NEW_FRAME("Lucy");
@@ -92,20 +91,28 @@ namespace Lucy {
 			m_Scene->Update();
 
 			m_RenderPipeline->BeginFrame();
+			m_RenderPipeline->RenderFrame();
+			m_RenderPipeline->EndFrame();
+
 			for (const auto& overlay : m_Overlays) {
 				overlay->Begin();
 				overlay->Render();
 				overlay->End();
 			}
-			m_RenderPipeline->RenderFrame();
-			m_RenderPipeline->EndFrame();
 
-			RenderContextResultCodes result = Renderer::WaitAndPresent();
-			if (result == RenderContextResultCodes::ERROR_OUT_OF_DATE_KHR || 
-				result == RenderContextResultCodes::SUBOPTIMAL_KHR || 
-				result == RenderContextResultCodes::NOT_READY) {
-				EventHandler::DispatchImmediateEvent<SwapChainResizeEvent>();
+			if (m_CreateInfo.RendererConfiguration.ThreadingPolicy == ThreadingPolicy::Singlethreaded) {
+				RenderContextResultCodes result = Renderer::WaitAndPresent();
+				if (result == RenderContextResultCodes::ERROR_OUT_OF_DATE_KHR || 
+					result == RenderContextResultCodes::SUBOPTIMAL_KHR || 
+					result == RenderContextResultCodes::NOT_READY) {
+					EventHandler::DispatchImmediateEvent<SwapChainResizeEvent>();
+				}
+			} else {
+				std::unique_lock<std::mutex> lock(s_MainThreadReadyMutex);
+				s_MainThreadReady = true;
+				s_MainThreadReadyCondVar.wait(lock, [&]() { return !s_MainThreadReady.load(); });
 			}
+
 			Renderer::Flush();
 
 			LUCY_PROFILE_NEW_EVENT("Metrics::Update");
@@ -130,12 +137,16 @@ namespace Lucy {
 			overlay->OnEvent(e);
 	}
 
+	void Application::SetMainThreadReady(bool val) {
+		s_MainThreadReady = val;
+	}
+
 	void Application::SetScene(Ref<Scene> scene) {
 		m_Scene = scene;
 	}
 
 	void Application::SetRenderType(RenderType renderType) {
-		m_RendererConfiguration.RenderType = renderType;
+		m_CreateInfo.RendererConfiguration.RenderType = renderType;
 	}
 
 	void Application::PushOverlay(Ref<Overlay> overlay) {

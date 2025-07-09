@@ -1,5 +1,7 @@
 #pragma once
 
+#include "SwapChain.h"
+
 #include "vulkan/vulkan.h"
 #include "Renderer/Image/VulkanImage2D.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
@@ -9,7 +11,7 @@
 namespace Lucy {
 
 	class Window;
-	class CommandQueue;
+	class RenderCommandQueue;
 
 	class Semaphore;
 	class Fence;
@@ -20,17 +22,17 @@ namespace Lucy {
 		std::vector<VkPresentModeKHR> presentModes;
 	};
 
-	class VulkanSwapChain {
+	class VulkanSwapChain final : public SwapChain {
 	public:
-		VulkanSwapChain() = default;
-		~VulkanSwapChain() = default;
+		VulkanSwapChain(const Ref<Window>& window, const Ref<RenderDevice>& renderDevice);
+		virtual ~VulkanSwapChain() = default;
 
-		void Create(const Ref<Window>& window, const Ref<VulkanRenderDevice>& renderDevice);
-		void Recreate();
-		VkResult AcquireNextImage(VkSemaphore currentFrameImageAvailSemaphore, uint32_t& imageIndex);
-		VkResult Present(const Semaphore& signalSemaphore, uint32_t& imageIndex);
+		void Init() final override;
+		void Recreate() final override;
+		RenderContextResultCodes AcquireNextImage(const Semaphore& currentFrameImageAvailSemaphore, uint32_t& imageIndex) final override;
+		RenderContextResultCodes Present(const Semaphore& signalSemaphore, uint32_t& imageIndex) final override;
 
-		void Destroy();
+		void Destroy() final override;
 
 		inline const Unique<VulkanSwapChainFrameBuffer>& GetFrameBuffer() const { return m_SwapChainFrameBuffer; }
 		inline Ref<VulkanRenderPass> GetRenderPass() const { return m_SwapChainRenderPass; }
@@ -57,9 +59,6 @@ namespace Lucy {
 		VkSurfaceFormatKHR m_SelectedFormat;
 		VkPresentModeKHR m_SelectedPresentMode;
 		VkExtent2D m_SelectedSwapExtent;
-
-		Ref<Window> m_Window = nullptr;
-		Ref<VulkanRenderDevice> m_RenderDevice = nullptr;
 
 		friend class RendererBackend; //for swapchain image count
 

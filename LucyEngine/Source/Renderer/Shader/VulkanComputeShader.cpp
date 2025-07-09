@@ -7,7 +7,7 @@
 namespace Lucy {
 
 	VulkanComputeShader::VulkanComputeShader(const std::string& name, const std::filesystem::path& path, Ref<RenderDevice> device)
-		: ComputeShader(name, path) {
+		: ComputeShader(name, path, device) {
 		RTLoad(device);
 	}
 

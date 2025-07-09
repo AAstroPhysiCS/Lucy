@@ -122,7 +122,7 @@ namespace Lucy {
 
 	void TaskScheduler::WaitForTask(TaskId taskId) const {
 		LUCY_ASSERT(taskId != -1, "Waiting for an invalid task is prohibited");
-		while (m_CurrentTaskCounter.load(std::memory_order_relaxed) <= taskId) {
+		while (m_CurrentTaskCounter.load(std::memory_order_relaxed) > taskId) {
 			/* Wait for the task to finish */
 			s_WorkerSleepCondition.notify_all();
 		}

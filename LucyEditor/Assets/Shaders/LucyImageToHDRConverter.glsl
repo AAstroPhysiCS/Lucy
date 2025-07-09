@@ -3,7 +3,7 @@
 #extension GL_ARB_shader_viewport_layer_array : require
 #extension GL_EXT_multiview : require
 
-#include "LucyIBLUtilities.glsl"
+#include "LucyIBLUtilities"
 
 layout (location = 0) in vec3 a_Pos;
 
@@ -16,7 +16,6 @@ layout (push_constant) uniform LucyCameraPushConstants {
 
 void main() {
     a_PosOut = a_Pos;
-    gl_Layer = gl_ViewIndex;
     gl_Position = u_ProjMatrix * inverse(CaptureViews[gl_ViewIndex]) * vec4(a_Pos, 1.0f);
 }
 

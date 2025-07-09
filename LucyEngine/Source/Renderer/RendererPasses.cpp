@@ -33,14 +33,15 @@ namespace Lucy {
 
 	void ForwardPBRPass::AddPass(const Ref<RenderGraph>& renderGraph) {
 
-		renderGraph->AddPass("PBRGeometryPass", [=, *this](RenderGraphBuilder& build) {
+		renderGraph->AddPass(TargetQueueFamily::Graphics, "PBRGeometryPass", [=, *this](RenderGraphBuilder& build) {
 			build.SetViewportArea(m_Width, m_Height);
 			build.SetInFlightMode(true);
 
 			build.DeclareImage(RGResource(GeometryImage), {
 				.Width = m_Width,
 				.Height = m_Height,
-				.ImageType = ImageType::Type2DColor,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsColorAttachment,
 				.Format = ImageFormat::R8G8B8A8_UNORM,
 				.GenerateSampler = true,
 				.ImGuiUsage = true,
@@ -48,7 +49,8 @@ namespace Lucy {
 			RGResource(GeometryDepthImage), {
 				.Width = m_Width,
 				.Height = m_Height,
-				.ImageType = ImageType::Type2DDepth,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsDepthAttachment,
 				.Format = ImageFormat::D32_SFLOAT,
 				.GenerateSampler = true,
 			}, RenderPassLoadStoreAttachments::ClearStore);
@@ -81,16 +83,20 @@ namespace Lucy {
 					}
 
 					lightningAttributes->Append((uint8_t*)&shadowCameraFarPlanes, sizeof(glm::vec4));
-
-					pbrShader->BindImageHandleTo("u_ShadowMap", registry.GetImage(RGResource(ShadowImages)));
 				});
+
+				shader->BindImageHandleTo("u_ShadowMap", registry.GetImage(RGResource(ShadowImages)));
 
 				bool imageBound = false;
 
-				m_Scene->ViewForEach<HDRCubemapComponent>([pbrShader = shader, &imageBound](const HDRCubemapComponent& hdrComponent) {
+				m_Scene->ViewForEach<HDRCubemapComponent>([pbrShader = shader, &registry, &imageBound](const HDRCubemapComponent& hdrComponent) {
 					if (!hdrComponent.IsPrimary || imageBound)
 						return;
+#if USE_COMPUTE_FOR_CUBEMAP_GEN
 					pbrShader->BindImageHandleTo("u_IrradianceMap", hdrComponent.GetIrradianceImage());
+#else
+					pbrShader->BindImageHandleTo("u_IrradianceMap", registry.GetImage(RGResource(IrradianceImage)));
+#endif
 					imageBound = true;
 				});
 
@@ -115,22 +121,23 @@ namespace Lucy {
 			};
 		});
 
-		renderGraph->AddPass("IDPass", [=, *this](RenderGraphBuilder& build) {
+		renderGraph->AddPass(TargetQueueFamily::Graphics, "IDPass", [=, *this](RenderGraphBuilder& build) {
 			build.SetViewportArea(m_Width, m_Height);
 			build.SetInFlightMode(true);
 
 			build.DeclareImage(RGResource(IDPassImage), {
 				.Width = m_Width,
 				.Height = m_Height,
-				.ImageType = ImageType::Type2DColor,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsColorTransferAttachment,
 				.Format = ImageFormat::R8G8B8A8_UNORM,
-				.Flags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
 				.GenerateSampler = true
 			}, RenderPassLoadStoreAttachments::ClearStore,
 				RGResource(IDPassDepthImage), {
 				.Width = m_Width,
 				.Height = m_Height,
-				.ImageType = ImageType::Type2DDepth,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsDepthAttachment,
 				.Format = ImageFormat::D32_SFLOAT,
 				.GenerateSampler = true,
 			}, RenderPassLoadStoreAttachments::ClearStore);
@@ -170,14 +177,15 @@ namespace Lucy {
 
 	void ShadowPass::AddPass(const Ref<RenderGraph>& renderGraph) {
 
-		renderGraph->AddPass("VSMPass", [=, *this](RenderGraphBuilder& build) {
+		renderGraph->AddPass(TargetQueueFamily::Graphics, "VSMPass", [=, *this](RenderGraphBuilder& build) {
 			build.SetViewportArea(m_ShadowMapSize, m_ShadowMapSize);
 			build.SetClearColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 
 			build.DeclareImage(RGResource(ShadowImages), {
 				.Width = m_ShadowMapSize,
 				.Height = m_ShadowMapSize,
-				.ImageType = ImageType::Type2DArrayColor,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsColorAttachment,
 				.Format = ImageFormat::R16G16_SFLOAT,
 				.Layers = ShadowPass::NUM_CASCADES,
 				.GenerateSampler = true,
@@ -185,7 +193,8 @@ namespace Lucy {
 				RGResource(VSMDepth), {
 				.Width = m_ShadowMapSize,
 				.Height = m_ShadowMapSize,
-				.ImageType = ImageType::Type2DArrayDepth,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsDepthAttachment,
 				.Format = ImageFormat::D32_SFLOAT,
 				.Layers = ShadowPass::NUM_CASCADES,
 				.GenerateSampler = true,
@@ -399,7 +408,7 @@ namespace Lucy {
 
 	void CubemapPass::AddPass(const Ref<RenderGraph>& renderGraph) {
 
-		renderGraph->AddPass("CubemapPass", [*this](RenderGraphBuilder& build) {
+		renderGraph->AddPass(TargetQueueFamily::Graphics, "CubemapPass", [*this](RenderGraphBuilder& build) {
 			build.SetViewportArea(m_Width, m_Height);
 			build.SetInFlightMode(true);
 
@@ -440,7 +449,7 @@ namespace Lucy {
 			};
 		});
 
-		renderGraph->AddPass("HDRImageToLayeredImage", [*this](RenderGraphBuilder& build) {
+		renderGraph->AddPass(TargetQueueFamily::Graphics, "HDRImageToLayeredImage", [*this](RenderGraphBuilder& build) {
 			build.SetViewportArea(HDRImageWidth, HDRImageHeight);
 
 			build.ReadExternalTransientImage(RGResource(OriginalHDRImage));
@@ -448,9 +457,9 @@ namespace Lucy {
 			build.DeclareImage(RGResource(HDRLayeredImage), {
 				.Width = HDRImageWidth,
 				.Height = HDRImageHeight,
-				.ImageType = ImageType::Type2DArrayColor,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsColorTransferAttachment,
 				.Format = ImageFormat::R32G32B32A32_SFLOAT,
-				.Flags = VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
 				.Layers = 6,
 				.GenerateSampler = true,
 			}, RenderPassLoadStoreAttachments::DontCareDontCare);
@@ -484,11 +493,12 @@ namespace Lucy {
 					draw.BindPushConstant(pushConstant);
 					draw.DrawIndexed(cubeMeshIndexCount, 1, 0, 0, 0);
 				}
+
 				cmdList.EndRenderCommand();
 			};
 		});
 
-		renderGraph->AddPass("CopyToSampler2DCube", [*this](RenderGraphBuilder& build) {
+		renderGraph->AddPass(TargetQueueFamily::Compute, "CopyToSampler2DCube", [*this](RenderGraphBuilder& build) {
 			build.ReadImage(RGResource(HDRLayeredImage));
 			build.WriteExternalImage(RGResource(HDRCubeImage));
 
@@ -531,7 +541,8 @@ namespace Lucy {
 					regions.push_back(region);
 				}
 				cmd.CopyImageToImage(preparedImage, cubeImage, regions);
-				cmd.SetImageLayout(cubeImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, 1, layerCount);
+
+				//cmd.SetImageLayout(preparedImage, VK_IMAGE_LAYOUT_GENERAL, 0, 0, 1, layerCount);
 
 				cmdList.EndRenderCommand();
 			};
@@ -539,7 +550,7 @@ namespace Lucy {
 
 #pragma region Irradiance
 #if USE_COMPUTE_FOR_CUBEMAP_GEN
-		renderGraph->AddPass("IrradiancePass", [*this](RenderGraphBuilder& build) {
+		renderGraph->AddPass(TargetQueueFamily::Compute, "IrradiancePass", [*this](RenderGraphBuilder& build) {
 			build.ReadExternalImage(RGResource(HDRCubeImage));
 			build.ReadExternalImage(RGResource(IrradianceImage));
 			build.WriteImage(RGResource(IrradianceImage));
@@ -554,52 +565,62 @@ namespace Lucy {
 				const auto& cubeImage = registry.GetExternalImage(RGResource(HDRCubeImage));
 				const auto& irradianceImage = registry.GetExternalImage(RGResource(IrradianceImage));
 
-				shader->BindImageHandleTo("u_EnvironmentMap", cubeImage);
-				shader->BindImageHandleTo("u_EnvironmentIrradianceMap", irradianceImage);
-
-				RenderCommand& draw = cmdList.BeginRenderCommand("Irradiance Compute");
+				RenderCommand& draw = cmdList.BeginRenderCommand("Irradiance Draw Compute");
 
 				draw.SetImageLayout(cubeImage, VK_IMAGE_LAYOUT_GENERAL, 0, 0, 1, layerCount);
 				draw.SetImageLayout(irradianceImage, VK_IMAGE_LAYOUT_GENERAL, 0, 0, 1, layerCount);
+
+				shader->BindImageHandleTo("u_EnvironmentMap", cubeImage);
+				shader->BindImageHandleTo("u_EnvironmentIrradianceMap", irradianceImage);
 
 				draw.BindPipeline(pipeline);
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
 				draw.DispatchCompute(HDRImageWidth / workGroupSize, HDRImageHeight / workGroupSize, layerCount);
 
-				draw.SetImageLayout(cubeImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, 1, layerCount);
-				draw.SetImageLayout(irradianceImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, 1, layerCount);
-
 				cmdList.EndRenderCommand();
 			};
 		});
 #else
-		renderGraph->AddPass("IrradiancePass", irradianceShader, [this](RenderGraphBuilder& build) {
+		renderGraph->AddPass(TargetQueueFamily::Graphics, "IrradiancePass", [*this](RenderGraphBuilder& build) {
+			build.SetViewportArea(HDRImageWidth, HDRImageHeight);
+
+			build.ReadExternalImage(RGResource(HDRCubeImage));
+
 			build.DeclareImage(RGResource(IrradianceImage), {
-				.Width = (int32_t)m_Width,
-				.Height = (int32_t)m_Height,
-				.ImageType = ImageType::Type2DColor,
+				.Width = HDRImageWidth,
+				.Height = HDRImageHeight,
+				.ImageType = ImageType::TypeCube,
+				.ImageUsage = ImageUsage::AsColorAttachment,
 				.Format = ImageFormat::R16G16B16A16_SFLOAT,
-				.Flags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-				.GenerateSampler = false,
+				.GenerateSampler = true,
 				.GenerateMipmap = false,
 				.ImGuiUsage = false,
-				}, RenderPassLoadStoreAttachments::ClearDontCare);
-
+			}, RenderPassLoadStoreAttachments::ClearDontCare);
+			
 			build.BindRenderTarget(RGResource(IrradianceImage));
 
-			return [=](RenderGraphRegistry& registry, const Ref<RenderDevice>& renderDevice, RenderCommandList& cmdList) {
-				SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, 1, m_LayerCount);
-				TransitionImageLayout(irradianceFrameBuffer->GetImages()[0]->GetVulkanHandle(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, 1, m_LayerCount);
+			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("IrradiancePipeline");
+				const auto& shader = pipeline->GetShader();
 
-				const auto& environmentMap = m_IrradiancePipeline->GetUniformBuffers<VulkanUniformImageBuffer>("u_EnvironmentMap");
-				environmentMap->BindImage(m_ImageView.GetVulkanHandle(), m_CurrentLayout, m_ImageView.GetSampler());
+				const auto& mesh = Renderer::GetEnvCubeMesh();
 
-				Renderer::UpdateDescriptorSets(m_IrradiancePipeline);
-				CommandResourceHandle computeHandle = Renderer::CreateCommandResource(m_IrradiancePipeline, ComputeIrradiance);
+				RenderCommand& draw = cmdList.BeginRenderCommand("Irradiance Draw");
+				const auto& irradianceImage = registry.GetImage(RGResource(IrradianceImage));
+				const auto& environmentMap = registry.GetExternalImage(RGResource(HDRCubeImage));
 
-				Renderer::EnqueueCommand<CubeRenderCommand>(computeHandle, m_IrradianceImageView.GetVulkanHandle(), VK_IMAGE_LAYOUT_GENERAL, m_IrradianceImageView.GetSampler(), m_CubeMesh);
-				Renderer::EnqueueCommandResourceFree(computeHandle);
+				draw.SetImageLayout(environmentMap, VK_IMAGE_LAYOUT_GENERAL, 0, 0, 1, 6);
+
+				shader->BindImageHandleTo("u_EnvironmentMap", environmentMap);
+
+				draw.BindPipeline(pipeline);
+				draw.UpdateDescriptorSets();
+				draw.BindAllDescriptorSets();
+				draw.BindBuffers(mesh);
+				draw.DrawIndexed(36, 1, 0, 0, 0);
+
+				cmdList.EndRenderCommand();
 			};
 		});
 #endif

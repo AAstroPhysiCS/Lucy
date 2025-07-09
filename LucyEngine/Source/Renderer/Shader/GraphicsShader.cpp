@@ -27,8 +27,15 @@ namespace Lucy {
 
 		const auto& [vertexFileExtension, fragmentFileExtension] = GetCachedFileExtension();
 
-		std::filesystem::path cacheFileVert = GetPath().replace_extension(vertexFileExtension);
-		std::filesystem::path cacheFileFrag = GetPath().replace_extension(fragmentFileExtension);
+		const auto& cachedFolder = Shader::GetCacheFolder();
+		auto cachedFolderWithName = cachedFolder / (std::filesystem::path(GetName()));
+
+		bool success = FileSystem::CreateDir(cachedFolder);
+		LUCY_ASSERT(success || FileSystem::DirectoryExists(cachedFolder),
+			"Failed to create cache directory");
+
+		std::filesystem::path cacheFileVert = cachedFolderWithName.replace_extension(vertexFileExtension);
+		std::filesystem::path cacheFileFrag = cachedFolderWithName.replace_extension(fragmentFileExtension);
 
 		if (!FileSystem::FileExists(cacheFileVert) || !FileSystem::FileExists(cacheFileFrag) || forceReloadFromDisk) {
 			auto path = GetPath();

@@ -11,11 +11,17 @@ namespace Lucy {
 	class Shader;
 	class CommandPool;
 
+	class VulkanPushConstant;
+
 	class Image;
 
 	class Mesh;
 
+	class GraphicsPipeline;
 	class ComputePipeline;
+
+	class VertexBuffer;
+	class IndexBuffer;
 
 	class RenderCommand final {
 	public:

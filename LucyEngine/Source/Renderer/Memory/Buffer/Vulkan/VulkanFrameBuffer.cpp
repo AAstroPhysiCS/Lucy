@@ -3,7 +3,6 @@
 
 #include "vulkan/vulkan.h"
 
-#include "Renderer/Renderer.h"
 #include "Renderer/Device/VulkanRenderDevice.h"
 
 namespace Lucy {
@@ -43,8 +42,10 @@ namespace Lucy {
 				for (uint32_t j = 0; j < imageViewHandles.capacity(); j++)
 					imageViewHandles.push_back(GetImage(i + j)->GetImageView().GetVulkanHandle());
 			} else {
-				for (uint32_t j = 0; j < m_ImageHandles.size(); j++)
-					imageViewHandles.push_back(GetImage(j)->GetImageView().GetVulkanHandle());
+				for (uint32_t j = 0; j < m_ImageHandles.size(); j++) {
+					auto& view = GetImage(j)->GetImageView();
+					imageViewHandles.push_back(view.GetVulkanHandle());
+				}
 			}
 
 			if (renderPass->IsDepthBuffered())
@@ -55,16 +56,16 @@ namespace Lucy {
 		}
 	}
 
-	Ref<VulkanImage2D> VulkanFrameBuffer::GetImage(uint32_t index) {
-		return Renderer::AccessResource<VulkanImage2D>(m_ImageHandles[index]);
+	Ref<VulkanImage> VulkanFrameBuffer::GetImage(uint32_t index) {
+		return m_VulkanDevice->AccessResource<VulkanImage>(m_ImageHandles[index]);
 	}
 
-	Ref<VulkanImage2D> VulkanFrameBuffer::GetDepthImage() {
-		return Renderer::AccessResource<VulkanImage2D>(m_DepthImageHandle);
+	Ref<VulkanImage> VulkanFrameBuffer::GetDepthImage() {
+		return m_VulkanDevice->AccessResource<VulkanImage>(m_DepthImageHandle);
 	}
 
 	Ref<VulkanRenderPass> VulkanFrameBuffer::GetRenderPass() {
-		return Renderer::AccessResource<VulkanRenderPass>(m_CreateInfo.RenderPassHandle);
+		return m_VulkanDevice->AccessResource<VulkanRenderPass>(m_CreateInfo.RenderPassHandle);
 	}
 
 	void VulkanFrameBuffer::RTRecreate(uint32_t width, uint32_t height) {

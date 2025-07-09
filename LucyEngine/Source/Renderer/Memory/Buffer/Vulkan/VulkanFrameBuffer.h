@@ -26,8 +26,8 @@ namespace Lucy {
 		void DestroyHandles();
 
 		//Helper functions
-		Ref<VulkanImage2D> GetImage(uint32_t index);
-		Ref<VulkanImage2D> GetDepthImage();
+		Ref<VulkanImage> GetImage(uint32_t index);
+		Ref<VulkanImage> GetDepthImage();
 		Ref<VulkanRenderPass> GetRenderPass();
 
 		std::vector<VkFramebuffer> m_FrameBufferHandles;

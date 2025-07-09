@@ -13,25 +13,39 @@
 namespace Lucy {
 
 	VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo, const Ref<VulkanRenderDevice>& vulkanDevice)
-		: GraphicsPipeline(createInfo), m_VulkanDeviceRT(vulkanDevice) {
-		RTCreate();
+		: GraphicsPipeline(createInfo) {
+		Renderer::EnqueueToRenderCommandQueue([&](const auto& device) {
+			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+			Create(vulkanDevice);
+		});
 	}
 
-	void VulkanGraphicsPipeline::RTCreate() {
-		const auto& renderPass = m_VulkanDeviceRT->AccessResource<RenderPass>(m_CreateInfo.RenderPassHandle)->As<VulkanRenderPass>();
+	void VulkanGraphicsPipeline::Create(const Ref<VulkanRenderDevice>& vulkanDevice) {
+		const auto& renderPass = vulkanDevice->AccessResource<RenderPass>(m_CreateInfo.RenderPassHandle)->As<VulkanRenderPass>();
 
 		if (!m_DescriptorPool) {
+#if USE_INTEGRATED_GRAPHICS
 			const std::vector<VkDescriptorPoolSize> poolSizes = {
-				{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10 },
-				{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10 },
-				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10 }
+				{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100 },
+				{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100 },
+				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 100 }
 			};
-
+#else
+			const std::vector<VkDescriptorPoolSize> poolSizes = {
+				{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100 },
+				{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100 },
+				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 100 }
+			};
+#endif
 			VulkanDescriptorPoolCreateInfo poolCreateInfo;
 			poolCreateInfo.PoolSizesVector = poolSizes;
+#if USE_INTEGRATED_GRAPHICS
 			poolCreateInfo.MaxSet = 100;
+#else
+			poolCreateInfo.MaxSet = 100;
+#endif
 			poolCreateInfo.PoolFlags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
-			poolCreateInfo.LogicalDevice = m_VulkanDeviceRT->GetLogicalDevice();
+			poolCreateInfo.LogicalDevice = vulkanDevice->GetLogicalDevice();
 			m_DescriptorPool = Memory::CreateRef<VulkanDescriptorPool>(poolCreateInfo);
 		}
 
@@ -66,14 +80,14 @@ namespace Lucy {
 
 		VkPipelineDynamicStateCreateInfo dynamicState = VulkanAPI::PipelineDynamicStateCreateInfo(3, dynamicStates);
 
-		m_CreateInfo.Shader->RTLoadDescriptors(m_VulkanDeviceRT, m_DescriptorPool);
+		m_CreateInfo.Shader->RTLoadDescriptors(vulkanDevice, m_DescriptorPool);
 		const auto& descriptorSetsHandles = m_CreateInfo.Shader->GetDescriptorSetHandles();
 		const auto& pushConstants = m_CreateInfo.Shader->GetPushConstants();
 		
 		std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
 		descriptorSetLayouts.reserve(descriptorSetsHandles.size());
 		for (auto handle : descriptorSetsHandles) {
-			const auto& descriptorSet = m_VulkanDeviceRT->AccessResource<VulkanDescriptorSet>(handle);
+			const auto& descriptorSet = vulkanDevice->AccessResource<VulkanDescriptorSet>(handle);
 			descriptorSetLayouts.emplace_back(descriptorSet->GetDescriptorSetLayout());
 		}
 
@@ -83,7 +97,7 @@ namespace Lucy {
 
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo = VulkanAPI::PipelineLayoutCreateInfo((uint32_t)descriptorSetLayouts.size(), descriptorSetLayouts.data(), (uint32_t)pushConstantRanges.size(), pushConstantRanges.data());
 
-		VkDevice logicalDevice = m_VulkanDeviceRT->GetLogicalDevice();
+		VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
 		LUCY_VK_ASSERT(vkCreatePipelineLayout(logicalDevice, &pipelineLayoutInfo, nullptr, &m_PipelineLayoutHandle));
 
 		VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = VulkanAPI::PipelineDepthStencilStateCreateInfo(m_CreateInfo.DepthConfiguration.DepthWriteEnable, 
@@ -155,19 +169,25 @@ namespace Lucy {
 	}
 
 	void VulkanGraphicsPipeline::RTDestroyResource() {
-		VkDevice logicalDevice = m_VulkanDeviceRT->GetLogicalDevice();
+		Renderer::EnqueueToRenderCommandQueue([=](const auto& device) {
+			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+			VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
 
-		m_DescriptorPool->RTDestroyResource();
-		m_DescriptorPool = nullptr;
-		vkDestroyPipelineLayout(logicalDevice, m_PipelineLayoutHandle, nullptr);
-		vkDestroyPipeline(logicalDevice, m_PipelineHandle, nullptr);
+			m_DescriptorPool->RTDestroyResource();
+			m_DescriptorPool = nullptr;
+			vkDestroyPipelineLayout(logicalDevice, m_PipelineLayoutHandle, nullptr);
+			vkDestroyPipeline(logicalDevice, m_PipelineHandle, nullptr);
 
-		m_PipelineHandle = VK_NULL_HANDLE;
-		m_PipelineLayoutHandle = VK_NULL_HANDLE;
+			m_PipelineHandle = VK_NULL_HANDLE;
+			m_PipelineLayoutHandle = VK_NULL_HANDLE;
+		});
 	}
 
 	void VulkanGraphicsPipeline::RTRecreate() {
 		RTDestroyResource();
-		RTCreate();
+		Renderer::EnqueueToRenderCommandQueue([&](const auto& device) {
+			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+			Create(vulkanDevice);
+		});
 	}
 }

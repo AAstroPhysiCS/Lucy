@@ -1,6 +1,8 @@
 #include "lypch.h"
 #include "VulkanRenderer.h"
 
+#include "Renderer/Synchronization/VulkanSyncItems.h"
+
 #include "Context/VulkanSwapChain.h"
 #include "Context/VulkanContext.h"
 
@@ -18,17 +20,44 @@ namespace Lucy {
 	}
 
 	void VulkanRenderer::Init() {
-		RendererBackend::Init();
+		const auto& vulkanContext = m_Context->As<VulkanContext>();
+		const auto& vulkanDevice = m_RenderDevice->As<VulkanRenderDevice>();
 
-		m_WaitSemaphores.resize(m_MaxFramesInFlight);
-		m_SignalSemaphores.resize(m_MaxFramesInFlight);
-		m_InFlightFences.resize(m_MaxFramesInFlight);
+		vulkanContext->Init();
+		vulkanContext->PrintInfo();
 
-		m_TransientCommandPool = Memory::CreateRef<VulkanTransientCommandPool>(GetRenderDevice()->As<VulkanRenderDevice>());
+		vulkanDevice->Init(vulkanContext->GetVulkanInstance(), vulkanContext->GetValidationLayers(),
+			vulkanContext->GetWindow()->GetVulkanSurface(), VulkanContext::GetAPIVersion());
+
+		m_SwapChain->Init();
+
+		m_RenderCommandQueue->Init();
+		m_RenderComputeCommandQueue->Init();
+
+		m_WaitSemaphores.reserve(m_MaxFramesInFlight);
+		m_SignalSemaphores.reserve(m_MaxFramesInFlight);
+		m_InFlightFences.reserve(m_MaxFramesInFlight);
+
+		m_WaitSemaphoresCompute.reserve(m_MaxFramesInFlight);
+		m_SignalSemaphoresCompute.reserve(m_MaxFramesInFlight);
+		m_InFlightFencesCompute.reserve(m_MaxFramesInFlight);
+
+		for (size_t i = 0; i < m_MaxFramesInFlight; i++) {
+			m_WaitSemaphores.emplace_back(vulkanDevice);
+			m_SignalSemaphores.emplace_back(vulkanDevice);
+			m_InFlightFences.emplace_back(vulkanDevice);
+
+			m_WaitSemaphoresCompute.emplace_back(vulkanDevice);
+			m_SignalSemaphoresCompute.emplace_back(vulkanDevice);
+			m_InFlightFencesCompute.emplace_back(vulkanDevice);
+		}
+
+		m_TransientCommandPool = Memory::CreateRef<VulkanTransientCommandPool>(vulkanDevice);
 	}
 
 	void VulkanRenderer::BeginFrame() {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::BeginFrame");
+		using enum RenderContextResultCodes;
 
 		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
 		VkDevice deviceVulkanHandle = renderDevice->GetLogicalDevice();
@@ -36,62 +65,111 @@ namespace Lucy {
 		vkWaitForFences(deviceVulkanHandle, 1, &m_InFlightFences[m_CurrentFrameIndex].GetFence(), VK_TRUE, UINT64_MAX);
 		vkResetFences(deviceVulkanHandle, 1, &m_InFlightFences[m_CurrentFrameIndex].GetFence());
 
-		m_LastSwapChainResult = GetRenderContext()->As<VulkanContext>()->GetSwapChain().AcquireNextImage(m_WaitSemaphores[m_CurrentFrameIndex].GetSemaphore(), m_ImageIndex);
-		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR || m_LastSwapChainResult == VK_NOT_READY)
+		if (!m_RenderComputeCommandQueue->IsEmpty()) {
+			vkWaitForFences(deviceVulkanHandle, 1, &m_InFlightFencesCompute[m_CurrentFrameIndex].GetFence(), VK_TRUE, UINT64_MAX);
+			vkResetFences(deviceVulkanHandle, 1, &m_InFlightFencesCompute[m_CurrentFrameIndex].GetFence());
+		}
+
+		m_UseComputeSemaphore = false;
+
+		const auto& swapChain = GetSwapChain()->As<VulkanSwapChain>();
+		m_LastSwapChainResult = swapChain->AcquireNextImage(m_WaitSemaphores[m_CurrentFrameIndex], m_ImageIndex);
+		if (m_LastSwapChainResult == ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == SUBOPTIMAL_KHR || m_LastSwapChainResult == NOT_READY)
 			return;
 	}
 	
 	void VulkanRenderer::RenderFrame() {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::RenderFrame");
-		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR || m_LastSwapChainResult == VK_NOT_READY)
+		using enum RenderContextResultCodes;
+		if (m_LastSwapChainResult == ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == SUBOPTIMAL_KHR || m_LastSwapChainResult == NOT_READY)
 			return;
 
-		Fence currentFrameFence = m_InFlightFences[m_CurrentFrameIndex];
-		Semaphore currentFrameWaitSemaphore = m_WaitSemaphores[m_CurrentFrameIndex];
-		Semaphore currentFrameSignalSemaphore = m_SignalSemaphores[m_CurrentFrameIndex];
+		Fence& currentFrameFence = m_InFlightFences[m_CurrentFrameIndex];
+		Semaphore& currentFrameWaitSemaphore = m_WaitSemaphores[m_CurrentFrameIndex];
+		Semaphore& currentFrameSignalSemaphore = m_SignalSemaphores[m_CurrentFrameIndex];
 
-		const auto& cmdLists = GetCommandLists();
+		Fence& currentFrameFenceCompute = m_InFlightFencesCompute[m_CurrentFrameIndex];
+		Semaphore& currentFrameWaitSemaphoreCompute = m_WaitSemaphoresCompute[m_CurrentFrameIndex];
+		Semaphore& currentFrameSignalSemaphoreCompute = m_SignalSemaphoresCompute[m_CurrentFrameIndex];
 
-		std::vector<Ref<CommandPool>> cmdPools;
-		cmdPools.resize(cmdLists.size(), nullptr);
+		const auto& graphicsCmdLists = m_RenderCommandQueue->GetCommandLists();
+		const auto& computeCmdLists = m_RenderComputeCommandQueue->GetCommandLists();
+
+		std::vector<Ref<CommandPool>> graphicsCmdPools;
+		graphicsCmdPools.reserve(graphicsCmdLists.size());
+
+		for (const auto& cmdList : graphicsCmdLists) {
+			if (!cmdList)
+				graphicsCmdPools.emplace_back(cmdList.GetPrimaryCommandPool());
+		}
 
 		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
-		for (size_t i = 0; const auto& cmdList : cmdLists)
-			cmdPools[i++] = cmdList.GetPrimaryCommandPool();
-			
-		renderDevice->SubmitWorkToGPU(TargetQueueFamily::Graphics, cmdPools, currentFrameFence, currentFrameWaitSemaphore, currentFrameSignalSemaphore);
+		renderDevice->SubmitWorkToGPU(TargetQueueFamily::Graphics, graphicsCmdPools, &currentFrameFence, &currentFrameWaitSemaphore, &currentFrameSignalSemaphore);
+
+		if (!m_RenderComputeCommandQueue->IsEmpty()) {
+			std::vector<Ref<CommandPool>> computeCmdPools;
+			computeCmdPools.reserve(computeCmdLists.size());
+
+			for (const auto& cmdList : computeCmdLists) {
+				if (!cmdList)
+					computeCmdPools.emplace_back(cmdList.GetPrimaryCommandPool());
+			}
+
+			// Submission to GPU for compute work (work is pending)
+			if (renderDevice->SubmitWorkToGPU(TargetQueueFamily::Compute, computeCmdPools, &currentFrameFenceCompute, &currentFrameSignalSemaphore, &currentFrameSignalSemaphoreCompute)) {
+				m_UseComputeSemaphore = true; // Flag to use compute semaphore for presentation
+			} else {
+				m_UseComputeSemaphore = false; // Fall back to graphics semaphore
+			}
+		}
 	}
 
 	void VulkanRenderer::EndFrame() {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::EndFrame");
-		if (m_LastSwapChainResult == VK_ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == VK_SUBOPTIMAL_KHR || m_LastSwapChainResult == VK_NOT_READY)
+		using enum RenderContextResultCodes;
+		if (m_LastSwapChainResult == ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == SUBOPTIMAL_KHR || m_LastSwapChainResult == NOT_READY)
 			return;
 
-		VulkanSwapChain& swapChain = GetRenderContext()->As<VulkanContext>()->GetSwapChain();
-		m_LastSwapChainResult = swapChain.Present(m_SignalSemaphores[m_CurrentFrameIndex], m_ImageIndex);
-		m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % m_MaxFramesInFlight;
+		const auto& swapChain = GetSwapChain()->As<VulkanSwapChain>();
+		Semaphore& presentSemaphore = m_UseComputeSemaphore ? m_SignalSemaphoresCompute[m_CurrentFrameIndex] : m_SignalSemaphores[m_CurrentFrameIndex];
+		m_LastSwapChainResult = swapChain->Present(presentSemaphore, m_ImageIndex);
+	}
+
+	void VulkanRenderer::FlushDeletionQueue() {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::FlushDeletionQueue");
+		auto& currentDeletionQueue = m_ResourceDeletionQueues[m_CurrentFrameIndex];
+		if (currentDeletionQueue.empty())
+			return;
+
+		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
+		auto result = vkGetFenceStatus(renderDevice->GetLogicalDevice(), m_InFlightFences[m_CurrentFrameIndex].GetFence());
+		if (result != VK_SUCCESS)
+			vkWaitForFences(renderDevice->GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrameIndex].GetFence(), VK_FALSE, UINT64_MAX);
+
+		if (!m_RenderComputeCommandQueue->IsEmpty()) {
+			auto resultCompute = vkGetFenceStatus(renderDevice->GetLogicalDevice(), m_InFlightFencesCompute[m_CurrentFrameIndex].GetFence());
+
+			if (resultCompute != VK_SUCCESS)
+				vkWaitForFences(renderDevice->GetLogicalDevice(), 1, &m_InFlightFencesCompute[m_CurrentFrameIndex].GetFence(), VK_FALSE, UINT64_MAX);
+		}
+		
+		size_t oldDeletionQueueSize = currentDeletionQueue.size();
+		for (const auto& deletionFunc : currentDeletionQueue)
+			deletionFunc();
+		currentDeletionQueue.erase(currentDeletionQueue.begin(), currentDeletionQueue.begin() + oldDeletionQueueSize);
 	}
 	
 	RenderContextResultCodes VulkanRenderer::WaitAndPresent() {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::WaitAndPresent");
-		if (GetRendererConfig().ThreadingPolicy == ThreadingPolicy::Multithreaded) {
-			const Ref<RenderThread>& renderThread = GetRenderThread();
-			//renderThread->SubmitCommandQueue(m_CommandQueue);
-			renderThread->SignalToPresent();
-
-			const auto WaitUntilFrameIsFinished = []() {
-			};
-
-			WaitUntilFrameIsFinished();
-			return renderThread->GetResultCode();
-		}
-
+		
 		BeginFrame();
 		FlushCommandQueue();
 		FlushSubmitQueue();
 		RenderFrame();
 		EndFrame();
 		FlushDeletionQueue();
+
+		m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % m_MaxFramesInFlight;
 
 		return (RenderContextResultCodes)m_LastSwapChainResult;
 	}
@@ -116,20 +194,32 @@ namespace Lucy {
 	}
 
 	void VulkanRenderer::Destroy() {
-		for (uint32_t i = 0; i < m_MaxFramesInFlight; i++) {
-			m_WaitSemaphores[i].Destroy();
-			m_SignalSemaphores[i].Destroy();
-			m_InFlightFences[i].Destroy();
-		}
-
 		auto& allocator = GetRenderDevice()->As<VulkanRenderDevice>()->GetAllocator();
 		allocator.DestroyBuffer(s_IDBuffer, s_IDBufferVma);
 
+		m_TransientCommandPool->Destroy();
+
+		const auto& swapChain = GetSwapChain();
+		swapChain->Destroy();
+
+		FlushDeletionQueue();
+
+		for (uint32_t i = 0; i < m_MaxFramesInFlight; i++) {
+			m_WaitSemaphores[i].Destroy(m_RenderDevice);
+			m_SignalSemaphores[i].Destroy(m_RenderDevice);
+			m_InFlightFences[i].Destroy(m_RenderDevice);
+
+			m_WaitSemaphoresCompute[i].Destroy(m_RenderDevice);
+			m_SignalSemaphoresCompute[i].Destroy(m_RenderDevice);
+			m_InFlightFencesCompute[i].Destroy(m_RenderDevice);
+		}
+
+		FlushCommandQueue();
 		RendererBackend::Destroy();
 	}
 
 	// Should not be used in a loop 
-	void VulkanRenderer::DirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size) {
+	void VulkanRenderer::RTDirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size) {
 		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
 		renderDevice->SubmitImmediateCommand([&](VkCommandBuffer commandBuffer) {
 			VkBufferCopy copyRegion = VulkanAPI::BufferCopy(0, 0, size);
@@ -149,8 +239,8 @@ namespace Lucy {
 		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
 		renderDevice->WaitForDevice();
 
-		VulkanSwapChain& swapChain = GetRenderContext()->As<VulkanContext>()->GetSwapChain();
-		swapChain.Recreate();
+		const auto& swapChain = GetSwapChain();
+		swapChain->Recreate();
 
 		RecreateCommandQueue();
 
@@ -222,12 +312,13 @@ namespace Lucy {
 	}
 
 	void VulkanRenderer::InitializeImGui() {
-		m_ImGuiPass.Init(GetRenderContext());
+		m_ImGuiPass.Init(this);
 	}
 
-	void VulkanRenderer::RenderImGui() {
-		EnqueueToRenderThread([this](RenderCommandList& cmdList) {
-			m_ImGuiPass.Render(GetRenderContext()->As<VulkanContext>()->GetSwapChain(), cmdList);
+	void VulkanRenderer::RTRenderImGui() {
+		auto swapChain = GetSwapChain()->As<VulkanSwapChain>();
+		EnqueueToRenderCommandQueue([this, swapChain](RenderCommandList& cmdList) {
+			m_ImGuiPass.Render(swapChain, cmdList);
 		});
 	}
 }

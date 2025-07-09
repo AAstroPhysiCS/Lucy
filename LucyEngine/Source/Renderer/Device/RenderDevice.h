@@ -31,7 +31,7 @@ namespace Lucy {
 	class GraphicsPipeline;
 	class ComputePipeline;
 
-	class CommandQueue;
+	class RenderCommandQueue;
 	class CommandPool;
 
 	class VulkanPushConstant;
@@ -45,6 +45,8 @@ namespace Lucy {
 	};
 
 	class RenderDevice : public MemoryTrackable {
+	public:
+		static Ref<RenderDevice> Create(RendererConfiguration config);
 	public:
 		RenderDevice() = default;
 		virtual ~RenderDevice() = default;
@@ -72,24 +74,28 @@ namespace Lucy {
 		bool IsValidResource(RenderResourceHandle handle) const;
 		void RTDestroyResource(RenderResourceHandle& handle);
 #pragma endregion ResourceManager
-		void CreateDeviceQueries(size_t pipelineCount, size_t passCount);
+		void CreatePipelineDeviceQueries(size_t pipelineCount);
+		void CreateTimestampDeviceQueries(size_t passCount);
 
-		uint32_t BeginTimestamp(Ref<CommandPool> cmdPool);
-		uint32_t EndTimestamp(Ref<CommandPool> cmdPool);
-		void ResetTimestampQuery(Ref<CommandPool> cmdPool);
+		uint32_t RTBeginTimestamp(Ref<CommandPool> cmdPool);
+		uint32_t RTEndTimestamp(Ref<CommandPool> cmdPool);
+		void RTResetTimestampQuery(Ref<CommandPool> commandPool);
 
-		uint32_t BeginPipelineQuery(Ref<CommandPool> cmdPool);
-		uint32_t EndPipelineQuery(Ref<CommandPool> cmdPool);
-		void ResetPipelineQuery(Ref<CommandPool> cmdPool);
+		uint32_t RTBeginPipelineQuery(Ref<CommandPool> cmdPool);
+		uint32_t RTEndPipelineQuery(Ref<CommandPool> cmdPool);
+		void RTResetPipelineQuery(Ref<CommandPool> commandPool);
 
 		std::vector<uint64_t> GetQueryResults(RenderDeviceQueryType type);
 
 		/// <param name="currentFrameWaitSemaphore: image is available, image is renderable"></param>
 		/// <param name="currentFrameSignalSemaphore: rendering finished, signal it"></param>
 		virtual void SubmitWorkToGPU(TargetQueueFamily queueFamily, Ref<CommandPool> cmdPool,
-							 const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) = 0;
+			Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore, Semaphore* currentFrameSignalSemaphore) = 0;
+		virtual bool SubmitWorkToGPU(TargetQueueFamily queueFamily, std::vector<Ref<CommandPool>>& cmdPools,
+			Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore, Semaphore* currentFrameSignalSemaphore) = 0;
 		virtual void SubmitWorkToGPU(TargetQueueFamily queueFamily, std::vector<Ref<CommandPool>>& cmdPools,
-									 const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) = 0;
+			Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore) = 0;
+
 		virtual void WaitForDevice() = 0;
 		virtual void WaitForQueue(TargetQueueFamily queueFamily) = 0;
 
@@ -127,9 +133,9 @@ namespace Lucy {
 		virtual void Destroy() = 0;
 	private:
 		RenderDeviceResourceManager m_ResourceManager;
-
-		Unique<RenderDeviceQuery> m_RenderDeviceTimestampQuery = nullptr; //initialized after we call CreateDeviceQueries
-		Unique<RenderDeviceQuery> m_RenderDevicePipelineQuery = nullptr;
+	protected:
+		Ref<RenderDeviceQuery> m_RenderDeviceTimestampQuery = nullptr; //initialized after we call CreateDeviceQueries
+		Ref<RenderDeviceQuery> m_RenderDevicePipelineQuery = nullptr;
 	};
 }
 

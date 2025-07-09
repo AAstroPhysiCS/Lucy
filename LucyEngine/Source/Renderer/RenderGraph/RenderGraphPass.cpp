@@ -1,6 +1,7 @@
 #include "lypch.h"
 
 #include "RenderGraphPass.h"
+#include "RenderGraphResource.h"
 
 namespace Lucy {
 
@@ -21,6 +22,7 @@ namespace Lucy {
 	}
 
 	void RenderGraphPass::Execute(RenderCommandList& cmdList) {
+		LUCY_PROFILE_NEW_EVENT("RenderGraphPass::Execute");
 		m_ExecuteFunc(m_CreateInfo.Registry, cmdList);
 	}
 

@@ -12,6 +12,8 @@ namespace Lucy {
 			: m_DebugName(name) {
 		}
 		virtual ~RenderResource() = default;
+
+		inline const std::string& GetDebugName() const { return m_DebugName; }
 	private:
 		virtual void RTDestroyResource() = 0;
 

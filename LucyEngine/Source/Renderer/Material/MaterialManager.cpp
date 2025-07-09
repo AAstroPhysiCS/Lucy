@@ -33,7 +33,7 @@ namespace Lucy {
 			RTDestroyMaterial(materialID);
 	}
 
-	void MaterialManager::RTDestroyAll() {
+	void MaterialManager::DestroyAll() {
 		for (const Ref<Material>& material : m_Materials | std::views::values)
 			material->RTDestroyResource();
 	}
@@ -64,15 +64,16 @@ namespace Lucy {
 		PBRMaterialData materialData(glm::vec3(diffuse.r, diffuse.g, diffuse.b), metallic, roughness, aoContribution);
 		MaterialID materialID = s_MaterialIDProvider.RequestID();
 
-		auto LoadPBRTexture = [](auto aiMaterial, auto aiTextureType, const std::string& importedFilePath, const Ref<PBRMaterial>& outMaterial) {
+		auto LoadPBRTexture = [](auto aiMaterial, aiTextureType textureType, const std::string& importedFilePath, const Ref<PBRMaterial>& outMaterial) {
 			aiString path;
-			if (aiMaterial->GetTexture(aiTextureType, 0, &path) == aiReturn_SUCCESS) {
+			if (aiMaterial->GetTexture(textureType, 0, &path) == aiReturn_SUCCESS) {
 				auto properTexturePath = FileSystem::GetParentPath(importedFilePath) / std::string(path.data);
 
-				Renderer::EnqueueToRenderThread([outMaterial, path, properTexturePath](const Ref<RenderDevice>& device) {
+				Renderer::EnqueueToRenderCommandQueue([outMaterial, path, properTexturePath](const Ref<RenderDevice>& device) {
 					ImageCreateInfo createInfo;
 					createInfo.Format = ImageFormat::R8G8B8A8_UNORM;
-					createInfo.ImageType = ImageType::Type2DColor;
+					createInfo.ImageType = ImageType::Type2D;
+					createInfo.ImageUsage = ImageUsage::AsColorAttachment;
 					createInfo.Parameter.Mag = ImageFilterMode::LINEAR;
 					createInfo.Parameter.Min = ImageFilterMode::LINEAR;
 					createInfo.Parameter.U = ImageAddressMode::REPEAT;
@@ -87,7 +88,7 @@ namespace Lucy {
 				});
 			} else {
 				if (path.data)
-					LUCY_WARN(fmt::format("Texture id: {0} could not be loaded: {1}", aiTextureType, path.data));
+					LUCY_WARN(std::format("Texture id: {0} could not be loaded: {1}", (uint32_t)textureType, path.data));
 			}
 		};
 

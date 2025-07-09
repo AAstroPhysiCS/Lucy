@@ -60,7 +60,7 @@ namespace Lucy {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				void* outputTextureID = m_RenderPipeline->GetOutputImage()->GetImGuiID();
-				ImGui::Image(outputTextureID, m_Size, {0, 1}, {1, 0});
+				ImGui::Image((ImTextureID)outputTextureID, m_Size, {0, 1}, {1, 0});
 				break;
 			}
 			default:

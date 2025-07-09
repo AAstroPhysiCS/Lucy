@@ -3,6 +3,7 @@ project "LucyEditor"
     kind "ConsoleApp"
     language "C++"
     cppdialect "C++20"
+    staticruntime "off"
 
     targetdir ("../bin/" .. outputdir .. "/%{prj.name}")
     objdir ("../bin-obj/" .. outputdir .. "/%{prj.name}")
@@ -10,7 +11,9 @@ project "LucyEditor"
     files {
         "Source/**.h",
         "Source/**.hpp",
-        "Source/**.cpp"
+        "Source/**.cpp",
+
+        "%{LibraryPath.Tracy}/public/TracyClient.cpp",
     }
 
     includedirs {
@@ -18,13 +21,12 @@ project "LucyEditor"
         "%{LibraryPath.GLFW}/include",
         "%{LibraryPath.Glad}/include",
         "%{LibraryPath.entt}/include",
-        "%{LibraryPath.Optick}/include",
         "%{LibraryPath.ImGui}",
         "%{LibraryPath.glm}",
         "%{LibraryPath.assimp}/include",
         "%{LibraryPath.ImGuizmo}/include",
         "%{LibraryPath.VulkanInclude}",
-        "%{LibraryPath.VMA}",
+        "%{LibraryPath.Tracy}/public",
         "../LucyEngine/Source"
     }
 
@@ -34,7 +36,6 @@ project "LucyEditor"
     }
 
     filter "platforms:win64"
-        staticruntime "On"
         systemversion "latest"
 
         defines {
@@ -49,7 +50,8 @@ project "LucyEditor"
     filter "configurations:Debug"
         defines {
             "LUCY_DEBUG",
-            "GLFW_INCLUDE_NONE"
+            "GLFW_INCLUDE_NONE",
+            "TRACY_ENABLE"
         }
         symbols "On"
         runtime "Debug"

@@ -9,15 +9,14 @@
 
 namespace Lucy {
 
-	void VulkanSwapChain::Create(const Ref<Window>& window, const Ref<VulkanRenderDevice>& renderDevice) {
-		m_Window = window;
-		m_RenderDevice = renderDevice;
+	void VulkanSwapChain::Init() {
 		m_SwapChain = Create(nullptr);
 	}
 
 	VkSwapchainKHR VulkanSwapChain::Create(VkSwapchainKHR oldSwapChain) {
-		VkPhysicalDevice physicalDevice = m_RenderDevice->GetPhysicalDevice();
-		VkDevice logicalDevice = m_RenderDevice->GetLogicalDevice();
+		const auto& vulkanDevice = GetRenderDevice()->As<VulkanRenderDevice>();
+		VkPhysicalDevice physicalDevice = vulkanDevice->GetPhysicalDevice();
+		VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
 
 		SwapChainCapabilities capabilities = GetSwapChainCapabilities(physicalDevice);
 		m_SelectedFormat = ChooseSwapSurfaceFormat(capabilities);
@@ -35,7 +34,7 @@ namespace Lucy {
 		LUCY_VK_ASSERT(vkCreateSwapchainKHR(logicalDevice, &createInfo, nullptr, &swapChain));
 
 		if (oldSwapChain) //for resize
-			vkDestroySwapchainKHR(m_RenderDevice->GetLogicalDevice(), m_OldSwapChain, nullptr);
+			vkDestroySwapchainKHR(vulkanDevice->GetLogicalDevice(), m_OldSwapChain, nullptr);
 
 		uint32_t swapChainImageCount = 0;
 		vkGetSwapchainImagesKHR(logicalDevice, swapChain, &swapChainImageCount, nullptr);
@@ -47,7 +46,7 @@ namespace Lucy {
 			for (uint32_t i = 0; i < swapChainImageCount; i++) {
 				ImageViewCreateInfo imageViewCreateInfo;
 				imageViewCreateInfo.Image = m_SwapChainImages[i];
-				imageViewCreateInfo.ImageType = ImageType::Type2DColor;
+				imageViewCreateInfo.ImageType = ImageType::Type2D;
 				imageViewCreateInfo.Format = m_SelectedFormat.format;
 
 				m_SwapChainImageViews[i].RTRecreate(imageViewCreateInfo);
@@ -58,10 +57,10 @@ namespace Lucy {
 			for (uint32_t i = 0; i < swapChainImageCount; i++) {
 				ImageViewCreateInfo imageViewCreateInfo;
 				imageViewCreateInfo.Image = m_SwapChainImages[i];
-				imageViewCreateInfo.ImageType = ImageType::Type2DColor;
+				imageViewCreateInfo.ImageType = ImageType::Type2D;
 				imageViewCreateInfo.Format = m_SelectedFormat.format;
 
-				m_SwapChainImageViews.emplace_back(imageViewCreateInfo, m_RenderDevice);
+				m_SwapChainImageViews.emplace_back(imageViewCreateInfo, vulkanDevice);
 			}
 
 			RenderPassCreateInfo renderPassCreateInfo;
@@ -79,11 +78,15 @@ namespace Lucy {
 				}
 			};
 
-			m_SwapChainRenderPass = Memory::CreateRef<VulkanRenderPass>(renderPassCreateInfo, m_RenderDevice);
-			m_SwapChainFrameBuffer = Memory::CreateUnique<VulkanSwapChainFrameBuffer>(m_RenderDevice, m_SelectedSwapExtent, m_SwapChainImageViews, m_SwapChainRenderPass);
+			m_SwapChainRenderPass = Memory::CreateRef<VulkanRenderPass>(renderPassCreateInfo, vulkanDevice);
+			m_SwapChainFrameBuffer = Memory::CreateUnique<VulkanSwapChainFrameBuffer>(vulkanDevice, m_SelectedSwapExtent, m_SwapChainImageViews, m_SwapChainRenderPass);
 		}
 
 		return swapChain;
+	}
+
+	VulkanSwapChain::VulkanSwapChain(const Ref<Window>& window, const Ref<RenderDevice>& renderDevice) 
+		: SwapChain(window, renderDevice) {
 	}
 
 	void VulkanSwapChain::Recreate() {
@@ -94,24 +97,27 @@ namespace Lucy {
 		m_SwapChainFrameBuffer->RTRecreate(width, height);
 	}
 
-	VkResult VulkanSwapChain::AcquireNextImage(VkSemaphore currentFrameImageAvailSemaphore, uint32_t& imageIndex) {
+	RenderContextResultCodes VulkanSwapChain::AcquireNextImage(const Semaphore& currentFrameImageAvailSemaphore, uint32_t& imageIndex) {
 		LUCY_PROFILE_NEW_EVENT("VulkanSwapChain::AcquireNextImage");
-		
-		return vkAcquireNextImageKHR(m_RenderDevice->GetLogicalDevice(), m_SwapChain, UINT64_MAX, currentFrameImageAvailSemaphore, VK_NULL_HANDLE, &imageIndex);
+		const auto& vulkanDevice = GetRenderDevice()->As<VulkanRenderDevice>();
+
+		VkResult result = vkAcquireNextImageKHR(vulkanDevice->GetLogicalDevice(), m_SwapChain, UINT64_MAX, currentFrameImageAvailSemaphore.GetSemaphore(), VK_NULL_HANDLE, &imageIndex);
+		return (RenderContextResultCodes)result;
 	}
 
-	VkResult VulkanSwapChain::Present(const Semaphore& signalSemaphore, uint32_t& imageIndex) {
+	RenderContextResultCodes VulkanSwapChain::Present(const Semaphore& signalSemaphore, uint32_t& imageIndex) {
 		LUCY_PROFILE_NEW_EVENT("VulkanSwapChain::Present");
-		
-		VkPresentInfoKHR presentInfo = VulkanAPI::PresentInfoKHR(1, &m_SwapChain, &imageIndex, 1, &signalSemaphore.GetSemaphore());
-		VkResult queuePresentResult = vkQueuePresentKHR(m_RenderDevice->GetPresentQueue(), &presentInfo);
+		const auto& vulkanDevice = GetRenderDevice()->As<VulkanRenderDevice>();
 
-		return queuePresentResult;
+		VkPresentInfoKHR presentInfo = VulkanAPI::PresentInfoKHR(1, &m_SwapChain, &imageIndex, 1, &signalSemaphore.GetSemaphore());
+		VkResult queuePresentResult = vkQueuePresentKHR(vulkanDevice->GetPresentQueue(), &presentInfo);
+
+		return (RenderContextResultCodes)queuePresentResult;
 	}
 
 	SwapChainCapabilities VulkanSwapChain::GetSwapChainCapabilities(VkPhysicalDevice device) const {
 		SwapChainCapabilities capabilities;
-		VkSurfaceKHR surface = m_Window->GetVulkanSurface();
+		VkSurfaceKHR surface = GetWindow()->GetVulkanSurface();
 
 		LUCY_VK_ASSERT(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &capabilities.surfaceCapabilities));
 
@@ -152,7 +158,7 @@ namespace Lucy {
 			return capabilities.surfaceCapabilities.currentExtent;
 		} else {
 			int32_t width, height;
-			glfwGetFramebufferSize(m_Window->Raw(), &width, &height);
+			glfwGetFramebufferSize(GetWindow()->Raw(), &width, &height);
 
 			VkExtent2D actualExtent = { (uint32_t)width, (uint32_t)height };
 
@@ -171,6 +177,7 @@ namespace Lucy {
 		m_SwapChainFrameBuffer->RTDestroyResource();
 		m_SwapChainRenderPass->RTDestroyResource();
 
-		vkDestroySwapchainKHR(m_RenderDevice->GetLogicalDevice(), m_SwapChain, nullptr);
+		const auto& vulkanDevice = GetRenderDevice()->As<VulkanRenderDevice>();
+		vkDestroySwapchainKHR(vulkanDevice->GetLogicalDevice(), m_SwapChain, nullptr);
 	}
 }

@@ -6,7 +6,7 @@ namespace Lucy {
 
 	class ComputeShader : public Shader {
 	public:
-		ComputeShader(const std::string& name, const std::filesystem::path& path);
+		ComputeShader(const std::string& name, const std::filesystem::path& path, Ref<RenderDevice> device);
 		virtual ~ComputeShader() = default;
 	protected:
 		void RTLoad(const Ref<RenderDevice>& device, bool forceReloadFromDisk = false) final override;

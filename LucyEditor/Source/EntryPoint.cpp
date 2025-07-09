@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
 	applicationCreateInfo.RendererConfiguration = {
 		.RenderArchitecture = Lucy::RenderArchitecture::Vulkan,
 		.RenderType = Lucy::RenderType::Rasterizer,
-		.ThreadingPolicy = Lucy::ThreadingPolicy::Singlethreaded
+		.ThreadingPolicy = Lucy::ThreadingPolicy::Multithreaded
 	};
 
 	Lucy::Application* lucyApplication = Lucy::CreateApplication({ argc, argv }, applicationCreateInfo);

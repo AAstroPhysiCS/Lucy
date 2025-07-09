@@ -13,15 +13,10 @@ namespace Lucy {
 
 	class RunnableThread : public MemoryTrackable {
 	public:
-		RunnableThread(const RunnableThreadCreateInfo& createInfo)
-			: m_DebugName(createInfo.Name), m_Affinity(createInfo.Affinity), m_Priority(createInfo.Priority) {
-		}
+		RunnableThread(const RunnableThreadCreateInfo& createInfo);
 		virtual ~RunnableThread() = default;
 
-		virtual bool OnInit(uint32_t threadIndex) = 0;
-		virtual uint32_t OnRun() = 0;
-		virtual void OnJoin() = 0;
-		virtual void OnStop() = 0;
+		void Start();
 
 		inline const std::string& GetDebugName() const { return m_DebugName; }
 
@@ -30,8 +25,16 @@ namespace Lucy {
 
 		inline void SetID(std::thread::id id) { m_ID = id; }
 		inline std::thread::id GetID() const { return m_ID; }
+	protected:
+		inline const std::thread& GetNativeThread() const { return m_ThreadNative; }
 	private:
+		virtual bool OnInit() = 0;
+		virtual uint32_t OnRun() = 0;
+		virtual void OnJoin() = 0;
+
 		std::thread::id m_ID;
+		std::thread m_ThreadNative;
+
 		std::string m_DebugName;
 		//TODO: For other platforms
 #ifdef LUCY_WINDOWS

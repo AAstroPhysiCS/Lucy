@@ -22,13 +22,13 @@ namespace Lucy {
 		~ScopedTimer() {
 			switch (m_Unit) {
 				case TimeUnit::Microseconds:
-					LUCY_INFO(fmt::format("{0} took {1} us.", m_Title, GetElapsedMicroseconds()));
+					LUCY_INFO(std::format("{0} took {1} us.", m_Title, GetElapsedMicroseconds()));
 					break;
 				case TimeUnit::Milliseconds:
-					LUCY_INFO(fmt::format("{0} took {1} ms.", m_Title, GetElapsedMilliseconds()));
+					LUCY_INFO(std::format("{0} took {1} ms.", m_Title, GetElapsedMilliseconds()));
 					break;
 				case TimeUnit::Nanoseconds:
-					LUCY_INFO(fmt::format("{0} took {1} ns.", m_Title, GetElapsedNanoseconds()));
+					LUCY_INFO(std::format("{0} took {1} ns.", m_Title, GetElapsedNanoseconds()));
 					break;
 			}
 		}

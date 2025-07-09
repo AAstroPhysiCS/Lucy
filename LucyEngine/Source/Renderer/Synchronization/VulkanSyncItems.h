@@ -9,10 +9,10 @@ namespace Lucy {
 	//TODO: VK Synchronization2
 	class Semaphore final {
 	public:
-		Semaphore();
+		Semaphore(Ref<RenderDevice> device);
 		~Semaphore() = default;
 
-		void Destroy();
+		void Destroy(Ref<RenderDevice> device);
 
 		inline const VkSemaphore& GetSemaphore() const { return m_Handle; }
 	private:
@@ -21,10 +21,11 @@ namespace Lucy {
 
 	class Fence final {
 	public:
-		Fence();
+		Fence(Ref<RenderDevice> device);
+		Fence(RenderDevice* device);
 		~Fence() = default;
 
-		void Destroy();
+		void Destroy(Ref<RenderDevice> device);
 
 		inline const VkFence& GetFence() const { return m_Handle; }
 	private:

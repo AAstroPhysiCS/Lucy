@@ -35,7 +35,7 @@ namespace Lucy {
 		}
 		MeshComponent(const MeshComponent& other) = default;
 
-		void SetMesh(Ref<Mesh> mesh);
+		void LoadMesh(const std::string& path);
 
 		inline Ref<Mesh> GetMesh() { return m_Mesh; }
 		inline bool IsValid() { return m_Mesh.get() != nullptr && !m_Mesh->GetSubmeshes().empty(); }

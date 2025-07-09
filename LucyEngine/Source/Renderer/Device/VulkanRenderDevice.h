@@ -40,7 +40,7 @@ namespace Lucy {
 		VulkanRenderDevice() = default;
 		virtual ~VulkanRenderDevice() = default;
 
-		void Init(VkInstance instance, std::vector<const char*>& enabledValidationLayers, VkSurfaceKHR surface, uint32_t apiVersion);
+		void Init(VkInstance instance, const std::vector<const char*>& enabledValidationLayers, VkSurfaceKHR surface, uint32_t apiVersion);
 		void Destroy() final override;
 
 		void BeginCommandBuffer(Ref<CommandPool> cmdPool);
@@ -75,10 +75,14 @@ namespace Lucy {
 		void EndDebugMarker(Ref<CommandPool> cmdPool) final override;
 
 		void SubmitWorkToGPU(TargetQueueFamily queueFamily, Ref<CommandPool> cmdPool,
-							 const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) final override;
+							 Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore, Semaphore* currentFrameSignalSemaphore) final override;
+		bool SubmitWorkToGPU(TargetQueueFamily queueFamily, std::vector<Ref<CommandPool>>& cmdPools,
+							 Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore, Semaphore* currentFrameSignalSemaphore) final override;
 		void SubmitWorkToGPU(TargetQueueFamily queueFamily, std::vector<Ref<CommandPool>>& cmdPools,
-							 const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) final override;
+			Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore) final override;
+
 		void SubmitImmediateCommand(const std::function<void(VkCommandBuffer)>& func, const Ref<VulkanTransientCommandPool>& cmdPool);
+
 		void WaitForDevice() final override;
 		void WaitForQueue(TargetQueueFamily queueFamily) final override;
 
@@ -98,12 +102,12 @@ namespace Lucy {
 		inline uint32_t GetMinUniformBufferOffsetAlignment() const { return m_DeviceInfo.MinUniformBufferAlignment; }
 		inline float GetTimestampPeriod() const { return m_DeviceInfo.TimestampPeriod; }
 	private:
-		void SubmitWorkToGPU(VkQueue queueHandle, size_t commandBufferCount, VkCommandBuffer* commandBuffers, const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) const;
-		void SubmitWorkToGPU(VkQueue queueHandle, VkCommandBuffer currentCommandBuffer, const Fence& currentFrameFence, const Semaphore& currentFrameWaitSemaphore, const Semaphore& currentFrameSignalSemaphore) const;
+		void SubmitWorkToGPU(VkQueue queueHandle, size_t commandBufferCount, VkCommandBuffer* commandBuffers, Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore, Semaphore* currentFrameSignalSemaphore) const;
+		void SubmitWorkToGPU(VkQueue queueHandle, VkCommandBuffer currentCommandBuffer, Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore, Semaphore* currentFrameSignalSemaphore) const;
 		void SubmitWorkToGPU(VkQueue queueHandle, size_t commandBufferCount, void* commandBufferHandles) const;
 
 		void PickDeviceByRanking(const std::vector<VkPhysicalDevice>& devices);
-		void CreateLogicalDevice(std::vector<const char*>& enabledValidationLayers);
+		void CreateLogicalDevice(const std::vector<const char*>& enabledValidationLayers);
 
 		void FindQueueFamilies(VkPhysicalDevice device);
 
@@ -135,7 +139,7 @@ namespace Lucy {
 		VulkanAllocator m_Allocator;
 		VulkanDeviceInfo m_DeviceInfo;
 		QueueFamilyIndices m_QueueFamilyIndices;
-
+			
 		VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
 
 		Unique<Fence> m_ImmediateCommandFence = nullptr;

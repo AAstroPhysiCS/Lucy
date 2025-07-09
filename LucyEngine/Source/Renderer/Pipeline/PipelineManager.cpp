@@ -22,6 +22,13 @@ namespace Lucy {
 		return tuple->second;
 	}
 
+	std::unordered_map<std::string, GraphicsPipelineStatistics> PipelineManager::GetAllGraphicsPipelineStatistics() const {
+		std::unordered_map<std::string, GraphicsPipelineStatistics> statistics;
+		for (const auto& [name, handle] : m_GraphicsPipelines)
+			statistics.try_emplace(name, m_RenderDevice->AccessResource<GraphicsPipeline>(handle)->GetStatistics());
+		return statistics;
+	}
+
 	void PipelineManager::RTRecreateAllPipelinesDependentOnShader(const Ref<Shader>& shader) {
 		const auto RecreateAllPipelines = [&]<typename TPipeline>() {
 			for (auto handle : (std::same_as<TPipeline, GraphicsPipeline>
@@ -50,11 +57,11 @@ namespace Lucy {
 		m_ComputePipelines.erase(name);
 	}
 
-	void PipelineManager::RTDestroyAll() {
+	void PipelineManager::DestroyAll() {
 		for (auto handle : m_GraphicsPipelines | std::views::values)
-			m_RenderDevice->RTDestroyResource(handle);
+			Renderer::EnqueueResourceDestroy(handle);
 		for (auto handle : m_ComputePipelines | std::views::values)
-			m_RenderDevice->RTDestroyResource(handle);
+			Renderer::EnqueueResourceDestroy(handle);
 		m_GraphicsPipelines.clear();
 		m_ComputePipelines.clear();
 	}

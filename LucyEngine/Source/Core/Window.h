@@ -30,8 +30,6 @@ namespace Lucy {
 
 		virtual void PollEvents() = 0;
 		virtual void Init(RenderArchitecture architecture) = 0;
-		virtual void InitVulkanSurface(VkInstance instance) = 0;
-		virtual void DestroyVulkanSurface(VkInstance instance) = 0; //leaving to child class, to destroy it's contents.
 		virtual void Destroy() = 0; //leaving to child class, to destroy it's contents.
 		virtual void WaitEventsIfMinimized() = 0;
 		virtual void SetEventCallback(const std::function<void(Event&)>& eventCallbackFunc) = 0;
@@ -41,7 +39,9 @@ namespace Lucy {
 		inline int32_t GetWidth() const { return m_CreateInfo.Width; }
 		inline int32_t GetHeight() const { return m_CreateInfo.Height; }
 		
-		VkSurfaceKHR GetVulkanSurface() const { return m_Surface; }
+		void InitVulkanSurface(VkInstance instance);
+		void DestroyVulkanSurface(VkInstance instance);
+		inline VkSurfaceKHR GetVulkanSurface() const { return m_Surface; }
 
 		void SetTitle(const char* title);
 		inline const std::string& GetTitle() const { return m_CreateInfo.Title; }
@@ -51,9 +51,9 @@ namespace Lucy {
 		WindowCreateInfo m_CreateInfo;
 		GLFWwindow* m_Window = nullptr;
 
-		static inline std::function<void(Event&)> s_EventFunc;
-
 		VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
+
+		static inline std::function<void(Event&)> s_EventFunc;
 	};
 
 	class WinWindow : public Window {
@@ -64,9 +64,7 @@ namespace Lucy {
 		void PollEvents() final override;
 		
 		void Init(RenderArchitecture architecture) final override;
-		void InitVulkanSurface(VkInstance instance) final override;
 		
-		void DestroyVulkanSurface(VkInstance instance) final override;
 		void Destroy() final override;
 
 		void SetEventCallback(const std::function<void(Event&)>& eventCallbackFunc) final override;

@@ -30,6 +30,12 @@ namespace Lucy {
 		static std::string GetFileName(const std::string& file);
 		static std::string GetFileName(const std::filesystem::path& file);
 
+		static bool CreateDir(const std::string& file);
+		static bool CreateDir(const std::filesystem::path& filePath);
+
+		static bool DirectoryExists(const std::string& file);
+		static bool DirectoryExists(const std::filesystem::path& filePath);
+
 		static bool FileExists(const std::string& file);
 		static bool FileExists(const std::filesystem::path& filePath);
 

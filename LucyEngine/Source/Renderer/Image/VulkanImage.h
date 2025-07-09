@@ -9,6 +9,7 @@ namespace Lucy {
 	struct ImageViewCreateInfo {
 		VkImage Image;
 		ImageType ImageType;
+		ImageUsage ImageUsage;
 		VkFormat Format;
 		bool GenerateSampler = false;
 		bool GenerateMipmap = false;
@@ -56,6 +57,8 @@ namespace Lucy {
 		VulkanImage(const ImageCreateInfo& createInfo);
 		virtual ~VulkanImage() = default;
 
+		virtual void RTRecreate(uint32_t width, uint32_t height) = 0;
+
 		inline VkImageLayout GetCurrentLayout() const { return m_CurrentLayout; }
 		inline VkImage GetVulkanHandle() const { return m_Image; }
 		inline const VulkanImageView& GetImageView() const { return m_ImageView; }
@@ -89,6 +92,8 @@ namespace Lucy {
 
 		void RTCreateVulkanImageViewHandle(const Ref<VulkanRenderDevice>& device);
 		void RTCreateVulkanImageViewHandle(const Ref<VulkanRenderDevice>& device, VulkanImageView& imageView, VkImage image);
+
+		VkImageUsageFlags GetImageFlagsBasedOnUsage();
 
 		VkImage m_Image = VK_NULL_HANDLE;
 		VmaAllocation m_ImageVma = VK_NULL_HANDLE;

@@ -33,11 +33,17 @@ namespace Lucy {
 	};
 
 	class Shader : public MemoryTrackable {
+	private:
+		inline static std::filesystem::path s_ShaderFolder = "Assets/Shaders/";
+		inline static std::filesystem::path s_CacheFolder = "Assets/Shaders/Cached/";
 	public:
 		static Ref<Shader> Create(const std::string& name, const std::filesystem::path& path, Ref<RenderDevice> device);
 
 		Shader(const std::string& name, const std::filesystem::path& path);
 		virtual ~Shader() = default;
+
+		inline static std::filesystem::path& GetShaderFolder() { return s_ShaderFolder; }
+		inline static std::filesystem::path& GetCacheFolder() { return s_CacheFolder; }
 
 		inline std::filesystem::path GetPath() const { return m_Path; }
 		inline const std::string& GetName() const { return m_Name; }

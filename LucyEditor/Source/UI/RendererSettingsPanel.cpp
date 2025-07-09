@@ -1,3 +1,5 @@
+#include <ranges>
+
 #include "RendererSettingsPanel.h"
 #include "Renderer/Renderer.h"
 
@@ -21,7 +23,7 @@ namespace Lucy {
 			ImGui::Text(nameCStr);
 			ImGui::SameLine();
 			if (ImGui::Button("Reload", { 50, 17 })) {
-				Renderer::RTReloadShader(name);
+				Renderer::ReloadShader(name);
 			}
 			ImGui::NewLine();
 			ImGui::PopID();

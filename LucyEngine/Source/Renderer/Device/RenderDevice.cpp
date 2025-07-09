@@ -16,49 +16,63 @@
 #include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanUniformBuffer.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanSharedStorageBuffer.h"
-#include "Renderer/Shader/VulkanGraphicsShader.h"
-#include "Renderer/Shader/VulkanComputeShader.h"
-
-#include "Core/FileSystem.h"
 
 namespace Lucy {
 
-	void RenderDevice::CreateDeviceQueries(size_t pipelineCount, size_t passCount) {
+	Ref<RenderDevice> RenderDevice::Create(RendererConfiguration config) {
+		switch (config.RenderArchitecture) {
+			case RenderArchitecture::Vulkan: {
+				return Memory::CreateRef<VulkanRenderDevice>();
+				break;
+			}
+			default:
+				LUCY_ASSERT(false, "No suitable API found to create the renderer!");
+				break;
+		}
+		return nullptr;
+	}
+
+	void RenderDevice::CreatePipelineDeviceQueries(size_t pipelineCount) {
+		LUCY_INFO("Creating pipeline queries. Pipeline count: {0}", pipelineCount);
+		m_RenderDevicePipelineQuery = RenderDeviceQuery::Create({
+			.Device = shared_from_this()->As<RenderDevice>(),
+			.QueryCount = (uint32_t)pipelineCount,
+			.QueryType = RenderDeviceQueryType::Pipeline
+		});
+	}
+
+	void RenderDevice::CreateTimestampDeviceQueries(size_t passCount) {
+		LUCY_INFO("Creating timestamp queries. Pass count: {0}", passCount);
+
 		m_RenderDeviceTimestampQuery = RenderDeviceQuery::Create({
 			.Device = shared_from_this()->As<RenderDevice>(),
 			.QueryCount = (uint32_t)passCount * 2,
 			.QueryType = RenderDeviceQueryType::Timestamp
 		});
-
-		m_RenderDevicePipelineQuery = RenderDeviceQuery::Create({
-			.Device = shared_from_this()->As<RenderDevice>(),
-			.QueryCount = (uint32_t)pipelineCount * 2,
-			.QueryType = RenderDeviceQueryType::Pipeline
-		});
 	}
 
-	uint32_t RenderDevice::BeginTimestamp(Ref<CommandPool> cmdPool) {
-		return m_RenderDeviceTimestampQuery->Begin(cmdPool);
+	void RenderDevice::RTResetPipelineQuery(Ref<CommandPool> commandPool) {
+		m_RenderDevicePipelineQuery->RTResetPoolByIndex(commandPool, Renderer::GetCurrentFrameIndex());
+	}
+
+	void RenderDevice::RTResetTimestampQuery(Ref<CommandPool> commandPool) {
+		m_RenderDeviceTimestampQuery->RTResetPoolByIndex(commandPool, Renderer::GetCurrentFrameIndex());
+	}
+
+	uint32_t RenderDevice::RTBeginTimestamp(Ref<CommandPool> cmdPool) {
+		return m_RenderDeviceTimestampQuery->RTBegin(cmdPool);
 	}
 	
-	uint32_t RenderDevice::EndTimestamp(Ref<CommandPool> cmdPool) {
-		return m_RenderDeviceTimestampQuery->End(cmdPool);
-	}
-	
-	void RenderDevice::ResetTimestampQuery(Ref<CommandPool> cmdPool) {
-		m_RenderDeviceTimestampQuery->ResetPool(cmdPool);
-	}
-	
-	uint32_t RenderDevice::BeginPipelineQuery(Ref<CommandPool> cmdPool) {
-		return m_RenderDevicePipelineQuery->Begin(cmdPool);
+	uint32_t RenderDevice::RTEndTimestamp(Ref<CommandPool> cmdPool) {
+		return m_RenderDeviceTimestampQuery->RTEnd(cmdPool);
 	}
 
-	uint32_t RenderDevice::EndPipelineQuery(Ref<CommandPool> cmdPool) {
-		return m_RenderDevicePipelineQuery->End(cmdPool);
+	uint32_t RenderDevice::RTBeginPipelineQuery(Ref<CommandPool> cmdPool) {
+		return m_RenderDevicePipelineQuery->RTBegin(cmdPool);
 	}
 
-	void RenderDevice::ResetPipelineQuery(Ref<CommandPool> cmdPool) {
-		m_RenderDevicePipelineQuery->ResetPool(cmdPool);
+	uint32_t RenderDevice::RTEndPipelineQuery(Ref<CommandPool> cmdPool) {
+		return m_RenderDevicePipelineQuery->RTEnd(cmdPool);
 	}
 
 	std::vector<uint64_t> RenderDevice::GetQueryResults(RenderDeviceQueryType type) {
@@ -74,9 +88,13 @@ namespace Lucy {
 	}
 
 	RenderResourceHandle RenderDevice::CreateGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo) {
+		static std::mutex pipelineCreationMutex;
+
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				auto resource = Memory::CreateRef<VulkanGraphicsPipeline>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
+
+				std::unique_lock<std::mutex> lock(pipelineCreationMutex);
 				auto handle = m_ResourceManager.PushResource(resource);
 				return handle;
 			}
@@ -87,9 +105,13 @@ namespace Lucy {
 	}
 
 	RenderResourceHandle RenderDevice::CreateComputePipeline(const ComputePipelineCreateInfo& createInfo) {
+		static std::mutex pipelineCreationMutex;
+
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				auto resource = Memory::CreateRef<VulkanComputePipeline>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
+
+				std::unique_lock<std::mutex> lock(pipelineCreationMutex);
 				auto handle = m_ResourceManager.PushResource(resource);
 				return handle;
 			}
@@ -115,7 +137,7 @@ namespace Lucy {
 	RenderResourceHandle RenderDevice::CreateImage(const ImageCreateInfo& createInfo) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
-				if (createInfo.ImageType == ImageType::TypeCubeColor) {
+				if (createInfo.ImageType == ImageType::TypeCube) {
 					auto resource = Memory::CreateRef<VulkanImageCube>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
 					auto handle = m_ResourceManager.PushResource(resource);
 					return handle;
@@ -133,7 +155,7 @@ namespace Lucy {
 	RenderResourceHandle RenderDevice::CreateImage(const std::filesystem::path& path, ImageCreateInfo& createInfo) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
-				if (createInfo.ImageType == ImageType::TypeCubeColor) {
+				if (createInfo.ImageType == ImageType::TypeCube) {
 					auto resource = Memory::CreateRef<VulkanImageCube>(path, createInfo, shared_from_this()->As<VulkanRenderDevice>());
 					auto handle = m_ResourceManager.PushResource(resource);
 					return handle;

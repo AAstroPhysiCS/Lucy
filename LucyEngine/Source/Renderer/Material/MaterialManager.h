@@ -25,7 +25,7 @@ namespace Lucy {
 		MaterialID CreateMaterialByPath(MaterialType materialType, aiMaterial* aiMaterial, const std::string& importedFilePath);
 		void RTDestroyMaterial(MaterialID materialID);
 		void RTDestroyMaterials(const std::vector<MaterialID>& materialIDs);
-		void RTDestroyAll();
+		void DestroyAll();
 
 		void UpdateMaterialsIfNecessary();
 		inline const Ref<Material>& GetMaterialByID(MaterialID materialID) const { return m_Materials.at(materialID); }

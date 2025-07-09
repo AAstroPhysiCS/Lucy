@@ -20,6 +20,14 @@ namespace Lucy {
 #endif
 	}
 
+	void Window::InitVulkanSurface(VkInstance instance) {
+		LUCY_VK_ASSERT(glfwCreateWindowSurface(instance, m_Window, nullptr, &m_Surface));
+	}
+
+	void Window::DestroyVulkanSurface(VkInstance instance) {
+		vkDestroySurfaceKHR(instance, m_Surface, nullptr);
+	}
+
 	void WinWindow::Init(RenderArchitecture architecture) {
 		LUCY_ASSERT(m_CreateInfo.Width != 0 || m_CreateInfo.Height != 0, "Window size is 0.");
 		LUCY_ASSERT(glfwInit(), "GLFW init failed!");
@@ -53,14 +61,6 @@ namespace Lucy {
 		//GLFWimage icon;
 		//icon.pixels = stbi_load("Assets/Textures/lucy_logo.png", &icon.width, &icon.height, 0, STBI_rgb_alpha);
 		//glfwSetWindowIcon(m_Window, 1, &icon);
-	}
-
-	void WinWindow::InitVulkanSurface(VkInstance instance) {
-		LUCY_VK_ASSERT(glfwCreateWindowSurface(instance, m_Window, nullptr, &m_Surface));
-	}
-
-	void WinWindow::DestroyVulkanSurface(VkInstance instance) {
-		vkDestroySurfaceKHR(instance, m_Surface, nullptr);
 	}
 
 	void WinWindow::SetEventCallback(const std::function<void(Event&)>& eventCallbackFunc) {

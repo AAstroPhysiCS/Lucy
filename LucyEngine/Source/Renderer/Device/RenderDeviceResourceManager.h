@@ -27,12 +27,14 @@ namespace Lucy {
 		}
 
 		inline Ref<RenderResource> GetResource(RenderResourceHandle handle) {
+			LUCY_ASSERT(handle != InvalidRenderResourceHandle, "Resource handle is invalid!");
 			LUCY_ASSERT(ResourceExists(handle), "Resource handle {0} could not be found!", handle);
 			return m_Resources.at(handle);
 		}
 
 		//frees the resource and deletes/invalidates the handle
 		inline void RTDestroyResource(RenderResourceHandle& handle) {
+			LUCY_ASSERT(handle != InvalidRenderResourceHandle, "Deleting handle that has already been deleted or that is invalid!");
 			m_Resources.at(handle)->RTDestroyResource();
 			m_Resources.erase(handle);
 			handle = InvalidRenderResourceHandle;

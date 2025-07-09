@@ -1,14 +1,15 @@
 #include "lypch.h"
 #include "RendererBackend.h"
-#include "Device/VulkanRenderDevice.h"
 
 #include "Core/Application.h"
+
+#include "Device/RenderDevice.h"
 
 #include "RenderPass.h"
 #include "Memory/Buffer/FrameBuffer.h"
 
 #include "VulkanRenderer.h"
-#include "Commands/CommandQueue.h"
+#include "Commands/RenderCommandQueue.h"
 
 namespace Lucy {
 
@@ -27,79 +28,68 @@ namespace Lucy {
 
 	RendererBackend::RendererBackend(RendererConfiguration config, const Ref<Window>& window)
 		: m_MaxFramesInFlight(3),
-		m_RenderContext(RenderContext::Create(config.RenderArchitecture, window)),
-		m_RenderThread(Application::GetRunnableThreadScheduler()->GetThread<RenderThread>()), 
-		m_CommandQueue(Memory::CreateRef<CommandQueue>(CommandQueueCreateInfo{ .CommandListParallelCount = 1, .RenderDevice = GetRenderDevice() })), 
+		m_Context(RenderContext::Create(config.RenderArchitecture, window)),
+		m_RenderDevice(RenderDevice::Create(config)),
+		m_RenderCommandQueue(Memory::CreateRef<RenderCommandQueue>(RenderCommandQueueCreateInfo{ .CommandListParallelCount = 1, .RenderDevice = m_RenderDevice, .TargetQueueFamily = TargetQueueFamily::Graphics })),
+		m_RenderComputeCommandQueue(Memory::CreateRef<RenderCommandQueue>(RenderCommandQueueCreateInfo{ .CommandListParallelCount = 1, .RenderDevice = m_RenderDevice, .TargetQueueFamily = TargetQueueFamily::Compute })),
+		m_SwapChain(SwapChain::Create(config.RenderArchitecture, window, m_RenderDevice)),
 		m_RendererConfiguration(config) {
 		/* m_MaxFramesInFlight = (uint32_t)m_SwapChain.GetSwapChainImageCount(); */
+		m_ResourceDeletionQueues.resize(m_MaxFramesInFlight);
 	}
 
-	void RendererBackend::Init() {
-		m_RenderContext->Init();
-		m_RenderContext->PrintInfo();
-
-		m_CommandQueue->Init();
+	void RendererBackend::EnqueueToRenderCommandQueue(RenderCommandFunc&& func) {
+		(*m_RenderCommandQueue) += std::move(func);
 	}
 
-	void RendererBackend::EnqueueToRenderThread(RenderCommandFunc&& func) {
-		(*m_CommandQueue) += std::move(func);
+	void RendererBackend::EnqueueToRenderCommandQueue(RenderSubmitFunc&& func) {
+		(*m_RenderCommandQueue) += std::move(func);
 	}
 
-	void RendererBackend::EnqueueResourceDestroy(RenderResourceHandle& handle) {
-		m_ResourceDeletionQueue.emplace_back([&]() {
+	void RendererBackend::EnqueueResourceDestroy(RenderResourceHandle handle) {
+		m_ResourceDeletionQueues[GetCurrentFrameIndex()].emplace_back([&, handle]() mutable {
+			LUCY_INFO("Debug Name {0}, ", GetRenderDevice()->AccessResource<RenderResource>(handle)->GetDebugName());
 			GetRenderDevice()->RTDestroyResource(handle);
-			handle = InvalidRenderResourceHandle;
 		});
 	}
 
-	void RendererBackend::EnqueueToRenderThread(RenderSubmitFunc&& func) {
-		(*m_CommandQueue) += std::move(func);
-	}
-
 	void RendererBackend::SubmitToRender(RenderGraphPass& pass, RenderResourceHandle renderPassHandle, RenderResourceHandle frameBufferHandle) {
-		EnqueueToRenderThread([&, renderPassHandle, frameBufferHandle](RenderCommandList& cmdList) {
+		//LUCY_ASSERT(!Renderer::IsOnRenderThread(), "SubmitToRender should only be called on the main thread!");
+		EnqueueToRenderCommandQueue([&, renderPassHandle, frameBufferHandle](RenderCommandList& cmdList) {
+			LUCY_PROFILE_NEW_EVENT("RendererBackend::SubmitToRender");
 			const auto& device = GetRenderDevice();
 			const auto& renderPass = device->AccessResource<RenderPass>(renderPassHandle);
 			const auto& frameBuffer = device->AccessResource<FrameBuffer>(frameBufferHandle);
-			GetRenderDevice()->BeginRenderPass(renderPass, frameBuffer, cmdList.GetPrimaryCommandPool());
+			device->BeginRenderPass(renderPass, frameBuffer, cmdList.GetPrimaryCommandPool());
 			pass.Execute(cmdList);
-			GetRenderDevice()->EndRenderPass(renderPass);
+			device->EndRenderPass(renderPass);
 		});
 	}
 
 	void RendererBackend::SubmitToCompute(RenderGraphPass& pass) {
-		EnqueueToRenderThread([&](RenderCommandList& cmdList) {
+		(*m_RenderComputeCommandQueue) += ([&](RenderCommandList& cmdList) {
+			LUCY_PROFILE_NEW_EVENT("RendererBackend::SubmitToCompute");
 			pass.Execute(cmdList);
 		});
 	}
 
 	void RendererBackend::RecreateCommandQueue() {
-		m_CommandQueue->Recreate();
+		m_RenderCommandQueue->Recreate();
 	}
 
 	void RendererBackend::FlushCommandQueue() {
-		m_CommandQueue->FlushCommandQueue();
+		m_RenderCommandQueue->FlushCommandQueue();
+		m_RenderComputeCommandQueue->FlushCommandQueue();
 	}
 
 	void RendererBackend::FlushSubmitQueue() {
 		m_CommandQueueMetricsOutput.RenderTime = 0.0;
-		m_CommandQueue->FlushSubmitQueue(m_CommandQueueMetricsOutput);
-	}
-
-	void RendererBackend::FlushDeletionQueue() {
-		if (m_ResourceDeletionQueue.empty())
-			return;
-		//TODO: do vkSynchronization2 -> this way, bad for perf
-		GetRenderDevice()->WaitForQueue(TargetQueueFamily::Graphics);
-		GetRenderDevice()->WaitForQueue(TargetQueueFamily::Compute);
-		for (const auto& deletionFunc : m_ResourceDeletionQueue)
-			deletionFunc();
-		m_ResourceDeletionQueue.clear();
+		m_RenderCommandQueue->FlushSubmitQueue(m_CommandQueueMetricsOutput);
+		m_RenderComputeCommandQueue->FlushSubmitQueue(m_CommandQueueMetricsOutputCompute);
 	}
 
 	void RendererBackend::Destroy() {
-		FlushDeletionQueue();
-		m_CommandQueue->Free();
-		m_RenderContext->Destroy();
+		m_RenderCommandQueue->Free();
+		m_RenderDevice->Destroy();
 	}
 }

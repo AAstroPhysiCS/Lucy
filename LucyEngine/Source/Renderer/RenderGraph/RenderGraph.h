@@ -25,7 +25,7 @@ namespace Lucy {
 		void ImportFromFile(const std::filesystem::path& path);
 		void ExportToFile(const std::filesystem::path& path);
 
-		void AddPass(const std::string& passName, RenderGraphSetupFunc&& setupFunc);
+		void AddPass(TargetQueueFamily targetQueueFamily, const std::string& passName, RenderGraphSetupFunc&& setupFunc);
 		void RemovePass(const std::string& passName);
 
 		void ImportExternalResource(const RenderGraphResource& rgResource, RenderResourceHandle handle);

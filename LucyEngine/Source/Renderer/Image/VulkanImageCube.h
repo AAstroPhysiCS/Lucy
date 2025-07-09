@@ -10,7 +10,7 @@ namespace Lucy {
 		VulkanImageCube(const ImageCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device);
 		virtual ~VulkanImageCube() = default;
 
-		void RTRecreate(uint32_t width, uint32_t height);
+		void RTRecreate(uint32_t width, uint32_t height) final override;
 	private:
 		void RTCreateFromPath();
 		void RTCreateEmptyImage();

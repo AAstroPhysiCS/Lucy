@@ -34,22 +34,22 @@ namespace Lucy {
 	}
 
 	void RenderCommand::BeginTimestamp() {
-		m_BeginTimestampIndex = m_RenderDevice->BeginTimestamp(m_PrimaryCommandPool);
+		m_BeginTimestampIndex = m_RenderDevice->RTBeginTimestamp(m_PrimaryCommandPool);
 	}
 
 	void RenderCommand::EndTimestamp() {
-		m_EndTimestampIndex = m_RenderDevice->EndTimestamp(m_PrimaryCommandPool);
+		m_EndTimestampIndex = m_RenderDevice->RTEndTimestamp(m_PrimaryCommandPool);
 	}
 
 	void RenderCommand::BeginPipelineStatistics() {
-		//m_RenderDevice->BeginPipelineQuery(m_PrimaryCommandPool);
+		m_RenderDevice->RTBeginPipelineQuery(m_PrimaryCommandPool);
 	}
 
 	void RenderCommand::EndPipelineStatistics() {
-		//m_RenderDevice->EndPipelineQuery(m_PrimaryCommandPool);
-
-		//if (auto pipeline = m_BoundedGraphicsPipeline; pipeline)
-		//	pipeline->Unbind(m_RenderDevice->GetQueryResults(RenderDeviceQueryType::Pipeline));
+		if (!m_BoundedGraphicsPipeline)
+			return;
+		m_RenderDevice->RTEndPipelineQuery(m_PrimaryCommandPool);
+		m_BoundedGraphicsPipeline->Unbind(m_RenderDevice->GetQueryResults(RenderDeviceQueryType::Pipeline));
 	}
 
 	void RenderCommand::BindBuffers(Ref<Mesh> mesh) {
@@ -74,15 +74,14 @@ namespace Lucy {
 	void RenderCommand::BindPipeline(const Ref<GraphicsPipeline>& pipeline) {
 		LUCY_ASSERT(pipeline, "BindPipeline failed, pipeline is nullptr.");
 		m_RenderDevice->BindPipeline(m_PrimaryCommandPool, pipeline);
-		BeginPipelineStatistics();
 		m_Shader = pipeline->GetShader();
 		m_BoundedGraphicsPipeline = pipeline;
+		BeginPipelineStatistics();
 	}
 
 	void RenderCommand::BindPipeline(const Ref<ComputePipeline>& pipeline) {
 		LUCY_ASSERT(pipeline, "BindPipeline failed, pipeline is nullptr.");
 		m_RenderDevice->BindPipeline(m_PrimaryCommandPool, pipeline);
-		BeginPipelineStatistics();
 		m_Shader = pipeline->GetShader();
 		m_BoundedComputePipeline = pipeline;
 	}

@@ -16,6 +16,10 @@
 #include "Renderer/Image/VulkanImage.h"
 #include "Renderer/Memory/Buffer/PushConstant.h"
 
+#include "slang/slang.h"
+#include "slang/slang-com-ptr.h"
+#include "slang/slang-com-helper.h"
+
 namespace Lucy {
 	
 	Ref<Shader> Shader::Create(const std::string& name, const std::filesystem::path& path, Ref<RenderDevice> device) {
@@ -28,6 +32,12 @@ namespace Lucy {
 			if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan)
 				resource = Memory::CreateRef<VulkanGraphicsShader>(name, path, device);
 		}
+
+		using namespace slang;
+
+		Slang::ComPtr<IGlobalSession> globalSession;
+		SlangGlobalSessionDesc desc = {};
+		createGlobalSession(&desc, globalSession.writeRef());
 
 		return resource;
 	}
@@ -161,33 +171,10 @@ namespace Lucy {
 		std::string requestedSourceNoExtension = requested_source;
 		requestedSourceNoExtension = requestedSourceNoExtension.substr(0, requestedSourceNoExtension.find_first_of('.', 0));
 
-		//Ref<Shader> requestedShader = Renderer::GetShader(requestedSourceNoExtension);
-		//if (!requestedShader) { //means that we do not have that shader loaded yet
-			//requestedShader = Shader::Create(requestedSourceNoExtension, "Assets/Shaders/" + std::string(requested_source), m_RenderDevice);
-			//Renderer::PushShader(requestedShader);
-		//}
-		const auto& path = "Assets/Shaders/" + std::string(requested_source);
+		const auto& path = Shader::GetShaderFolder() / std::string(requested_source);
 
 		std::vector<std::string> m_LinesBuffer;
 		FileSystem::ReadFileLine<std::string>(path, m_LinesBuffer);
-
-		//using Iter = std::vector<std::string>::iterator;
-		//
-		//Iter from, to;
-		//switch (type) {
-		//	case shaderc_shader_kind::shaderc_vertex_shader:
-		//		from = std::find(m_LinesBuffer.begin(), m_LinesBuffer.end(), "//type vertex");
-		//		to = std::find(m_LinesBuffer.begin(), m_LinesBuffer.end(), "//type fragment");
-		//		break;
-		//	case shaderc_shader_kind::shaderc_fragment_shader:
-		//		from = std::find(m_LinesBuffer.begin(), m_LinesBuffer.end(), "//type fragment");
-		//		to = m_LinesBuffer.end();
-		//		break;
-		//	case shaderc_shader_kind::shaderc_compute_shader:
-		//		from = m_LinesBuffer.begin();
-		//		to = m_LinesBuffer.end();
-		//		break;
-		//}
 
 		m_DataBuffer = new std::string(Utils::CombineDataToSingleBuffer(m_LinesBuffer));
 

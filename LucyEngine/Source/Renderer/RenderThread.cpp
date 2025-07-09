@@ -2,62 +2,73 @@
 #include "RenderThread.h"
 
 #include "Core/Window.h"
+#include "Events/EventHandler.h"
 
 #include "Renderer.h"
 
 namespace Lucy {
 
-	//Run function runs every single iteration. But first we must ensure that the RenderThread kicks off at the right time
-	//Since the main thread and the render thread needs to run simultaneously, we have to keep some sort of synchronization between these two.
-	//Hence the conditional variable.
-
-	RenderThread::RenderThread(const RunnableThreadCreateInfo& createInfo)
-		: RunnableThread(createInfo) {
+	RenderThread::RenderThread(const RunnableThreadCreateInfo& createInfo, const RenderThreadCreateInfo& renderThreadCreateInfo) 
+		: RunnableThread(createInfo), m_RenderThreadCreateInfo(renderThreadCreateInfo) {
 	}
 
-	bool RenderThread::OnInit(uint32_t threadIndex) {
+	void RenderThread::SignalToShutdown() {
+		LUCY_ASSERT(!IsOnRenderThread(), "SignalToShutdown should only be called from the main thread!");
+		m_Running = false;
+	}
+
+	void RenderThread::WaitToShutdown() {
+		LUCY_ASSERT(!IsOnRenderThread(), "WaitToShutdown should only be called from the main thread!");
+		static std::mutex m;
+
+		std::unique_lock lock(m);
+		m_FinishedCondVar.wait(lock, [&]() { return m_Finished.load(); });
+	}
+
+	bool RenderThread::OnInit() {
+		LUCY_PROFILE_NEW_EVENT("RenderThread::OnInit");
 		LUCY_ASSERT(IsOnRenderThread(), "OnInit function is being called on a another thread!");
 		LUCY_INFO("Renderer running on separate thread");
-		return true;
+
+		tracy::SetThreadName(GetDebugName().c_str());
+
+		m_Backend = RendererBackend::Create(m_RenderThreadCreateInfo.Config, m_RenderThreadCreateInfo.Window);
+		Renderer::RTSetBackend(m_Backend);
+		m_Backend->Init();
+
+		m_RenderThreadCreateInfo.InitPromise.set_value();
+		m_Running = true;
+		return m_Running;
 	}
 
 	uint32_t RenderThread::OnRun() {
 		LUCY_ASSERT(IsOnRenderThread(), "OnRun function is being called on a another thread!");
+
+		m_Backend->FlushCommandQueue();
+		
 		while (m_Running) {
-			std::unique_lock<std::mutex> lock;
-			m_ExecutionVariable.wait(lock, [this]() { return m_Running; });
-			ExecuteCommands();
+			LUCY_PROFILE_NEW_EVENT("RenderThread::OnRun");
+
+			if (Application::IsMainThreadReady()) {
+				RenderContextResultCodes result = Renderer::WaitAndPresent();
+				if (result == RenderContextResultCodes::ERROR_OUT_OF_DATE_KHR ||
+					result == RenderContextResultCodes::SUBOPTIMAL_KHR ||
+					result == RenderContextResultCodes::NOT_READY) {
+					EventHandler::DispatchImmediateEvent<SwapChainResizeEvent>();
+				}
+
+				Application::SetMainThreadReady(false);
+				Application::IsMainThreadReadyCondVar().notify_one();
+			}
 		}
 		return true;
 	}
 
 	void RenderThread::OnJoin() {
+		LUCY_PROFILE_NEW_EVENT("RenderThread::OnJoin");
 		LUCY_ASSERT(IsOnRenderThread(), "OnJoin function is being called on a another thread!");
-		m_CommandQueue->Free();
-		m_Running = false;
-	}
-
-	void RenderThread::OnStop() {
-		LUCY_ASSERT(IsOnRenderThread(), "OnStop function is being called on a another thread!");
-		LUCY_INFO("Render thread is shutting down!");
-	}
-
-	void RenderThread::ExecuteCommands() {
-		LUCY_PROFILE_NEW_EVENT("RenderThread::ExecuteCommands");
-		m_CommandQueue->FlushCommandQueue();
-		//m_CommandQueue->FlushSubmitQueue();
-	}
-
-	void RenderThread::SubmitCommandQueue(Ref<CommandQueue> commandQueue) {
-		m_CommandQueue = commandQueue;
-	}
-
-	void RenderThread::SignalToPresent() {
-		LUCY_ASSERT(!IsOnRenderThread(), "SignalToPresent function should be called from the Game thread!");
-		m_ExecutionVariable.notify_one();
-	}
-
-	bool RenderThread::IsOnRenderThread() const {
-		return GetID() == std::this_thread::get_id();
+		m_Backend->Destroy();
+		m_Finished = true;
+		m_FinishedCondVar.notify_one();
 	}
 }

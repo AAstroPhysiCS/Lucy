@@ -4,28 +4,19 @@
 
 namespace Lucy {
 
-	enum class ImageType {
-		//Image2D
-		Type2DDepth,
-		Type2DArrayDepth,
-
-		Type2DColor,
-		Type2DArrayColor,
-
-		//Image3D
-		Type3DColor,
-
-		//ImageCube
-		TypeCubeColor
+	enum class ImageType : uint8_t {
+		Type2D,
+		Type3D,
+		TypeCube
 	};
 
-	enum class ImageAddressMode {
+	enum class ImageAddressMode : uint8_t {
 		REPEAT, 
 		CLAMP_TO_EDGE, 
 		CLAMP_TO_BORDER
 	};
 
-	enum class ImageFilterMode {
+	enum class ImageFilterMode : uint8_t {
 		NEAREST, 
 		LINEAR
 	};
@@ -60,6 +51,15 @@ namespace Lucy {
 		R32_UINT
 	};
 
+	enum class ImageUsage : uint8_t {
+		Unknown = 1 << 1,
+		AsColorAttachment = 1 << 2,
+		AsColorTransferAttachment = 1 << 3,
+		AsColorStorageTransferAttachment = 1 << 4,
+		AsDepthAttachment = 1 << 5,
+		AsTransientColorAttachment = 1 << 6,
+	};
+
 	//to be implemented by CLIENT
 	uint32_t GetAPIImageFormat(ImageFormat format);
 	ImageFormat GetLucyImageFormat(uint32_t format);
@@ -72,14 +72,12 @@ namespace Lucy {
 		ImageFilterMode Mag = ImageFilterMode::LINEAR;
 	};
 
-	using ImageFlags = uint32_t;
-
 	struct ImageCreateInfo {
 		uint32_t Width = 0, Height = 0; //gets replaced if path is available
 		ImageType ImageType;
+		ImageUsage ImageUsage = ImageUsage::Unknown;
 		ImageFormat Format;
 		ImageParameter Parameter;
-		ImageFlags Flags = 0;
 
 		uint32_t Samples = 1;
 		uint32_t Layers = 1;
@@ -114,6 +112,7 @@ namespace Lucy {
 			: RenderResource("Image"), m_CreateInfo(createInfo) {
 			if (m_CreateInfo.GenerateMipmap)
 				m_MaxMipLevel = (uint32_t)glm::floor(glm::log2(glm::max(m_CreateInfo.Width, m_CreateInfo.Height))) + 1u;
+			LUCY_ASSERT(m_CreateInfo.ImageUsage != ImageUsage::Unknown, "Image usage is unknown.");
 		}
 
 		//Loads an asset

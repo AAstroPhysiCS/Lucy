@@ -17,11 +17,7 @@ namespace Lucy {
 		return nullptr;
 	}
 
-	RenderContext::RenderContext(const Ref<Window>& window, Ref<RenderDevice> renderDevice)
-		: m_Window(window), m_RenderDevice(renderDevice) {
-	}
-
-	RenderContext::~RenderContext() {
-		m_RenderDevice->Destroy();
+	RenderContext::RenderContext(const Ref<Window>& window)
+		: m_Window(window) {
 	}
 }
