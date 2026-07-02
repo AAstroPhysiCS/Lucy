@@ -146,17 +146,17 @@ namespace Lucy {
 		const std::unordered_set<RenderGraphResource>& outputResources) {
 		LUCY_PROFILE_NEW_EVENT("RenderGraph::CheckIfPassNeedsCulling");
 
-		const auto CheckIfPassIsDependent = [this](const std::unordered_set<RenderGraphResource>& rgResources) {
+		const auto CheckIfPassIsDependent = [&](const std::unordered_set<RenderGraphResource>& rgResources) {
 			LUCY_PROFILE_NEW_EVENT("RenderGraph::CheckIfPassIsDependent");
 			for (const RenderGraphResource& rgResource : rgResources) {
 				RenderGraphPass* parentPass = m_AcyclicGraph.FindOutputPassGivenResource(rgResource);
-				if (parentPass && parentPass->GetCurrentState() == RenderGraphPassState::Waiting)
+				if (parentPass && parentPass != pass && parentPass->GetCurrentState() == RenderGraphPassState::Waiting)
 					return false;
 			}
 			return true;
 		};
 
-		const auto CheckIfExternalResourcesAreValid = [this](const std::unordered_set<RenderGraphResource>& rgResources) {
+		const auto CheckIfExternalResourcesAreValid = [&](const std::unordered_set<RenderGraphResource>& rgResources) {
 			LUCY_PROFILE_NEW_EVENT("RenderGraph::CheckIfExternalResourcesAreValid");
 			for (const RenderGraphResource& rgResource : rgResources) {
 				if (m_Registry.Contains(rgResource) && !Renderer::IsValidRenderResource(m_Registry.GetResourceEntry(rgResource).ResourceHandle))
@@ -316,6 +316,11 @@ namespace Lucy {
 			
 			bool needsCulling = CheckIfPassNeedsCulling(pass, inputResources, outputResources);
 
+			if (pass->GetExecutionPolicy() == RenderGraphExecutionPolicy::Once && pass->GetCurrentState() == RenderGraphPassState::Executed) {
+				pass->SetState(RenderGraphPassState::Terminated);
+				continue;
+			}
+
 			if (needsCulling) {
 				if (pass->GetCurrentState() == RenderGraphPassState::Waiting)
 					continue;
@@ -327,7 +332,7 @@ namespace Lucy {
 				continue;
 			}
 
-			if (pass->GetCurrentState() == RenderGraphPassState::Runnable)
+			if (pass->GetCurrentState() == RenderGraphPassState::Runnable || pass->GetCurrentState() == RenderGraphPassState::Terminated)
 				continue;
 
 			pass->SetState(RenderGraphPassState::Runnable);
@@ -358,6 +363,10 @@ namespace Lucy {
 		auto& pass = m_Passes.at(passName);
 		RenderGraphBuilder builder(this, &pass);
 		pass.Setup(builder);
+	}
+
+	void RenderGraph::RemovePass(RenderGraphPass* pass) {
+		m_Passes.erase(pass->GetName());
 	}
 
 	void RenderGraph::RemovePass(const std::string& passName) {

@@ -25,6 +25,10 @@ namespace Lucy {
 		m_RenderGraphPass->SetClearColor(clearColor);
 	}
 
+	void RenderGraphBuilder::SetExecutionPolicy(RenderGraphExecutionPolicy policy) {
+		m_RenderGraphPass->SetExecutionPolicy(policy);
+	}
+
 	void RenderGraphBuilder::DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp) {
 		m_RenderGraph->DeclareImage(rgResource, createInfo, loadStoreAccessOp);
 	}

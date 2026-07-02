@@ -1,5 +1,9 @@
 #pragma once
 
+#include <array>
+
+#include "vulkan/vulkan.h"
+
 #include "assimp/scene.h"
 
 #include "Material/Material.h"
@@ -10,17 +14,80 @@ namespace Lucy {
 
 	class RenderDevice;
 
+	struct Vertex final {
+		glm::vec3 Position = glm::vec3{0.0f};
+		glm::vec3 MeshID = glm::vec3{0.0f};
+		glm::vec2 TexCoords = glm::vec2{0.0f};
+		glm::vec3 Normal = glm::vec3{0.0f};
+		glm::vec3 Tangent = glm::vec3{0.0f};
+		glm::vec3 Bitangent = glm::vec3{0.0f};
+
+		[[nodiscard]] static consteval uint32_t GetComponentCount() {
+			return decltype(Position)::length()
+				+ decltype(MeshID)::length()
+				+ decltype(TexCoords)::length()
+				+ decltype(Normal)::length()
+				+ decltype(Tangent)::length()
+				+ decltype(Bitangent)::length();
+		}
+
+		[[nodiscard]] static constexpr VkVertexInputBindingDescription GetBindingDescription() {
+			return {
+				.binding = 0,
+				.stride = sizeof(Vertex),
+				.inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+			};
+		}
+
+		[[nodiscard]] static constexpr std::array<VkVertexInputAttributeDescription, 6> GetAttributeDescriptions(uint32_t binding) {
+			return {
+				VkVertexInputAttributeDescription{
+					.location = 0,
+					.binding = binding,
+					.format = VK_FORMAT_R32G32B32_SFLOAT,
+					.offset = offsetof(Vertex, Position)
+				},
+				VkVertexInputAttributeDescription{
+					.location = 1,
+					.binding = binding,
+					.format = VK_FORMAT_R32G32B32_SFLOAT,
+					.offset = offsetof(Vertex, MeshID)
+				},
+				VkVertexInputAttributeDescription{
+					.location = 2,
+					.binding = binding,
+					.format = VK_FORMAT_R32G32_SFLOAT,
+					.offset = offsetof(Vertex, TexCoords)
+				},
+				VkVertexInputAttributeDescription{
+					.location = 3,
+					.binding = binding,
+					.format = VK_FORMAT_R32G32B32_SFLOAT,
+					.offset = offsetof(Vertex, Normal)
+				},
+				VkVertexInputAttributeDescription{
+					.location = 4,
+					.binding = binding,
+					.format = VK_FORMAT_R32G32B32_SFLOAT,
+					.offset = offsetof(Vertex, Tangent)
+				},
+				VkVertexInputAttributeDescription{
+					.location = 5,
+					.binding = binding,
+					.format = VK_FORMAT_R32G32B32_SFLOAT,
+					.offset = offsetof(Vertex, Bitangent)
+				}
+			};
+		}
+	};
+
 	struct Submesh {
-		std::vector<glm::vec3> Vertices;
-		std::vector<glm::vec3> Normals;
-		std::vector<glm::vec3> Tangents;
-		std::vector<glm::vec3> BiTangents;
-		std::vector<glm::vec2> TextureCoords;
+		std::vector<Vertex> Vertices;
+		std::vector<uint32_t> Indices;
 
-		std::vector<uint32_t> Faces;
-		MaterialID MaterialID;
+		MaterialID MaterialID = -1;
 
-		glm::mat4 Transform = glm::mat4(1.0f);
+		glm::mat4 Transform = glm::mat4{1.0f};
 
 		uint32_t VertexCount = 0;
 		uint32_t IndexCount = 0;
@@ -33,14 +100,12 @@ namespace Lucy {
 		uint32_t TotalVerticesSize = 0;
 	};
 
-	inline static std::atomic_uint32_t s_NextMeshID = 1;
-
 	class Mesh : public MemoryTrackable {
 	public:
 		static Ref<Mesh> Create(const std::vector<float>& vertices, const std::vector<uint32_t>& indices);
 		static Ref<Mesh> Create(const std::string& path);
 
-		Mesh(const std::vector<float>& vertices, const std::vector<uint32_t>& indices);
+		Mesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
 		Mesh(const std::string& path);
 		~Mesh() = default;
 
@@ -57,7 +122,9 @@ namespace Lucy {
 
 		void Destroy();
 	private:
-		void Load(const Ref<RenderDevice>& device, const std::vector<float>& vertices, const std::vector<uint32_t>& indices);
+		inline static std::atomic_uint32_t s_NextMeshID = 1;
+
+		void Load(const Ref<RenderDevice>& device, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
 		void Load();
 
 		void LoadProgram(const aiScene* scene);

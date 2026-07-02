@@ -11,6 +11,11 @@ namespace Lucy {
 	class RenderGraphRegistry;
 	class RenderGraphBuilder;
 
+	enum class RenderGraphExecutionPolicy : uint8_t {
+		Once,
+		Always
+	};
+
 	using RenderGraphExecuteFunc = std::function<void(RenderGraphRegistry&, RenderCommandList&)>;
 	using RenderGraphSetupFunc = std::function<RenderGraphExecuteFunc(RenderGraphBuilder&)>;
 
@@ -18,6 +23,7 @@ namespace Lucy {
 		New,
 		Waiting,
 		Runnable,
+		Executed,
 		Terminated
 	};
 
@@ -125,6 +131,7 @@ namespace Lucy {
 		void SetInFlightMode(bool mode);
 		void SetState(RenderGraphPassState state);
 		void SetClearColor(ClearColor clearColor);
+		void SetExecutionPolicy(RenderGraphExecutionPolicy policy);
 
 		inline bool operator==(const RenderGraphPass& other) const { return m_CreateInfo.Name.compare(other.m_CreateInfo.Name) == 0; }
 
@@ -148,6 +155,7 @@ namespace Lucy {
 
 		inline TargetQueueFamily GetTargetQueueFamily() const { return m_CreateInfo.TargetQueueFamily; }
 
+		inline RenderGraphExecutionPolicy GetExecutionPolicy() const { return m_ExecutionPolicy; }
 		inline RenderGraphPassState GetCurrentState() const { return m_State; }
 		inline const std::string& GetName() const { return m_CreateInfo.Name; }
 	private:
@@ -160,6 +168,7 @@ namespace Lucy {
 		RGUsedResourceElements m_ResourceWrites;
 
 		RenderGraphPassState m_State = RenderGraphPassState::New;
+		RenderGraphExecutionPolicy m_ExecutionPolicy = RenderGraphExecutionPolicy::Always;
 
 		uint32_t m_ViewportWidth = 0;
 		uint32_t m_ViewportHeight = 0;

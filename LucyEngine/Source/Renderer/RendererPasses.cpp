@@ -55,7 +55,7 @@ namespace Lucy {
 			);
 
 			build.ReadImage(RGResource(ShadowImages), RenderGraphResourceAccess::ShaderSampledRead);
-			build.ReadImage(RGResource(BRDFLutImage), RenderGraphResourceAccess::ShaderSampledRead);
+			build.ReadExternalImage(RGResource(BRDFLutImage), RenderGraphResourceAccess::ShaderSampledRead);
 			//build.ReadImage(RGResource(PrefilterImage), RenderGraphResourceAccess::ShaderSampledRead);
 			//build.ReadImage(RGResource(IrradianceImage), RenderGraphResourceAccess::ShaderSampledRead);
 
@@ -263,13 +263,13 @@ namespace Lucy {
 			cmd.BindPipeline(blurPipeline);
 
 			if (direction == GaussianBlurDirection::Horizontal) {
-				int32_t dir[2] = { 1, 0 };
+				int32_t dir[4] = { 1, 0, width, height };
 				pushConstant.SetData(reinterpret_cast<uint8_t*>(&dir), sizeof(dir));
 
 				blurPipeline->BindImageHandleTo("u_InputMoments", shadowImages);
 				blurPipeline->BindImageHandleTo("u_OutputMoments", shadowImagesBlurred);
 			} else {
-				int32_t dir[2] = { 0, 1 };
+				int32_t dir[4] = { 0, 1, width, height };
 				pushConstant.SetData(reinterpret_cast<uint8_t*>(&dir), sizeof(dir));
 
 				blurPipeline->BindImageHandleTo("u_InputMoments", shadowImagesBlurred);
@@ -705,17 +705,10 @@ namespace Lucy {
 
 	void BRDFLutPass::AddPass(const Ref<RenderGraph>& renderGraph) {
 		renderGraph->AddPass(TargetQueueFamily::Compute, "BRDFLutPass", [*this](RenderGraphBuilder& build) {
-			build.DeclareImage(RGResource(BRDFLutImage), {
-				.Width = m_Size,
-				.Height = m_Size,
-				.ImageType = ImageType::Type2D,
-				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
-				.Format = ImageFormat::R16G16_SFLOAT,
-				.GenerateSampler = true,
-			}, RenderPassLoadStoreAttachments::ClearDontCare);
+			build.SetExecutionPolicy(RenderGraphExecutionPolicy::Once);
 
-			//build.ReadImage(RGResource(HDRLayeredImage), RenderGraphResourceAccess::ShaderSampledRead);
-			build.WriteImage(RGResource(BRDFLutImage), RenderGraphResourceAccess::StorageWrite);
+			build.ReadExternalImage(RGResource(BRDFLutImage), RenderGraphResourceAccess::StorageRead);
+			build.WriteExternalImage(RGResource(BRDFLutImage), RenderGraphResourceAccess::StorageWrite);
 
 			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
 				static constexpr const uint32_t workGroupSize = 8;
@@ -734,6 +727,19 @@ namespace Lucy {
 
 				cmdList.EndRenderCommand();
 			};
+		});
+
+		Renderer::EnqueueToRenderCommandQueue([width = m_Size, height = m_Size](const Ref<RenderDevice>& device) {
+			auto imageHandle = device->CreateImage({
+				.Width = width,
+				.Height = height,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
+				.Format = ImageFormat::R16G16_SFLOAT,
+				.GenerateSampler = true,
+			}, "BRDFLutImage");
+
+			Renderer::ImportExternalRenderGraphResource(RGResource(BRDFLutImage), imageHandle);
 		});
 	}
 #pragma endregion BRDFLutPass

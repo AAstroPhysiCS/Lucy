@@ -5,7 +5,9 @@ namespace Lucy {
 	class RenderGraph;
 	class RenderGraphPass;
 	class RenderGraphResource;
+
 	enum class RenderGraphResourceAccess : uint8_t;
+	enum class RenderGraphExecutionPolicy : uint8_t;
 
 	struct ImageCreateInfo;
 
@@ -17,6 +19,7 @@ namespace Lucy {
 		void SetViewportArea(uint32_t width, uint32_t height);
 		void SetInFlightMode(bool mode);
 		void SetClearColor(ClearColor clearColor);
+		void SetExecutionPolicy(RenderGraphExecutionPolicy policy);
 
 		void DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp);
 		void DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp,

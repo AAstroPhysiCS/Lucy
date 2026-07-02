@@ -255,7 +255,6 @@ namespace Lucy {
 				.Rasterization = rasterizationConfig,
 				.DepthConfiguration = depthConfig,
 				.BlendConfiguration = blendConfig,
-				.VertexShaderLayout = shader->GetVertexShaderLayout(),
 				.RenderPassHandle = renderPassHandle,
 				.Shader = shader,
 			});

@@ -29,6 +29,7 @@ namespace Lucy {
 		void ExportToFile(const std::filesystem::path& path);
 
 		void AddPass(TargetQueueFamily targetQueueFamily, const std::string& passName, RenderGraphSetupFunc&& setupFunc);
+		void RemovePass(RenderGraphPass* pass);
 		void RemovePass(const std::string& passName);
 
 		void ImportExternalResource(const RenderGraphResource& rgResource, RenderResourceHandle handle);
@@ -49,9 +50,10 @@ namespace Lucy {
 						func(node.Pass);
 						break;
 					}
+					case RenderGraphPassState::Executed:
 					case RenderGraphPassState::New:
 					case RenderGraphPassState::Terminated:
-						LUCY_ASSERT(false, "RenderGraphPassState is new or terminated!");
+						LUCY_ASSERT(false, "RenderGraphPassState is new, terminated or already executed!");
 						break;
 				}
 			}

@@ -41,11 +41,6 @@ VertexOutput main(VertexInput input) {
     float4 worldPos = mul(PushConstants.u_ModelMatrix, float4(input.a_Pos, 1.0));
     float4 viewPos = mul(Camera.u_ViewMatrix, worldPos);
 
-    VertexOutput output;
-    output.a_Pos = mul(Camera.u_ProjMatrix, viewPos);
-    output.a_PosOutWS = worldPos.xyz;
-    output.a_TextureCoordsOut = input.a_TextureCoords;
-
     float3x3 normalMatrix = float3x3(PushConstants.u_ModelMatrixInversedTransposed);
 
     float3 N = normalize(mul(normalMatrix, input.a_Normals));
@@ -53,14 +48,15 @@ VertexOutput main(VertexInput input) {
     float3 B = normalize(mul(normalMatrix, input.a_Bitangents));
 
     // Make tangent perpendicular to the normal.
-    T = normalize(
-        T -
-        N * dot(N, T)
-    );
+    T = normalize(T - N * dot(N, T));
 
     /* need to do that */
     float handedness = (dot(cross(N, T), B) < 0.0f) ? -1.0f : 1.0f;
 
+    VertexOutput output;
+    output.a_Pos = mul(Camera.u_ProjMatrix, viewPos);
+    output.a_PosOutWS = worldPos.xyz;
+    output.a_TextureCoordsOut = input.a_TextureCoords;
     output.a_TangentWSOut = float4(T, handedness);
     output.a_ViewDepthOut = viewPos.z;
     output.a_NormalsWSOut = N;

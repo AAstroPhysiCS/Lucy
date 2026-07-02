@@ -38,6 +38,7 @@ namespace Lucy {
 	void RenderGraphPass::Execute(RenderCommandList& cmdList) {
 		LUCY_PROFILE_NEW_EVENT("RenderGraphPass::Execute");
 		m_ExecuteFunc(m_CreateInfo.Registry, cmdList);
+		SetState(RenderGraphPassState::Executed);
 	}
 
 	void RenderGraphPass::SetViewportArea(uint32_t width, uint32_t height) {
@@ -55,5 +56,9 @@ namespace Lucy {
 
 	void RenderGraphPass::SetClearColor(ClearColor clearColor) {
 		m_ClearColor = clearColor;
+	}
+
+	void RenderGraphPass::SetExecutionPolicy(RenderGraphExecutionPolicy policy) {
+		m_ExecutionPolicy = policy;
 	}
 }

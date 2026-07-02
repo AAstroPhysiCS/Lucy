@@ -23,8 +23,7 @@ namespace Lucy {
 		// Additionally, print entry point details
 		for (uint32_t i = 0; i < layout->getEntryPointCount(); i++) {
 			auto entryPoint = layout->getEntryPointByIndex(i);
-			LUCY_INFO("Entry Point {}: Name={}, Stage={}",
-				i, entryPoint->getName(), ShaderStageToShaderString(SlangStageToShaderStage(entryPoint->getStage())));
+			LUCY_INFO("Entry Point {}: Name={}, Stage={}", i, entryPoint->getName(), ShaderStageToShaderString(SlangStageToShaderStage(entryPoint->getStage())));
 		}
 	}
 	

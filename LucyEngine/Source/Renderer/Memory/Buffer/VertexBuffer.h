@@ -7,7 +7,7 @@
 
 namespace Lucy {
 
-	class VertexBuffer : public FloatBuffer, public RenderResource {
+	class VertexBuffer : public Buffer<Vertex>, public RenderResource {
 	public:
 		virtual ~VertexBuffer() = default;
 

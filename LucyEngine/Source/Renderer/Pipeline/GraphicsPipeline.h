@@ -12,7 +12,6 @@ namespace Lucy {
 		Rasterization Rasterization;
 		DepthConfiguration DepthConfiguration;
 		BlendConfiguration BlendConfiguration;
-		VertexShaderLayout VertexShaderLayout;
 
 		RenderResourceHandle RenderPassHandle;
 		Ref<Shader> Shader;

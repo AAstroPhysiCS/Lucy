@@ -186,42 +186,11 @@ namespace Lucy {
 	}
 
 	VkVertexInputBindingDescription VulkanGraphicsPipeline::CreateBindingDescription() const {
-		const auto& bufferLayout = m_CreateInfo.VertexBufferLayout;
-		LUCY_ASSERT(bufferLayout.Stride > 0, "Vertex buffer stride cannot be zero.");
-
-		return VulkanAPI::VertexInputBindingDescription(bufferLayout.Binding, bufferLayout.Stride, bufferLayout.InputRate);
+		return Vertex::GetBindingDescription();
 	}
 
-	std::vector<VkVertexInputAttributeDescription> VulkanGraphicsPipeline::CreateAttributeDescription(uint32_t binding) {
-		const auto& bufferLayout = m_CreateInfo.VertexBufferLayout;
-		const auto& shaderLayout = m_CreateInfo.VertexShaderLayout;
-
-		std::vector<VkVertexInputAttributeDescription> vertexInputAttributeDescriptions;
-		vertexInputAttributeDescriptions.reserve(shaderLayout.size());
-
-		for (const VertexShaderLayoutElement& shaderElement : shaderLayout) {
-			const auto bufferElement = std::ranges::find(bufferLayout.Elements, shaderElement.Location, &VertexBufferLayoutElement::Location);
-
-			LUCY_ASSERT(bufferElement != bufferLayout.Elements.end(), "Vertex shader expects location {}, but the vertex buffer layout does not provide it.", shaderElement.Location);
-			LUCY_ASSERT(bufferElement->Type == shaderElement.Type, "Vertex type mismatch at location {}.", shaderElement.Location);
-			LUCY_ASSERT(bufferElement->ComponentCount == shaderElement.ElementCount, "Vertex component-count mismatch at location {}.", shaderElement.Location);
-
-			vertexInputAttributeDescriptions.emplace_back(
-				VulkanAPI::VertexInputAttributeDescription(binding, bufferElement->Location, GetVulkanTypeFromSize(bufferElement->Type, bufferElement->ComponentCount), bufferElement->Offset)
-			);
-		}
-
-		/*uint32_t offset = 0;
-
-		std::ranges::sort(m_CreateInfo.VertexShaderLayout, {}, &VertexShaderLayoutElement::Location);
-
-		for (const auto& [name, location, type, size, elementCount] : m_CreateInfo.VertexShaderLayout) {
-			VkVertexInputAttributeDescription attributeDescriptor = VulkanAPI::VertexInputAttributeDescription(binding, location, GetVulkanTypeFromSize(type, elementCount), offset);
-			offset += size * elementCount;
-
-			vertexInputAttributeDescriptions.push_back(attributeDescriptor);
-		}*/
-		return vertexInputAttributeDescriptions;
+	std::array<VkVertexInputAttributeDescription, 6> VulkanGraphicsPipeline::CreateAttributeDescription(uint32_t binding) {
+		return Vertex::GetAttributeDescriptions(binding);
 	}
 
 	void VulkanGraphicsPipeline::RTDestroyResource() {
