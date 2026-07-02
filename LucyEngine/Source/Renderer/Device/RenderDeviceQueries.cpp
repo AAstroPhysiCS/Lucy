@@ -57,18 +57,18 @@ namespace Lucy {
 	}
 
 	uint32_t VulkanRenderDeviceQuery::RTBegin(Ref<CommandPool> cmdPool) {
-		size_t frameIndex = Renderer::GetCurrentFrameIndex();
-		VkCommandBuffer commandBuffer = (VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer();
+		uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		VkCommandBuffer commandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
 
 		const auto BeginQuery = [&]() { vkCmdBeginQuery(commandBuffer, m_QueryPools[frameIndex], m_ActiveQueryIndex[frameIndex], 0); };
-		const auto BeginTimestamp = [&]() { vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_QueryPools[frameIndex], m_ActiveQueryIndex[frameIndex]); };
+		const auto BeginTimestamp = [&]() { vkCmdWriteTimestamp2(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_QueryPools[frameIndex], m_ActiveQueryIndex[frameIndex]); };
 
 		switch (GetCreateInfo().QueryType) {
 			case RenderDeviceQueryType::Timestamp:
 				BeginTimestamp();
 				break;
 			case RenderDeviceQueryType::Pipeline:
-				BeginQuery();
+				//BeginQuery(); TODO:
 				break;
 			default:
 				LUCY_ASSERT(false, "Unimplemented device query type!");
@@ -77,18 +77,18 @@ namespace Lucy {
 	}
 
 	uint32_t VulkanRenderDeviceQuery::RTEnd(Ref<CommandPool> cmdPool) {
-		size_t frameIndex = Renderer::GetCurrentFrameIndex();
-		VkCommandBuffer commandBuffer = (VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer();
+		uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		VkCommandBuffer commandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
 
 		const auto EndQuery = [&]() { vkCmdEndQuery(commandBuffer, m_QueryPools[frameIndex], m_ActiveQueryIndex[frameIndex]); };
-		const auto EndTimestamp = [&]() { vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_QueryPools[frameIndex], m_ActiveQueryIndex[frameIndex]); };
+		const auto EndTimestamp = [&]() { vkCmdWriteTimestamp2(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_QueryPools[frameIndex], m_ActiveQueryIndex[frameIndex]); };
 
 		switch (GetCreateInfo().QueryType) {
 			case RenderDeviceQueryType::Timestamp:
 				EndTimestamp();
 				break;
 			case RenderDeviceQueryType::Pipeline:
-				EndQuery();
+				//EndQuery(); TODO:
 				break;
 			default:
 				LUCY_ASSERT(false, "Unimplemented device query type!");
@@ -97,7 +97,7 @@ namespace Lucy {
 	}
 
 	void VulkanRenderDeviceQuery::ResetPoolByIndex(size_t index) {
-		size_t frameIndex = Renderer::GetCurrentFrameIndex();
+		uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 		m_ActiveQueryIndex[frameIndex] = 0;
 
 		VkDevice logicalDevice = GetCreateInfo().Device->As<VulkanRenderDevice>()->GetLogicalDevice();
@@ -105,14 +105,14 @@ namespace Lucy {
 	}
 
 	void VulkanRenderDeviceQuery::RTResetPoolByIndex(Ref<CommandPool> commandPool, size_t index) {
-		size_t frameIndex = Renderer::GetCurrentFrameIndex();
+		uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 		m_ActiveQueryIndex[frameIndex] = 0;
 
-		vkCmdResetQueryPool((VkCommandBuffer)commandPool->GetCurrentFrameCommandBuffer(), m_QueryPools[index], 0, GetCreateInfo().QueryCount);
+		vkCmdResetQueryPool((VkCommandBuffer)commandPool->GetCommandBuffer(frameIndex), m_QueryPools[index], 0, GetCreateInfo().QueryCount);
 	}
 
 	std::vector<uint64_t> VulkanRenderDeviceQuery::GetQueryResults() {
-		size_t frameIndex = Renderer::GetCurrentFrameIndex();
+		uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 		
 		uint32_t beginStageOfQuery = 0;
 		uint32_t endStageOfQuery = GetCreateInfo().QueryCount;

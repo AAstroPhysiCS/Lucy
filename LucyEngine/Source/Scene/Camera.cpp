@@ -32,7 +32,7 @@ namespace Lucy {
 		CameraViewProjection mvp;
 		mvp.View = m_ViewMatrix;
 		mvp.Proj = m_Projection;
-		mvp.CamPos = glm::vec4(m_Position, 1.0f) * glm::vec4(-1.0f, 1.0f, -1.0f, 1.0f);
+		mvp.CamPos = glm::vec4(m_Position, 1.0f);
 
 		return mvp;
 	}

@@ -121,6 +121,7 @@ namespace Lucy {
 		VulkanExternalFuncLinkage::vkCmdBeginDebugUtilsLabelEXT = (PFN_vkCmdBeginDebugUtilsLabelEXT)(vkGetInstanceProcAddr(m_Instance, "vkCmdBeginDebugUtilsLabelEXT"));
 		VulkanExternalFuncLinkage::vkCmdEndDebugUtilsLabelEXT = (PFN_vkCmdEndDebugUtilsLabelEXT)(vkGetInstanceProcAddr(m_Instance, "vkCmdEndDebugUtilsLabelEXT"));
 		VulkanExternalFuncLinkage::vkCmdInsertDebugUtilsLabelEXT = (PFN_vkCmdInsertDebugUtilsLabelEXT)(vkGetInstanceProcAddr(m_Instance, "vkCmdInsertDebugUtilsLabelEXT"));
+		VulkanExternalFuncLinkage::vkSetDebugUtilsObjectNameEXT = (PFN_vkSetDebugUtilsObjectNameEXT)(vkGetInstanceProcAddr(m_Instance, "vkSetDebugUtilsObjectNameEXT"));
 	}
 
 	void VulkanContext::DestroyDebugCallbacks() {
@@ -134,16 +135,85 @@ namespace Lucy {
 		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 		void* pUserData) {
 
-		if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-			LUCY_WARN(std::format("Vulkan validation warning {0}", pCallbackData->pMessage));
-		} else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-			LUCY_CRITICAL(std::format("Vulkan validation error {0}\n", pCallbackData->pMessage));
-		} else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
-			LUCY_INFO(std::format("Vulkan validation verbose {0}", pCallbackData->pMessage));
-		} else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
-			LUCY_INFO(std::format("Vulkan validation info {0}", pCallbackData->pMessage));
+		const auto SeverityToString = [](VkDebugUtilsMessageSeverityFlagBitsEXT severity) -> std::string_view {
+			if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)   return "Error";
+			if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) return "Warning";
+			if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)    return "Info";
+			if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) return "Verbose";
+			return "Unknown";
+		};
+
+		const auto ObjectTypeToString = [](VkObjectType type) -> const char* {
+			switch (type) {
+				case VK_OBJECT_TYPE_BUFFER: return "Buffer";
+				case VK_OBJECT_TYPE_IMAGE: return "Image";
+				case VK_OBJECT_TYPE_IMAGE_VIEW: return "ImageView";
+				case VK_OBJECT_TYPE_SAMPLER: return "Sampler";
+				case VK_OBJECT_TYPE_DESCRIPTOR_SET: return "DescriptorSet";
+				case VK_OBJECT_TYPE_PIPELINE: return "Pipeline";
+				case VK_OBJECT_TYPE_RENDER_PASS: return "RenderPass";
+				case VK_OBJECT_TYPE_FRAMEBUFFER: return "Framebuffer";
+				case VK_OBJECT_TYPE_COMMAND_BUFFER: return "CommandBuffer";
+				case VK_OBJECT_TYPE_COMMAND_POOL: return "CommandPool";
+				case VK_OBJECT_TYPE_QUEUE: return "Queue";
+				case VK_OBJECT_TYPE_DEVICE: return "Device";
+				case VK_OBJECT_TYPE_INSTANCE: return "Instance";
+				case VK_OBJECT_TYPE_SWAPCHAIN_KHR: return "SwapchainKHR";
+				default: return "Unknown";
+			}
+		};
+
+		const auto MessageTypeToString = [](VkDebugUtilsMessageTypeFlagsEXT type) -> std::string {
+			std::string result = "Unknown";
+
+			if (type & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT)
+				result += "General|";
+			if (type & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT)
+				result += "Validation|";
+			if (type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)
+				result += "Performance|";
+
+#ifdef VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT
+			if (type & VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT)
+				result += "DeviceAddressBinding|";
+#endif
+
+			if (!result.empty())
+				result.pop_back();
+
+			return result;
+		};
+
+		std::string message;
+		message += std::format("[Vulkan {0}] [{1}]\nMessage: {2}\n", SeverityToString(messageSeverity), MessageTypeToString(messageType), pCallbackData ? pCallbackData->pMessage : "<null>");
+		
+		if (!pCallbackData)
+			return VK_FALSE;
+
+		message += "\tQueue Labels:\n";
+		for (uint32_t i = 0; i < pCallbackData->queueLabelCount; ++i) {
+			const VkDebugUtilsLabelEXT& label = pCallbackData->pQueueLabels[i];
+			message += std::format("\t\t  - {}\n", label.pLabelName);
+		}
+
+		message += "\tCommand Buffer Labels:\n";
+		for (uint32_t i = 0; i < pCallbackData->cmdBufLabelCount; ++i) {
+			const VkDebugUtilsLabelEXT& label = pCallbackData->pCmdBufLabels[i];
+			message += std::format("\t\t  - {}\n", label.pLabelName);
+		}
+
+		message += "\tObjects:\n";
+		for (uint32_t i = 0; i < pCallbackData->objectCount; ++i) {
+			const VkDebugUtilsObjectNameInfoEXT& object = pCallbackData->pObjects[i];
+			message += std::format("\t\t  - {} | Handle: {} | Name: {}\n", ObjectTypeToString(object.objectType), static_cast<uint64_t>(object.objectHandle), object.pObjectName == nullptr ? "<null>" : object.pObjectName);
+		}
+
+		if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+			LUCY_CRITICAL(message);
+		} else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+			LUCY_WARN(message);
 		} else {
-			LUCY_INFO(std::format("Unknown vulkan validation {0}", pCallbackData->pMessage));
+			LUCY_INFO(message);
 		}
 
 		return VK_FALSE;

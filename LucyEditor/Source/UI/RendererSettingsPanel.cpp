@@ -2,6 +2,7 @@
 
 #include "RendererSettingsPanel.h"
 #include "Renderer/Renderer.h"
+#include "Renderer/RendererPasses.h"
 
 #include "imgui.h"
 
@@ -16,7 +17,10 @@ namespace Lucy {
 		static bool pOpen = false;
 		ImGui::Begin("Renderer Settings", &pOpen, ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoCollapse);
 
-		const auto& shaders = Renderer::GetAllShaders();
+		auto& settings = Renderer::GetRendererSettings();
+		ImGui::SliderFloat("Environment LOD", &settings.EnvironmentLOD, 0.0f, PrefilterPass::MAX_MIP_LEVELS);
+
+		const auto& shaders = Renderer::GetShaderLibrary();
 		for (const auto& name : shaders | std::views::keys) {
 			const char* nameCStr = name.c_str();
 			ImGui::PushID(nameCStr);

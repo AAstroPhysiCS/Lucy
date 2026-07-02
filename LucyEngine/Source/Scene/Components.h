@@ -101,12 +101,14 @@ namespace Lucy {
 		
 		bool IsPrimary = false;
 
-		inline bool IsValid() const { return Renderer::IsValidRenderResource(m_CubemapImageHandle); /* && m_CubemapImage->GetWidth() > 0 && m_CubemapImage->GetHeight() > 0*/ }
+		inline bool IsValid() const { return true; }
+		inline const std::filesystem::path& GetPath() const { return m_Path; }
+
 		inline Ref<Image> GetIrradianceImage() const { return Renderer::AccessResource<Image>(m_IrradianceImageHandle); }
-		inline Ref<Image> GetCubemapImage() const { return Renderer::AccessResource<Image>(m_CubemapImageHandle); }
-		inline void Destroy() { Renderer::EnqueueResourceDestroy(m_CubemapImageHandle); }
 	private:
-		RenderResourceHandle m_CubemapImageHandle = InvalidRenderResourceHandle;
+		std::filesystem::path m_Path;
+
+		RenderResourceHandle m_OriginalImageHandle = InvalidRenderResourceHandle;
 		RenderResourceHandle m_IrradianceImageHandle = InvalidRenderResourceHandle;
 	};
 }

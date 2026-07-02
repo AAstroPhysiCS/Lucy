@@ -29,13 +29,13 @@ namespace Lucy {
 		return statistics;
 	}
 
-	void PipelineManager::RTRecreateAllPipelinesDependentOnShader(const Ref<Shader>& shader) {
+	void PipelineManager::RTRecreateAllPipelinesDependentOnShader(const std::string_view& shaderName) {
 		const auto RecreateAllPipelines = [&]<typename TPipeline>() {
 			for (auto handle : (std::same_as<TPipeline, GraphicsPipeline>
 				? m_GraphicsPipelines : m_ComputePipelines)
 				| std::views::values) {
 				const auto& pipeline = m_RenderDevice->AccessResource<TPipeline>(handle);
-				if (pipeline->GetShader() == shader)
+				if (pipeline->GetShader()->GetName() == shaderName)
 					pipeline->RTRecreate();
 			}
 		};

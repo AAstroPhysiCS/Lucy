@@ -1,6 +1,10 @@
 #pragma once
 
+#include <map>
+
 #include "RenderCommandList.h"
+
+#include "Renderer/ExecutionBatch.h"
 
 namespace Lucy {
 
@@ -9,55 +13,65 @@ namespace Lucy {
 	using RenderCommandFunc = std::function<void(Ref<RenderDevice>&)>;
 	using RenderSubmitFunc = std::function<void(RenderCommandList&)>;
 
+	struct RenderSubmitInfo {
+		ExecutionBatch Batch;
+		std::vector<RenderSubmitFunc> SubmitFuncs;
+	};
+
 	struct RenderCommandQueueCreateInfo {
-		//TODO: Expand this further and implement multithreaded command buffer submissions.
-		size_t CommandListParallelCount = 1; // if 1, then the submission is being only done in the main thread.
 		Ref<RenderDevice> RenderDevice = nullptr;
-		TargetQueueFamily TargetQueueFamily;
+		size_t MaxFramesInFlight = 0;
 	};
 
 	struct RenderCommandQueueMetricsOutput final {
-		double RenderTime;
-		std::unordered_map<std::string, double> RenderTimeOfPasses;
+		double Time;
+		std::unordered_map<std::string, double> TimeOfPasses;
 	};
 
-	class RenderCommandQueue final {
+	struct ExecutionBatch;
+
+	using RenderSubmitQueue = std::map<ExecutionBatchID, RenderSubmitInfo>;
+
+	class RenderCommandQueue {	
 	public:
 		RenderCommandQueue(const RenderCommandQueueCreateInfo& createInfo);
-		~RenderCommandQueue() = default;
+		virtual ~RenderCommandQueue() = default;
 
 		RenderCommandQueue(const RenderCommandQueue& other) = delete;
 		RenderCommandQueue(RenderCommandQueue&& other) noexcept = delete;
 		RenderCommandQueue& operator=(const RenderCommandQueue& other) = delete;
 		RenderCommandQueue& operator=(RenderCommandQueue&& other) noexcept = delete;
 
-		inline void operator+=(RenderCommandFunc&& func) { 
-			std::unique_lock lock(s_Mutex);
-			m_RenderCommandQueue.emplace_back(std::move(func)); 
-		}
-		inline void operator+=(RenderSubmitFunc&& func) { 
-			std::unique_lock lock(s_Mutex);
-			m_RenderSubmitQueue.emplace_back(std::move(func)); 
+		void operator+=(RenderCommandFunc&& func);
+		void operator+=(RenderSubmitInfo&& info);
+
+		std::vector<RenderCommandList>& GetCommandLists(TargetQueueFamily family);
+		inline const std::vector<RenderCommandList>& GetCommandLists(TargetQueueFamily family) const {
+			return const_cast<std::vector<RenderCommandList>&>(std::as_const(*this).GetCommandLists(family));
 		}
 
-		inline bool IsEmpty() const { return m_RenderSubmitQueue.empty(); }
+		inline RenderSubmitQueue& GetRenderSubmitQueue() { return m_RenderSubmitQueue; }
+		inline const RenderSubmitQueue& GetRenderSubmitQueue() const { return m_RenderSubmitQueue; }
 
-		inline const std::vector<RenderCommandList>& GetCommandLists() const { return m_CommandLists; }
+		RenderCommandList& GetNextAvailableCommandList(uint32_t frameIndex, TargetQueueFamily family);
+		
+		void AllocateCommandLists(const RenderSubmitQueue& submitQueue);
+		void ResetFrameSlotRecordersIfCompleted(uint32_t frameIndex, TargetQueueFamily family);
 
 		void Init();
+		void RecreateForQueue(TargetQueueFamily family);
 		void Recreate();
 		void FlushCommandQueue();
-		void FlushSubmitQueue(RenderCommandQueueMetricsOutput& output);
 		void Clear();
-		void Free();
+		void Destroy();
 	private:
 		RenderCommandQueueCreateInfo m_CreateInfo;
 		uint64_t m_BeginTimestampIndex = 0uLL, m_EndTimestampIndex = 0uLL;
 
-		std::vector<RenderCommandList> m_CommandLists;
+		std::map<TargetQueueFamily, std::vector<RenderCommandList>> m_CommandLists;
 
 		std::vector<RenderCommandFunc> m_RenderCommandQueue;
-		std::vector<RenderSubmitFunc> m_RenderSubmitQueue;
+		RenderSubmitQueue m_RenderSubmitQueue;
 
 		inline static std::mutex s_Mutex;
 	};

@@ -134,15 +134,15 @@ namespace Lucy {
 		return InvalidRenderResourceHandle;
 	}
 
-	RenderResourceHandle RenderDevice::CreateImage(const ImageCreateInfo& createInfo) {
+	RenderResourceHandle RenderDevice::CreateImage(const ImageCreateInfo& createInfo, std::string_view debugName) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				if (createInfo.ImageType == ImageType::TypeCube) {
-					auto resource = Memory::CreateRef<VulkanImageCube>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
+					auto resource = Memory::CreateRef<VulkanImageCube>(createInfo, shared_from_this()->As<VulkanRenderDevice>(), debugName);
 					auto handle = m_ResourceManager.PushResource(resource);
 					return handle;
 				}
-				auto resource = Memory::CreateRef<VulkanImage2D>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
+				auto resource = Memory::CreateRef<VulkanImage2D>(createInfo, shared_from_this()->As<VulkanRenderDevice>(), debugName);
 				auto handle = m_ResourceManager.PushResource(resource);
 				return handle;
 			}
@@ -152,15 +152,15 @@ namespace Lucy {
 		return InvalidRenderResourceHandle;
 	}
 
-	RenderResourceHandle RenderDevice::CreateImage(const std::filesystem::path& path, ImageCreateInfo& createInfo) {
+	RenderResourceHandle RenderDevice::CreateImage(const std::filesystem::path& path, ImageCreateInfo& createInfo, std::string_view debugName) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				if (createInfo.ImageType == ImageType::TypeCube) {
-					auto resource = Memory::CreateRef<VulkanImageCube>(path, createInfo, shared_from_this()->As<VulkanRenderDevice>());
+					auto resource = Memory::CreateRef<VulkanImageCube>(path, createInfo, shared_from_this()->As<VulkanRenderDevice>(), debugName);
 					auto handle = m_ResourceManager.PushResource(resource);
 					return handle;
 				}
-				auto resource = Memory::CreateRef<VulkanImage2D>(path, createInfo, shared_from_this()->As<VulkanRenderDevice>());
+				auto resource = Memory::CreateRef<VulkanImage2D>(path, createInfo, shared_from_this()->As<VulkanRenderDevice>(), debugName);
 				auto handle = m_ResourceManager.PushResource(resource);
 				return handle;
 			}
@@ -182,7 +182,7 @@ namespace Lucy {
 		}
 		return InvalidRenderResourceHandle;
 	}
-
+	
 	RenderResourceHandle RenderDevice::CreateFrameBuffer(const FrameBufferCreateInfo& createInfo) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {

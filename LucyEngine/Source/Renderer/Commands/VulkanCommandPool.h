@@ -11,10 +11,13 @@ namespace Lucy {
 		VulkanCommandPool(const CommandPoolCreateInfo& createInfo);
 		virtual ~VulkanCommandPool() = default;
 
-		inline void* GetCurrentFrameCommandBuffer() { return m_CommandBuffers[Renderer::GetCurrentFrameIndex()]; }
+		inline void* GetCommandBuffer(uint32_t frameIndex) final override { return m_CommandBuffers.at(frameIndex); }
+		inline const std::vector<VkCommandBuffer>& GetCommandBuffers() { return m_CommandBuffers; }
 
 		void Destroy();
+		void Reset() final override;
 		void Recreate() final override;
+		void ResetCommandBuffer(uint32_t frameIndex) final override;
 	protected:
 		void FreeCommandBuffers(uint32_t commandBufferCount, size_t commandBufferStartIndex);
 

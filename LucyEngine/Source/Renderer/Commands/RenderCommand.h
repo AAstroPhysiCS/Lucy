@@ -11,7 +11,9 @@ namespace Lucy {
 	class Shader;
 	class CommandPool;
 
-	class VulkanPushConstant;
+	class PipelineConstant;
+
+	struct ImageMemoryBarrierCreateInfo;
 
 	class Image;
 
@@ -43,7 +45,8 @@ namespace Lucy {
 		void SetStencilTestEnable(bool stencilTestEnable);
 #pragma endregion DepthConfiguration
 #pragma region Image
-		void SetImageLayout(Ref<Image> image, uint32_t newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount);
+		//void SetImageLayout(Ref<Image> image, uint32_t newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount);
+		//void SetImageLayoutImmediate(Ref<Image> image, uint32_t newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount);
 
 		void CopyImageToImage(Ref<Image> srcImage, Ref<Image> destImage, const std::vector<VkImageCopy>& regions);
 
@@ -54,7 +57,7 @@ namespace Lucy {
 		void BindBuffers(Ref<Mesh> mesh);
 		void BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer);
 		
-		void BindPushConstant(const VulkanPushConstant& pushConstant);
+		void BindPushConstant(const PipelineConstant& pushConstant);
 		
 		void BindPipeline(const Ref<GraphicsPipeline>& pipeline);
 		void BindPipeline(const Ref<ComputePipeline>& pipeline);
@@ -99,7 +102,7 @@ namespace Lucy {
 		ClearColor m_DynamicClearColor;
 		DepthConfiguration m_DynamicDepthConfig;
 
-		uint32_t m_BeginTimestampIndex, m_EndTimestampIndex;
+		uint32_t m_BeginTimestampIndex = 0, m_EndTimestampIndex = 0;
 
 		friend class RenderCommandList;
 	};

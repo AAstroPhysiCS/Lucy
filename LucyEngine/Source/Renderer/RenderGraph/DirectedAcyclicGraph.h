@@ -53,6 +53,8 @@ namespace Lucy {
 			return nodeIt != m_Nodes.end() ? (*nodeIt).Pass : nullptr;
 		}
 
+		inline size_t Size() const { return m_Nodes.size(); }
+
 		void Build();
 	private:
 		struct Node {
@@ -89,12 +91,18 @@ namespace Lucy {
 
 		inline ConstIterator begin() const { return m_Nodes.cbegin(); }
 		inline ConstIterator end() const { return m_Nodes.cend(); }
-	private:
+
 		inline Iterator FindPass(TRenderGraphPass* pass) {
 			return std::ranges::find_if(m_Nodes, [&pass](const Node& n) {
 				return n.Pass == pass;
 			});
 		}
+
+		inline const Node& operator[](ConstIterator it) const {
+			LUCY_ASSERT(it != m_Nodes.end(), "Iterator is out of bounds!");
+			return *it;
+		}
+	private:
 
 		inline Iterator FindResource(const TRenderGraphResource& resource) {
 			return std::ranges::find_if(m_Nodes, [&resource](const Node& n) {

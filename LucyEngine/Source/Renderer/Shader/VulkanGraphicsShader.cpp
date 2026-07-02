@@ -6,12 +6,13 @@
 
 namespace Lucy {
 
-	VulkanGraphicsShader::VulkanGraphicsShader(const std::string& name, const std::filesystem::path& path, Ref<RenderDevice> device)
+	VulkanGraphicsShader::VulkanGraphicsShader(const std::string& name, const std::filesystem::path& path, Ref<RenderDevice> device, 
+		const std::span<const uint32_t>& dataVertex, const std::span<const uint32_t>& dataFragment)
 		: GraphicsShader(name, path) {
-		RTLoad(device);
+		RTLoad(device, { dataVertex, dataFragment });
 	}
 
-	void VulkanGraphicsShader::LoadInternal(const Ref<RenderDevice>& device, const std::vector<uint32_t>& dataVertex, const std::vector<uint32_t>& dataFragment) {
+	void VulkanGraphicsShader::LoadInternal(const Ref<RenderDevice>& device, const std::span<const uint32_t>& dataVertex, const std::span<const uint32_t>& dataFragment) {
 		VkShaderModuleCreateInfo vertexCreateInfo = VulkanAPI::ShaderModuleCreateInfo(dataVertex.size() * sizeof(uint32_t), dataVertex.data());
 		VkShaderModuleCreateInfo fragmentCreateInfo = VulkanAPI::ShaderModuleCreateInfo(dataFragment.size() * sizeof(uint32_t), dataFragment.data());
 

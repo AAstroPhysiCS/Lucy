@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Renderer/Device/RenderResource.h"
+#include "Pipeline.h"
 #include "Renderer/Shader/Shader.h"
 
 #include "PipelineConfigurations.h"
@@ -41,13 +41,10 @@ namespace Lucy {
 		}
 	};
 
-
-	class GraphicsPipeline : public RenderResource {
+	class GraphicsPipeline : public Pipeline {
 	public:
 		GraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo);
 		virtual ~GraphicsPipeline() = default;
-
-		inline const Ref<Shader>& GetShader() const { return m_CreateInfo.Shader; }
 
 		inline Topology GetTopology() const { return m_CreateInfo.Topology; }
 		inline Rasterization GetRasterization() const { return m_CreateInfo.Rasterization; }
@@ -59,8 +56,6 @@ namespace Lucy {
 		virtual void RTRecreate() = 0;
 		void Unbind(GraphicsPipelineStatistics&& statistics);
 	protected:
-		static uint32_t CalculateStride(const VertexShaderLayout& vertexLayout);
-
 		GraphicsPipelineCreateInfo m_CreateInfo;
 		GraphicsPipelineStatistics m_Statistics;
 	};

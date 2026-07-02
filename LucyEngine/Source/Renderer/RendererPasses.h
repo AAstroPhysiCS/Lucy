@@ -31,8 +31,8 @@ namespace Lucy {
 
 		inline float GetCascadeSplitDepth() const { return m_CascadeSplitDepth; }
 
-		inline static constexpr float GetNearPlaneFactor() { return s_NearPlaneFactor; }
-		inline static constexpr float GetFarPlaneFactor() { return s_FarPlaneFactor; }
+		inline static constexpr const float GetNearPlaneFactor() { return s_NearPlaneFactor; }
+		inline static constexpr const float GetFarPlaneFactor() { return s_FarPlaneFactor; }
 
 		static void ResetSplit();
 	private:
@@ -44,8 +44,8 @@ namespace Lucy {
 
 		inline static float s_LastSplitDist = 0.0f;
 
-		inline static constexpr float s_NearPlaneFactor = 1.0f;
-		inline static constexpr float s_FarPlaneFactor = 1.0f;
+		inline static constexpr const float s_NearPlaneFactor = 1.0f;
+		inline static constexpr const float s_FarPlaneFactor = 1.0f;
 	};
 
 	struct ShadowPass final {
@@ -77,14 +77,11 @@ namespace Lucy {
 
 		//the resolution of the hdr image. its an arbitrary number (increase it, if necessary)
 #if USE_INTEGRATED_GRAPHICS && USE_COMPUTE_FOR_CUBEMAP_GEN
-		static inline constexpr const uint32_t HDRImageWidth = 256;
-		static inline constexpr const uint32_t HDRImageHeight = 256;
+		static inline constexpr const uint32_t HDRImageSize = 256;
 #elif USE_INTEGRATED_GRAPHICS
-		static inline constexpr const uint32_t HDRImageWidth = 128;
-		static inline constexpr const uint32_t HDRImageHeight = 128;
+		static inline constexpr const uint32_t HDRImageSize = 128;
 #else
-		static inline constexpr const uint32_t HDRImageWidth = 1024;
-		static inline constexpr const uint32_t HDRImageHeight = 1024;
+		static inline constexpr const uint32_t HDRImageSize = 1024;
 #endif
 	private:
 		Ref<Scene> m_Scene;
@@ -93,7 +90,44 @@ namespace Lucy {
 	};
 #pragma endregion CubemapPass
 
-#pragma region BRDFPass
-	//TODO:
-#pragma endregion BRDFPass
+#pragma region IrradiancePass
+
+	struct IrradiancePass final {
+		IrradiancePass(Ref<Scene> scene, uint32_t size);
+		~IrradiancePass() = default;
+		
+		void AddPass(const Ref<RenderGraph>& renderGraph);
+	private:
+		Ref<Scene> m_Scene;
+		uint32_t m_Size = 0;
+	};
+#pragma endregion IrradiancePass
+
+#pragma region PrefilterPass
+	
+	struct PrefilterPass final {
+		static constexpr inline uint32_t MAX_MIP_LEVELS = 5;
+
+		PrefilterPass(Ref<Scene> scene, uint32_t size);
+		~PrefilterPass() = default;
+		
+		void AddPass(const Ref<RenderGraph>& renderGraph);
+	private:
+		Ref<Scene> m_Scene;
+		uint32_t m_CubemapSize = 0;
+	};
+#pragma endregion PrefilterPass
+
+#pragma region BRDFLutPass
+
+	struct BRDFLutPass final {
+		BRDFLutPass(uint32_t size);
+		~BRDFLutPass() = default;
+
+		void AddPass(const Ref<RenderGraph>& renderGraph);
+	private:
+		Ref<Scene> m_Scene;
+		uint32_t m_Size = 0;
+	};
+#pragma endregion BRDFLutPass
 }

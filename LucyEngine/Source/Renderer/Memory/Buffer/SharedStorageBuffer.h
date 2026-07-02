@@ -14,7 +14,7 @@ namespace Lucy {
 		uint32_t Binding = 0;
 		uint32_t BufferSize = 0;
 		uint32_t ArraySize = 0; //default is 0, which means no array
-		DescriptorType Type = DescriptorType::Undefined;
+		DescriptorType Type = UndefinedDescriptorType;
 		std::vector<ShaderMemberVariable> ShaderMemberVariables;
 	};
 

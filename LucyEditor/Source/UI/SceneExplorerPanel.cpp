@@ -17,7 +17,7 @@ namespace Lucy {
 
 			if (e == MouseCode::Button0) {
 				Entity entity{};
-				EventHandler::DispatchImmediateEvent<EntityPickedEvent>(entity, m_Scene.get(), viewportPanel.GetViewportMouseX(), viewportPanel.GetViewportMouseY());
+				EventHandler::Submit<EntityPickedEvent>(entity, m_Scene.get(), viewportPanel.GetViewportMouseX(), viewportPanel.GetViewportMouseY());
 				SetEntityContext(entity);
 			}
 		});

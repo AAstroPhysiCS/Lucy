@@ -18,52 +18,30 @@ namespace Lucy {
 	}
 
 	void HDRCubemapComponent::LoadCubemap(const std::filesystem::path& path) {
-		Renderer::EnqueueToRenderCommandQueue([&, path](const Ref<RenderDevice>& device) {
-			ImageCreateInfo hdrCreateInfo = {
-				.Width = CubemapPass::HDRImageWidth,
-				.Height = CubemapPass::HDRImageHeight,
-				.ImageType = ImageType::TypeCube,
-				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
-				.Format = ImageFormat::R32G32B32A32_SFLOAT,
-				.Parameter = {
-					.U = ImageAddressMode::REPEAT,
-					.V = ImageAddressMode::REPEAT,
-					.W = ImageAddressMode::REPEAT,
-					.Min = ImageFilterMode::LINEAR,
-					.Mag = ImageFilterMode::LINEAR,
-				},
-				.GenerateSampler = true,
-				.GenerateMipmap = false //does not support it yet
-			};
+		m_Path = path;
 
+		Renderer::EnqueueToRenderCommandQueue([&, path](const Ref<RenderDevice>& device) {
 			ImageCreateInfo irradianceImageCreateInfo = {
-				.Width = CubemapPass::HDRImageWidth,
-				.Height = CubemapPass::HDRImageHeight,
+				.Width = CubemapPass::HDRImageSize,
+				.Height = CubemapPass::HDRImageSize,
 				.ImageType = ImageType::TypeCube,
-#if USE_COMPUTE_FOR_CUBEMAP_GEN
 				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
-#else
-				.ImageUsage = ImageUsage::AsColorAttachment,
-#endif
 				.Format = ImageFormat::R16G16B16A16_SFLOAT,
 				.GenerateSampler = true,
-				.GenerateMipmap = false,
+				.GenerateMipmap = MipmapCreateInfo::NoMipmap(),
 				.ImGuiUsage = false
 			};
 
 			ImageCreateInfo originalImageCreateInfo{
 				.ImageType = ImageType::Type2D,
 				.ImageUsage = ImageUsage::AsColorTransferAttachment,
-				.Format = hdrCreateInfo.Format,
-				.Parameter = hdrCreateInfo.Parameter,
+				.Format = ImageFormat::R32G32B32A32_SFLOAT,
 				.GenerateSampler = true
 			};
 
-			auto originalImageHandle = device->CreateImage(path, originalImageCreateInfo);
-			m_CubemapImageHandle = device->CreateImage(path, hdrCreateInfo);
+			m_OriginalImageHandle = device->CreateImage(path, originalImageCreateInfo);
 
-			Renderer::ImportExternalRenderGraphTransientResource(RGResource(OriginalHDRImage), originalImageHandle);
-			Renderer::ImportExternalRenderGraphResource(RGResource(HDRCubeImage), m_CubemapImageHandle);
+			Renderer::ImportExternalRenderGraphTransientResource(RGResource(OriginalHDRImage), m_OriginalImageHandle);
 #if USE_COMPUTE_FOR_CUBEMAP_GEN
 			m_IrradianceImageHandle = device->CreateImage(irradianceImageCreateInfo);
 			Renderer::ImportExternalRenderGraphResource(RGResource(IrradianceImage), m_IrradianceImageHandle);

@@ -17,6 +17,8 @@ namespace Lucy {
 		inline RenderResourceHandle PushResource(const TResource& r) {
 			static UniformRandom<uint64_t> randomGen;
 
+			r->As<RenderResource>()->SetInitialized(true);
+
 			RenderResourceHandle handle = randomGen.NextValue();
 			m_Resources.emplace(handle, std::move(r));
 			return handle;

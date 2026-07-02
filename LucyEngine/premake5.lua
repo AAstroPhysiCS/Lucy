@@ -35,7 +35,6 @@ project "LucyEngine"
         "ImGui",
         "glm",
         
-        "%{LibraryPath.assimp}/assimp.lib",
         "%{LibraryPath.nativefiledialog}/nfd.lib"
     }
 
@@ -56,15 +55,12 @@ project "LucyEngine"
         runtime "Debug"
 
         links {
+            "%{LibraryPath.assimp}/assimp-vc143-mtd.lib",
+
             "%{LibraryPath.VulkanLib}/vulkan-1.lib",
 
             "%{LibraryPath.SlangDebug}",
             "%{LibraryPath.SlangDebugRT}",
-
-            "%{LibraryPath.ShaderCDebug}",
-            "%{LibraryPath.SPIRVDebug}",
-            "%{LibraryPath.SPIRVGLSLDebug}",
-            "%{LibraryPath.SPIRVTools}"
         }
 
     filter "configurations:Release"
@@ -77,12 +73,10 @@ project "LucyEngine"
         runtime "Release"
 
         links {
+            "%{LibraryPath.assimp}/assimp-vc143-mt.lib",
+
             "%{LibraryPath.VulkanLib}/vulkan-1.lib",
 
             "%{LibraryPath.SlangRelease}",
             "%{LibraryPath.SlangReleaseRT}",
-
-            "%{LibraryPath.ShaderCRelease}",
-            "%{LibraryPath.SPIRVRelease}",
-            "%{LibraryPath.SPIRVGLSLRelease}"
         }

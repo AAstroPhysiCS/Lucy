@@ -1,12 +1,13 @@
 #include "lypch.h"
 #include "VulkanRenderer.h"
 
-#include "Renderer/Synchronization/VulkanSyncItems.h"
+#include "ExecutionBatch.h"
 
 #include "Context/VulkanSwapChain.h"
 #include "Context/VulkanContext.h"
 
 #include "Device/VulkanRenderDevice.h"
+#include "RenderGraph/RenderGraphCompiler.h"
 
 #include "Memory/Buffer/Buffer.h"
 #include "Commands/VulkanCommandPool.h"
@@ -32,27 +33,35 @@ namespace Lucy {
 		m_SwapChain->Init();
 
 		m_RenderCommandQueue->Init();
-		m_RenderComputeCommandQueue->Init();
 
-		m_WaitSemaphores.reserve(m_MaxFramesInFlight);
-		m_SignalSemaphores.reserve(m_MaxFramesInFlight);
+		const size_t swapImageCount = m_SwapChain->As<VulkanSwapChain>()->GetSwapChainImageCount();
+
 		m_InFlightFences.reserve(m_MaxFramesInFlight);
+		m_ImageAvailableSemaphores.reserve(m_MaxFramesInFlight);
+		m_SceneFinishedSemaphores.reserve(m_MaxFramesInFlight);
 
-		m_WaitSemaphoresCompute.reserve(m_MaxFramesInFlight);
-		m_SignalSemaphoresCompute.reserve(m_MaxFramesInFlight);
-		m_InFlightFencesCompute.reserve(m_MaxFramesInFlight);
+		m_RenderFinishedSemaphores.reserve(swapImageCount);
+
+		m_BridgeSemaphores.resize(m_MaxFramesInFlight);
+		m_FrameFenceValues.resize(m_MaxFramesInFlight, 0);
 
 		for (size_t i = 0; i < m_MaxFramesInFlight; i++) {
-			m_WaitSemaphores.emplace_back(vulkanDevice);
-			m_SignalSemaphores.emplace_back(vulkanDevice);
-			m_InFlightFences.emplace_back(vulkanDevice);
+			m_InFlightFences.emplace_back(SemaphoreType::Timeline, m_RenderDevice);
+			m_ImageAvailableSemaphores.emplace_back(SemaphoreType::Binary, m_RenderDevice);
+			m_SceneFinishedSemaphores.emplace_back(SemaphoreType::Binary, m_RenderDevice);
+		}
 
-			m_WaitSemaphoresCompute.emplace_back(vulkanDevice);
-			m_SignalSemaphoresCompute.emplace_back(vulkanDevice);
-			m_InFlightFencesCompute.emplace_back(vulkanDevice);
+		for (size_t i = 0; i < swapImageCount; i++) {
+			m_RenderFinishedSemaphores.emplace_back(SemaphoreType::Binary, m_RenderDevice);
 		}
 
 		m_TransientCommandPool = Memory::CreateRef<VulkanTransientCommandPool>(vulkanDevice);
+
+		//for imgui
+		m_ImGuiRenderCommandList = Memory::CreateUnique<RenderCommandList>(RenderCommandListCreateInfo{
+			.RenderDevice = m_RenderDevice,
+			.TargetQueueFamily = TargetQueueFamily::Graphics
+		});
 	}
 
 	void VulkanRenderer::BeginFrame() {
@@ -62,66 +71,93 @@ namespace Lucy {
 		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
 		VkDevice deviceVulkanHandle = renderDevice->GetLogicalDevice();
 
-		vkWaitForFences(deviceVulkanHandle, 1, &m_InFlightFences[m_CurrentFrameIndex].GetFence(), VK_TRUE, UINT64_MAX);
-		vkResetFences(deviceVulkanHandle, 1, &m_InFlightFences[m_CurrentFrameIndex].GetFence());
+		{
+			LUCY_PROFILE_NEW_EVENT("VulkanRenderer::BeginFrame::TimelineWait");
 
-		if (!m_RenderComputeCommandQueue->IsEmpty()) {
-			vkWaitForFences(deviceVulkanHandle, 1, &m_InFlightFencesCompute[m_CurrentFrameIndex].GetFence(), VK_TRUE, UINT64_MAX);
-			vkResetFences(deviceVulkanHandle, 1, &m_InFlightFencesCompute[m_CurrentFrameIndex].GetFence());
+			const uint64_t frameValue = m_FrameFenceValues[m_CurrentFrameIndex];
+			m_InFlightFences[m_CurrentFrameIndex].Wait(frameValue);
+
+			m_RenderCommandQueue->ResetFrameSlotRecordersIfCompleted(m_CurrentFrameIndex, TargetQueueFamily::Graphics);
+			m_RenderCommandQueue->ResetFrameSlotRecordersIfCompleted(m_CurrentFrameIndex, TargetQueueFamily::Compute);
+			m_RenderCommandQueue->ResetFrameSlotRecordersIfCompleted(m_CurrentFrameIndex, TargetQueueFamily::Transfer);
+
+			m_ImGuiRenderCommandList->ResetRenderCommand(m_CurrentFrameIndex);
 		}
 
-		m_UseComputeSemaphore = false;
-
 		const auto& swapChain = GetSwapChain()->As<VulkanSwapChain>();
-		m_LastSwapChainResult = swapChain->AcquireNextImage(m_WaitSemaphores[m_CurrentFrameIndex], m_ImageIndex);
+		m_LastSwapChainResult = swapChain->AcquireNextImage(m_ImageAvailableSemaphores[m_CurrentFrameIndex], m_ImageIndex);
 		if (m_LastSwapChainResult == ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == SUBOPTIMAL_KHR || m_LastSwapChainResult == NOT_READY)
 			return;
 	}
-	
+
 	void VulkanRenderer::RenderFrame() {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::RenderFrame");
 		using enum RenderContextResultCodes;
+
 		if (m_LastSwapChainResult == ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == SUBOPTIMAL_KHR || m_LastSwapChainResult == NOT_READY)
 			return;
 
-		Fence& currentFrameFence = m_InFlightFences[m_CurrentFrameIndex];
-		Semaphore& currentFrameWaitSemaphore = m_WaitSemaphores[m_CurrentFrameIndex];
-		Semaphore& currentFrameSignalSemaphore = m_SignalSemaphores[m_CurrentFrameIndex];
+		auto& submitQueue = m_RenderCommandQueue->GetRenderSubmitQueue();
+		const bool hasSceneWork = !submitQueue.empty();
 
-		Fence& currentFrameFenceCompute = m_InFlightFencesCompute[m_CurrentFrameIndex];
-		Semaphore& currentFrameWaitSemaphoreCompute = m_WaitSemaphoresCompute[m_CurrentFrameIndex];
-		Semaphore& currentFrameSignalSemaphoreCompute = m_SignalSemaphoresCompute[m_CurrentFrameIndex];
+		m_CommandQueueMetricsOutput.Time = 0.0;
 
-		const auto& graphicsCmdLists = m_RenderCommandQueue->GetCommandLists();
-		const auto& computeCmdLists = m_RenderComputeCommandQueue->GetCommandLists();
+		uint64_t signalValue = m_FrameFenceValues[m_CurrentFrameIndex] + 1;
 
-		std::vector<Ref<CommandPool>> graphicsCmdPools;
-		graphicsCmdPools.reserve(graphicsCmdLists.size());
+		const auto ExecuteVulkanBatchBarrier = [](VkCommandBuffer cmdBuffer, const VulkanBatchBarrier& barrier) {
 
-		for (const auto& cmdList : graphicsCmdLists) {
-			if (!cmdList)
-				graphicsCmdPools.emplace_back(cmdList.GetPrimaryCommandPool());
-		}
-
-		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
-		renderDevice->SubmitWorkToGPU(TargetQueueFamily::Graphics, graphicsCmdPools, &currentFrameFence, &currentFrameWaitSemaphore, &currentFrameSignalSemaphore);
-
-		if (!m_RenderComputeCommandQueue->IsEmpty()) {
-			std::vector<Ref<CommandPool>> computeCmdPools;
-			computeCmdPools.reserve(computeCmdLists.size());
-
-			for (const auto& cmdList : computeCmdLists) {
-				if (!cmdList)
-					computeCmdPools.emplace_back(cmdList.GetPrimaryCommandPool());
+			std::vector<VkImageMemoryBarrier2> imageBarriers;
+			imageBarriers.reserve(barrier.ImageBarriers.size());
+			for (const auto& barrier : barrier.ImageBarriers) {
+				imageBarriers.emplace_back(barrier.Barrier);
 			}
 
-			// Submission to GPU for compute work (work is pending)
-			if (renderDevice->SubmitWorkToGPU(TargetQueueFamily::Compute, computeCmdPools, &currentFrameFenceCompute, &currentFrameSignalSemaphore, &currentFrameSignalSemaphoreCompute)) {
-				m_UseComputeSemaphore = true; // Flag to use compute semaphore for presentation
-			} else {
-				m_UseComputeSemaphore = false; // Fall back to graphics semaphore
+			VkDependencyInfo depInfo{};
+			depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+			depInfo.imageMemoryBarrierCount = static_cast<uint32_t>(imageBarriers.size());
+			depInfo.pImageMemoryBarriers = imageBarriers.empty() ? nullptr : imageBarriers.data();
+			depInfo.bufferMemoryBarrierCount = static_cast<uint32_t>(barrier.BufferBarriers.size());
+			depInfo.pBufferMemoryBarriers = barrier.BufferBarriers.empty() ? nullptr : barrier.BufferBarriers.data();
+
+			vkCmdPipelineBarrier2(cmdBuffer, &depInfo);
+
+			for (const auto& [image, barrier] : barrier.ImageBarriers)
+				image->SetLayout(barrier.newLayout);
+		};
+
+		if (hasSceneWork) {
+			m_RenderCommandQueue->AllocateCommandLists(submitQueue);
+			LinkBatches(submitQueue, signalValue);
+
+			for (auto& [id, info] : submitQueue) {
+				auto& vkBatch = info.Batch.AsVulkanBatch();
+
+				auto& cmdList = m_RenderCommandQueue->GetNextAvailableCommandList(m_CurrentFrameIndex, vkBatch.QueueFamily);
+				const auto& primaryCommandPool = cmdList.GetPrimaryCommandPool();
+
+				m_RenderDevice->BeginCommandBuffer(primaryCommandPool);
+
+				if (!vkBatch.PreBatchBarrier.ImageBarriers.empty() || !vkBatch.PreBatchBarrier.BufferBarriers.empty()) {
+					VkCommandBuffer cmdBuffer = static_cast<VkCommandBuffer>(primaryCommandPool->GetCommandBuffer(m_CurrentFrameIndex));
+					ExecuteVulkanBatchBarrier(cmdBuffer, vkBatch.PreBatchBarrier);
+				}
+
+				for (const auto& submitFunc : info.SubmitFuncs)
+					submitFunc(cmdList);
+
+				if (!vkBatch.PostBatchBarrier.ImageBarriers.empty() || !vkBatch.PostBatchBarrier.BufferBarriers.empty()) {
+					VkCommandBuffer cmdBuffer = static_cast<VkCommandBuffer>(primaryCommandPool->GetCommandBuffer(m_CurrentFrameIndex));
+					ExecuteVulkanBatchBarrier(cmdBuffer, vkBatch.PostBatchBarrier);
+				}
+
+				m_RenderDevice->EndCommandBuffer(primaryCommandPool);
+				m_RenderDevice->SubmitWorkToGPUAsBatch(cmdList, info.Batch);
 			}
 		}
+
+		InternalImGuiPass(signalValue, hasSceneWork);
+
+		m_FrameFenceValues[m_CurrentFrameIndex] = signalValue;
 	}
 
 	void VulkanRenderer::EndFrame() {
@@ -131,8 +167,7 @@ namespace Lucy {
 			return;
 
 		const auto& swapChain = GetSwapChain()->As<VulkanSwapChain>();
-		Semaphore& presentSemaphore = m_UseComputeSemaphore ? m_SignalSemaphoresCompute[m_CurrentFrameIndex] : m_SignalSemaphores[m_CurrentFrameIndex];
-		m_LastSwapChainResult = swapChain->Present(presentSemaphore, m_ImageIndex);
+		m_LastSwapChainResult = swapChain->Present(m_RenderFinishedSemaphores[m_ImageIndex], m_ImageIndex);
 	}
 
 	void VulkanRenderer::FlushDeletionQueue() {
@@ -142,55 +177,162 @@ namespace Lucy {
 			return;
 
 		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
-		auto result = vkGetFenceStatus(renderDevice->GetLogicalDevice(), m_InFlightFences[m_CurrentFrameIndex].GetFence());
-		if (result != VK_SUCCESS)
-			vkWaitForFences(renderDevice->GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrameIndex].GetFence(), VK_FALSE, UINT64_MAX);
-
-		if (!m_RenderComputeCommandQueue->IsEmpty()) {
-			auto resultCompute = vkGetFenceStatus(renderDevice->GetLogicalDevice(), m_InFlightFencesCompute[m_CurrentFrameIndex].GetFence());
-
-			if (resultCompute != VK_SUCCESS)
-				vkWaitForFences(renderDevice->GetLogicalDevice(), 1, &m_InFlightFencesCompute[m_CurrentFrameIndex].GetFence(), VK_FALSE, UINT64_MAX);
-		}
+		const uint64_t frameValue = m_FrameFenceValues[m_CurrentFrameIndex];
+		m_InFlightFences[m_CurrentFrameIndex].Wait(frameValue);
 		
 		size_t oldDeletionQueueSize = currentDeletionQueue.size();
 		for (const auto& deletionFunc : currentDeletionQueue)
 			deletionFunc();
 		currentDeletionQueue.erase(currentDeletionQueue.begin(), currentDeletionQueue.begin() + oldDeletionQueueSize);
 	}
+
+	void VulkanRenderer::InternalImGuiPass(uint64_t signalValue, bool hasSceneWork) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::InternalImGuiPass");
+		const auto& imguiPool = m_ImGuiRenderCommandList->GetPrimaryCommandPool();
+		const auto& swapChain = GetSwapChain()->As<VulkanSwapChain>();
+
+		m_RenderDevice->BeginCommandBuffer(imguiPool);
+		m_ImGuiPassImpl.Render(swapChain, *m_ImGuiRenderCommandList.get());
+		m_RenderDevice->EndCommandBuffer(imguiPool);
+
+		VulkanSemaphore& waitSem = hasSceneWork
+			? m_SceneFinishedSemaphores[m_CurrentFrameIndex]
+			: m_ImageAvailableSemaphores[m_CurrentFrameIndex];
+
+		m_RenderDevice->As<VulkanRenderDevice>()->SubmitWorkToGPU(*m_ImGuiRenderCommandList.get(), waitSem, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+			m_RenderFinishedSemaphores[m_ImageIndex], m_InFlightFences[m_CurrentFrameIndex], signalValue);
+	}
+
+	void VulkanRenderer::LinkBatches(RenderSubmitQueue& submitQueue, uint64_t signalValue) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::LinkBatches");
+
+		for (auto& [id, info] : submitQueue) {
+			auto& vkBatch = info.Batch.AsVulkanBatch();
+			vkBatch.Waits.clear();
+			vkBatch.Signals.clear();
+		}
+
+		if (submitQueue.empty())
+			return;
+
+		auto& imageAvailable = m_ImageAvailableSemaphores[m_CurrentFrameIndex];
+		auto& sceneFinishedSemaphore = m_SceneFinishedSemaphores[m_CurrentFrameIndex];
+
+		while (m_BridgeSemaphores[m_CurrentFrameIndex].size() < (submitQueue.size() > 0 ? submitQueue.size() - 1 : 0)) {
+			m_BridgeSemaphores[m_CurrentFrameIndex].emplace_back(SemaphoreType::Binary, m_RenderDevice);
+		}
+
+		const auto GetDefaultWaitStage = [](TargetQueueFamily family) -> VkPipelineStageFlags2 {
+			switch (family) {
+				case TargetQueueFamily::Graphics: return VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+				case TargetQueueFamily::Compute:  return VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+				case TargetQueueFamily::Transfer: return VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+				default:                          return VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+			}
+		};
+
+		const auto GetDefaultSignalStage = [](TargetQueueFamily family) -> VkPipelineStageFlags2 {
+			switch (family) {
+				case TargetQueueFamily::Graphics: return VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+				case TargetQueueFamily::Compute:  return VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+				case TargetQueueFamily::Transfer: return VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+				default:                          return VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+			}
+		};
+
+		// First batch waits on the acquire semaphore for this frame slot.
+		auto firstIt = submitQueue.begin();
+		auto& firstBatch = firstIt->second.Batch.AsVulkanBatch();
+		firstBatch.Waits.emplace_back(GetDefaultWaitStage(firstBatch.QueueFamily), 0, imageAvailable);
+
+		// Adjacent batch bridges.
+		size_t bridgeIndex = 0;
+		for (auto it = submitQueue.begin(); it != submitQueue.end(); ) {
+			auto next = std::next(it);
+			if (next == submitQueue.end())
+				break;
+
+			auto& srcBatch = it->second.Batch.AsVulkanBatch();
+			auto& dstBatch = next->second.Batch.AsVulkanBatch();
+			auto& bridge = m_BridgeSemaphores[m_CurrentFrameIndex][bridgeIndex++];
+
+			srcBatch.Signals.emplace_back(GetDefaultSignalStage(srcBatch.QueueFamily), 0, bridge);
+			dstBatch.Waits.emplace_back(GetDefaultWaitStage(dstBatch.QueueFamily), 0, bridge);
+
+			it = next;
+		}
+
+		auto lastIt = std::prev(submitQueue.end());
+		auto& lastBatch = lastIt->second.Batch.AsVulkanBatch();
+		const VkPipelineStageFlags2 lastSignalStages = GetDefaultSignalStage(lastBatch.QueueFamily);
+
+		lastBatch.Signals.emplace_back(lastSignalStages, 0, sceneFinishedSemaphore);
+	}
 	
+	void VulkanRenderer::SubmitBatchesToRender(std::vector<ExecutionBatch>& batches, const std::unordered_map<std::string, RenderFrameHandles>& renderFrameHandleMap) {
+		//LUCY_ASSERT(!Renderer::IsOnRenderThread(), "SubmitBatchesToRender should only be called on the main thread!");
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::SubmitBatchesToRender");
+
+		for (const auto& batch : batches) {
+			const VulkanExecutionBatch& vkBatch = batch.AsVulkanBatch();
+			
+			std::vector<RenderSubmitFunc> passExecuteFuncs;
+			passExecuteFuncs.reserve(vkBatch.Passes.size());
+
+			for (const auto& pass : vkBatch.Passes) {
+				auto queueFamily = pass->GetTargetQueueFamily();
+
+				switch (queueFamily) {
+					case TargetQueueFamily::Compute: {
+						passExecuteFuncs.push_back([=](RenderCommandList& cmdList) {
+							LUCY_PROFILE_NEW_EVENT("RendererBackend::SubmitToCompute");
+							pass->Execute(cmdList);
+						});
+						break;
+					}
+					case TargetQueueFamily::Graphics: {
+						const auto& [renderPassHandle, frameBufferHandle] = renderFrameHandleMap.at(pass->GetName());
+						passExecuteFuncs.push_back([=](RenderCommandList& cmdList) {
+							LUCY_PROFILE_NEW_EVENT("RendererBackend::SubmitToRender");
+							const auto& device = GetRenderDevice();
+							const auto& renderPass = device->AccessResource<RenderPass>(renderPassHandle);
+							const auto& frameBuffer = device->AccessResource<FrameBuffer>(frameBufferHandle);
+							device->BeginRenderPass(renderPass, frameBuffer, cmdList.GetPrimaryCommandPool());
+							pass->Execute(cmdList);
+							device->EndRenderPass(renderPass);
+						});
+						break;
+					}
+					case TargetQueueFamily::Transfer: {
+						passExecuteFuncs.push_back([=](RenderCommandList& cmdList) {
+							LUCY_PROFILE_NEW_EVENT("RendererBackend::SubmitToTransfer");
+							pass->Execute(cmdList);
+						});
+						break;
+					}
+					default:
+						LUCY_ASSERT(false);
+						break;
+				}
+			}
+			EnqueueToRenderCommandQueue(batch, passExecuteFuncs);
+		}
+	}
+
 	RenderContextResultCodes VulkanRenderer::WaitAndPresent() {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::WaitAndPresent");
 		
 		BeginFrame();
 		FlushCommandQueue();
-		FlushSubmitQueue();
 		RenderFrame();
 		EndFrame();
 		FlushDeletionQueue();
 
 		m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % m_MaxFramesInFlight;
 
+		m_RenderCommandQueue->Clear();
+
 		return (RenderContextResultCodes)m_LastSwapChainResult;
-	}
-
-	void VulkanRenderer::ExecuteBarrier(void* commandBufferHandle, Ref<Image> image) {
-		const auto& vulkanImage = image->As<VulkanImage>();
-		ExecuteBarrier(commandBufferHandle, (void*)vulkanImage->GetVulkanHandle(), vulkanImage->GetCurrentLayout(), vulkanImage->GetLayerCount(), vulkanImage->GetMaxMipLevel());
-	}
-
-	void VulkanRenderer::ExecuteBarrier(void* commandBufferHandle, void* imageHandle, uint32_t imageLayout, uint32_t layerCount, uint32_t mipCount) {
-		VkImageSubresourceRange subResourceRange = VulkanAPI::ImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, mipCount, layerCount);
-
-		ImageMemoryBarrierCreateInfo createInfo;
-		createInfo.ImageHandle = (VkImage)imageHandle;
-		createInfo.NewLayout = (VkImageLayout)imageLayout;
-		createInfo.OldLayout = createInfo.NewLayout; //no layout changes
-		createInfo.SubResourceRange = subResourceRange;
-
-		ImageMemoryBarrier barrier(createInfo);
-
-		barrier.RunBarrier((VkCommandBuffer)commandBufferHandle);
 	}
 
 	void VulkanRenderer::Destroy() {
@@ -199,19 +341,25 @@ namespace Lucy {
 
 		m_TransientCommandPool->Destroy();
 
+		const uint32_t swapImageCount = m_SwapChain->As<VulkanSwapChain>()->GetSwapChainImageCount();
+
 		const auto& swapChain = GetSwapChain();
 		swapChain->Destroy();
 
 		FlushDeletionQueue();
 
 		for (uint32_t i = 0; i < m_MaxFramesInFlight; i++) {
-			m_WaitSemaphores[i].Destroy(m_RenderDevice);
-			m_SignalSemaphores[i].Destroy(m_RenderDevice);
-			m_InFlightFences[i].Destroy(m_RenderDevice);
+			m_ImageAvailableSemaphores[i].Destroy();
+			m_InFlightFences[i].Destroy();
+		}
 
-			m_WaitSemaphoresCompute[i].Destroy(m_RenderDevice);
-			m_SignalSemaphoresCompute[i].Destroy(m_RenderDevice);
-			m_InFlightFencesCompute[i].Destroy(m_RenderDevice);
+		for (uint32_t i = 0; i < swapImageCount; i++) {
+			m_RenderFinishedSemaphores[i].Destroy();
+		}
+
+		for (auto& perFrameBridges : m_BridgeSemaphores) {
+			for (auto& semaphore : perFrameBridges)
+				semaphore.Destroy();
 		}
 
 		FlushCommandQueue();
@@ -223,12 +371,28 @@ namespace Lucy {
 		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
 		renderDevice->SubmitImmediateCommand([&](VkCommandBuffer commandBuffer) {
 			VkBufferCopy copyRegion = VulkanAPI::BufferCopy(0, 0, size);
+
+			VkMemoryBarrier2 barrier{};
+			barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+			barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+			barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+			barrier.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+			barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+
+			VkDependencyInfo depInfo{};
+			depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+			depInfo.memoryBarrierCount = 1;
+			depInfo.pMemoryBarriers = &barrier;
+
+			vkCmdPipelineBarrier2(commandBuffer, &depInfo);
 			vkCmdCopyBuffer(commandBuffer, stagingBuffer, buffer, 1, &copyRegion);
+			vkCmdPipelineBarrier2(commandBuffer, &depInfo);
 		}, m_TransientCommandPool);
 	}
 
 	// Should not be used in a loop 
 	void VulkanRenderer::SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::SubmitImmediateCommand");
 		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
 		renderDevice->SubmitImmediateCommand(func, m_TransientCommandPool);
 	}
@@ -312,13 +476,6 @@ namespace Lucy {
 	}
 
 	void VulkanRenderer::InitializeImGui() {
-		m_ImGuiPass.Init(this);
-	}
-
-	void VulkanRenderer::RTRenderImGui() {
-		auto swapChain = GetSwapChain()->As<VulkanSwapChain>();
-		EnqueueToRenderCommandQueue([this, swapChain](RenderCommandList& cmdList) {
-			m_ImGuiPass.Render(swapChain, cmdList);
-		});
+		m_ImGuiPassImpl.Init(this);
 	}
 }

@@ -36,6 +36,8 @@ namespace Lucy {
 		static bool DirectoryExists(const std::string& file);
 		static bool DirectoryExists(const std::filesystem::path& filePath);
 
+		static size_t GetDirectoryFileCount(const std::filesystem::path& filePath);
+
 		static bool FileExists(const std::string& file);
 		static bool FileExists(const std::filesystem::path& filePath);
 
@@ -47,6 +49,19 @@ namespace Lucy {
 			LUCY_ASSERT(of && of.is_open(), "Writing to {0} failed", path.generic_string());
 
 			of.write((const char*)data.data(), data.size() * sizeof(TData));
+			of.flush();
+			of.close();
+		}
+
+		template <typename TData>
+		static inline void WriteToFile(const std::filesystem::path& path, const Slang::ComPtr<TData>& data, OpenMode mode) {
+			uint16_t flags = 0x02 | mode; //see std::ios::out
+
+			std::ofstream of(path, flags);
+			LUCY_ASSERT(of && of.is_open(), "Writing to {0} failed", path.generic_string());
+			LUCY_ASSERT(data && data->getBufferPointer() && data->getBufferSize() > 0, "Data is nullptr or empty!");
+
+			of.write((const char*)data->getBufferPointer(), data->getBufferSize());
 			of.flush();
 			of.close();
 		}

@@ -76,9 +76,5 @@ namespace Lucy {
 		ViewForEach<MeshComponent>([](MeshComponent& meshComponent) {
 			meshComponent.GetMesh()->Destroy();
 		});
-
-		ViewForEach<HDRCubemapComponent>([&](HDRCubemapComponent& cubemapComponent) {
-			cubemapComponent.Destroy();
-		});
 	}
 }

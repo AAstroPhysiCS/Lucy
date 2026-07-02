@@ -48,7 +48,7 @@ namespace Lucy {
 		static inline std::mutex s_TaskQueueMutex;
 
 		std::atomic_bool m_Running = true;
-		std::atomic_int m_CurrentTaskCounter;
+		std::atomic_int m_CurrentTaskCounter{ 0 };
 
 		static inline thread_local size_t t_ThreadIndex = 0;
 	};

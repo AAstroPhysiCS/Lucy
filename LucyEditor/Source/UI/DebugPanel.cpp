@@ -27,7 +27,7 @@ namespace Lucy {
 
 			std::string outputStr;
 
-			for (const auto& [passName, renderTime] : cmdQueueMetrics.RenderTimeOfPasses)
+			for (const auto& [passName, renderTime] : cmdQueueMetrics.TimeOfPasses)
 				std::format_to(std::back_inserter(outputStr), "Render pass: {0} took {1:.3f} ms \n", passName, renderTime);
 			
 			const auto& allPipelineStatistics = Renderer::GetPipelineManager()->GetAllGraphicsPipelineStatistics();
@@ -46,7 +46,7 @@ namespace Lucy {
 
 			std::format_to(std::back_inserter(outputStr), "Frame Time: {0:.3f} ms \n", appMetrics.GetFrameTime());
 			std::format_to(std::back_inserter(outputStr), "Frames: {0} FPS \n", appMetrics.GetFrames());
-			std::format_to(std::back_inserter(outputStr), "Render Time: {0:.3f} ms \n", cmdQueueMetrics.RenderTime);
+			std::format_to(std::back_inserter(outputStr), "Render Time: {0:.3f} ms \n", cmdQueueMetrics.Time);
 
 			std::format_to(std::back_inserter(outputStr), "Total Allocated Memory: {0:.3f} mb \n", appMetrics.GetTotalAllocated());
 			std::format_to(std::back_inserter(outputStr), "Total Freed Memory: {0:.3f} mb \n", appMetrics.GetTotalFreed());

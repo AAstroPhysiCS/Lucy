@@ -1,10 +1,13 @@
 #pragma once
 
+#include "RenderGraphResource.h"
+
+#include "Renderer/Device/RenderDevice.h"
+
 namespace Lucy {
 
 	class RenderCommandList;
 
-	class RenderGraphResource;
 	class RenderGraphRegistry;
 	class RenderGraphBuilder;
 
@@ -18,6 +21,82 @@ namespace Lucy {
 		Terminated
 	};
 
+	enum class RenderGraphResourceAccess : uint8_t {
+		None,
+
+		ColorAttachmentWrite,
+		DepthAttachmentWrite,
+		
+		ShaderSampledRead,
+		StorageRead,
+		StorageWrite,
+		
+		TransferRead,
+		TransferWrite,
+		
+		VertexRead, //TODO: maybe we dont need this?
+		IndexRead, //TODO: maybe we dont need this?
+		IndirectRead,
+
+		Present,
+	};
+
+	enum class RenderGraphResourceType : uint8_t {
+		Buffer,
+		Image
+	};
+
+	struct RenderGraphResourceAddInfo {
+		RenderGraphResource Resource = UndefinedRenderGraphResource;
+		RenderGraphResourceType Type = RenderGraphResourceType::Image;
+		RenderGraphResourceAccess Access = RenderGraphResourceAccess::None;
+		TargetQueueFamily QueueFamily = TargetQueueFamily::Graphics;
+		bool IsExternal = false;
+		bool IsTransient = false;
+	};
+
+	/*
+	* Quick note to myself:
+	* Intra: between passes of the same queue family. We can only do pipeline barriers here.
+	* Inter: between passes of different queue family. We have to do ownership transfer + pipeline barriers here.
+	*/
+
+	struct RenderGraphIntraQueueTransition {
+		RenderGraphResource Resource = UndefinedRenderGraphResource;
+		RenderGraphResourceType ResourceType = RenderGraphResourceType::Image;
+		TargetQueueFamily QueueFamily = TargetQueueFamily::Graphics;
+
+		RenderGraphResourceAccess SrcAccess = RenderGraphResourceAccess::None;
+		RenderGraphResourceAccess DstAccess = RenderGraphResourceAccess::None;
+
+		RenderGraphPass* SrcPass = nullptr;
+		RenderGraphPass* DstPass = nullptr;
+	};
+
+	struct RenderGraphInterQueueTransition {
+		RenderGraphResource Resource = UndefinedRenderGraphResource;
+		RenderGraphResourceType ResourceType = RenderGraphResourceType::Image;
+
+		TargetQueueFamily SrcQueue = TargetQueueFamily::Graphics;
+		TargetQueueFamily DstQueue = TargetQueueFamily::Graphics;
+
+		RenderGraphResourceAccess SrcAccess = RenderGraphResourceAccess::None;
+		RenderGraphResourceAccess DstAccess = RenderGraphResourceAccess::None;
+
+		RenderGraphPass* SrcPass = nullptr;
+		RenderGraphPass* DstPass = nullptr;
+	};
+
+	struct RenderGraphBatch {
+		std::vector<RenderGraphPass*> Passes;
+		std::vector<RenderGraphInterQueueTransition> IncomingInterQueueTransitions; //acquire
+		std::vector<RenderGraphInterQueueTransition> OutgoingInterQueueTransitions; //release
+
+		std::vector<RenderGraphIntraQueueTransition> IntraQueueTransition;
+	};
+
+	using RenderGraphBatches = std::vector<RenderGraphBatch>;
+
 	struct RenderGraphPassCreateInfo {
 		RenderGraphSetupFunc SetupFunc;
 		RenderGraphRegistry& Registry;
@@ -26,6 +105,7 @@ namespace Lucy {
 	};
 
 	using RGRenderTargetElements = std::vector<RenderGraphResource>;
+	using RGUsedResourceElements = std::vector<RenderGraphResourceAddInfo>;
 
 	class RenderGraphPass final {
 	public:
@@ -34,7 +114,10 @@ namespace Lucy {
 
 		void Execute(RenderCommandList& cmdList);
 		void Setup(RenderGraphBuilder& build);
+		
 		void AddRenderTarget(const RenderGraphResource& renderTargetToAdd);
+		void AddResourceRead(const RenderGraphResourceAddInfo& addInfo);
+		void AddResourceWrite(const RenderGraphResourceAddInfo& addInfo);
 
 		void SetViewportArea(uint32_t width, uint32_t height);
 		void OnViewportResize(uint32_t width, uint32_t height);
@@ -46,6 +129,9 @@ namespace Lucy {
 		inline bool operator==(const RenderGraphPass& other) const { return m_CreateInfo.Name.compare(other.m_CreateInfo.Name) == 0; }
 
 		inline const RGRenderTargetElements& GetRenderTargets() const { return m_RenderTargets; }
+
+		inline const RGUsedResourceElements& GetResourceReads() const { return m_ResourceReads; }
+		inline const RGUsedResourceElements& GetResourceWrites() const { return m_ResourceWrites; }
 
 		inline ClearColor GetClearColor() { return m_ClearColor; }
 
@@ -69,6 +155,9 @@ namespace Lucy {
 		RenderGraphPassCreateInfo m_CreateInfo;
 
 		RGRenderTargetElements m_RenderTargets;
+
+		RGUsedResourceElements m_ResourceReads;
+		RGUsedResourceElements m_ResourceWrites;
 
 		RenderGraphPassState m_State = RenderGraphPassState::New;
 

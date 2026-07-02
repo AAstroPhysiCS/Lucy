@@ -22,24 +22,26 @@ namespace Lucy {
 	template <typename T>
 	inline static constexpr const T InvalidID = T(~0);
 
-	template <typename TID = LucyID>
+	template <typename TID = LucyID, bool ReturnPolicy = true>
 	class IDProvider final {
 		static inline constexpr const size_t s_PoolResizeStep = 100;
 	public:
 		IDProvider() = default;
 		~IDProvider() = default;
 
-		TID RequestID();
+		[[nodiscard]] TID RequestID();
 		void ReturnID(TID id);
-		TID Renew(TID oldId);
+		[[nodiscard]] TID Renew(TID oldId);
+
+		void Reset();
 	private:
 		void IncreasePool(size_t step);
 
 		std::vector<TID> s_IDCount;
 	};
 
-	template<typename TID>
-	TID IDProvider<TID>::RequestID() {
+	template<typename TID, bool ReturnPolicy>
+	TID IDProvider<TID, ReturnPolicy>::RequestID() {
 		//basically, init
 		if (s_IDCount.empty())
 			IncreasePool(s_PoolResizeStep);
@@ -57,8 +59,11 @@ namespace Lucy {
 		return index;
 	}
 
-	template<typename TID>
-	void IDProvider<TID>::ReturnID(TID id) {
+	template<typename TID, bool ReturnPolicy>
+	void IDProvider<TID, ReturnPolicy>::ReturnID(TID id) {
+		if constexpr (!ReturnPolicy) {
+			static_assert(false, "Return policy is disabled and you are returning the id! You have to reset the provider every time!");
+		}
 		const auto& result = std::find(s_IDCount.begin(), s_IDCount.end(), id);
 
 		if (result != s_IDCount.end()) {
@@ -69,14 +74,22 @@ namespace Lucy {
 		LUCY_ASSERT(false, "IDProvider: {0} does not exist!", id);
 	}
 
-	template<typename TID>
-	TID IDProvider<TID>::Renew(TID oldId) {
+	template<typename TID, bool ReturnPolicy>
+	TID IDProvider<TID, ReturnPolicy>::Renew(TID oldId) {
+		if constexpr (!ReturnPolicy) {
+			static_assert(false, "Return policy is disabled and you are returning the id! You have to reset the provider every time!");
+		}
 		ReturnID(oldId);
 		return RequestID();
 	}
 
-	template<typename TID>
-	void IDProvider<TID>::IncreasePool(size_t step) {
+	template<typename TID, bool ReturnPolicy>
+	void IDProvider<TID, ReturnPolicy>::Reset() {
+		s_IDCount.clear();
+	}
+
+	template<typename TID, bool ReturnPolicy>
+	void IDProvider<TID, ReturnPolicy>::IncreasePool(size_t step) {
 		s_IDCount.resize(s_IDCount.size() + step);
 	}
 }

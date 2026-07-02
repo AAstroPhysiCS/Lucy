@@ -34,40 +34,112 @@ namespace Lucy {
 		m_RenderGraph->DeclareImage(rgResource, createInfo, loadStoreAccessOp, rgResourceDepth, createDepthInfo, loadStoreDepthAccessOp);
 	}
 
-	void RenderGraphBuilder::ReadExternalImage(const RenderGraphResource& rgResource) {
+	void RenderGraphBuilder::ReadExternalImage(const RenderGraphResource& rgResource, RenderGraphResourceAccess access) {
 		m_RenderGraph->ReadExternalImage(m_RenderGraphPass, rgResource);
+		m_RenderGraphPass->AddResourceRead({
+			.Resource = rgResource,
+			.Type = RenderGraphResourceType::Image,
+			.Access = access,
+			.QueueFamily = m_RenderGraphPass->GetTargetQueueFamily(),
+			.IsExternal = true,
+			.IsTransient = false
+		});
 	}
 
-	void RenderGraphBuilder::ReadExternalTransientImage(const RenderGraphResource& rgResource) {
+	void RenderGraphBuilder::ReadExternalTransientImage(const RenderGraphResource& rgResource, RenderGraphResourceAccess access) {
 		m_RenderGraph->ReadExternalTransientImage(m_RenderGraphPass, rgResource);
+		m_RenderGraphPass->AddResourceRead({
+			.Resource = rgResource,
+			.Type = RenderGraphResourceType::Image,
+			.Access = access,
+			.QueueFamily = m_RenderGraphPass->GetTargetQueueFamily(),
+			.IsExternal = true,
+			.IsTransient = true
+		});
 	}
 
-	void RenderGraphBuilder::WriteExternalImage(const RenderGraphResource& rgResource) {
+	void RenderGraphBuilder::WriteExternalImage(const RenderGraphResource& rgResource, RenderGraphResourceAccess access) {
 		m_RenderGraph->WriteExternalImage(m_RenderGraphPass, rgResource);
+		m_RenderGraphPass->AddResourceWrite({
+			.Resource = rgResource,
+			.Type = RenderGraphResourceType::Image,
+			.Access = access,
+			.QueueFamily = m_RenderGraphPass->GetTargetQueueFamily(),
+			.IsExternal = true,
+			.IsTransient = false
+		});
 	}
 
-	void RenderGraphBuilder::ReadImage(const RenderGraphResource& rgResourceToRead) {
+	void RenderGraphBuilder::ReadImage(const RenderGraphResource& rgResourceToRead, RenderGraphResourceAccess access) {
 		m_RenderGraph->ReadImage(m_RenderGraphPass, rgResourceToRead);
+		m_RenderGraphPass->AddResourceRead({
+			.Resource = rgResourceToRead,
+			.Type = RenderGraphResourceType::Image,
+			.Access = access,
+			.QueueFamily = m_RenderGraphPass->GetTargetQueueFamily(),
+			.IsExternal = false,
+			.IsTransient = false
+		});
 	}
 
-	void RenderGraphBuilder::WriteImage(const RenderGraphResource& rgResourceToWrite) {
+	void RenderGraphBuilder::WriteImage(const RenderGraphResource& rgResourceToWrite, RenderGraphResourceAccess access) {
 		m_RenderGraph->WriteImage(m_RenderGraphPass, rgResourceToWrite);
+		m_RenderGraphPass->AddResourceWrite({
+			.Resource = rgResourceToWrite,
+			.Type = RenderGraphResourceType::Image,
+			.Access = access,
+			.QueueFamily = m_RenderGraphPass->GetTargetQueueFamily(),
+			.IsExternal = false,
+			.IsTransient = false
+		});
+	}
+
+	void RenderGraphBuilder::ReadBuffer(const RenderGraphResource& rgResourceToRead, RenderGraphResourceAccess access) {
+		m_RenderGraph->ReadBuffer(m_RenderGraphPass, rgResourceToRead);
+		m_RenderGraphPass->AddResourceRead({
+			.Resource = rgResourceToRead,
+			.Type = RenderGraphResourceType::Buffer,
+			.Access = access,
+			.QueueFamily = m_RenderGraphPass->GetTargetQueueFamily(),
+			.IsExternal = false,
+			.IsTransient = false
+		});
+	}
+
+	void RenderGraphBuilder::WriteBuffer(const RenderGraphResource& rgResourceToWrite, RenderGraphResourceAccess access) {
+		m_RenderGraph->WriteBuffer(m_RenderGraphPass, rgResourceToWrite);
+		m_RenderGraphPass->AddResourceWrite({
+			.Resource = rgResourceToWrite,
+			.Type = RenderGraphResourceType::Buffer,
+			.Access = access,
+			.QueueFamily = m_RenderGraphPass->GetTargetQueueFamily(),
+			.IsExternal = false,
+			.IsTransient = false
+		});
 	}
 
 	void RenderGraphBuilder::BindRenderTarget(const RenderGraphResource& rgResourceToBind, const RenderGraphResource& rgResourceDepthToBind) {
 		BindRenderTarget(rgResourceToBind);
-		BindRenderTarget(rgResourceDepthToBind);
+		m_RenderGraph->BindRenderTarget(m_RenderGraphPass, rgResourceDepthToBind);
+		m_RenderGraphPass->AddResourceWrite({
+			.Resource = rgResourceDepthToBind,
+			.Type = RenderGraphResourceType::Image,
+			.Access = RenderGraphResourceAccess::DepthAttachmentWrite,
+			.QueueFamily = m_RenderGraphPass->GetTargetQueueFamily(),
+			.IsExternal = false,
+			.IsTransient = false
+		});
 	}
 
 	void RenderGraphBuilder::BindRenderTarget(const RenderGraphResource& rgResourceToBind) {
 		m_RenderGraph->BindRenderTarget(m_RenderGraphPass, rgResourceToBind);
-	}
-
-	void RenderGraphBuilder::ReadBuffer(const RenderGraphResource& rgResourceToRead) {
-		m_RenderGraph->ReadBuffer(m_RenderGraphPass, rgResourceToRead);
-	}
-
-	void RenderGraphBuilder::WriteBuffer(const RenderGraphResource& rgResourceToWrite) {
-		m_RenderGraph->WriteBuffer(m_RenderGraphPass, rgResourceToWrite);
+		m_RenderGraphPass->AddResourceWrite({
+			.Resource = rgResourceToBind,
+			.Type = RenderGraphResourceType::Image,
+			.Access = RenderGraphResourceAccess::ColorAttachmentWrite,
+			.QueueFamily = m_RenderGraphPass->GetTargetQueueFamily(),
+			.IsExternal = false,
+			.IsTransient = false
+		});
 	}
 }

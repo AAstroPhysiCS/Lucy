@@ -14,15 +14,15 @@ namespace Lucy {
 				while (m_Running.load()) {
 					{
 						std::unique_lock lock(s_TaskQueueMutex);
-						if (m_TaskQueue.empty()) {
-							s_WorkerSleepCondition.wait(lock, [this]() { return !m_TaskQueue.empty() || !m_Running; });
-							continue;
-						}
+						s_WorkerSleepCondition.wait(lock, [this]() {
+							return !m_TaskQueue.empty() || !m_Running.load(std::memory_order_acquire);
+						});
+
+						if (!m_Running.load(std::memory_order_acquire) && m_TaskQueue.empty())
+							break;
 
 						task = std::move(m_TaskQueue.front());
 						m_TaskQueue.pop_front();
-
-						task.Args.TaskIndex = m_TaskQueue.size();
 					}
 
 					task.Args.ThreadIndex = t_ThreadIndex;
@@ -31,7 +31,8 @@ namespace Lucy {
 					else
 						task.Func(task.Args);
 
-					m_CurrentTaskCounter.fetch_sub(1, std::memory_order_release);
+					m_CurrentTaskCounter.fetch_sub(1, std::memory_order_acq_rel);
+					m_CurrentTaskCounter.notify_all();
 				}
 			};
 
@@ -81,9 +82,9 @@ namespace Lucy {
 				task.BatchArgs.BatchIndex = batchIndex;
 				task.BatchArgs.BatchOffset = batchOffset;
 
-				taskIds[taskIdIndex++] = ScheduleInternal(task, priority, false);
+				task.Args.TaskIndex = batchIndex * batchSize + batchOffset;
 
-				s_WorkerSleepCondition.notify_one();
+				taskIds[taskIdIndex++] = ScheduleInternal(task, priority, false);
 			}
 		}
 
@@ -96,28 +97,23 @@ namespace Lucy {
 	}
 
 	TaskId TaskScheduler::ScheduleInternal(Task& task, TaskPriority priority, bool isDeferred) {
-		task.Id = m_CurrentTaskCounter.fetch_add(1, std::memory_order_relaxed);
+		TaskId id = task.Id = m_CurrentTaskCounter.fetch_add(1, std::memory_order_relaxed);
 		{
 			std::unique_lock lock(s_TaskQueueMutex);
 			if (priority > TaskPriority::Medium)
-				m_TaskQueue.push_front(task);
+				m_TaskQueue.push_front(std::move(task));
 			else
-				m_TaskQueue.push_back(task);
+				m_TaskQueue.push_back(std::move(task));
 		}
 
+		s_WorkerSleepCondition.notify_one();
+
 		if (isDeferred) {
-			WaitForTask(task.Id);
+			WaitForTask(id);
 			return -1;
 		}
 
 		return task.Id;
-	}
-
-	void TaskScheduler::WaitForAllTasks() const {
-		while (m_CurrentTaskCounter.load(std::memory_order_relaxed) != 0) {
-			/* Wait for all the tasks to finish */
-			s_WorkerSleepCondition.notify_all();
-		}
 	}
 
 	void TaskScheduler::WaitForTask(TaskId taskId) const {
@@ -125,6 +121,15 @@ namespace Lucy {
 		while (m_CurrentTaskCounter.load(std::memory_order_relaxed) > taskId) {
 			/* Wait for the task to finish */
 			s_WorkerSleepCondition.notify_all();
+		}
+	}
+
+	void TaskScheduler::WaitForAllTasks() const {
+		int32_t currentTaskCount = m_CurrentTaskCounter.load(std::memory_order_acquire);
+
+		while (currentTaskCount != 0) {
+			m_CurrentTaskCounter.wait(currentTaskCount, std::memory_order_acquire);
+			currentTaskCount = m_CurrentTaskCounter.load(std::memory_order_acquire);
 		}
 	}
 

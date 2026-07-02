@@ -8,8 +8,8 @@ namespace Lucy {
 
 	class VulkanImage2D : public VulkanImage {
 	public:
-		VulkanImage2D(const std::filesystem::path& path, const ImageCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device);
-		VulkanImage2D(const ImageCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device);
+		VulkanImage2D(const std::filesystem::path& path, const ImageCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device, std::string_view debugName);
+		VulkanImage2D(const ImageCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device, std::string_view debugName);
 		VulkanImage2D(const Ref<VulkanImage2D>& other, const Ref<VulkanRenderDevice>& device);
 		virtual ~VulkanImage2D() = default;
 

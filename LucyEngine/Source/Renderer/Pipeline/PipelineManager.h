@@ -14,7 +14,7 @@ namespace Lucy {
 		~PipelineManager() = default;
 
 		template <typename TPipeline>
-		inline Ref<TPipeline> GetAs(const std::string& name) {
+		inline Ref<TPipeline> GetAs(const std::string& name) const {
 			if (m_GraphicsPipelines.contains(name))
 				return m_RenderDevice->AccessResource<TPipeline>(m_GraphicsPipelines.at(name));
 			return m_RenderDevice->AccessResource<TPipeline>(m_ComputePipelines.at(name));
@@ -26,7 +26,7 @@ namespace Lucy {
 
 		std::unordered_map<std::string, GraphicsPipelineStatistics> GetAllGraphicsPipelineStatistics() const;
 
-		void RTRecreateAllPipelinesDependentOnShader(const Ref<Shader>& shader);
+		void RTRecreateAllPipelinesDependentOnShader(const std::string_view& shaderName);
 
 		void DestroyPipeline(const std::string& name);
 		void DestroyAll();

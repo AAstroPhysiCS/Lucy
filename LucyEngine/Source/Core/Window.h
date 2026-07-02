@@ -23,6 +23,15 @@ namespace Lucy {
 		Lucy::WindowMode WindowMode = WindowMode::WINDOWED;
 	};
 
+	struct WindowData {
+		std::string Title;
+		int32_t Width = 0;
+		int32_t Height = 0;
+		bool Minimized = false;
+
+		std::function<void(std::unique_ptr<Event>)> EventCallback;
+	};
+
 	class Window {
 	public:
 		Window() = default;
@@ -32,7 +41,7 @@ namespace Lucy {
 		virtual void Init(RenderArchitecture architecture) = 0;
 		virtual void Destroy() = 0; //leaving to child class, to destroy it's contents.
 		virtual void WaitEventsIfMinimized() = 0;
-		virtual void SetEventCallback(const std::function<void(Event&)>& eventCallbackFunc) = 0;
+		virtual void SetEventCallback(const std::function<void(std::unique_ptr<Event>)>& eventCallbackFunc) = 0;
 
 		GLFWwindow* Raw();
 
@@ -53,7 +62,7 @@ namespace Lucy {
 
 		VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
 
-		static inline std::function<void(Event&)> s_EventFunc;
+		WindowData m_Data;
 	};
 
 	class WinWindow : public Window {
@@ -67,9 +76,7 @@ namespace Lucy {
 		
 		void Destroy() final override;
 
-		void SetEventCallback(const std::function<void(Event&)>& eventCallbackFunc) final override;
+		void SetEventCallback(const std::function<void(std::unique_ptr<Event>)>& eventCallbackFunc) final override;
 		void WaitEventsIfMinimized() final override;
-
-		inline static bool s_WasMinimized = false;
 	};
 }

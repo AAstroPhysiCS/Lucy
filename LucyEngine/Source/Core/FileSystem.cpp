@@ -42,6 +42,11 @@ namespace Lucy {
 		return std::filesystem::is_directory(filePath);
 	}
 
+	size_t FileSystem::GetDirectoryFileCount(const std::filesystem::path& filePath) {
+		using std::filesystem::directory_iterator;
+		return std::count_if(directory_iterator(filePath), directory_iterator{}, (bool(*)(const std::filesystem::path&))std::filesystem::is_regular_file);
+	}
+
 	bool FileSystem::FileExists(const std::string& file) {
 		return std::filesystem::exists(file);
 	}

@@ -62,7 +62,7 @@ namespace Lucy {
 		m_RenderDevice->BindBuffers(m_PrimaryCommandPool, vertexBuffer, indexBuffer);
 	}
 
-	void RenderCommand::BindPushConstant(const VulkanPushConstant& pushConstant) {
+	void RenderCommand::BindPushConstant(const PipelineConstant& pushConstant) {
 		LUCY_ASSERT(m_BoundedGraphicsPipeline || m_BoundedComputePipeline, "BindPushConstant failed, bounded pipeline is nullptr.");
 		if (m_BoundedGraphicsPipeline) {
 			m_RenderDevice->BindPushConstant(m_PrimaryCommandPool, m_BoundedGraphicsPipeline, pushConstant);
@@ -87,7 +87,7 @@ namespace Lucy {
 	}
 
 	void RenderCommand::UpdateDescriptorSets() {
-		if (m_BoundedGraphicsPipeline) {
+		if (m_BoundedGraphicsPipeline) { 
 			m_RenderDevice->UpdateDescriptorSets(m_BoundedGraphicsPipeline);
 			return;
 		}
@@ -118,7 +118,7 @@ namespace Lucy {
 
 		BindBuffers(mesh);
 
-		VulkanPushConstant& meshPushConstant = m_Shader->GetPushConstants("LocalPushConstant");
+		PipelineConstant& meshPushConstant = m_BoundedGraphicsPipeline->GetPipelineConstants("PushConstants");
 
 		const auto& submeshes = mesh->GetSubmeshes();
 
@@ -126,9 +126,12 @@ namespace Lucy {
 			const Submesh& submesh = submeshes[i];
 
 			const glm::mat4& finalTransform = meshTransform * submesh.Transform;
+			const glm::mat4& inversedTransposedModelMatrix = glm::transpose(glm::inverse(finalTransform));
 
 			ByteBuffer pushConstantData;
 			pushConstantData.Append((uint8_t*)&finalTransform, sizeof(finalTransform));
+			if (meshPushConstant.GetSize() >= sizeof(finalTransform) + sizeof(inversedTransposedModelMatrix))
+				pushConstantData.Append((uint8_t*)&inversedTransposedModelMatrix, sizeof(inversedTransposedModelMatrix));
 
 			meshPushConstant.SetData(pushConstantData);
 
@@ -143,7 +146,7 @@ namespace Lucy {
 		
 		BindBuffers(mesh);
 
-		VulkanPushConstant& meshPushConstant = m_Shader->GetPushConstants("LocalPushConstant");
+		PipelineConstant& meshPushConstant = m_BoundedGraphicsPipeline->GetPipelineConstants("PushConstants");
 
 		const auto& submeshes = mesh->GetSubmeshes();
 
@@ -151,10 +154,14 @@ namespace Lucy {
 			const Submesh& submesh = submeshes[i];
 			MaterialID materialID = submesh.MaterialID;
 
-			const glm::mat4& finalTransform = meshTransform * submesh.Transform;
-
 			ByteBuffer pushConstantData;
+
+			const glm::mat4& finalTransform = meshTransform * submesh.Transform;
+			const glm::mat4& inversedTransposedModelMatrix = glm::transpose(glm::inverse(finalTransform));
 			pushConstantData.Append((uint8_t*)&finalTransform, sizeof(finalTransform));
+			//TODO: temporary fix, delete this when we have a better solution
+			if (meshPushConstant.GetSize() >= sizeof(finalTransform) + sizeof(inversedTransposedModelMatrix))
+				pushConstantData.Append((uint8_t*)&inversedTransposedModelMatrix, sizeof(inversedTransposedModelMatrix));
 			pushConstantData.Append((uint8_t*)&materialID, sizeof(MaterialID));
 
 			meshPushConstant.SetData(pushConstantData);
@@ -183,20 +190,30 @@ namespace Lucy {
 		m_RenderDevice->DispatchCompute(m_PrimaryCommandPool, m_BoundedComputePipeline, groupCountX, groupCountY, groupCountZ);
 	}
 
-	void RenderCommand::SetImageLayout(Ref<Image> image, uint32_t newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {
+	/*void RenderCommand::SetImageLayout(Ref<Image> image, uint32_t newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {
+		if (Renderer::GetRenderArchitecture() != RenderArchitecture::Vulkan)
+			return;
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		const auto& vulkanImage = image->As<VulkanImage>();
+		vulkanImage->SetLayout((VkCommandBuffer)m_PrimaryCommandPool->GetCommandBuffer(frameIndex),
+			(VkImageLayout)newLayout, baseMipLevel, baseArrayLayer, levelCount, layerCount);
+	}
+
+	void RenderCommand::SetImageLayoutImmediate(Ref<Image> image, uint32_t newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {
 		if (Renderer::GetRenderArchitecture() != RenderArchitecture::Vulkan)
 			return;
 		const auto& vulkanImage = image->As<VulkanImage>();
-		vulkanImage->SetLayout((VkCommandBuffer)m_PrimaryCommandPool->GetCurrentFrameCommandBuffer(),
-			(VkImageLayout)newLayout, baseMipLevel, baseArrayLayer, levelCount, layerCount);
-	}
+		vulkanImage->SetLayoutImmediate((VkImageLayout)newLayout, baseMipLevel, baseArrayLayer, levelCount, layerCount);
+	}*/
 
 	void RenderCommand::CopyImageToImage(Ref<Image> srcImage, Ref<Image> destImage, const std::vector<VkImageCopy>& regions) {
 		if (Renderer::GetRenderArchitecture() != RenderArchitecture::Vulkan)
 			return;
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+
 		const auto& srcVulkanImage = srcImage->As<VulkanImage>();
 		const auto& destVulkanImage = destImage->As<VulkanImage>();
-		srcVulkanImage->CopyImageToImage((VkCommandBuffer)m_PrimaryCommandPool->GetCurrentFrameCommandBuffer(), destVulkanImage, regions);
+		srcVulkanImage->CopyImageToImage((VkCommandBuffer)m_PrimaryCommandPool->GetCommandBuffer(frameIndex), destVulkanImage, regions);
 	}
 
 	void RenderCommand::CopyBufferToImage(Ref<ByteBuffer> srcBuffer, Ref<Image> destImage) {

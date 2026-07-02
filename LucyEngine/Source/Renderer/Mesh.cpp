@@ -7,41 +7,28 @@
 #include "Memory/Buffer/VertexBuffer.h"
 #include "Memory/Buffer/IndexBuffer.h"
 
+#include "../Core/Application.h"
+
 #include "Renderer.h"
 
 #include "Core/Timer.h"
 
+#include <unordered_map>
+
 namespace Lucy {
 
-	constexpr static uint32_t ASSIMP_FLAGS = aiProcess_CalcTangentSpace |
-		aiProcess_GenSmoothNormals |
-		aiProcess_FixInfacingNormals |
-		aiProcess_FlipUVs |
-		aiProcess_JoinIdenticalVertices |
-		aiProcess_ImproveCacheLocality |
-		aiProcess_LimitBoneWeights |
-		aiProcess_RemoveRedundantMaterials |
-		aiProcess_ValidateDataStructure |
-		aiProcess_Triangulate |
-		//aiProcess_PreTransformVertices | (animations won't work, if you enable this)
-		aiProcess_SplitLargeMeshes |
-		aiProcess_OptimizeMeshes;
+	constexpr static inline uint32_t ASSIMP_FLAGS = aiProcess_FlipUVs | aiProcessPreset_TargetRealtime_MaxQuality;
 
-	static void IncreaseMeshCount(Mesh* m) {
-		if (MESH_ID_COUNT_X <= 255) {
-			MESH_ID_COUNT_X++;
-		} else {
-			MESH_ID_COUNT_X = 0;
-			if (MESH_ID_COUNT_Y <= 255) {
-				MESH_ID_COUNT_Y++;
-			} else {
-				MESH_ID_COUNT_Y = 0;
-				if (MESH_ID_COUNT_Z <= 255) {
-					MESH_ID_COUNT_Z++;
-				}
-			}
-		}
-		m->m_MeshID = glm::vec3(MESH_ID_COUNT_X, MESH_ID_COUNT_Y, MESH_ID_COUNT_Z);
+	[[nodiscard]] glm::vec3 AllocateMeshID() {
+		const uint32_t id = s_NextMeshID.fetch_add(1, std::memory_order_relaxed);
+
+		LUCY_ASSERT(id <= 0x00FFFFFFu, "Maximum mesh ID count exceeded.");
+
+		return {
+			static_cast<float>(id & 0xFFu),
+			static_cast<float>((id >> 8u) & 0xFFu),
+			static_cast<float>((id >> 16u) & 0xFFu)
+		};
 	}
 
 	Ref<Mesh> Mesh::Create(const std::vector<float>& vertices, const std::vector<uint32_t>& indices) {
@@ -63,7 +50,7 @@ namespace Lucy {
 		Load();
 	}
 
-	void Mesh::Load(Ref<RenderDevice>& device, const std::vector<float>& vertices, const std::vector<uint32_t>& indices) {
+	void Mesh::Load(const Ref<RenderDevice>& device, const std::vector<float>& vertices, const std::vector<uint32_t>& indices) {
 		m_VertexBufferHandle = device->CreateVertexBuffer(vertices.size());
 		m_IndexBufferHandle = device->CreateIndexBuffer(indices.size());
 
@@ -83,168 +70,170 @@ namespace Lucy {
 		Assimp::Importer importer;
 		const aiScene* scene = importer.ReadFile(m_Path, ASSIMP_FLAGS);
 
-		if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+		if (!scene || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) || !scene->mRootNode) {
 			LUCY_CRITICAL("Mesh could not be imported!");
 			LUCY_CRITICAL(importer.GetErrorString());
 			return;
 		}
 
 		m_Name = scene->mRootNode->mName.C_Str();
+		m_MetadataInfo = {};
+		m_Submeshes.clear();
 
-		LoadData(scene);
+		LoadProgram(scene);
 		TraverseHierarchy(scene->mRootNode, glm::mat4(1.0f));
+		m_MeshID = AllocateMeshID();
 
-		IncreaseMeshCount(this);
+		const glm::vec3 meshID = m_MeshID;
 
-		//Getting the size of the buffer
+		static constexpr uint32_t VERTEX_SIZE = 17; // position(3) + meshID(3) + uv(2) + normal(3) + tangent(3) + bitangent(3)
+
+		std::vector<float> packedVertices;
+		std::vector<uint32_t> packedIndices;
+
+		packedVertices.resize(static_cast<size_t>(m_MetadataInfo.TotalVerticesSize) * VERTEX_SIZE);
+		packedIndices.resize(static_cast<size_t>(m_MetadataInfo.TotalIndicesSize));
+
 		for (const Submesh& submesh : m_Submeshes) {
-			m_MetadataInfo.TotalIndicesSize += submesh.IndexCount;
-			m_MetadataInfo.TotalVerticesSize += submesh.VertexCount;
+			if (!submesh.Faces.empty())
+				memcpy(packedIndices.data() + submesh.BaseIndexCount, submesh.Faces.data(), submesh.Faces.size() * sizeof(uint32_t));
+
+			size_t dstFloatOffset = static_cast<size_t>(submesh.BaseVertexCount) * VERTEX_SIZE;
+
+			for (uint32_t i = 0; i < submesh.VertexCount; i++) {
+				glm::vec2 uv = { 0.0f, 0.0f };
+				if (!submesh.TextureCoords.empty())
+					uv = { submesh.TextureCoords[i].x, submesh.TextureCoords[i].y };
+
+				glm::vec3 n = { 0.0f, 0.0f, 0.0f };
+				if (!submesh.Normals.empty())
+					n = { submesh.Normals[i].x, submesh.Normals[i].y, submesh.Normals[i].z };
+
+				glm::vec3 t = { 0.0f, 0.0f, 0.0f };
+				if (!submesh.Tangents.empty())
+					t = { submesh.Tangents[i].x, submesh.Tangents[i].y, submesh.Tangents[i].z };
+
+				glm::vec3 b = { 0.0f, 0.0f, 0.0f };
+				if (!submesh.BiTangents.empty())
+					b = { submesh.BiTangents[i].x, submesh.BiTangents[i].y, submesh.BiTangents[i].z };
+
+				const auto& p = submesh.Vertices[i];
+				float* dst = packedVertices.data() + dstFloatOffset;
+
+				dst[0] = p.x;
+				dst[1] = p.y;
+				dst[2] = p.z;
+
+				dst[3] = meshID.x;
+				dst[4] = meshID.y;
+				dst[5] = meshID.z;
+
+				dst[6] = uv.x;
+				dst[7] = uv.y;
+
+				dst[8] = n.x;
+				dst[9] = n.y;
+				dst[10] = n.z;
+
+				dst[11] = t.x;
+				dst[12] = t.y;
+				dst[13] = t.z;
+
+				dst[14] = b.x;
+				dst[15] = b.y;
+				dst[16] = b.z;
+
+				dstFloatOffset += VERTEX_SIZE;
+			}
 		}
 
-		Renderer::EnqueueToRenderCommandQueue([=](const Ref<RenderDevice>& device) {
-			m_VertexBufferHandle = device->CreateVertexBuffer(m_MetadataInfo.TotalVerticesSize * 17LL);
-			m_IndexBufferHandle = device->CreateIndexBuffer(m_MetadataInfo.TotalIndicesSize);
-
-			const auto& vertexBuffer = Renderer::AccessResource<VertexBuffer>(m_VertexBufferHandle);
-			const auto& indexBuffer = Renderer::AccessResource<IndexBuffer>(m_IndexBufferHandle);
-
-			size_t from = 0;
-			for (uint32_t i = 0; i < m_Submeshes.size(); i++) {
-				const Submesh& submesh = m_Submeshes[i];
-				auto& faces = submesh.Faces;
-				indexBuffer->SetData(faces, from);
-				from += faces.size();
-			}
-
-			from = 0;
-
-			for (Submesh& submesh : m_Submeshes) {
-				auto& submeshVertices = submesh.Vertices;
-				auto& submeshTextureCoords = submesh.TextureCoords;
-				auto& submeshNormals = submesh.Normals;
-				auto& submeshTangents = submesh.Tangents;
-				auto& submeshBiTangents = submesh.BiTangents;
-
-				for (uint32_t i = 0; i < submesh.VertexCount; i++) {
-
-					glm::vec2 textureCoords = { 0.0f, 0.0f };
-					if (!submeshTextureCoords.empty())
-						textureCoords = { submeshTextureCoords[i].x, submeshTextureCoords[i].y };
-
-					glm::vec3 normals = { 0.0f, 0.0f, 0.0f };
-					if (!submeshNormals.empty())
-						normals = { submeshNormals[i].x, submeshNormals[i].y, submeshNormals[i].z };
-
-					glm::vec3 tangents = { 0.0f, 0.0f, 0.0f };
-					if (!submeshTangents.empty())
-						tangents = { submeshTangents[i].x, submeshTangents[i].y, submeshTangents[i].z };
-
-					glm::vec3 biTangents = { 0.0f, 0.0f, 0.0f };
-					if (!submeshBiTangents.empty())
-						biTangents = { submeshBiTangents[i].x, submeshBiTangents[i].y, submeshBiTangents[i].z };
-
-					std::vector<float> vertex = {
-						submeshVertices[i].x,
-						submeshVertices[i].y,
-						submeshVertices[i].z,
-
-						(float)MESH_ID_COUNT_X,
-						(float)MESH_ID_COUNT_Y,
-						(float)MESH_ID_COUNT_Z,
-
-						textureCoords.x,
-						textureCoords.y,
-
-						normals.x,
-						normals.y,
-						normals.z,
-
-						tangents.x,
-						tangents.y,
-						tangents.z,
-
-						biTangents.x,
-						biTangents.y,
-						biTangents.z
-					};
-					vertexBuffer->SetData(vertex, from);
-					from += vertex.size();
-				}
-			}
-				
-			vertexBuffer->RTLoadToDevice();
-			indexBuffer->RTLoadToDevice();
+		Renderer::EnqueueToRenderCommandQueue([this, packedVertices = std::move(packedVertices), packedIndices = std::move(packedIndices)](const Ref<RenderDevice>& device) {
+			Load(device, packedVertices, packedIndices);
 		});
 	}
 
-	void Mesh::LoadData(const aiScene* scene) {
+	void Mesh::LoadProgram(const aiScene* scene) {
+		const auto& taskScheduler = Application::GetTaskScheduler();
+
 		ScopedTimer scopedTimer(std::format("{0} data parsing", m_Name));
 
 		aiMesh** meshes = scene->mMeshes;
-		uint32_t meshCount = scene->mNumMeshes;
+		const uint32_t meshCount = scene->mNumMeshes;
 
-		uint32_t baseVertexCount = 0;
-		uint32_t baseIndexCount = 0;
+		m_Submeshes.resize(meshCount);
 
-		for (uint32_t i = 0; i < meshCount; i++) {
-			aiMesh* mesh = meshes[i];
-			Submesh submesh;
-			submesh.BaseVertexCount = baseVertexCount;
-			submesh.BaseIndexCount = baseIndexCount;
+		taskScheduler->ScheduleBatch(TaskScheduler::Launch::Async, TaskPriority::High, [=](const TaskArgs& args, const TaskBatchArgs&) {
+			const uint32_t index = static_cast<uint32_t>(args.TaskIndex);
+
+			aiMesh* mesh = meshes[index];
+			Submesh& submesh = m_Submeshes[index];
+
 			submesh.VertexCount = mesh->mNumVertices;
 			submesh.IndexCount = mesh->mNumFaces * 3;
 
-			baseVertexCount += submesh.VertexCount;
-			baseIndexCount += submesh.IndexCount;
-
-			uint32_t sizeVertices = submesh.VertexCount;
+			const uint32_t vertexCount = submesh.VertexCount;
 
 			if (mesh->HasPositions()) {
-				aiVector3D* vertices = mesh->mVertices;
-				submesh.Vertices.resize(sizeVertices);
-				memcpy(submesh.Vertices.data(), vertices, sizeVertices * sizeof(aiVector3D));
+				submesh.Vertices.resize(vertexCount);
+				memcpy(submesh.Vertices.data(), mesh->mVertices, vertexCount * sizeof(aiVector3D));
 			}
 
 			if (mesh->HasNormals()) {
-				aiVector3D* normals = mesh->mNormals;
-				submesh.Normals.resize(sizeVertices);
-				memcpy(submesh.Normals.data(), normals, sizeVertices * sizeof(aiVector3D));
+				submesh.Normals.resize(vertexCount);
+				memcpy(submesh.Normals.data(), mesh->mNormals, vertexCount * sizeof(aiVector3D));
 			}
 
 			if (mesh->HasTextureCoords(0)) {
-				aiVector3D* textureCoords = mesh->mTextureCoords[0];
-				submesh.TextureCoords.reserve(sizeVertices);
-				for (uint32_t j = 0; j < sizeVertices; j++) {
-					submesh.TextureCoords.emplace_back(textureCoords[j].x, textureCoords[j].y);
+				submesh.TextureCoords.resize(vertexCount);
+				const aiVector3D* textureCoords = mesh->mTextureCoords[0];
+				for (uint32_t j = 0; j < vertexCount; j++) {
+					submesh.TextureCoords[j] = { textureCoords[j].x, textureCoords[j].y };
 				}
 			}
 
 			if (mesh->HasTangentsAndBitangents()) {
-				aiVector3D* tangents = mesh->mTangents;
-				submesh.Tangents.resize(sizeVertices);
-				memcpy(submesh.Tangents.data(), tangents, sizeVertices * sizeof(aiVector3D));
+				submesh.Tangents.resize(vertexCount);
+				submesh.BiTangents.resize(vertexCount);
 
-				aiVector3D* biTangents = mesh->mBitangents;
-				submesh.BiTangents.resize(sizeVertices);
-				memcpy(submesh.BiTangents.data(), biTangents, sizeVertices * sizeof(aiVector3D));
+				memcpy(submesh.Tangents.data(), mesh->mTangents, vertexCount * sizeof(aiVector3D));
+				memcpy(submesh.BiTangents.data(), mesh->mBitangents, vertexCount * sizeof(aiVector3D));
 			}
 
 			if (mesh->HasFaces()) {
-				submesh.Faces.reserve(submesh.IndexCount);
+				submesh.Faces.resize(submesh.IndexCount);
+
+				uint32_t dst = 0;
 				for (uint32_t j = 0; j < mesh->mNumFaces; j++) {
-					aiFace aiFace = mesh->mFaces[j];
-					for (uint32_t k = 0; k < aiFace.mNumIndices; k++) {
-						submesh.Faces.emplace_back(aiFace.mIndices[k]);
-					}
+					const aiFace& face = mesh->mFaces[j];
+					LUCY_ASSERT(face.mNumIndices == 3, "Mesh is expected to be triangulated.");
+					submesh.Faces[dst++] = face.mIndices[0];
+					submesh.Faces[dst++] = face.mIndices[1];
+					submesh.Faces[dst++] = face.mIndices[2];
 				}
 			}
+		}, meshCount, 1);
 
-			//TODO: Animation
+		taskScheduler->WaitForAllTasks();
 
-			submesh.MaterialID = Renderer::GetMaterialManager()->CreateMaterialByPath(MaterialType::PBR, 
-				scene->mMaterials[mesh->mMaterialIndex], m_Path);
-			m_Submeshes.push_back(submesh);
+		uint32_t runningVertexOffset = 0;
+		uint32_t runningIndexOffset = 0;
+
+		for (uint32_t i = 0; i < meshCount; i++) {
+			Submesh& submesh = m_Submeshes[i];
+
+			submesh.BaseVertexCount = runningVertexOffset;
+			submesh.BaseIndexCount = runningIndexOffset;
+
+			runningVertexOffset += submesh.VertexCount;
+			runningIndexOffset += submesh.IndexCount;
+		}
+
+		m_MetadataInfo.TotalVerticesSize = runningVertexOffset;
+		m_MetadataInfo.TotalIndicesSize = runningIndexOffset;
+
+		for (uint32_t i = 0; i < meshCount; i++) {
+			aiMesh* mesh = meshes[i];
+			m_Submeshes[i].MaterialID = Renderer::GetMaterialManager()->CreateMaterialByPath(MaterialType::PBR, scene->mMaterials[mesh->mMaterialIndex], m_Path);
 		}
 	}
 
@@ -258,14 +247,15 @@ namespace Lucy {
 		}
 
 		for (uint32_t i = 0; i < node->mNumChildren; i++) {
-			aiNode* childrenNode = node->mChildren[i];
-			TraverseHierarchy(childrenNode, transformed);
+			aiNode* childNode = node->mChildren[i];
+			TraverseHierarchy(childNode, transformed);
 		}
 	}
 
 	void Mesh::Destroy() {
 		for (Submesh& submesh : m_Submeshes)
 			Renderer::GetMaterialManager()->RTDestroyMaterial(submesh.MaterialID);
+
 		Renderer::EnqueueResourceDestroy(m_VertexBufferHandle);
 		Renderer::EnqueueResourceDestroy(m_IndexBufferHandle);
 	}

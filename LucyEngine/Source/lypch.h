@@ -5,11 +5,12 @@
 	#ifndef NOMINMAX
 	#define NOMINMAX
 	#endif
-	
+
 	#include <Windows.h>
 #endif
 
 #define GLM_FORCE_RADIANS
+#define GLM_FORCE_RIGHT_HANDED
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_ENABLE_EXPERIMENTAL
 

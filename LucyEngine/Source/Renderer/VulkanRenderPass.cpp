@@ -3,7 +3,9 @@
 
 #include "Renderer/Renderer.h"
 #include "Device/VulkanRenderDevice.h"
+
 #include "Context/VulkanSwapChain.h"
+#include "Context/VulkanContext.h"
 
 namespace Lucy {
 
@@ -80,7 +82,20 @@ namespace Lucy {
 		if (m_CreateInfo.Multiview.IsValid())
 			createInfo.pNext = &renderPassMultiview;
 
-		LUCY_VK_ASSERT(vkCreateRenderPass(m_VulkanDevice->GetLogicalDevice(), &createInfo, nullptr, &m_RenderPass));
+		VkDevice logicalDevice = m_VulkanDevice->GetLogicalDevice();
+		LUCY_VK_ASSERT(vkCreateRenderPass(logicalDevice, &createInfo, nullptr, &m_RenderPass));
+
+#ifdef LUCY_DEBUG
+		std::string objectName = std::format("{0} Render Pass", GetDebugName());
+
+		VkDebugUtilsObjectNameInfoEXT nameInfo{};
+		nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+		nameInfo.objectType = VK_OBJECT_TYPE_RENDER_PASS;
+		nameInfo.objectHandle = reinterpret_cast<uint64_t>(m_RenderPass);
+		nameInfo.pObjectName = objectName.c_str();
+
+		VulkanExternalFuncLinkage::vkSetDebugUtilsObjectNameEXT(logicalDevice, &nameInfo);
+#endif
 	}
 
 	void VulkanRenderPass::RTBegin(VulkanRenderPassBeginInfo& info) {

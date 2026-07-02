@@ -3,6 +3,7 @@
 #include <future>
 
 #include "Core/Timer.h"
+#include "Core/Application.h"
 
 #include "Renderer.h"
 #include "Renderer/VulkanRenderer.h"
@@ -52,51 +53,13 @@ namespace Lucy {
 
 		LUCY_ASSERT(s_Backend, "RendererBackend is nullptr!");
 
-		constexpr size_t graphicsShaderCount = 5;
-		constexpr size_t computeShaderCount = 2;
-
-		constexpr const std::array<const char*, graphicsShaderCount> graphicsShaders = {
-			"LucyPBR",
-			"LucyID",
-			"LucyHDRSkybox",
-			"LucyImageToHDRConverter",
-			"LucyVSM",
-		};
-
-		constexpr const std::array<const char*, computeShaderCount> computeShaders = {
-			"LucyIrradianceGen",
-			"LucyPrefilterGen",
-		};
-
 		const auto& device = GetRenderDevice();
-		const auto& shaderFolder = Shader::GetShaderFolder();
 		
-		static std::mutex shaderCompilationMutex;
+		s_ShaderManager.InitializeShaders(device);
 
-		TaskScheduler* taskScheduler = Application::GetTaskScheduler();
-		{
-			ScopedTimer timer("Shader Compilation");
-
-			const auto ScheduleShaderCompilationBatch = [&]<typename T>(const T& shaderArray, const char* extension, size_t count) {
-				taskScheduler->ScheduleBatch(TaskScheduler::Launch::Async, TaskPriority::High, [=](const TaskArgs& args, const TaskBatchArgs& batchArgs) {
-					const std::string& shaderName = shaderArray[batchArgs.BatchIndex];
-					auto shader = Shader::Create(shaderName, shaderFolder / (shaderName + extension), device);
-					std::unique_lock lock(shaderCompilationMutex);
-					PushShader(shader);
-				}, count, 1);
-			};
-			ScheduleShaderCompilationBatch(graphicsShaders, ".glsl", graphicsShaderCount);
-#if USE_COMPUTE_FOR_CUBEMAP_GEN
-			ScheduleShaderCompilationBatch(computeShaders, ".comp", computeShaderCount);
-#else
-			ScheduleShaderCompilationBatch(computeShaders, ".glsl", computeShaderCount);
-#endif
-
-		}
-
-		s_RenderGraph = Memory::CreateRef<RenderGraph>();
+		s_RenderGraph = Memory::CreateRef<RenderGraph>(s_Config.RenderArchitecture, s_Backend->GetRenderDevice());
 		s_PipelineManager = Memory::CreateUnique<PipelineManager>(GetRenderDevice());
-		s_MaterialManager = Memory::CreateUnique<MaterialManager>(s_Shaders);
+		s_MaterialManager = Memory::CreateUnique<MaterialManager>(s_PipelineManager);
 
 		EnqueueToRenderCommandQueue([](const Ref<RenderDevice>& device) {
 			static ImageCreateInfo blankCubeCreateInfo;
@@ -105,14 +68,14 @@ namespace Lucy {
 			blankCubeCreateInfo.Format = ImageFormat::R32G32B32A32_SFLOAT;
 			blankCubeCreateInfo.ImageType = ImageType::TypeCube;
 			blankCubeCreateInfo.ImageUsage = ImageUsage::AsColorTransferAttachment;
-			blankCubeCreateInfo.Parameter.U = ImageAddressMode::REPEAT;
-			blankCubeCreateInfo.Parameter.V = ImageAddressMode::REPEAT;
-			blankCubeCreateInfo.Parameter.W = ImageAddressMode::REPEAT;
-			blankCubeCreateInfo.Parameter.Mag = ImageFilterMode::LINEAR;
-			blankCubeCreateInfo.Parameter.Min = ImageFilterMode::LINEAR;
 			blankCubeCreateInfo.GenerateSampler = true;
 
 			s_BlankCubeHandle = device->CreateImage(blankCubeCreateInfo);
+
+			static ImageCreateInfo blankArrayCreateInfo = blankCubeCreateInfo;
+			blankArrayCreateInfo.ImageType = ImageType::Type2D;
+			blankArrayCreateInfo.Layers = 6;
+			s_BlankArrayHandle = device->CreateImage(blankArrayCreateInfo);
 		});
 
 		static std::vector<float> vertices = {
@@ -166,14 +129,12 @@ namespace Lucy {
 
 		s_CubeMesh = Mesh::Create(vertices, indices);
 
-		taskScheduler->WaitForAllTasks();
-
 		if (config.ThreadingPolicy == ThreadingPolicy::Singlethreaded)
 			s_Backend->FlushCommandQueue();
 	}
 
 	void Renderer::CompileRenderGraph() {
-		s_RenderGraph->Compile();
+		s_RenderGraph->Build();
 
 		const auto& device = GetRenderDevice();
 		auto& acyclicGraph = s_RenderGraph->GetAcyclicGraph();
@@ -184,18 +145,17 @@ namespace Lucy {
 
 			for (const RenderGraphResource& rgRenderTarget : rgRenderTargetElements) {
 				auto image = s_RenderGraph->GetImageByRGResource(rgRenderTarget);
-				const auto& imageData = s_RenderGraph->GetImageData(rgRenderTarget);
 				bool isDepth = image->GetFormat() == ImageFormat::D32_SFLOAT;
 
 				RenderGraphPass* renderTargetPass = acyclicGraph.FindOutputPassGivenResource(rgRenderTarget);
 				bool usingRenderTargetsOfAnotherPass = currentPass != renderTargetPass;
 
-				RenderPassLoadStoreAttachments loadStoreOp = imageData.LoadStoreAttachment;
+				RenderPassLoadStoreAttachments loadStoreOp = s_RenderGraph->GetLoadStoreAttachmentsByRGResource(rgRenderTarget);
 				VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 				if (usingRenderTargetsOfAnotherPass) {
 					loadStoreOp = RenderPassLoadStoreAttachments::LoadStore;
-					initialLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR;
+					initialLayout = image->As<VulkanImage>()->GetCurrentLayout();
 				}
 
 				if (isDepth) {
@@ -213,7 +173,7 @@ namespace Lucy {
 
 				colorAttachments.emplace_back(image->GetFormat(), image->GetSamples(),
 											  loadStoreOp, RenderPassLoadStoreAttachments::DontCareDontCare,
-											  initialLayout, VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR,
+											  initialLayout, image->As<VulkanImage>()->GetCurrentLayout(),
 											  RenderPassLayout::AttachmentReference{ VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
 			}
 
@@ -244,7 +204,7 @@ namespace Lucy {
 
 			for (const auto& rgRenderTarget : rgRenderTargetElements) {
 				const auto& image = s_RenderGraph->GetImageByRGResource(rgRenderTarget);
-				const auto& imageData = s_RenderGraph->GetImageData(rgRenderTarget);
+				auto handle = s_RenderGraph->GetHandleByRGResource(rgRenderTarget);
 				bool isDepth = image->GetFormat() == ImageFormat::D32_SFLOAT;
 
 				RenderGraphPass* renderTargetPass = acyclicGraph.FindOutputPassGivenResource(rgRenderTarget);
@@ -259,10 +219,10 @@ namespace Lucy {
 				}
 
 				if (isDepth) {
-					depthImageHandle = imageData.ResourceHandle;
+					depthImageHandle = handle;
 					continue;
 				}
-				imageBufferHandles.push_back(imageData.ResourceHandle);
+				imageBufferHandles.push_back(handle);
 			}
 
 			FrameBufferCreateInfo frameBufferCreateInfo{
@@ -279,12 +239,12 @@ namespace Lucy {
 
 		const auto CreateGraphicsPipeline = [](const char* shaderName, const char* passName, const char* pipelineName, 
 			Rasterization rasterizationConfig = {}, DepthConfiguration depthConfig = {}, BlendConfiguration blendConfig = {}) {
-			if (!s_Shaders.contains(shaderName)) {
+			if (!s_ShaderManager.HasShader(shaderName)) {
 				LUCY_WARN("Shader '{0}' cannot be found while creating graphics pipeline '{1}' for pass '{2}'!",
 					shaderName, pipelineName, passName);
 				return;
 			}
-			const auto& shader = s_Shaders.at(shaderName);
+			const auto& shader = s_ShaderManager.GetShader(ShaderStageType::VertexAndFragment, shaderName);
 			if (!s_RenderFrameHandleMap.contains(passName)) {
 				LUCY_WARN("Frame handles for pass '{0}' cannot be found that uses shader '{1}' and tries to create graphics pipeline '{2}'!",
 					passName, shaderName, pipelineName);
@@ -302,12 +262,12 @@ namespace Lucy {
 		};
 
 		const auto CreateComputePipeline = [](const char* shaderName, const char* pipelineName) {
-			const auto& shader = s_Shaders.at(shaderName);
-			if (!s_Shaders.contains(shaderName)) {
+			if (!s_ShaderManager.HasShader(shaderName)) {
 				LUCY_WARN("Shader '{0}' cannot be found while creating compute pipeline '{1}'!",
 					shaderName, pipelineName);
 				return;
 			}
+			const auto& shader = s_ShaderManager.GetShader(ShaderStageType::Compute, shaderName);
 			s_PipelineManager->CreateComputePipeline(pipelineName, ComputePipelineCreateInfo{
 				.Shader = shader->As<ComputeShader>(),
 			});
@@ -348,7 +308,7 @@ namespace Lucy {
 			};
 
 #if !USE_COMPUTE_FOR_CUBEMAP_GEN
-			constexpr size_t graphicsPipelineCount = 7;
+			constexpr size_t graphicsPipelineCount = 6;
 #else
 			constexpr size_t graphicsPipelineCount = 5;
 #endif
@@ -395,23 +355,36 @@ namespace Lucy {
 					.PassName = "IrradiancePass",
 					.PipelineName = "IrradiancePipeline",
 				},
-				{
-					.ShaderName = "LucyPrefilterGen",
-					.PassName = "PrefilterPass",
-					.PipelineName = "PrefilterPipeline",
-				},
 #endif
 			};
 
-			constexpr size_t computePipelineCount = 2;
+#if USE_COMPUTE_FOR_CUBEMAP_GEN
+			constexpr size_t computePipelineCount = 5;
+#else
+			constexpr size_t computePipelineCount = 4;
+#endif
 			constexpr const std::array<RenderGraphPipelineCreateInfo, computePipelineCount> computePipelineCreateInfos = {
+#if USE_COMPUTE_FOR_CUBEMAP_GEN
 				RenderGraphPipelineCreateInfo {
 					.ShaderName = "LucyIrradianceGen",
 					.PipelineName = "IrradianceComputePipeline"
 				},
-				{
+#endif
+				RenderGraphPipelineCreateInfo {
+					.ShaderName = "LucyBRDFLut",
+					.PipelineName = "BRDFLutComputePipeline"
+				},
+				RenderGraphPipelineCreateInfo {
 					.ShaderName = "LucyPrefilterGen",
 					.PipelineName = "PrefilterComputePipeline"
+				},
+				RenderGraphPipelineCreateInfo {
+					.ShaderName = "LucyBlur",
+					.PipelineName = "VSMHorizontalBlurComputePipeline"
+				},
+				RenderGraphPipelineCreateInfo {
+					.ShaderName = "LucyBlur",
+					.PipelineName = "VSMVerticalBlurComputePipeline"
 				},
 			};
 
@@ -448,17 +421,18 @@ namespace Lucy {
 
 	void Renderer::ExecuteRenderGraph() {
 		LUCY_PROFILE_NEW_EVENT("Renderer::ExecuteRenderGraph");
-		s_RenderGraph->Execute();
+		auto batches = s_RenderGraph->Execute();
+		SubmitToRender(batches);
 	}
 
 	void Renderer::Flush() {
 		LUCY_PROFILE_NEW_EVENT("Renderer::Flush");
 		s_RenderGraph->Flush();
+		s_MaterialManager->UpdateMaterialsIfNecessary();
 	}
 
 	RenderContextResultCodes Renderer::WaitAndPresent() {
 		LUCY_PROFILE_NEW_EVENT("Renderer::WaitAndPresent");
-		s_MaterialManager->UpdateMaterialsIfNecessary();
 		return s_Backend->WaitAndPresent();
 	}
 
@@ -482,18 +456,18 @@ namespace Lucy {
 			distinctFrameBufferHandles.insert(fb);
 		}
 
-		auto destroyResources = [](const auto& resourceSet) {
+		auto DestroyResources = [](const auto& resourceSet) {
 			for (auto resource : resourceSet) {
 				EnqueueResourceDestroy(resource);
 			}
 		};
 
-		destroyResources(distinctRenderPassHandles);
-		destroyResources(distinctFrameBufferHandles);
+		DestroyResources(distinctRenderPassHandles);
+		DestroyResources(distinctFrameBufferHandles);
 
 		s_PipelineManager->DestroyAll();
 		s_MaterialManager->DestroyAll();
-
+		
 		s_CubeMesh->Destroy();
 		DestroyAllShaders();
 
@@ -553,10 +527,6 @@ namespace Lucy {
 		s_Backend->InitializeImGui();
 	}
 
-	void Renderer::RenderImGui() {
-		s_Backend->RTRenderImGui();
-	}
-
 	bool Renderer::IsValidRenderResource(RenderResourceHandle handle) {
 		bool isValid = (handle != InvalidRenderResourceHandle); //check if the handle is invalid
 		isValid &= GetRenderDevice()->IsValidResource(handle);
@@ -569,34 +539,19 @@ namespace Lucy {
 			device->WaitForQueue(TargetQueueFamily::Graphics);
 			device->WaitForQueue(TargetQueueFamily::Compute);
 
-			const Ref<Shader>& shader = s_Shaders.at(name);
-			shader->RTDestroyResource(device);
-			shader->RTLoad(device, true);
+			const auto& shaders = s_ShaderManager.GetShaderStageMap(name);
+			for (const auto& shader : shaders | std::views::values)
+				shader->RTDestroyResource(device);
+
+			s_ShaderManager.ReloadShader(device, name);
 		});
 
-		const Ref<Shader>& shader = s_Shaders.at(name);
-		s_PipelineManager->RTRecreateAllPipelinesDependentOnShader(shader);
+		s_PipelineManager->RTRecreateAllPipelinesDependentOnShader(name);
 	}
 
-	void Renderer::SubmitToRender(RenderGraphPass& pass) {
-		switch (pass.GetTargetQueueFamily()) {
-			case TargetQueueFamily::Compute: {
-				s_Backend->SubmitToCompute(pass);
-				break;
-			}
-			case TargetQueueFamily::Graphics: {
-				const auto& [renderPassHandle, frameBufferHandle] = s_RenderFrameHandleMap.at(pass.GetName());
-				s_Backend->SubmitToRender(pass, renderPassHandle, frameBufferHandle);
-				break;
-			}
-			case TargetQueueFamily::Transfer: {
-				LUCY_ASSERT(false);
-				break;
-			}
-			default:
-				LUCY_ASSERT(false);
-				break;
-		}
+	void Renderer::SubmitToRender(std::vector<ExecutionBatch>& batches) {
+		LUCY_PROFILE_NEW_EVENT("Renderer::SubmitToRender");
+		s_Backend->SubmitBatchesToRender(batches, s_RenderFrameHandleMap);
 	}
 
 	void Renderer::OnEvent(Event& evt) {
@@ -652,20 +607,12 @@ namespace Lucy {
 		return glm::vec3(-1.0f);
 	}
 
-	void Renderer::PushShader(Ref<Shader> shader) {
-		const auto& name = shader->GetName();
-		//LUCY_ASSERT(!s_Shaders.contains(name), "Creating shader that already exists!");
-		if (s_Shaders.contains(name))
-			return;
-		s_Shaders.try_emplace(name, shader);
-	}
-
 	void Renderer::DestroyAllShaders() {
 		EnqueueToRenderCommandQueue([](const auto& device){
 			LUCY_ASSERT(IsOnRenderThread(), "DestroyAllShaders is being called from the main thread!");
 
-			for (const auto& shader : s_Shaders | std::views::values)
-				shader->RTDestroyResource(device);
+			s_ShaderManager.DestroyAllShaders(device);
+			s_ShaderManager.Destroy();
 		});
 	}
 }

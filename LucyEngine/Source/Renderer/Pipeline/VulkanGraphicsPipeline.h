@@ -3,6 +3,7 @@
 #include "GraphicsPipeline.h"
 
 #include "Renderer/Descriptors/VulkanDescriptorPool.h"
+#include "Renderer/Memory/Buffer/PushConstant.h"
 
 namespace Lucy {
 
@@ -19,6 +20,8 @@ namespace Lucy {
 	private:
 		void Create(const Ref<VulkanRenderDevice>& vulkanDevice);
 		void RTDestroyResource() final override;
+
+		void RTLoadDescriptors(const Ref<RenderDevice>& vulkanDevice) final override;
 
 		VkVertexInputBindingDescription CreateBindingDescription() const;
 		std::vector<VkVertexInputAttributeDescription> CreateAttributeDescription(uint32_t binding);

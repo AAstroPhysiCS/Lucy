@@ -33,10 +33,7 @@ namespace Lucy {
 		uint32_t TotalVerticesSize = 0;
 	};
 
-	static int32_t MESH_ID_COUNT_X = 0;
-	static int32_t MESH_ID_COUNT_Y = 0;
-	static int32_t MESH_ID_COUNT_Z = 0;
-	static int32_t MESH_ID_COUNT_W = 0;
+	inline static std::atomic_uint32_t s_NextMeshID = 1;
 
 	class Mesh : public MemoryTrackable {
 	public:
@@ -60,10 +57,10 @@ namespace Lucy {
 
 		void Destroy();
 	private:
-		void Load(Ref<RenderDevice>& device, const std::vector<float>& vertices, const std::vector<uint32_t>& indices);
+		void Load(const Ref<RenderDevice>& device, const std::vector<float>& vertices, const std::vector<uint32_t>& indices);
 		void Load();
 
-		void LoadData(const aiScene* scene);
+		void LoadProgram(const aiScene* scene);
 		void TraverseHierarchy(const aiNode* node, const glm::mat4& parentTransform);
 
 		RenderResourceHandle m_VertexBufferHandle = InvalidRenderResourceHandle;
@@ -76,7 +73,7 @@ namespace Lucy {
 		glm::vec3 m_MeshID = glm::vec3(-1.0f);
 		MetadataInfo m_MetadataInfo;
 	private:
-		friend void IncreaseMeshCount(Mesh* m);
+		friend glm::vec3 AllocateMeshID();
 	};
 }
 

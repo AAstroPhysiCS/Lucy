@@ -13,12 +13,11 @@ namespace Lucy {
 
 		const auto& vulkanDevice = createInfo.RenderDevice->As<VulkanRenderDevice>();
 
-		VkCommandPoolCreateInfo createCommandPoolInfo = VulkanAPI::CommandPoolCreateInfo(m_CreateInfo.PoolFlags, 
-			m_CreateInfo.TargetQueueFamily == TargetQueueFamily::Graphics ? vulkanDevice->GetQueueFamilies().GraphicsFamily : vulkanDevice->GetQueueFamilies().ComputeFamily);
+		VkCommandPoolCreateInfo createCommandPoolInfo = VulkanAPI::CommandPoolCreateInfo(m_CreateInfo.PoolFlags, vulkanDevice->GetQueue(m_CreateInfo.TargetQueueFamily).Family);
 		LUCY_VK_ASSERT(vkCreateCommandPool(vulkanDevice->GetLogicalDevice(), &createCommandPoolInfo, nullptr, &m_CommandPool));
 
 		m_CommandBuffers.resize(m_CreateInfo.CommandBufferCount);
-
+		
 		VkCommandBufferAllocateInfo createAllocInfo = VulkanAPI::CommandBufferAllocateInfo(m_CommandPool, m_CreateInfo.Level, m_CreateInfo.CommandBufferCount);
 		LUCY_VK_ASSERT(vkAllocateCommandBuffers(vulkanDevice->GetLogicalDevice(), &createAllocInfo, m_CommandBuffers.data()));
 	}
@@ -28,6 +27,12 @@ namespace Lucy {
 		vkDestroyCommandPool(vulkanDevice->GetLogicalDevice(), m_CommandPool, nullptr);
 	}
 
+	void VulkanCommandPool::Reset() {
+		const auto& vulkanDevice = m_CreateInfo.RenderDevice->As<VulkanRenderDevice>();
+		LUCY_VK_ASSERT(vkResetCommandPool(vulkanDevice->GetLogicalDevice(), m_CommandPool, 0));
+		SetAllState(CommandBufferSlotState::Ready);
+	}
+
 	void VulkanCommandPool::Recreate() {
 		const auto& vulkanDevice = m_CreateInfo.RenderDevice->As<VulkanRenderDevice>();
 
@@ -35,6 +40,15 @@ namespace Lucy {
 
 		VkCommandBufferAllocateInfo createAllocInfo = VulkanAPI::CommandBufferAllocateInfo(m_CommandPool, m_CreateInfo.Level, m_CreateInfo.CommandBufferCount);
 		LUCY_VK_ASSERT(vkAllocateCommandBuffers(vulkanDevice->GetLogicalDevice(), &createAllocInfo, m_CommandBuffers.data()));
+	}
+
+	void VulkanCommandPool::ResetCommandBuffer(uint32_t frameIndex) {
+		const auto& vulkanDevice = m_CreateInfo.RenderDevice->As<VulkanRenderDevice>();
+
+		LUCY_ASSERT(frameIndex < m_CommandBuffers.size(), "Invalid frame slot!");
+		LUCY_VK_ASSERT(vkResetCommandBuffer(m_CommandBuffers[frameIndex], 0));
+
+		SetState(frameIndex, CommandBufferSlotState::Ready);
 	}
 
 	void VulkanCommandPool::FreeCommandBuffers(uint32_t commandBufferCount, size_t commandBufferStartIndex) {

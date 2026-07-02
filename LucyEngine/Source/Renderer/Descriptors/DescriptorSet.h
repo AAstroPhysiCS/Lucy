@@ -2,11 +2,13 @@
 
 #include "Renderer/Device/RenderResource.h"
 
+#include "Renderer/Shader/ShaderReflect.h"
+
 namespace Lucy {
 
 #if USE_INTEGRATED_GRAPHICS
-	constexpr uint32_t MAX_DYNAMIC_DESCRIPTOR_COUNT = 32u;
-	constexpr uint32_t MAX_DYNAMICALLY_ALLOCATED_BUFFER_SIZE = 1024u * 10u;
+	constexpr uint32_t MAX_DYNAMIC_DESCRIPTOR_COUNT = 4u;
+	constexpr uint32_t MAX_DYNAMICALLY_ALLOCATED_BUFFER_SIZE = 128u;
 #else
 	constexpr uint32_t MAX_DYNAMIC_DESCRIPTOR_COUNT = 1024u;
 	constexpr uint32_t MAX_DYNAMICALLY_ALLOCATED_BUFFER_SIZE = MAX_DYNAMIC_DESCRIPTOR_COUNT * 10u; //10 kilobytes
@@ -14,7 +16,7 @@ namespace Lucy {
 
 	struct DescriptorSetCreateInfo {
 		uint32_t SetIndex = 0;
-		std::vector<ShaderUniformBlock> ShaderUniformBlocks;
+		std::vector<ShaderVariable> ShaderVariables;
 	};
 
 	class DescriptorSet : public RenderResource {

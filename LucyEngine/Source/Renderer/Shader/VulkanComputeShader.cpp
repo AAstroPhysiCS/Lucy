@@ -6,12 +6,12 @@
 
 namespace Lucy {
 
-	VulkanComputeShader::VulkanComputeShader(const std::string& name, const std::filesystem::path& path, Ref<RenderDevice> device)
-		: ComputeShader(name, path, device) {
-		RTLoad(device);
+	VulkanComputeShader::VulkanComputeShader(const std::string& name, const std::filesystem::path& path, Ref<RenderDevice> device, const std::span<const uint32_t>& dataCompute)
+		: ComputeShader(name, path) {
+		RTLoad(device, { dataCompute });
 	}
 
-	void VulkanComputeShader::LoadInternal(const Ref<RenderDevice>& device, const std::vector<uint32_t>& dataCompute) {
+	void VulkanComputeShader::LoadInternal(const Ref<RenderDevice>& device, const std::span<const uint32_t>& dataCompute) {
 		VkShaderModuleCreateInfo computeCreateInfo = VulkanAPI::ShaderModuleCreateInfo(dataCompute.size() * sizeof(uint32_t), dataCompute.data());
 
 		VkDevice logicalDevice = device->As<VulkanRenderDevice>()->GetLogicalDevice();

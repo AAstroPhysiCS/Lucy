@@ -1,5 +1,5 @@
-// Vertex Shader
-[shader("vertex")]
+#include "LucyCommons.slang"
+
 struct VertexInput {
     [[vk::location(0)]] float3 a_Pos : POSITION;
     [[vk::location(1)]] float3 a_ID : ID;
@@ -11,60 +11,84 @@ struct VertexInput {
 
 struct VertexOutput {
     float4 a_Pos : SV_Position;
-    [[vk::location(0)]] float3 a_PosOut : POSITION0;
+    [[vk::location(0)]] float3 a_PosOutWS : POSITION0;
     [[vk::location(1)]] float2 a_TextureCoordsOut : TEXCOORD0;
-    [[vk::location(2)]] float3 a_NormalsOut : NORMAL;
-    [[vk::location(3)]] float a_Depth : DEPTH;
+    [[vk::location(2)]] float3 a_NormalsWSOut : NORMAL;
+    [[vk::location(3)]] float4 a_TangentWSOut : TANGENT0;
+    [[vk::location(4)]] float a_ViewDepthOut : TEXCOORD1;
 };
 
-[[vk::binding(0, 0)]] 
-cbuffer LucyCamera : register(b0) {
+struct LucyCamera {
     float4x4 u_ViewMatrix;
     float4x4 u_ProjMatrix;
     float4 u_CamPos;
 };
 
-[[vk::push_constant]] 
+[[vk::binding(0, 0)]]
+ConstantBuffer<LucyCamera> Camera;
+
 struct LocalPushConstant {
     float4x4 u_ModelMatrix;
+    float4x4 u_ModelMatrixInversedTransposed;
     float u_MaterialID;
-} pushConstants;
+};
 
+[[vk::push_constant]]
+LocalPushConstant PushConstants;
+
+[shader("vertex")]
 VertexOutput main(VertexInput input) {
+    float4 worldPos = mul(PushConstants.u_ModelMatrix, float4(input.a_Pos, 1.0));
+    float4 viewPos = mul(Camera.u_ViewMatrix, worldPos);
+
     VertexOutput output;
-    
-    output.a_PosOut = input.a_Pos;
+    output.a_Pos = mul(Camera.u_ProjMatrix, viewPos);
+    output.a_PosOutWS = worldPos.xyz;
     output.a_TextureCoordsOut = input.a_TextureCoords;
-    output.a_NormalsOut = input.a_Normals;
 
-    float4 worldPos = mul(pushConstants.u_ModelMatrix, float4(input.a_Pos, 1.0));
-    float4 viewPos = mul(u_ViewMatrix, worldPos);
-    output.a_Depth = viewPos.z;
+    float3x3 normalMatrix = float3x3(PushConstants.u_ModelMatrixInversedTransposed);
 
-    output.a_Pos = mul(u_ProjMatrix, viewPos);
+    float3 N = normalize(mul(normalMatrix, input.a_Normals));
+    float3 T = normalize(mul(normalMatrix, input.a_Tangents));
+    float3 B = normalize(mul(normalMatrix, input.a_Bitangents));
+
+    // Make tangent perpendicular to the normal.
+    T = normalize(
+        T -
+        N * dot(N, T)
+    );
+
+    /* need to do that */
+    float handedness = (dot(cross(N, T), B) < 0.0f) ? -1.0f : 1.0f;
+
+    output.a_TangentWSOut = float4(T, handedness);
+    output.a_ViewDepthOut = viewPos.z;
+    output.a_NormalsWSOut = N;
+
     return output;
 }
 
-// Fragment Shader
-[shader("fragment")]
-struct FragmentInput {
-    [[vk::location(0)]] float3 a_Pos : POSITION0;
-    [[vk::location(1)]] float2 a_TextureCoords : TEXCOORD0;
-    [[vk::location(2)]] float3 a_Normals : NORMAL;
-    [[vk::location(3)]] float a_Depth : DEPTH;
+#include "LucyCommons.slang"
+
+struct PixelInput {
+    [[vk::location(0)]] float3 a_PosOutWS : POSITION0;
+    [[vk::location(1)]] float2 a_TextureCoordsOut : TEXCOORD0;
+    [[vk::location(2)]] float3 a_NormalsWSOut : NORMAL;
+    [[vk::location(3)]] float4 a_TangentWSOut : TANGENT0;
+    [[vk::location(4)]] float a_ViewDepthOut : TEXCOORD1;
 };
 
-struct FragmentOutput {
+struct PixelOutput {
     [[vk::location(0)]] float4 a_Color : SV_Target0;
 };
+
+static const int NULL_TEXTURE_SLOT = -1;
 
 static const uint ROUGHNESS_MASK = 0x00000001u;
 static const uint METALLIC_MASK = 0x00000002u;
 static const uint AO_MASK = 0x00000004u;
 
-#define NULL_TEXTURE_SLOT -1
-#define NUM_CASCADES 4
-#define DEBUG_CASCADED_SHADOW_MAPS 0
+static const bool DEBUG_CASCADED_SHADOW_MAPS = false;
 
 static const float4 DEBUG_CASCADE_COLORS[NUM_CASCADES] = {
     float4(1.0f, 0.0f, 0.5f, 1.0f),
@@ -73,7 +97,7 @@ static const float4 DEBUG_CASCADE_COLORS[NUM_CASCADES] = {
     float4(1.0f, 0.5f, 0.5f, 1.0f),
 };
 
-struct MaterialAttributes {
+struct LucyMaterialAttribute {
     float AlbedoSlot;
     float NormalSlot;
     float RoughnessSlot;
@@ -83,92 +107,70 @@ struct MaterialAttributes {
     float BaseMetallicValue;
     float BaseAOValue;
     float AOSlot;
+    float NormalStrength;
 };
 
 struct DirectionalLight {
     float3 Direction;
-    float _padding0;
     float3 Color;
-    float _padding1;
     float4x4 DirLightShadowMatrices[NUM_CASCADES];
-    float4 DirLightShadowCascadeSplits;
+    float4 DirLightShadowCascadeSplits; // x = 0, y = 1, z = 2, w = 3 cascadeIndex
 };
 
-[[vk::push_constant]] 
-struct LocalPushConstant {
-    float4x4 u_ModelMatrix;
-    float u_MaterialID;
-} pushConstants;
-
-[[vk::binding(0, 0)]] 
-cbuffer LucyCamera : register(b0) {
-    float4x4 u_ViewMatrix;
-    float4x4 u_ProjMatrix;
-    float4 u_CamPos;
-};
-
-[[vk::binding(1, 0)]] 
-cbuffer LucyLightningValues : register(b1) {
+struct LucyLightValues {
     DirectionalLight u_DirectionalLight;
 };
 
-[[vk::binding(2, 0)]] 
-StructuredBuffer<MaterialAttributes> b_MaterialAttributes : register(t0, space0);
+[[vk::binding(1, 0)]]
+ConstantBuffer<LucyLightValues> LightValues;
 
-[[vk::binding(3, 0)]] 
-TextureCube u_IrradianceMap : register(t1, space0);
-[[vk::binding(3, 0)]] 
-SamplerState u_IrradianceSampler : register(s1, space0);
+[[vk::binding(2, 0)]]
+StructuredBuffer<LucyMaterialAttribute> MaterialAttributes;
 
-[[vk::binding(4, 0)]] 
-Texture2DArray u_ShadowMap : register(t2, space0);
-[[vk::binding(4, 0)]] 
-SamplerState u_ShadowSampler : register(s2, space0);
+[[vk::binding(3, 0)]]
+SamplerCube u_IrradianceMap;
+
+[[vk::binding(4, 0)]]
+SamplerCube u_PrefilterMap;
+
+[[vk::binding(5, 0)]]
+Sampler2D u_BRDFLut;
+
+[[vk::binding(6, 0)]]
+Sampler2DArray u_ShadowMap;
 
 [[vk::binding(0, 1)]] 
-Texture2D u_Textures[] : register(t0, space1);
-[[vk::binding(0, 1)]] 
-SamplerState u_LinearSampler : register(s0, space1);
+Sampler2D u_Textures[];
 
-// Include LucySamplingUtilities (assumed to contain BRDF implementation)
-#include "LucySamplingUtilities"
+#include "LucySamplingUtilities.slang"
 
-void GetAttributeColor(int slot, float4 baseColor, out float4 outColor) {
-    if (slot != NULL_TEXTURE_SLOT) {
-        outColor = u_Textures[slot].Sample(u_LinearSampler, a_TextureCoords);
-    } else {
-        outColor = baseColor;
-    }
+#define DIELECTRIC_SPECULAR 0.04
+
+void SampleAttributeTexture(in PixelInput input, float slot, inout float4 outColor) {
+    if (slot == NULL_TEXTURE_SLOT)
+        return;
+    outColor = u_Textures[int(slot)].Sample(input.a_TextureCoordsOut);
 }
 
-void GetAttributeValue(int slot, float baseValue, out float outValue, uint mask) {
-    if (slot != NULL_TEXTURE_SLOT) {
-        float4 texValue = u_Textures[slot].Sample(u_LinearSampler, a_TextureCoords);
-        switch (mask) {                                                        
-            case ROUGHNESS_MASK:                                                
-                outValue = texValue.r;        
-                break;
-            case METALLIC_MASK:                                                
-                outValue = texValue.g;        
-                break;
-            case AO_MASK:                                                
-                outValue = texValue.b;        
-                break;
-        }
-    } else {                                            
-        outValue = baseValue;
+void SampleAttributeTexture(in PixelInput input, float slot, inout float outValue, uint mask) {
+    if (slot == NULL_TEXTURE_SLOT)
+        return;
+    float4 texValue = u_Textures[int(slot)].Sample(input.a_TextureCoordsOut);
+    switch (mask) {
+        case ROUGHNESS_MASK:
+            outValue *= texValue.g;
+            break;
+        case METALLIC_MASK:
+            outValue *= texValue.b;
+            break;
+        case AO_MASK:
+            outValue *= texValue.r;
+            break;
     }
-}
-
-float4 LinearizeDepth(float4 fragCoord, float4x4 projMat) {
-    float4 normalizedFrag = fragCoord * 2.0 - 1.0;
-    float4x4 invProj = inverse(projMat);
-    float4 unprojected = mul(invProj, normalizedFrag);
-    return unprojected / unprojected.w;
 }
 
 float ChebyshevUpperBound(float2 moments, float t) {
-    const float minVariance = 0.002f;
+    const float minVariance = 0.00001f;
 
     if (t <= moments.x)
         return 1.0f;
@@ -190,35 +192,40 @@ float ReduceLightBleeding(float p_max, float amount) {
 }
 
 float VSMContribution(float2 posInShadowSpace, float distanceToLight, uint cascadeIndex) {
-    float2 moments = u_ShadowMap.Sample(u_ShadowSampler, float3(posInShadowSpace, cascadeIndex)).xy;
-    return ReduceLightBleeding(ChebyshevUpperBound(moments, distanceToLight), 0.9f);
+    float2 moments = u_ShadowMap.Sample(float3(posInShadowSpace, cascadeIndex)).xy;
+    return ReduceLightBleeding(ChebyshevUpperBound(moments, distanceToLight), 0.8f);
 }
 
 static const float4x4 g_TexScaleBias = float4x4(
-    0.5, 0.0, 0.0, 0.0,
-    0.0, 0.5, 0.0, 0.0,
-    0.0, 0.0, 1.0, 0.0,
-    0.5, 0.5, 0.0, 1.0 
+    float4(0.5f, 0.0f, 0.0f, 0.5f),
+    float4(0.0f, 0.5f, 0.0f, 0.5f),
+    float4(0.0f, 0.0f, 1.0f, 0.0f),
+    float4(0.0f, 0.0f, 0.0f, 1.0f),
 );
 
-float CalculateShadowFactor(float4 modelWorldPos, uint cascadeIndex) {
-    float4x4 lightMatrix = u_DirectionalLight.DirLightShadowMatrices[cascadeIndex];
-    float4 posInShadowSpace = mul(g_TexScaleBias, mul(lightMatrix, modelWorldPos));
+float4 CalculatePosInShadowSpace(float3 modelWorldPos, uint cascadeIndex) {
+    float4x4 lightMatrix = LightValues.u_DirectionalLight.DirLightShadowMatrices[cascadeIndex];
+    float4 posInShadowSpace = mul(g_TexScaleBias, mul(lightMatrix, float4(modelWorldPos, 1.0f)));
     posInShadowSpace /= posInShadowSpace.w;
+    return posInShadowSpace;
+}
 
-    if (any(posInShadowSpace.xy < 0.0) || 
-        any(posInShadowSpace.xy > 1.0) ||
-        posInShadowSpace.z < 0.0 || posInShadowSpace.z > 1.0) {
-        return 1.0;
+float CalculateShadowFactor(float3 modelWorldPos, uint cascadeIndex) {
+    float4 posInShadowSpace = CalculatePosInShadowSpace(modelWorldPos, cascadeIndex);
+
+    if (any(posInShadowSpace.xy < 0.0f) || 
+            any(posInShadowSpace.xy > 1.0f) ||
+            posInShadowSpace.z < 0.0f || posInShadowSpace.z > 1.0f) {
+        return 1.0f;
     }
 
     return VSMContribution(posInShadowSpace.xy, posInShadowSpace.z, cascadeIndex);
 }
 
-float4 ShadowContribution(float4 modelWorldPos) {
+float4 ShadowContribution(in PixelInput input, float3 modelWorldPos) {
     uint cascadeIndex = 0;
-    for(uint i = 0; i < NUM_CASCADES - 1; i++) {
-        if(-FragmentInput.a_Depth > u_DirectionalLight.DirLightShadowCascadeSplits[i]) {
+    for (uint i = 0; i < NUM_CASCADES - 1; i++) {
+        if (-input.a_ViewDepthOut > LightValues.u_DirectionalLight.DirLightShadowCascadeSplits[i]) {
             cascadeIndex = i + 1;
         }
     }
@@ -226,67 +233,90 @@ float4 ShadowContribution(float4 modelWorldPos) {
     if (DEBUG_CASCADED_SHADOW_MAPS)
         return DEBUG_CASCADE_COLORS[cascadeIndex];
         
-    return float4(CalculateShadowFactor(modelWorldPos, cascadeIndex).xxx, 1.0);
+    return float4(CalculateShadowFactor(modelWorldPos, cascadeIndex));
 }
 
-FragmentOutput main(FragmentInput input) {
-    FragmentOutput output;
-    float alpha = 1.0f;
-    MaterialAttributes attributes = b_MaterialAttributes[(int)pushConstants.u_MaterialID];
+[shader("fragment")]
+PixelOutput main(PixelInput input) {
+    PixelOutput output;
 
-    int albedoSlot = (int)attributes.AlbedoSlot;
-    int normalSlot = (int)attributes.NormalSlot;
-    int metallicSlot = (int)attributes.MetallicSlot;
-    int roughnessSlot = (int)attributes.RoughnessSlot;
-    int aoSlot = (int)attributes.AOSlot;
+    const float gamma = 2.2f;
 
-    float4 albedoColor = float4(0.0f, 0.0f, 0.0f, alpha);
-    float metallicValue = 0.0f;
-    float roughnessValue = 0.0f;
-    float aoValue = 0.0f;
+    LucyMaterialAttribute attributes = MaterialAttributes[(int)PushConstants.u_MaterialID];
 
-    GetAttributeColor(albedoSlot, attributes.BaseDiffuseColor, albedoColor);
-    GetAttributeValue(metallicSlot, attributes.BaseMetallicValue, metallicValue, METALLIC_MASK);
-    GetAttributeValue(roughnessSlot, attributes.BaseRoughnessValue, roughnessValue, ROUGHNESS_MASK);
-    GetAttributeValue(aoSlot, attributes.BaseAOValue, aoValue, AO_MASK);
+    float4 albedoColor = attributes.BaseDiffuseColor;
+    float metallicValue = attributes.BaseMetallicValue;
+    float roughnessValue = attributes.BaseRoughnessValue;
+    float aoValue = attributes.BaseAOValue;
 
-    alpha = albedoColor.w;
+    SampleAttributeTexture(input, attributes.AlbedoSlot, albedoColor);
+    SampleAttributeTexture(input, attributes.MetallicSlot, metallicValue, METALLIC_MASK);
+    SampleAttributeTexture(input, attributes.RoughnessSlot, roughnessValue, ROUGHNESS_MASK);
+    SampleAttributeTexture(input, attributes.AOSlot, aoValue, AO_MASK);
+
+    float alpha = albedoColor.w;
     if (alpha < 0.5f)
         discard;
 
-    float4 modelWorldPos = mul(pushConstants.u_ModelMatrix, float4(input.a_Pos, 1.0));
-    float3 modelNormalNormalized = normalize(mul((float3x3)pushConstants.u_ModelMatrix, input.a_Normals));
-    float3 viewDirCamera = normalize(u_CamPos.xyz - modelWorldPos.xyz);
+    int normalSlot = (int)attributes.NormalSlot;
+    float3 normalsWS = normalize(input.a_NormalsWSOut);
+    if (normalSlot != NULL_TEXTURE_SLOT) {
+        float3 normalTS = u_Textures[normalSlot].Sample(input.a_TextureCoordsOut).rgb * 2.0 - 1.0;
 
-    float3 F0 = float3(0.04f, 0.04f, 0.04f);
+        float3 tangentWS = normalize(input.a_TangentWSOut.xyz - normalsWS * dot(normalsWS, input.a_TangentWSOut.xyz));
+        float3 bitangentWS = cross(normalsWS, tangentWS) * input.a_TangentWSOut.w;
+
+        normalTS.rg *= attributes.NormalStrength;
+
+        normalsWS = normalize(tangentWS * normalTS.x + bitangentWS * normalTS.y + normalsWS * normalTS.z);
+    }
+
+    float3 F0 = float3(DIELECTRIC_SPECULAR);
     F0 = lerp(F0, albedoColor.rgb, metallicValue);
 
-    float3 viewDirectionLight = normalize(modelWorldPos.xyz - u_DirectionalLight.Direction);
-    float3 specularContribution = BRDF(
-        viewDirectionLight, 
-        viewDirCamera, 
-        modelNormalNormalized, 
+    float3 viewDirectionLight = normalize(-LightValues.u_DirectionalLight.Direction);
+    float3 viewDirCamera = normalize(Camera.u_CamPos.xyz - input.a_PosOutWS.xyz);
+
+    float4 shadow = ShadowContribution(input, input.a_PosOutWS);
+
+    float3 ambientValue = albedoColor.rgb * aoValue;
+
+    float3 directLight = BRDF(
+        viewDirectionLight,
+        viewDirCamera,
+        normalsWS, 
         F0, 
-        metallicValue, 
-        roughnessValue, 
-        albedoColor.rgb, 
-        u_DirectionalLight.Color
-    );
+        metallicValue,
+        roughnessValue,
+        albedoColor.rgb,
+        LightValues.u_DirectionalLight.Color
+    ) * shadow.r;
 
-    float3 ambientContribution = u_IrradianceMap.Sample(u_IrradianceSampler, normalize(input.a_Normals)).rgb;
+    float NdotV = saturate(dot(normalsWS, viewDirCamera));
+    float3 F = F_SchlickRoughness(NdotV, F0, roughnessValue);
+    float3 kD = (1.0f - F) * (1.0 - metallicValue);
 
-    float4 shadow = ShadowContribution(modelWorldPos);
-    float3 directLighting = specularContribution * shadow.r;
-    float3 ambient = ambientContribution * aoValue;
-    float3 outputColor = (directLighting + ambient) * albedoColor.rgb;
+    float3 R = normalize(reflect(-viewDirCamera, normalsWS));
+    R.xy *= -1.0f;
 
-    const float gamma = 2.2f;
+    float3 prefilterColor = u_PrefilterMap.SampleLevel(R, roughnessValue * (NUM_PREFILTER_MIP_LEVELS - 1)).rgb;
+    float2 brdf = u_BRDFLut.Sample(float2(NdotV, roughnessValue)).rg;
+
+    // Indirect diffuse (ambient term) — AO affects only diffuse IBL
+    float3 diffuseIBL = u_IrradianceMap.Sample(normalsWS).rgb * albedoColor.rgb * aoValue * kD;
+    // Indirect specular (prefiltered env map * BRDF LUT)
+    float3 specularIBL = prefilterColor * (F0 * brdf.x + brdf.y);
+
+    float3 ibl = diffuseIBL + specularIBL;
+    float3 outputColor = ibl + directLight;
+
     outputColor = pow(outputColor, float3(1.0f / gamma));
-
     output.a_Color = float4(outputColor, alpha);
 
     if (DEBUG_CASCADED_SHADOW_MAPS)
         output.a_Color = shadow;
+
+    //output.a_Color = float4(normalsWS * 0.5f + 0.5f, 1.0f);
 
     return output;
 }

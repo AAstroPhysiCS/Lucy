@@ -1,22 +1,45 @@
 #pragma once
 
-#include "vulkan/vulkan.h"
+#include "slang/slang.h"
 
 namespace Lucy {
 
-	enum class DescriptorType {
+	enum class DescriptorBaseShape {
 		Undefined,
-		SampledImage,
+		Array,
+		SharedStorageBuffer,
+		UniformBuffer,
+		PushConstant,
 		Sampler,
-		CombinedImageSampler,
-		StorageImage,
-		Buffer,
-		DynamicBuffer,
-		SSBO,
-		SSBODynamic
+		Texture2D,
+		Texture2DArray,
+		TextureCube,
+		Texture3D,
+		SampledImage,
+		SampledImageArray,
+		RWTexture2D,
+		RWTexture2DArray,
+		RWTexture3D,
+		RWSharedStorageBuffer,
+		UniformTexelBuffer,
+		StorageTexelBuffer,
+		InputAttachment,
+		AccelerationStructure,
+		RayTracingScene,
 	};
 
-	DescriptorType ConvertDescriptorType(uint32_t type);
-	uint32_t ConvertDescriptorType(DescriptorType type);
-}
+	struct DescriptorType {
+		DescriptorBaseShape Shape = DescriptorBaseShape::Undefined;
+		bool isDynamic = false;
 
+		inline bool operator==(const DescriptorType& other) const { return Shape == other.Shape && isDynamic == other.isDynamic; }
+	};
+
+	static constexpr DescriptorType UndefinedDescriptorType = { DescriptorBaseShape::Undefined, false };
+
+	//DescriptorType ConvertDescriptorType(uint32_t type);
+	uint32_t ConvertDescriptorType(DescriptorType type);
+
+	DescriptorType ConvertSlangKindToDescriptorBlockType(slang::TypeReflection::Kind kind);
+	DescriptorType ConvertSlangResourceShapeToDescriptorBlockType(SlangResourceShape shape, SlangResourceAccess access);
+}

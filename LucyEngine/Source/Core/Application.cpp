@@ -43,9 +43,12 @@ namespace Lucy {
 
 		m_Window = Window::Create(m_CreateInfo.WindowCreateInfo);
 		m_Window->Init(m_CreateInfo.RendererConfiguration.RenderArchitecture);
-		m_Window->SetEventCallback(LUCY_BIND_FUNC(&Application::OnEvent, this, std::placeholders::_1));
 
-		EventHandler::Init(this, m_Window->Raw());
+		m_Window->SetEventCallback([](std::unique_ptr<Event> event) {
+			EventHandler::s_EventQueue->Push(std::move(event));
+		});
+
+		Input::Init(m_Window->Raw());
 		FileSystem::Init();
 
 #ifdef LUCY_DEBUG
@@ -88,6 +91,12 @@ namespace Lucy {
 
 			m_Window->PollEvents();
 
+			EventHandler::s_EventQueue->Drain([this](Event& event) {
+				OnEvent(event);
+			});
+			
+			m_Window->WaitEventsIfMinimized();
+
 			m_Scene->Update();
 
 			m_RenderPipeline->BeginFrame();
@@ -105,7 +114,7 @@ namespace Lucy {
 				if (result == RenderContextResultCodes::ERROR_OUT_OF_DATE_KHR || 
 					result == RenderContextResultCodes::SUBOPTIMAL_KHR || 
 					result == RenderContextResultCodes::NOT_READY) {
-					EventHandler::DispatchImmediateEvent<SwapChainResizeEvent>();
+					EventHandler::Submit<SwapChainResizeEvent>();
 				}
 			} else {
 				std::unique_lock<std::mutex> lock(s_MainThreadReadyMutex);
@@ -121,20 +130,21 @@ namespace Lucy {
 	}
 
 	void Application::OnEvent(Event& e) {
-		m_Window->WaitEventsIfMinimized();
-
 		EventHandler::AddListener<KeyEvent>(e, [&](const KeyEvent& e) {
 			if (e == KeyCode::Escape) {
 				glfwSetWindowShouldClose(m_Window->Raw(), true);
+				return true;
 			}
+			return false;
 		});
 
 		m_RenderPipeline->OnEvent(e);
 		m_Scene->OnEvent(e);
 		Renderer::OnEvent(e);
 
-		for (const auto& overlay : m_Overlays)
-			overlay->OnEvent(e);
+		for (auto it = m_Overlays.rbegin(); it != m_Overlays.rend(); ++it) {
+			(*it)->OnEvent(e);
+		}
 	}
 
 	void Application::SetMainThreadReady(bool val) {

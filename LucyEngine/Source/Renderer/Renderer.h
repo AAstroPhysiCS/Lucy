@@ -2,12 +2,14 @@
 
 #include "Renderer/RendererBackend.h"
 
+#include "RenderGraph/RenderGraphPass.h"
+
 #include "Pipeline/PipelineManager.h"
 #include "Material/MaterialManager.h"
 
 #include "Device/RenderDeviceResourceManager.h"
 #include "Device/RenderDevice.h"
-
+#include "Shader/ShaderManager.h"
 #include "Image/Image.h"
 #include "Memory/Buffer/IndexBuffer.h"
 #include "Renderer/Mesh.h"
@@ -69,7 +71,6 @@ namespace Lucy {
 		static void EnqueueResourceDestroy(RenderResourceHandle& handle);
 #pragma endregion RenderDevice
 		static void InitializeImGui();
-		static void RenderImGui();
 
 		static bool IsValidRenderResource(RenderResourceHandle handle);
 
@@ -80,16 +81,17 @@ namespace Lucy {
 		static inline const RenderCommandQueueMetricsOutput& GetCommandQueueMetrics() { return s_Backend->GetCommandQueueMetrics(); }
 
 		static void ReloadShader(const std::string& name);
-		static inline const Ref<Shader>& GetShader(const std::string& name) { return s_Shaders[name]; }
-		static inline const std::unordered_map<std::string, Ref<Shader>>& GetAllShaders() { return s_Shaders; }
+		static inline const ShaderLibrary& GetShaderLibrary() { return s_ShaderManager.GetShaderLibrary(); }
 
 		static inline Unique<PipelineManager>& GetPipelineManager() { return s_PipelineManager; }
 		static inline Unique<MaterialManager>& GetMaterialManager() { return s_MaterialManager; }
 
 		static inline RenderArchitecture GetRenderArchitecture() { return s_Config.RenderArchitecture; }
+		static inline RendererSettings& GetRendererSettings() { return s_Config.Settings; }
 
 		static inline RenderResourceHandle GetBlankCubeImageHandle() { return s_BlankCubeHandle; }
 		static inline Ref<Image> GetBlankCubeImage() { return GetRenderDevice()->AccessResource<Image>(s_BlankCubeHandle); }
+		static inline Ref<Image> GetBlankArrayImage() { return GetRenderDevice()->AccessResource<Image>(s_BlankArrayHandle); }
 		static inline const Ref<Mesh>& GetEnvCubeMesh() { return s_CubeMesh; }
 		static inline uint32_t GetEnvCubeMeshIndexCount() { return (uint32_t)GetRenderDevice()->AccessResource<IndexBuffer>(s_CubeMesh->GetIndexBufferHandle())->GetSize(); }
 
@@ -108,33 +110,31 @@ namespace Lucy {
 		static void Init(RendererConfiguration config, const Ref<Window>& window);
 		static void Destroy();
 
-		static void SubmitToRender(RenderGraphPass& pass);
+		static void SubmitToRender(std::vector<ExecutionBatch>& batches);
 
 		static void OnWindowResize();
 		static void OnViewportResize();
 		static glm::vec3 OnMousePicking(const EntityPickedEvent& e);
 
-		static void PushShader(Ref<Shader> shader);
 		static void DestroyAllShaders();
 
 		static inline RendererConfiguration s_Config;
 		static inline RenderThread* s_RenderThread = nullptr;
 		static inline Ref<RendererBackend> s_Backend = nullptr;
 		static inline Ref<RenderGraph> s_RenderGraph = nullptr;
-			
+
+		static inline ShaderManager s_ShaderManager;
+
 		static inline std::unordered_map<std::string, RenderFrameHandles> s_RenderFrameHandleMap;
 
 		static inline Unique<PipelineManager> s_PipelineManager;
 		static inline Unique<MaterialManager> s_MaterialManager;
 
-		static inline std::unordered_map<std::string, Ref<Shader>> s_Shaders;
-
 		static inline RenderResourceHandle s_BlankCubeHandle = InvalidRenderResourceHandle;
+		static inline RenderResourceHandle s_BlankArrayHandle = InvalidRenderResourceHandle;
 		static inline Ref<Mesh> s_CubeMesh = nullptr;
 
 		friend class Application; //for Init etc.
 		friend class RenderGraph; //for CreateImage etc.
-
-		friend class CustomShaderIncluder; //for ShaderIncluder
 	};
 }

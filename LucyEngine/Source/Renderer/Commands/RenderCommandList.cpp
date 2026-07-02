@@ -39,13 +39,20 @@ namespace Lucy {
 
 	RenderCommand& RenderCommandList::BeginRenderCommand(const std::string& nameOfDraw) {
 		LUCY_ASSERT(!s_CurrentActiveRenderCommand, "There is an active ongoing render command that needs to be closed!");
-		LUCY_PROFILE_NEW_EVENT(std::format("RenderCommandList::BeginRenderCommand {}", nameOfDraw).c_str());
+		const auto& profileName = std::format("RenderCommandList::BeginRenderCommand {}", nameOfDraw);
+		LUCY_PROFILE_NEW_EVENT(profileName.c_str());
 
-		if (!m_RenderCommands.contains(nameOfDraw))
-			m_RenderCommands.try_emplace(nameOfDraw, nameOfDraw, m_CreateInfo.RenderDevice, m_PrimaryCommandPool);
+		if (!m_RenderCommands.empty() && m_RenderCommands.back().GetDebugName() == nameOfDraw) {
+			auto& cmd = m_RenderCommands.back();
+			cmd.BeginDebugMarker();
+			s_CurrentActiveRenderCommand = &cmd;
+			return cmd;
+		}
 
-		RenderCommand& cmd = m_RenderCommands.at(nameOfDraw);
-		cmd.BeginTimestamp();
+		m_RenderCommands.emplace_back(nameOfDraw, m_CreateInfo.RenderDevice, m_PrimaryCommandPool);
+
+		RenderCommand& cmd = m_RenderCommands.back();
+		//cmd.BeginTimestamp();
 		cmd.BeginDebugMarker();
 
 		s_CurrentActiveRenderCommand = &cmd;
@@ -56,11 +63,30 @@ namespace Lucy {
 		LUCY_ASSERT(s_CurrentActiveRenderCommand, "There isn't any active ongoing render command right now!");
 		LUCY_PROFILE_NEW_EVENT(std::format("RenderCommandList::EndRenderCommand{}", s_CurrentActiveRenderCommand->GetDebugName()).c_str());
 
-		s_CurrentActiveRenderCommand->EndPipelineStatistics();
+		//s_CurrentActiveRenderCommand->EndPipelineStatistics();
 		s_CurrentActiveRenderCommand->EndDebugMarker();
-		s_CurrentActiveRenderCommand->EndTimestamp();
+		//s_CurrentActiveRenderCommand->EndTimestamp();
 
 		s_CurrentActiveRenderCommand = nullptr;
+	}
+
+	bool RenderCommandList::IsCurrentFrameSlotAvailable(uint32_t frameIndex) const {
+		auto pool = m_PrimaryCommandPool->As<VulkanCommandPool>();
+		return pool->GetState(frameIndex) == CommandBufferSlotState::Ready;
+	}
+
+	bool RenderCommandList::IsCurrentFrameSlotRecorded(uint32_t frameIndex) const {
+		auto pool = m_PrimaryCommandPool->As<VulkanCommandPool>();
+		return pool->GetState(frameIndex) == CommandBufferSlotState::Recorded;
+	}
+
+	void RenderCommandList::Reset() {
+		m_RenderCommands.clear();
+		m_PrimaryCommandPool->Reset();
+	}
+
+	void RenderCommandList::ResetRenderCommand(uint32_t frameIndex) {
+		m_PrimaryCommandPool->ResetCommandBuffer(frameIndex);
 	}
 
 	void RenderCommandList::Recreate() {

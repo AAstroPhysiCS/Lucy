@@ -31,9 +31,8 @@ namespace Lucy {
 		uint32_t OnRun() final override;
 		void OnJoin() final override;
 
-		std::atomic_bool m_Running = false;
-
-		std::atomic_bool m_Finished = false;
+		bool m_Running = false;
+		bool m_Finished = false;
 		std::condition_variable m_FinishedCondVar;
 
 		std::thread m_ThreadNative;

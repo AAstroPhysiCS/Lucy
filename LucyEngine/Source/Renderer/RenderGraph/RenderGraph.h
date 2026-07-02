@@ -2,7 +2,10 @@
 
 #include <filesystem>
 
+#include "Renderer/Memory/Memory.h"
+
 #include "RenderGraphPass.h"
+#include "RenderGraphCompiler.h"
 #include "RenderGraphRegistry.h"
 #include "DirectedAcyclicGraph.h"
 
@@ -10,7 +13,7 @@ namespace Lucy {
 
 	class RenderGraph final {
 	public:
-		RenderGraph();
+		RenderGraph(RenderArchitecture arch, Ref<RenderDevice> device);
 		~RenderGraph() = default;
 
 		RenderGraph(const RenderGraph& other) = delete;
@@ -18,8 +21,8 @@ namespace Lucy {
 		RenderGraph& operator=(const RenderGraph& other) = delete;
 		RenderGraph& operator=(RenderGraph&& other) noexcept = delete;
 
-		void Compile();
-		void Execute();
+		void Build();
+		std::vector<ExecutionBatch> Execute();
 		void Flush();
 
 		void ImportFromFile(const std::filesystem::path& path);
@@ -33,15 +36,19 @@ namespace Lucy {
 
 		inline DirectedAcyclicGraph<RenderGraphPass, RenderGraphResource>& GetAcyclicGraph() { return m_AcyclicGraph; }
 		inline size_t GetPassCount() const { return m_Passes.size(); }
-
 	private:
 		template <typename TFunc>
 		inline void Traverse(TFunc&& func) {
 			for (const auto& node : m_AcyclicGraph) {
+				RenderGraphPass* pass = node.Pass;
+				const auto& resourceReads = pass->GetResourceReads();
+				const auto& resourceWrites = pass->GetResourceWrites();
+
 				switch (node.Pass->GetCurrentState()) {
-					case RenderGraphPassState::Runnable:
+					case RenderGraphPassState::Runnable: {
 						func(node.Pass);
 						break;
+					}
 					case RenderGraphPassState::New:
 					case RenderGraphPassState::Terminated:
 						LUCY_ASSERT(false, "RenderGraphPassState is new or terminated!");
@@ -68,22 +75,28 @@ namespace Lucy {
 		void WriteImage(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToWrite);
 #pragma endregion Builder
 		inline Ref<Image> GetImageByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetImage(rgResource); }
-		inline const RGImageData& GetImageData(const RenderGraphResource& rgResource) { return m_Registry.GetImageData(rgResource); }
-		inline const RGBufferData& GetBufferData(const RenderGraphResource& rgResource) { return m_Registry.GetBufferData(rgResource); }
+		inline Ref<Image> GetImageByRGResource(const RenderGraphResource& rgResource) const { return m_Registry.GetImage(rgResource); }
 
-		bool CheckIfPassNeedsCulling(RenderGraphPass* pass, const std::unordered_set<RenderGraphResource>& inputResources, 
-			const std::unordered_set<RenderGraphResource>& outputResources);
+		inline Ref<RenderResource> GetBufferByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetBuffer(rgResource); }
+		inline Ref<RenderResource> GetBufferByRGResource(const RenderGraphResource& rgResource) const { return m_Registry.GetBuffer(rgResource); }
+
+		inline RenderPassLoadStoreAttachments GetLoadStoreAttachmentsByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetResourceEntry(rgResource).GetImageData().LoadStoreAttachment; }
+		inline RenderResourceHandle GetHandleByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetResourceEntry(rgResource).ResourceHandle; }
+
+		RenderGraphBatches CreateBatchesForRendering() const;
+
+		bool CheckIfPassNeedsCulling(RenderGraphPass* pass, const std::unordered_set<RenderGraphResource>& inputResources, const std::unordered_set<RenderGraphResource>& outputResources);
 		void Update();
 		
 		std::map<std::string, RenderGraphPass> m_Passes;
 		
 		DirectedAcyclicGraph<RenderGraphPass, RenderGraphResource> m_AcyclicGraph;
-		ExternalResources m_ExternalResources;
-		ExternalResources m_ExternalTransientResources;
 
 		RenderGraphRegistry m_Registry;
+		Unique<RenderGraphCompiler> m_Compiler;
 
 		friend class RenderGraphBuilder;
+		friend class VulkanRenderGraphCompiler; //for GetImageByRGResource
 		friend class Renderer; //for GetImageByRGResource, GetImageData, GetBufferData
 	};
 }

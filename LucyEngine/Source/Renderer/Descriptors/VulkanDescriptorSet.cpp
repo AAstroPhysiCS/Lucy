@@ -4,7 +4,7 @@
 #include "Renderer/Memory/Buffer/Vulkan/VulkanUniformBuffer.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanSharedStorageBuffer.h"
 
-#include "Renderer/Shader/VulkanUniformImageSampler.h"
+#include "Renderer/Pipeline/VulkanUniformImageSampler.h"
 
 #include "Renderer/Renderer.h"
 #include "Renderer/Device/VulkanRenderDevice.h"
@@ -19,43 +19,63 @@ namespace Lucy {
 	void VulkanDescriptorSet::RTCreate() {
 		LUCY_ASSERT(Renderer::IsOnRenderThread());
 		
-		for (const auto& block : m_CreateInfo.ShaderUniformBlocks) {
-			switch (block.Type) {
-				using enum Lucy::DescriptorType;
-				case SSBODynamic:
-				case SSBO: {
+		for (const auto& variable : m_CreateInfo.ShaderVariables) {
+			switch (variable.Type.Shape) {
+				case DescriptorBaseShape::RWSharedStorageBuffer:
+				case DescriptorBaseShape::SharedStorageBuffer: {
 					SharedStorageBufferCreateInfo createInfo;
-					createInfo.Name = block.Name;
-					createInfo.Binding = block.Binding;
-					createInfo.Type = block.Type;
+					createInfo.Name = variable.Name;
+					createInfo.Binding = variable.Binding;
+					createInfo.Type = variable.Type;
 					createInfo.BufferSize = MAX_DYNAMICALLY_ALLOCATED_BUFFER_SIZE;
-					createInfo.ArraySize = block.ArraySize;
-					createInfo.ShaderMemberVariables = block.Members;
+					createInfo.ArraySize = variable.ArraySize;
+					createInfo.ShaderMemberVariables = variable.Layout.Members;
 
 					AddSharedStorageBuffer(createInfo.Name, m_VulkanDevice->CreateSharedStorageBuffer(createInfo));
 					break;
 				}
-				case SampledImage:
-				case Sampler:
-				case CombinedImageSampler:
-				case StorageImage: {
-					m_UniformImageSamplers.try_emplace(block.Name, Memory::CreateRef<VulkanUniformImageSampler>(block.Binding, block.Name, block.Type));
-					break;
-				}
-				case Buffer:
-				case DynamicBuffer: {
+				case DescriptorBaseShape::UniformBuffer: {
 					UniformBufferCreateInfo createInfo;
-					createInfo.Name = block.Name;
-					createInfo.Binding = block.Binding;
-					createInfo.Type = block.Type;
-					createInfo.BufferSize = block.BufferSize;
-					createInfo.ArraySize = block.ArraySize;
-					createInfo.ShaderMemberVariables = block.Members;
+					createInfo.Name = variable.Name;
+					createInfo.Binding = variable.Binding;
+					createInfo.Type = variable.Type;
+					createInfo.BufferSize = variable.BufferSize;
+					createInfo.ArraySize = variable.ArraySize;
+					createInfo.ShaderMemberVariables = variable.Layout.Members;
 
 					AddUniformBuffer(createInfo.Name, m_VulkanDevice->CreateUniformBuffer(createInfo));
 					break;
 				}
-				default: LUCY_ASSERT(false);
+				case DescriptorBaseShape::SampledImage:
+				case DescriptorBaseShape::SampledImageArray:
+				case DescriptorBaseShape::RWTexture2D:
+				case DescriptorBaseShape::RWTexture2DArray:
+				case DescriptorBaseShape::RWTexture3D:
+				case DescriptorBaseShape::Texture2D:
+				case DescriptorBaseShape::Texture2DArray:
+				case DescriptorBaseShape::TextureCube:
+				case DescriptorBaseShape::Texture3D:
+					m_UniformImageSamplers.try_emplace(variable.Name, Memory::CreateRef<VulkanUniformImageSampler>(variable.Binding, variable.Name, variable.Type));
+					break;
+				/*case DescriptorBaseShape::Sampler: {
+					ImageSamplerCreateInfo createInfo;
+					createInfo.MipmapEnabled = true;
+					createInfo.MipmapLevel = 11;
+					createInfo.Parameter = {
+						.U = ImageAddressMode::REPEAT,
+						.V = ImageAddressMode::REPEAT,
+						.W = ImageAddressMode::REPEAT,
+						.Min = ImageFilterMode::LINEAR,
+						.Mag = ImageFilterMode::LINEAR,
+					};
+
+					m_SamplerStateHandles.try_emplace(variable.Name, m_VulkanDevice->CreateSampler(createInfo));
+					break;
+				}*/
+				default: {
+					LUCY_CRITICAL("Shader variable '{0}' isn't being parsed by descriptor sets, because of its descriptor base shape", variable.Name);
+					break;
+				}
 			}
 		}
 	}
@@ -74,7 +94,7 @@ namespace Lucy {
 		std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
 		std::vector<bool> isBindlessVector;
 
-		for (auto& buffer : m_CreateInfo.ShaderUniformBlocks) {
+		for (auto& buffer : m_CreateInfo.ShaderVariables) {
 			VkDescriptorSetLayoutBinding binding = VulkanAPI::DescriptorSetLayoutBinding(buffer.Binding, buffer.ArraySize == 0 ? 1 : buffer.ArraySize, buffer.Type, buffer.StageFlag);
 			isBindlessVector.push_back(buffer.DynamicallyAllocated); //the set is bindless if true
 
@@ -149,52 +169,39 @@ namespace Lucy {
 			const auto& uniformBuffer = Renderer::AccessResource<VulkanUniformBuffer>(bufferHandle);
 			if (!uniformBuffer)
 				continue;
-			uniformBuffer->RTLoadToDevice();
 
 			DescriptorType descriptorType = uniformBuffer->GetDescriptorType();
-			switch (descriptorType) {
-				case DescriptorType::DynamicBuffer:
-				case DescriptorType::Buffer: {
-					const uint32_t arraySize = uniformBuffer->GetArraySize();
+			if (descriptorType.Shape != DescriptorBaseShape::UniformBuffer)
+				continue;
 
-					VkDescriptorBufferInfo bufferInfo = VulkanAPI::DescriptorBufferInfo(uniformBuffer->GetVulkanBufferHandle(frameIndex), 0, VK_WHOLE_SIZE);
-					VkWriteDescriptorSet setWrite = VulkanAPI::WriteDescriptorSet(m_DescriptorSets[frameIndex], 0, 
-						uniformBuffer->GetBinding(), arraySize == 0 ? 1 : arraySize, 
-						(VkDescriptorType)ConvertDescriptorType(descriptorType), &bufferInfo);
+			uniformBuffer->RTLoadToDevice();
 
-					vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr);
+			const uint32_t arraySize = uniformBuffer->GetArraySize();
 
-					uniformBuffer->Clear();
-					break;
-				}
-				case DescriptorType::Undefined:
-					LUCY_ASSERT(false, "Descriptor type is undefined!");
-					break;
-			}
+			VkDescriptorBufferInfo bufferInfo = VulkanAPI::DescriptorBufferInfo(uniformBuffer->GetVulkanBufferHandle(frameIndex), 0, VK_WHOLE_SIZE);
+			VkWriteDescriptorSet setWrite = VulkanAPI::WriteDescriptorSet(m_DescriptorSets[frameIndex], 0, 
+				uniformBuffer->GetBinding(), arraySize == 0 ? 1 : arraySize, 
+				(VkDescriptorType)ConvertDescriptorType(descriptorType), &bufferInfo);
+
+			vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr);
+
+			uniformBuffer->Clear();
 		}
 
 		for (RenderResourceHandle bufferHandle : GetAllSharedStorageBufferHandles() | std::views::values) {
 			const auto& ssbo = m_VulkanDevice->AccessResource<SharedStorageBuffer>(bufferHandle)->As<VulkanSharedStorageBuffer>();
-			ssbo->RTLoadToDevice();
-
+			const auto& descriptorType = ssbo->GetDescriptorType();
 			const uint32_t arraySize = ssbo->GetArraySize();
+
+			if (descriptorType.Shape != DescriptorBaseShape::SharedStorageBuffer && descriptorType.Shape != DescriptorBaseShape::RWSharedStorageBuffer)
+				continue;
+
+			ssbo->RTLoadToDevice();
 
 			VkDescriptorBufferInfo bufferInfo = VulkanAPI::DescriptorBufferInfo(ssbo->GetVulkanBufferHandle(frameIndex), 0, VK_WHOLE_SIZE);
 
-			VkWriteDescriptorSet setWrite = VulkanAPI::WriteDescriptorSet(m_DescriptorSets[frameIndex], 0, ssbo->GetBinding(), arraySize == 0 ? 1 : arraySize, VK_DESCRIPTOR_TYPE_MAX_ENUM,
-																		  &bufferInfo);
-			switch (ssbo->GetDescriptorType()) {
-				case DescriptorType::SSBO:
-					setWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-					break;
-				case DescriptorType::SSBODynamic:
-					setWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-					LUCY_ASSERT(false, "Dynamic SSBO not yet supported!");
-					break;
-				case DescriptorType::Undefined:
-					LUCY_ASSERT(false, "Descriptor type is undefined!");
-					break;
-			}
+			VkWriteDescriptorSet setWrite = VulkanAPI::WriteDescriptorSet(m_DescriptorSets[frameIndex], 0, ssbo->GetBinding(), arraySize == 0 ? 1 : arraySize, 
+				(VkDescriptorType)ConvertDescriptorType(descriptorType), &bufferInfo);
 
 			vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr);
 			ssbo->Clear();
@@ -203,13 +210,14 @@ namespace Lucy {
 		if (m_UniformImageSamplers.empty())
 			return;
 
-		for (const Ref<VulkanUniformImageSampler>& sampler : m_UniformImageSamplers | std::views::values) {
+		for (size_t mip = 0; const Ref<VulkanUniformImageSampler>& sampler : m_UniformImageSamplers | std::views::values) {
 			auto& imageInfos = sampler->ImageInfos;
 			if (imageInfos.empty())
-				break;
-
-			VkWriteDescriptorSet setWrite = VulkanAPI::WriteDescriptorSet(m_DescriptorSets[frameIndex], 0, sampler->Binding, (uint32_t)imageInfos.size(), (VkDescriptorType)ConvertDescriptorType(sampler->DescriptorType),
-																		  nullptr, imageInfos.data());
+				continue;
+			
+			VkWriteDescriptorSet setWrite = VulkanAPI::WriteDescriptorSet(m_DescriptorSets[frameIndex], 0, sampler->Binding, (uint32_t)imageInfos.size(),
+				(VkDescriptorType)ConvertDescriptorType(sampler->DescriptorType), nullptr, imageInfos.data());
+															  
 			vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr);
 
 			imageInfos.clear();

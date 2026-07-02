@@ -69,7 +69,7 @@ namespace Lucy {
 
 		auto [w, h] = m_RenderPipeline->GetViewportArea();
 		if (w != m_Size.x || h != m_Size.y)
-			EventHandler::DispatchImmediateEvent<ViewportAreaResizeEvent>((uint32_t)m_Size.x, (uint32_t)m_Size.y);
+			EventHandler::Submit<ViewportAreaResizeEvent>((uint32_t)m_Size.x, (uint32_t)m_Size.y);
 
 		const ImVec2& mousePos = ImGui::GetMousePos();
 		const ImVec2& offset = ImGui::GetCursorPos();
@@ -77,7 +77,7 @@ namespace Lucy {
 
 		m_ViewportMouseX = mousePos.x - windowPos.x - offset.x;
 		m_ViewportMouseY = mousePos.y - windowPos.y;
-		EventHandler::DispatchImmediateEvent<CursorPosEvent>(nullptr, m_ViewportMouseX, m_ViewportMouseY);
+		EventHandler::Submit<CursorPosEvent>(nullptr, m_ViewportMouseX, m_ViewportMouseY);
 
 		ImGuizmo::SetDrawlist();
 		ImGuizmo::SetRect(windowPos.x, windowPos.y, ImGui::GetWindowWidth(), ImGui::GetWindowHeight());

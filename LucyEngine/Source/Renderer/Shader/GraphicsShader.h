@@ -9,14 +9,8 @@ namespace Lucy {
 		GraphicsShader(const std::string& name, const std::filesystem::path& path);
 		virtual ~GraphicsShader() = default;
 
-		void RTLoad(const Ref<RenderDevice>& device, bool forceReloadFromDisk = false) final override;
-
-		struct Extensions {
-			const char* vertexExtension;
-			const char* fragmentExtension;
-		};
-		Extensions GetCachedFileExtension() const;
+		void RTLoad(const Ref<RenderDevice>& device, const std::vector<std::span<const uint32_t>>& datas) final override;
 	protected:
-		virtual void LoadInternal(const Ref<RenderDevice>& device, const std::vector<uint32_t>& dataVertex, const std::vector<uint32_t>& dataFragment) = 0;
+		virtual void LoadInternal(const Ref<RenderDevice>& device, const std::span<const uint32_t>& dataVertex, const std::span<const uint32_t>& dataFragment) = 0;
 	};
 }

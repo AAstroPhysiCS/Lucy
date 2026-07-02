@@ -14,4 +14,3 @@ namespace Lucy {
 		Ref<VulkanDescriptorPool> ImGuiPool = nullptr;
 	};
 }
-

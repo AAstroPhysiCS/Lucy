@@ -16,7 +16,7 @@ layout (push_constant) uniform LucyCameraPushConstants {
 
 void main() {
     a_PosOut = a_Pos;
-    gl_Position = u_ProjMatrix * inverse(CaptureViews[gl_ViewIndex]) * vec4(a_Pos, 1.0f);
+    gl_Position = u_ProjMatrix * matrix_inverse(CaptureViews[gl_ViewIndex]) * vec4(a_Pos, 1.0f);
 }
 
 //type fragment

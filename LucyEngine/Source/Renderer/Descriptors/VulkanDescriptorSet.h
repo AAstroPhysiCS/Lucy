@@ -2,6 +2,8 @@
 
 #include "DescriptorSet.h"
 
+#include "Renderer/Image/Image.h"
+
 #include "Renderer/Descriptors/VulkanDescriptorPool.h"
 
 namespace Lucy {
@@ -36,6 +38,7 @@ namespace Lucy {
 		void RTDestroyResource() final override;
 
 		std::unordered_map<std::string, Ref<VulkanUniformImageSampler>> m_UniformImageSamplers;
+
 		std::vector<VkDescriptorSet> m_DescriptorSets;
 		VkDescriptorSetLayout m_DescriptorSetLayout;
 

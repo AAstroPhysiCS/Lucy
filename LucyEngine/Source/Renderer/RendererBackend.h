@@ -9,12 +9,15 @@ namespace Lucy {
 
 	class Window;
 	class Image;
-	class VulkanPushConstant;
+	class PipelineConstant;
 	class DescriptorSet;
 
 	class RenderDevice;
 	class SwapChain;
 	class RenderGraphPass;
+
+	struct ExecutionBatch;
+	struct RenderFrameHandles;
 
 	struct EntityPickedEvent;
 
@@ -33,12 +36,8 @@ namespace Lucy {
 		void EnqueueToRenderCommandQueue(RenderCommandFunc&& func);
 		void EnqueueResourceDestroy(RenderResourceHandle handle);
 
-		void SubmitToRender(RenderGraphPass& pass, RenderResourceHandle renderPassHandle, RenderResourceHandle frameBufferHandle);
-		void SubmitToCompute(RenderGraphPass& pass);
+		virtual void SubmitBatchesToRender(std::vector<ExecutionBatch>& batches, const std::unordered_map<std::string, RenderFrameHandles>& renderFrameHandleMap) = 0;
 		virtual RenderContextResultCodes WaitAndPresent() = 0;
-
-		virtual void ExecuteBarrier(void* commandBufferHandle, Ref<Image> image) = 0;
-		virtual void ExecuteBarrier(void* commandBufferHandle, void* imageHandle, uint32_t imageLayout, uint32_t layerCount, uint32_t mipCount) = 0;
 
 		virtual void Destroy();
 		
@@ -55,7 +54,6 @@ namespace Lucy {
 		virtual glm::vec3 OnMousePicking(const EntityPickedEvent& e, const Ref<Image>& currentFrameBufferImage) = 0;
 
 		virtual void InitializeImGui() = 0;
-		virtual void RTRenderImGui() = 0;
 	protected:
 		virtual void Init() = 0;
 
@@ -63,11 +61,10 @@ namespace Lucy {
 		virtual void RenderFrame() = 0;
 		virtual void EndFrame() = 0;
 
-		void EnqueueToRenderCommandQueue(RenderSubmitFunc&& func);
+		void EnqueueToRenderCommandQueue(const ExecutionBatch& batch, const std::vector<RenderSubmitFunc>& submitFuncs);
 
 		void RecreateCommandQueue();
 		void FlushCommandQueue();
-		void FlushSubmitQueue();
 
 		virtual void FlushDeletionQueue() = 0;
 
@@ -84,15 +81,12 @@ namespace Lucy {
 		Ref<SwapChain> m_SwapChain = nullptr;
 
 		Ref<RenderCommandQueue> m_RenderCommandQueue = nullptr;
-		Ref<RenderCommandQueue> m_RenderComputeCommandQueue = nullptr;
+		RenderCommandQueueMetricsOutput m_CommandQueueMetricsOutput;
 
 		RendererConfiguration m_RendererConfiguration;
 
-		RenderCommandQueueMetricsOutput m_CommandQueueMetricsOutput;
-		RenderCommandQueueMetricsOutput m_CommandQueueMetricsOutputCompute;
-
 		friend class Renderer;
 		friend class RenderThread;
-		friend class ImGuiVulkanImpl;
+		friend struct ImGuiVulkanImpl;
 	};
 }

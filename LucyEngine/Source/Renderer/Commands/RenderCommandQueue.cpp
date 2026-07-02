@@ -1,31 +1,56 @@
 #include "lypch.h"
 
 #include "RenderCommandQueue.h"
+
 #include "Renderer/Device/VulkanRenderDevice.h"
+
+#include "Renderer/ExecutionBatch.h"
 
 namespace Lucy {
 
-	//TODO: for now, we will select the 0. index command list and execute only that (in the future, multithread this with JobSystem)
-	static inline constexpr const uint32_t commandListIndex = 0;
-
 	RenderCommandQueue::RenderCommandQueue(const RenderCommandQueueCreateInfo& createInfo)
 		: m_CreateInfo(createInfo) {
-		LUCY_ASSERT(m_CreateInfo.CommandListParallelCount == 1, "Multithreaded command list generation will be supported in the future!");
+	}
+
+	void RenderCommandQueue::operator+=(RenderCommandFunc&& func) {
+		std::unique_lock lock(s_Mutex);
+		m_RenderCommandQueue.emplace_back(std::move(func));
+	}
+
+	void RenderCommandQueue::operator+=(RenderSubmitInfo&& info) {
+		std::unique_lock lock(s_Mutex);
+		m_RenderSubmitQueue.try_emplace(info.Batch.ID, std::move(info));
+	}
+
+	std::vector<RenderCommandList>& RenderCommandQueue::GetCommandLists(TargetQueueFamily family) {
+		return m_CommandLists[family];
 	}
 
 	void RenderCommandQueue::Init() {
-		RenderCommandListCreateInfo graphicsCreateInfo = {
-			.RenderDevice = m_CreateInfo.RenderDevice,
-			.TargetQueueFamily = m_CreateInfo.TargetQueueFamily
-		};
-		for (uint32_t i = 0; i < m_CreateInfo.CommandListParallelCount; i++)
-			m_CommandLists.emplace_back(graphicsCreateInfo);
+		
+	}
+
+	void RenderCommandQueue::RecreateForQueue(TargetQueueFamily family) {
+		auto& recorder = m_CommandLists[family];
+
+		for (auto& [family, cmdLists] : m_CommandLists) {
+			for (auto& cmdList : cmdLists)
+				cmdList.Recreate();
+		}
 	}
 
 	void RenderCommandQueue::Recreate() {
 		LUCY_PROFILE_NEW_EVENT("RenderCommandQueue::Recreate");
-		for (auto& cmdList : m_CommandLists)
-			cmdList.Recreate();
+		for (auto& [family, cmdLists] : m_CommandLists) {
+			for (auto& cmdList : cmdLists)
+				cmdList.Recreate();
+		}
+	}
+
+	void RenderCommandQueue::ResetFrameSlotRecordersIfCompleted(uint32_t frameIndex, TargetQueueFamily family) {
+		auto& cmdLists = m_CommandLists[family];
+		for (auto& cmdList : cmdLists)
+			cmdList.ResetRenderCommand(frameIndex);
 	}
 
 	void RenderCommandQueue::FlushCommandQueue() {
@@ -33,6 +58,9 @@ namespace Lucy {
 		/*	For it to support, nested command/submit function lambdas
 			Nested lambda functions are being run in the second iteration.
 		*/
+		if (m_RenderCommandQueue.empty())
+			return;
+
 		size_t oldCommandSize = m_RenderCommandQueue.size();
 		for (size_t i = 0; i < oldCommandSize; i++)
 			m_RenderCommandQueue[i](m_CreateInfo.RenderDevice);
@@ -40,43 +68,34 @@ namespace Lucy {
 		m_RenderCommandQueue.erase(m_RenderCommandQueue.begin(), m_RenderCommandQueue.begin() + oldCommandSize);
 	}
 
-	void RenderCommandQueue::FlushSubmitQueue(RenderCommandQueueMetricsOutput& output) {
-		LUCY_PROFILE_NEW_EVENT("RenderCommandQueue::FlushSubmitQueue");
+	RenderCommandList& RenderCommandQueue::GetNextAvailableCommandList(uint32_t frameIndex, TargetQueueFamily family) {
+		auto& cmdLists = GetCommandLists(family);
 
-		const auto& device = m_CreateInfo.RenderDevice;
-		auto& cmdList = m_CommandLists[commandListIndex];
-		const auto& primaryCommandPool = cmdList.GetPrimaryCommandPool();
-
-		device->BeginCommandBuffer(primaryCommandPool);
-		device->RTResetTimestampQuery(primaryCommandPool);
-		device->RTResetPipelineQuery(primaryCommandPool);
-
-		m_BeginTimestampIndex = device->RTBeginTimestamp(primaryCommandPool);
-
-		size_t oldSubmitCommandSize = m_RenderSubmitQueue.size();
-		for (size_t i = 0; i < oldSubmitCommandSize; i++)
-			m_RenderSubmitQueue[i](cmdList);
-
-		m_EndTimestampIndex = device->RTEndTimestamp(primaryCommandPool);
-		auto renderTimes = device->GetQueryResults(RenderDeviceQueryType::Timestamp);
-
-		device->EndCommandBuffer(primaryCommandPool);
-
-		m_RenderSubmitQueue.erase(m_RenderSubmitQueue.begin(), m_RenderSubmitQueue.begin() + oldSubmitCommandSize);
-
-		double timestampPeriod = 0.0;
-
-		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan)
-			timestampPeriod = device->As<VulkanRenderDevice>()->GetTimestampPeriod();
-
-		for (const auto& [name, cmd] : cmdList.m_RenderCommands) {
-			double renderTime = cmd.GetRenderTime(renderTimes) * timestampPeriod / 1000000.0;
-			const auto& [it, success] = output.RenderTimeOfPasses.try_emplace(name, renderTime);
-			if (!success)
-				output.RenderTimeOfPasses.at(name) = renderTime;
+		for (auto& cmdList : cmdLists) {
+			if (cmdList.IsCurrentFrameSlotAvailable(frameIndex))
+				return cmdList;
 		}
 
-		output.RenderTime = (double)(renderTimes[m_EndTimestampIndex] - renderTimes[m_BeginTimestampIndex]) * timestampPeriod / 1000000.0;
+		LUCY_ASSERT(false, "No available command list found for current frame slot!");
+	}
+
+	void RenderCommandQueue::AllocateCommandLists(const RenderSubmitQueue& submitQueue) {
+		std::array<size_t, static_cast<size_t>(TargetQueueFamily::Count)> batchIndexWithinFamily{};
+
+		for (const auto& [id, info] : submitQueue) {
+			const auto& vkBatch = info.Batch.AsVulkanBatch();
+			auto& cmdLists = GetCommandLists(vkBatch.QueueFamily);
+
+			auto index = static_cast<uint8_t>(vkBatch.QueueFamily);
+			batchIndexWithinFamily[index]++;
+
+			while (cmdLists.size() < batchIndexWithinFamily[index]) {
+				cmdLists.emplace_back(RenderCommandListCreateInfo{
+					.RenderDevice = m_CreateInfo.RenderDevice,
+					.TargetQueueFamily = vkBatch.QueueFamily
+				});
+			}
+		}
 	}
 
 	void RenderCommandQueue::Clear() {
@@ -84,9 +103,12 @@ namespace Lucy {
 		m_RenderCommandQueue.clear();
 	}
 
-	void RenderCommandQueue::Free() {
+	void RenderCommandQueue::Destroy() {
 		Clear();
-		for (auto& cmdList : m_CommandLists)
-			cmdList.Destroy();
+
+		for (auto& [family, cmdLists] : m_CommandLists) {
+			for (auto& cmdList : cmdLists)
+				cmdList.Destroy();
+		}
 	}
 }

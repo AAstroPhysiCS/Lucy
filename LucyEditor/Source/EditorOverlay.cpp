@@ -34,6 +34,7 @@ namespace Lucy {
 		auto& metricsPanel = DebugPanel::GetInstance();
 		metricsPanel.ToggleShow();
 
+
 		sceneExplorerPanel.SetScene(m_Scene);
 
 		viewportPanel.SetRenderPipeline(m_RenderPipeline);
@@ -95,8 +96,6 @@ namespace Lucy {
 			ImGui::RenderPlatformWindowsDefault();
 			glfwMakeContextCurrent(backup_current_context);
 		}
-
-		Renderer::RenderImGui();
 	}
 
 	void EditorOverlay::Render() {

@@ -4,12 +4,6 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/RendererPasses.h"
 
-#include "Renderer/RenderGraph/RenderGraph.h"
-
-#include "Events/EventHandler.h"
-
-#include "Scene/Entity.h"
-
 #include "Utilities/Utilities.h"
 
 namespace Lucy {
@@ -21,6 +15,9 @@ namespace Lucy {
 
 		Renderer::AddRendererPass<ForwardPBRPass>(scene, viewportWidth, viewportHeight);
 		Renderer::AddRendererPass<CubemapPass>(scene, viewportWidth, viewportHeight);
+		Renderer::AddRendererPass<IrradiancePass>(scene, CubemapPass::HDRImageSize);
+		Renderer::AddRendererPass<BRDFLutPass>(512);
+		Renderer::AddRendererPass<PrefilterPass>(scene, CubemapPass::HDRImageSize);
 		Renderer::AddRendererPass<ShadowPass>(scene, 2048);
 	}
 

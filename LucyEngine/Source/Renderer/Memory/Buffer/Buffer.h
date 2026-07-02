@@ -7,6 +7,9 @@ namespace Lucy {
 		using VecIterator = typename std::vector<T>::iterator;
 	public:
 		Buffer() = default;
+		Buffer(T* data, size_t size) {
+			SetData(data, size);
+		}
 
 		virtual ~Buffer() {
 			Clear();
@@ -20,6 +23,18 @@ namespace Lucy {
 			if (this != &other) {
 				Clear();
 				std::copy(other.m_Data.begin(), other.m_Data.end(), std::back_inserter(m_Data));
+			}
+			return *this;
+		}
+
+		Buffer(Buffer&& other) noexcept {
+			m_Data = std::move(other.m_Data);
+		}
+
+		Buffer& operator=(Buffer&& other) noexcept {
+			if (this != &other) {
+				Clear();
+				m_Data = std::move(other.m_Data);
 			}
 			return *this;
 		}
@@ -94,7 +109,6 @@ namespace Lucy {
 		inline size_t GetCapacity() const { return m_Data.capacity(); }
 	protected:
 		std::vector<T> m_Data;
-
 	private:
 		inline void InsertPadding(size_t alignment) {
 			size_t offset = m_Data.size();

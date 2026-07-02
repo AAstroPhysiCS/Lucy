@@ -61,7 +61,7 @@ namespace Lucy {
 		void Update() final override;
 
 	protected:
-		glm::quat m_Orientation;
+		glm::quat m_Orientation{};
 	private:
 		void UpdateProjection();
 

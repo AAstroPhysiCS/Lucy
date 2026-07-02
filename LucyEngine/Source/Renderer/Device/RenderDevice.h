@@ -4,7 +4,7 @@
 
 #include "RenderDeviceResourceManager.h"
 
-#include "Renderer/Synchronization/VulkanSyncItems.h"
+#include "Renderer/Semaphore.h"
 #include "RenderDeviceQueries.h"
 
 namespace Lucy {
@@ -28,13 +28,15 @@ namespace Lucy {
 
 	class Mesh;
 
+	struct ExecutionBatch;
+
 	class GraphicsPipeline;
 	class ComputePipeline;
 
 	class RenderCommandQueue;
 	class CommandPool;
 
-	class VulkanPushConstant;
+	class PipelineConstant;
 
 	class PipelineManager;
 
@@ -42,6 +44,7 @@ namespace Lucy {
 		Graphics,
 		Compute,
 		Transfer,
+		Count
 	};
 
 	class RenderDevice : public MemoryTrackable {
@@ -63,10 +66,10 @@ namespace Lucy {
 		RenderResourceHandle CreateSharedStorageBuffer(const SharedStorageBufferCreateInfo& createInfo);
 		RenderResourceHandle CreateUniformBuffer(const UniformBufferCreateInfo& createInfo);
 
-		RenderResourceHandle CreateImage(const std::filesystem::path& path, ImageCreateInfo& createInfo);
-		RenderResourceHandle CreateImage(const ImageCreateInfo& createInfo);
+		RenderResourceHandle CreateImage(const std::filesystem::path& path, ImageCreateInfo& createInfo, std::string_view debugName = {});
+		RenderResourceHandle CreateImage(const ImageCreateInfo& createInfo, std::string_view debugName = {});
 		RenderResourceHandle CreateImage(const Ref<VulkanImage2D>& other);
-
+		
 		template <typename TResource> requires IsRenderResource<TResource>
 		inline Ref<TResource> AccessResource(RenderResourceHandle handle) {
 			return m_ResourceManager.GetResource(handle)->As<TResource>();
@@ -87,14 +90,18 @@ namespace Lucy {
 
 		std::vector<uint64_t> GetQueryResults(RenderDeviceQueryType type);
 
+		virtual void SubmitWorkToGPUAsBatch(const RenderCommandList& renderCommandList, const ExecutionBatch& batch) = 0;
+
 		/// <param name="currentFrameWaitSemaphore: image is available, image is renderable"></param>
 		/// <param name="currentFrameSignalSemaphore: rendering finished, signal it"></param>
+		/*virtual void SubmitWorkToGPU(const std::vector<RenderCommandList>& renderCommandLists,
+			Semaphore* currentFrameFence, VulkanSemaphore* currentFrameWaitSemaphore, VulkanSemaphore* currentFrameSignalSemaphore) = 0;
 		virtual void SubmitWorkToGPU(TargetQueueFamily queueFamily, Ref<CommandPool> cmdPool,
-			Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore, Semaphore* currentFrameSignalSemaphore) = 0;
+			Semaphore* currentFrameFence, VulkanSemaphore* currentFrameWaitSemaphore, VulkanSemaphore* currentFrameSignalSemaphore) = 0;
 		virtual bool SubmitWorkToGPU(TargetQueueFamily queueFamily, std::vector<Ref<CommandPool>>& cmdPools,
-			Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore, Semaphore* currentFrameSignalSemaphore) = 0;
+			Semaphore* currentFrameFence, VulkanSemaphore* currentFrameWaitSemaphore, VulkanSemaphore* currentFrameSignalSemaphore) = 0;
 		virtual void SubmitWorkToGPU(TargetQueueFamily queueFamily, std::vector<Ref<CommandPool>>& cmdPools,
-			Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore) = 0;
+			Semaphore* currentFrameFence, VulkanSemaphore* currentFrameWaitSemaphore) = 0;*/
 
 		virtual void WaitForDevice() = 0;
 		virtual void WaitForQueue(TargetQueueFamily queueFamily) = 0;
@@ -105,8 +112,8 @@ namespace Lucy {
 		virtual void BindBuffers(Ref<CommandPool> cmdPool, Ref<Mesh> mesh) = 0;
 		virtual void BindBuffers(Ref<CommandPool> cmdPool, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) = 0;
 
-		virtual void BindPushConstant(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline, const VulkanPushConstant& pushConstant) = 0;
-		virtual void BindPushConstant(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline, const VulkanPushConstant& pushConstant) = 0;
+		virtual void BindPushConstant(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline, const PipelineConstant& pushConstant) = 0;
+		virtual void BindPushConstant(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline, const PipelineConstant& pushConstant) = 0;
 
 		virtual void BindPipeline(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline) = 0;
 		virtual void BindPipeline(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline) = 0;

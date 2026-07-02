@@ -1,51 +1,79 @@
 #pragma once
 
-#include "Renderer/Memory/Memory.h"
+#include <variant>
 
+#include "Renderer/Memory/Memory.h"
 #include "Renderer/Device/RenderResource.h"
 #include "Renderer/RenderPass.h"
 
 #include "RenderGraphResource.h"
 
 namespace Lucy {
+    class Image;
 
-	class Image;
+    enum class RGResourceType : uint8_t {
+        Internal,
+        External,
+        ExternalTransient
+    };
 
-	struct RGImageData {
-		RenderResourceHandle ResourceHandle;
-		RenderPassLoadStoreAttachments LoadStoreAttachment;
-		bool IsDepth = false;
-	};
+    struct RGImageData {
+        RenderPassLoadStoreAttachments LoadStoreAttachment{};
+        bool IsDepth = false;
+    };
 
-	struct RGBufferData {
-		RenderResourceHandle ResourceHandle;
-		//Alignment? Any special formats? etc...
-	};
+    struct RGBufferData {
+        // Alignment, size, usage flags, etc.
+    };
 
-	using ExternalResources = std::unordered_map<RenderGraphResource, RenderResourceHandle>;
-	using RGImageResources = std::unordered_map<RenderGraphResource, RGImageData>;
-	using RGBufferResources = std::unordered_map<RenderGraphResource, RGBufferData>;
+    using RGResourceData = std::variant<RGImageData, RGBufferData>;
 
-	class RenderGraphRegistry final {
-	public:
-		RenderGraphRegistry(ExternalResources& externalResources, ExternalResources& externalTransientResources);
-		~RenderGraphRegistry() = default;
+    struct RGResourceEntry {
+        RenderResourceHandle ResourceHandle;
+        RGResourceType Type = RGResourceType::Internal;
+        RGResourceData Data;
 
-		void DeclareImage(const RenderGraphResource& rgResource, const RGImageData& imageData);
-		void DeclareBuffer(const RenderGraphResource& rgResource, const RGBufferData& bufferData);
+        [[nodiscard]] bool IsImage() const { return std::holds_alternative<RGImageData>(Data); }
+        [[nodiscard]] bool IsBuffer() const { return std::holds_alternative<RGBufferData>(Data); }
 
-		Ref<Image> GetImage(const RenderGraphResource& rgResource);
-		Ref<Image> GetExternalImage(const RenderGraphResource& rgResource);
-	private:
-		const RGImageData& GetImageData(const RenderGraphResource& rgResource);
-		const RGBufferData& GetBufferData(const RenderGraphResource& rgResource);
+        [[nodiscard]] bool IsExternal() const { return Type == RGResourceType::External; }
+        [[nodiscard]] bool IsExternalTransient() const { return Type == RGResourceType::ExternalTransient; }
 
-		RGImageResources m_ImageResources;
-		RGBufferResources m_BufferResources;
+        [[nodiscard]] RGImageData& GetImageData() { return std::get<RGImageData>(Data); }
+        [[nodiscard]] const RGImageData& GetImageData() const { return std::get<RGImageData>(Data); }
 
-		ExternalResources& m_ExternalResources;
-		ExternalResources& m_ExternalTransientResources;
+        [[nodiscard]] RGBufferData& GetBufferData() { return std::get<RGBufferData>(Data); }
+        [[nodiscard]] const RGBufferData& GetBufferData() const { return std::get<RGBufferData>(Data); }
+    };
 
-		friend class RenderGraph; //for GetImageData...
-	};
+    using RGResources = std::unordered_map<RenderGraphResource, RGResourceEntry>;
+
+    class RenderGraphRegistry final {
+    public:
+        RenderGraphRegistry() = default;
+        ~RenderGraphRegistry() = default;
+
+        void Flush();
+
+        void ImportExternalResource(const RenderGraphResource& rgResource, RenderResourceHandle handle);
+        void ImportExternalTransientResource(const RenderGraphResource& rgResource, RenderResourceHandle handle);
+
+        void DeclareImage(const RenderGraphResource& rgResource, RenderResourceHandle handle, const RGImageData& imageData);
+        void DeclareBuffer(const RenderGraphResource& rgResource, RenderResourceHandle handle, const RGBufferData& bufferData);
+
+        [[nodiscard]] bool Contains(const RenderGraphResource& rgResource) const;
+
+        [[nodiscard]] Ref<Image> GetImage(const RenderGraphResource& rgResource);
+        [[nodiscard]] Ref<Image> GetImage(const RenderGraphResource& rgResource) const;
+
+        [[nodiscard]] Ref<RenderResource> GetBuffer(const RenderGraphResource& rgResource);
+        [[nodiscard]] Ref<RenderResource> GetBuffer(const RenderGraphResource& rgResource) const;
+    private:
+        [[nodiscard]] RGResourceEntry& GetResourceEntry(const RenderGraphResource& rgResource) { return m_Resources.at(rgResource); }
+        [[nodiscard]] const RGResourceEntry& GetResourceEntry(const RenderGraphResource& rgResource) const { return m_Resources.at(rgResource); }
+
+        RGResources m_Resources;
+
+        friend class RenderGraph;
+    };
 }

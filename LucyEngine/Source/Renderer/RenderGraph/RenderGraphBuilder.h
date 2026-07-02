@@ -5,6 +5,7 @@ namespace Lucy {
 	class RenderGraph;
 	class RenderGraphPass;
 	class RenderGraphResource;
+	enum class RenderGraphResourceAccess : uint8_t;
 
 	struct ImageCreateInfo;
 
@@ -21,18 +22,18 @@ namespace Lucy {
 		void DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp,
 						const RenderGraphResource& rgResourceDepth, const ImageCreateInfo& createDepthInfo, RenderPassLoadStoreAttachments loadStoreDepthAccessOp);
 
-		void ReadExternalImage(const RenderGraphResource& rgResource);
-		void ReadExternalTransientImage(const RenderGraphResource& rgResource);
-		void WriteExternalImage(const RenderGraphResource& rgResource);
-
 		void BindRenderTarget(const RenderGraphResource& rgResourceToBind, const RenderGraphResource& rgResourceDepthToBind);
 		void BindRenderTarget(const RenderGraphResource& rgResourceToBind);
-#pragma region Compute
-		void ReadBuffer(const RenderGraphResource& rgResourceToRead);
-		void WriteBuffer(const RenderGraphResource& rgResourceToWrite);
 
-		void ReadImage(const RenderGraphResource& rgResourceToRead);
-		void WriteImage(const RenderGraphResource& rgResourceToWrite);
+		void ReadExternalImage(const RenderGraphResource& rgResource, RenderGraphResourceAccess access);
+		void ReadExternalTransientImage(const RenderGraphResource& rgResource, RenderGraphResourceAccess access);
+		void WriteExternalImage(const RenderGraphResource& rgResource, RenderGraphResourceAccess access);
+#pragma region Compute
+		void ReadBuffer(const RenderGraphResource& rgResourceToRead, RenderGraphResourceAccess access);
+		void WriteBuffer(const RenderGraphResource& rgResourceToWrite, RenderGraphResourceAccess access);
+
+		void ReadImage(const RenderGraphResource& rgResourceToRead, RenderGraphResourceAccess access);
+		void WriteImage(const RenderGraphResource& rgResourceToWrite, RenderGraphResourceAccess access);
 #pragma endregion Compute
 	private:
 		RenderGraph* m_RenderGraph = nullptr;

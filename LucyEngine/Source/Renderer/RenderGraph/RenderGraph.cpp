@@ -1,50 +1,49 @@
 #include "lypch.h"
 #include "RenderGraph.h"
+#include "RenderGraphPass.h"
 #include "RenderGraphResource.h"
 #include "RenderGraphBuilder.h"
 
+#include "Renderer/ExecutionBatch.h"
+
+#include "Renderer/Image/VulkanImage.h"
+
 namespace Lucy {
 	
-	RenderGraph::RenderGraph() 
-		: m_Registry(m_ExternalResources, m_ExternalTransientResources) {
+	RenderGraph::RenderGraph(RenderArchitecture arch, Ref<RenderDevice> device) {
+		switch (arch) {
+			case RenderArchitecture::Vulkan:
+				m_Compiler = Memory::CreateUnique<VulkanRenderGraphCompiler>(*this, device);
+				break;
+			default:
+				LUCY_ASSERT(false, "Unsupported Render Architecture!");
+		}
 	}
 
-	void RenderGraph::Compile() {
+	void RenderGraph::Build() {
+		LUCY_PROFILE_NEW_EVENT("RenderGraph::Build");
 		m_AcyclicGraph.Build();
 		Update();
 	}
 
-	void RenderGraph::Execute() {
+	std::vector<ExecutionBatch> RenderGraph::Execute() {
 		LUCY_PROFILE_NEW_EVENT("RenderGraph::Execute");
-		Traverse([](RenderGraphPass* pass) {
-			Renderer::SubmitToRender(*pass);
-		});
+		const auto& batches = CreateBatchesForRendering();
+		return m_Compiler->Compile(batches);
 	}
 
 	void RenderGraph::Flush() {
 		LUCY_PROFILE_NEW_EVENT("RenderGraph::Flush");
 		Update();
-		for (auto& [rgResource, transientRenderResource] : m_ExternalTransientResources) {
-			if (!Renderer::IsValidRenderResource(transientRenderResource))
-				continue;
-			Renderer::EnqueueResourceDestroy(transientRenderResource);
-		}
+		m_Registry.Flush();
 	}
 
 	void RenderGraph::ImportExternalResource(const RenderGraphResource& rgResource, RenderResourceHandle handle) {
-		if (m_ExternalResources.contains(rgResource)) {
-			m_ExternalResources.at(rgResource) = handle;
-			return;
-		}
-		m_ExternalResources.try_emplace(rgResource, handle);
+		m_Registry.ImportExternalResource(rgResource, handle);
 	}
 
 	void RenderGraph::ImportExternalTransientResource(const RenderGraphResource& rgResource, RenderResourceHandle handle) {
-		if (m_ExternalTransientResources.contains(rgResource)) {
-			m_ExternalTransientResources.at(rgResource) = handle;
-			return;
-		}
-		m_ExternalTransientResources.try_emplace(rgResource, handle);
+		m_Registry.ImportExternalTransientResource(rgResource, handle);
 	}
 
 	void RenderGraph::DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp) {
@@ -52,12 +51,12 @@ namespace Lucy {
 	}
 
 	void RenderGraph::DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp, const RenderGraphResource& rgResourceDepth, const ImageCreateInfo& createDepthInfo, RenderPassLoadStoreAttachments loadStoreDepthAccessOp) {
-		const auto& imageHandle = Renderer::GetRenderDevice()->CreateImage(createInfo);
+		const auto& imageHandle = Renderer::GetRenderDevice()->CreateImage(createInfo, "Image " + rgResource.GetName());
 		LUCY_ASSERT(Renderer::IsValidRenderResource(imageHandle));
 
 		m_Registry.DeclareImage(rgResource,
+			imageHandle,
 			RGImageData{ 
-				.ResourceHandle = imageHandle, 
 				.LoadStoreAttachment = loadStoreAccessOp, 
 				.IsDepth = false 
 			}
@@ -70,8 +69,8 @@ namespace Lucy {
 		LUCY_ASSERT(Renderer::IsValidRenderResource(imageDepthHandle));
 
 		m_Registry.DeclareImage(rgResourceDepth,
+			imageDepthHandle,
 			RGImageData{
-				.ResourceHandle = imageDepthHandle,
 				.LoadStoreAttachment = loadStoreDepthAccessOp,
 				.IsDepth = true
 			}
@@ -79,7 +78,7 @@ namespace Lucy {
 	}
 
 	void RenderGraph::ReadExternalImage(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToRead) {
-		if (auto it = m_ExternalResources.find(rgResourceToRead); it != m_ExternalResources.end()) {
+		if (m_Registry.Contains(rgResourceToRead)) {
 			//const auto& image = device->AccessResource<Image>(externalResources.at(resource));
 			ReadImage(currentPass, rgResourceToRead);
 			return;
@@ -91,7 +90,7 @@ namespace Lucy {
 	}
 
 	void RenderGraph::ReadExternalTransientImage(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToRead) {
-		if (auto it = m_ExternalTransientResources.find(rgResourceToRead); it != m_ExternalTransientResources.end()) {
+		if (m_Registry.Contains(rgResourceToRead)) {
 			//const auto& image = device->AccessResource<Image>(externalTransientResources.at(resource));
 			ReadImage(currentPass, rgResourceToRead);
 			return;
@@ -106,7 +105,7 @@ namespace Lucy {
 	}
 
 	void RenderGraph::WriteExternalImage(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToWrite) {
-		if (auto it = m_ExternalResources.find(rgResourceToWrite); it != m_ExternalResources.end()) {
+		if (m_Registry.Contains(rgResourceToWrite)) {
 			//const auto& image = device->AccessResource<Image>(externalResources.at(resource));
 			WriteImage(currentPass, rgResourceToWrite);
 			return;
@@ -145,29 +144,167 @@ namespace Lucy {
 
 	bool RenderGraph::CheckIfPassNeedsCulling(RenderGraphPass* pass, const std::unordered_set<RenderGraphResource>& inputResources, 
 		const std::unordered_set<RenderGraphResource>& outputResources) {
+		LUCY_PROFILE_NEW_EVENT("RenderGraph::CheckIfPassNeedsCulling");
 
 		const auto CheckIfPassIsDependent = [this](const std::unordered_set<RenderGraphResource>& rgResources) {
+			LUCY_PROFILE_NEW_EVENT("RenderGraph::CheckIfPassIsDependent");
 			for (const RenderGraphResource& rgResource : rgResources) {
 				RenderGraphPass* parentPass = m_AcyclicGraph.FindOutputPassGivenResource(rgResource);
 				if (parentPass && parentPass->GetCurrentState() == RenderGraphPassState::Waiting)
-					return true;
-			}
-			return false;
-		};
-
-		const auto CheckIfExternalResourcesAreValid = [this](const std::unordered_set<RenderGraphResource>& rgResources) {
-			LUCY_PROFILE_NEW_EVENT("RenderGraph::CheckIfPassHasExternalDependency");
-			for (const RenderGraphResource& rgResource : rgResources) {
-				if (m_ExternalResources.contains(rgResource) && !Renderer::IsValidRenderResource(m_ExternalResources.at(rgResource)))
-					return false;
-				if (m_ExternalTransientResources.contains(rgResource) && !Renderer::IsValidRenderResource(m_ExternalTransientResources.at(rgResource)))
 					return false;
 			}
 			return true;
 		};
 
-		return CheckIfPassIsDependent(inputResources) || !(CheckIfExternalResourcesAreValid(inputResources) &&
-			CheckIfExternalResourcesAreValid(outputResources));
+		const auto CheckIfExternalResourcesAreValid = [this](const std::unordered_set<RenderGraphResource>& rgResources) {
+			LUCY_PROFILE_NEW_EVENT("RenderGraph::CheckIfExternalResourcesAreValid");
+			for (const RenderGraphResource& rgResource : rgResources) {
+				if (m_Registry.Contains(rgResource) && !Renderer::IsValidRenderResource(m_Registry.GetResourceEntry(rgResource).ResourceHandle))
+					return false;
+			}
+			return true;
+		};
+
+		return !(CheckIfPassIsDependent(inputResources) && CheckIfExternalResourcesAreValid(inputResources));
+	}
+	
+	RenderGraphBatches RenderGraph::CreateBatchesForRendering() const {
+		LUCY_PROFILE_NEW_EVENT("RenderGraph::CreateBatchesForRendering");
+		RenderGraphBatches batches;
+
+		std::vector<RenderGraphPass*> orderedPasses;
+		orderedPasses.reserve(m_AcyclicGraph.Size());
+
+		for (const auto& node : m_AcyclicGraph) {
+			RenderGraphPass* pass = node.Pass;
+			if (pass->GetCurrentState() != RenderGraphPassState::Runnable)
+				continue;
+			orderedPasses.push_back(pass);
+		}
+
+		if (orderedPasses.empty())
+			return batches;
+
+		// 1) Build contiguous queue-family batches
+		{
+			RenderGraphBatch currentBatch{};
+			TargetQueueFamily currentBatchFamily = orderedPasses.front()->GetTargetQueueFamily();
+
+			for (RenderGraphPass* pass : orderedPasses) {
+				TargetQueueFamily family = pass->GetTargetQueueFamily();
+
+				if (currentBatchFamily == family) {
+					currentBatch.Passes.push_back(pass);
+				} else {
+					//old current batch
+					batches.push_back(std::move(currentBatch));
+
+					currentBatch = {};
+					currentBatchFamily = family;
+
+					currentBatch.Passes.push_back(pass);
+				}
+			}
+
+			if (!currentBatch.Passes.empty())
+				batches.push_back(std::move(currentBatch));
+		}
+
+		std::unordered_map<RenderGraphPass*, size_t> batchIndexOfPass;
+		for (size_t i = 0; i < batches.size(); ++i) {
+			for (RenderGraphPass* pass : batches[i].Passes)
+				batchIndexOfPass[pass] = i;
+		}
+
+		const auto IsReadOnlyAccess = [](RenderGraphResourceAccess access) {
+			switch (access) {
+				case RenderGraphResourceAccess::ShaderSampledRead:
+				case RenderGraphResourceAccess::StorageRead:
+				case RenderGraphResourceAccess::TransferRead:
+				case RenderGraphResourceAccess::VertexRead:
+				case RenderGraphResourceAccess::IndexRead:
+				case RenderGraphResourceAccess::IndirectRead:
+					return true;
+				default:
+					return false;
+			}
+		};
+
+		const auto NeedsIntraQueueBarrier = [&](RenderGraphResourceAccess src, RenderGraphResourceAccess dst) {
+			if (src == RenderGraphResourceAccess::None || dst == RenderGraphResourceAccess::None)
+				return false;
+
+			// read -> read on same queue usually needs no explicit barrier here
+			if (IsReadOnlyAccess(src) && IsReadOnlyAccess(dst))
+				return false;
+
+			return true;
+		};
+
+		struct LastUseInfo {
+			RenderGraphPass* Pass = nullptr;
+			TargetQueueFamily Queue = TargetQueueFamily::Graphics;
+			RenderGraphResourceAccess Access = RenderGraphResourceAccess::None;
+			RenderGraphResourceType Type = RenderGraphResourceType::Image;
+		};
+
+		std::unordered_map<RenderGraphResource, LastUseInfo> lastUse;
+
+		const auto HandleUse = [&](RenderGraphPass* pass, const RenderGraphResourceAddInfo& use) {
+			auto it = lastUse.find(use.Resource);
+			if (it != lastUse.end() && it->second.Pass) {
+				const LastUseInfo& prev = it->second;
+
+				if (prev.Queue != use.QueueFamily) {
+					RenderGraphInterQueueTransition tr{};
+					tr.Resource = use.Resource;
+					tr.ResourceType = use.Type;
+					tr.SrcQueue = prev.Queue;
+					tr.DstQueue = use.QueueFamily;
+					tr.SrcAccess = prev.Access;
+					tr.DstAccess = use.Access;
+					tr.SrcPass = prev.Pass;
+					tr.DstPass = pass;
+
+					size_t srcBatchIndex = batchIndexOfPass.at(prev.Pass);
+					size_t dstBatchIndex = batchIndexOfPass.at(pass);
+
+					batches[srcBatchIndex].OutgoingInterQueueTransitions.push_back(tr);
+					batches[dstBatchIndex].IncomingInterQueueTransitions.push_back(tr);
+				} else if (NeedsIntraQueueBarrier(prev.Access, use.Access)) {
+					RenderGraphIntraQueueTransition br{};
+					br.Resource = use.Resource;
+					br.ResourceType = use.Type;
+					br.QueueFamily = use.QueueFamily;
+					br.SrcAccess = prev.Access;
+					br.DstAccess = use.Access;
+					br.SrcPass = prev.Pass;
+					br.DstPass = pass;
+
+					size_t dstBatchIndex = batchIndexOfPass.at(pass);
+					batches[dstBatchIndex].IntraQueueTransition.push_back(br);
+				}
+				//everything else is deemed to be automatically synchronized by the vulkan driver
+			}
+
+			lastUse[use.Resource] = {
+				.Pass = pass,
+				.Queue = use.QueueFamily,
+				.Access = use.Access,
+				.Type = use.Type
+			};
+		};
+
+		// 3) Walk passes in execution order and build intra/inter queue dependencies
+		for (RenderGraphPass* pass : orderedPasses) {
+			for (const RenderGraphResourceAddInfo& readUse : pass->GetResourceReads())
+				HandleUse(pass, readUse);
+
+			for (const RenderGraphResourceAddInfo& writeUse : pass->GetResourceWrites())
+				HandleUse(pass, writeUse);
+		}
+
+		return batches;
 	}
 
 	void RenderGraph::Update() {

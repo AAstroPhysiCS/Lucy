@@ -2,6 +2,8 @@
 #include "RenderThread.h"
 
 #include "Core/Window.h"
+#include "Core/Application.h"
+
 #include "Events/EventHandler.h"
 
 #include "Renderer.h"
@@ -22,7 +24,7 @@ namespace Lucy {
 		static std::mutex m;
 
 		std::unique_lock lock(m);
-		m_FinishedCondVar.wait(lock, [&]() { return m_Finished.load(); });
+		m_FinishedCondVar.wait(lock, [&]() { return m_Finished; });
 	}
 
 	bool RenderThread::OnInit() {
@@ -54,7 +56,7 @@ namespace Lucy {
 				if (result == RenderContextResultCodes::ERROR_OUT_OF_DATE_KHR ||
 					result == RenderContextResultCodes::SUBOPTIMAL_KHR ||
 					result == RenderContextResultCodes::NOT_READY) {
-					EventHandler::DispatchImmediateEvent<SwapChainResizeEvent>();
+					EventHandler::Submit<SwapChainResizeEvent>();
 				}
 
 				Application::SetMainThreadReady(false);

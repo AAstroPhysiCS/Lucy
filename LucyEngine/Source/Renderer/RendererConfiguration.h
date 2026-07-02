@@ -18,9 +18,15 @@ namespace Lucy {
 		Multithreaded
 	};
 
+	struct RendererSettings {
+		float EnvironmentLOD = 0.0f;
+	};
+
 	struct RendererConfiguration {
 		RenderArchitecture RenderArchitecture = RenderArchitecture::Vulkan;
 		RenderType RenderType = RenderType::Rasterizer;
 		ThreadingPolicy ThreadingPolicy = ThreadingPolicy::Singlethreaded;
+
+		RendererSettings Settings;
 	};
 }

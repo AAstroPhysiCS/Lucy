@@ -13,7 +13,7 @@ namespace Lucy {
 
 	void VulkanIndexBuffer::RTCreate(size_t size) {
 		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
-		allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, size * sizeof(uint32_t), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 										m_StagingBufferHandle, m_StagingBufferVma);
 	}
 
@@ -27,12 +27,12 @@ namespace Lucy {
 
 		void* data;
 		allocator.MapMemory(m_StagingBufferVma, data);
-		memcpy(data, m_Data.data(), m_Data.size() * sizeof(float));
+		memcpy(data, m_Data.data(), m_Data.size() * sizeof(uint32_t));
 		allocator.UnmapMemory(m_StagingBufferVma);
 
-		allocator.CreateVulkanBufferVma(VulkanBufferUsage::GPUOnly, m_Data.size() * sizeof(float),
+		allocator.CreateVulkanBufferVma(VulkanBufferUsage::GPUOnly, m_Data.size() * sizeof(uint32_t),
 										VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, m_BufferHandle, m_BufferVma);
-		Renderer::RTDirectCopyBuffer(m_StagingBufferHandle, m_BufferHandle, m_Data.size() * sizeof(float));
+		Renderer::RTDirectCopyBuffer(m_StagingBufferHandle, m_BufferHandle, m_Data.size() * sizeof(uint32_t));
 
 		allocator.DestroyBuffer(m_StagingBufferHandle, m_StagingBufferVma);
 	}

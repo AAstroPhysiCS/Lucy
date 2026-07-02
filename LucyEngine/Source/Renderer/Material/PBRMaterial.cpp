@@ -5,46 +5,57 @@
 
 namespace Lucy {
 
-	PBRMaterial::PBRMaterial(MaterialID materialID, const Ref<Shader>& shader, const PBRMaterialData& data) 
-		: Material(materialID), m_PBRShader(shader), m_MaterialData(data) {
+	PBRMaterial::PBRMaterial(const MaterialCreateInfo& createInfo, const PBRMaterialData& data) 
+		: Material(createInfo), m_MaterialData(data) {
 	}
 
 	void PBRMaterial::Update() {
 		LUCY_PROFILE_NEW_EVENT("Material::Update");
 
+		const Ref<Pipeline>& pbrPipeline = GetPipeline();
+
 		if (HasImage(PBRMaterial::ALBEDO_TYPE)) {
-			uint32_t pos = m_PBRShader->BindImageHandleTo("u_Textures", GetImage(PBRMaterial::ALBEDO_TYPE));
+			uint32_t pos = pbrPipeline->BindImageHandleTo("u_Textures", GetImage(PBRMaterial::ALBEDO_TYPE));
 			m_MaterialShaderData.AlbedoSlot = pos;
-		} else if (HasImage(PBRMaterial::NORMALS_TYPE)) {
-			uint32_t pos = m_PBRShader->BindImageHandleTo("u_Textures", GetImage(PBRMaterial::NORMALS_TYPE));
+		} 
+		
+		if (HasImage(PBRMaterial::NORMALS_TYPE)) {
+			uint32_t pos = pbrPipeline->BindImageHandleTo("u_Textures", GetImage(PBRMaterial::NORMALS_TYPE));
 			m_MaterialShaderData.NormalSlot = pos;
-		} else if (HasImage(PBRMaterial::METALLIC_TYPE)) {
-			uint32_t pos = m_PBRShader->BindImageHandleTo("u_Textures", GetImage(PBRMaterial::METALLIC_TYPE));
+		} 
+		
+		if (HasImage(PBRMaterial::METALLIC_TYPE)) {
+			uint32_t pos = pbrPipeline->BindImageHandleTo("u_Textures", GetImage(PBRMaterial::METALLIC_TYPE));
 			m_MaterialShaderData.MetallicSlot = pos;
-		} else if (HasImage(PBRMaterial::ROUGHNESS_TYPE)) {
-			uint32_t pos = m_PBRShader->BindImageHandleTo("u_Textures", GetImage(PBRMaterial::ROUGHNESS_TYPE));
+		} 
+		
+		if (HasImage(PBRMaterial::ROUGHNESS_TYPE)) {
+			uint32_t pos = pbrPipeline->BindImageHandleTo("u_Textures", GetImage(PBRMaterial::ROUGHNESS_TYPE));
 			m_MaterialShaderData.RoughnessSlot = pos;
-		} else if (HasImage(PBRMaterial::AO_TYPE)) {
-			uint32_t pos = m_PBRShader->BindImageHandleTo("u_Textures", GetImage(PBRMaterial::AO_TYPE));
+		} 
+		
+		if (HasImage(PBRMaterial::AO_TYPE)) {
+			uint32_t pos = pbrPipeline->BindImageHandleTo("u_Textures", GetImage(PBRMaterial::AO_TYPE));
 			m_MaterialShaderData.AOSlot = pos;
 		}
 
 		//TODO: Change diffuse color to vec4
-		m_MaterialShaderData.BaseDiffuseColor = glm::vec4(m_MaterialData.Diffuse, 1.0f);
+		m_MaterialShaderData.BaseAlbedoColor = glm::vec4(m_MaterialData.Albedo, 1.0f);
 		m_MaterialShaderData.BaseMetallicValue = m_MaterialData.Metallic;
 		m_MaterialShaderData.BaseRoughnessValue = m_MaterialData.Roughness;
 		m_MaterialShaderData.BaseAOValue = m_MaterialData.AOContribution;
+		m_MaterialShaderData.NormalStrength = m_MaterialData.NormalStrength;
 
-		auto ssboMaterialAttributes = m_PBRShader->GetSharedStorageBufferIfExists("LucyMaterialAttributes");
+		auto ssboMaterialAttributes = pbrPipeline->GetSharedStorageBufferIfExists("MaterialAttributes");
 		ssboMaterialAttributes->Append((uint8_t*)&m_MaterialShaderData, sizeof(m_MaterialShaderData));
 	}
 
-	void PBRMaterial::AddTexture(RenderResourceHandle textureHandle) {
-		m_MaterialData.TextureHandles.push_back(textureHandle);
+	void PBRMaterial::SetTexture(const MaterialImageType& type, RenderResourceHandle textureHandle) {
+		AddTexture(type.Index, textureHandle);
 	}
 
 	void PBRMaterial::RTDestroyResource() {
-		for (RenderResourceHandle imageHandle : m_MaterialData.TextureHandles)
+		for (RenderResourceHandle imageHandle : GetAllTextureHandles())
 			Renderer::EnqueueResourceDestroy(imageHandle);
 	}
 }

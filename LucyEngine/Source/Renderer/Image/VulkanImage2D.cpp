@@ -7,20 +7,20 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
 
-#include "../../../ThirdParty/ImGui/imgui_impl_vulkan.h"
-
 namespace Lucy {
 
-	VulkanImage2D::VulkanImage2D(const std::filesystem::path& path, const ImageCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device)
-		: VulkanImage(path, createInfo), m_VulkanDevice(device) {
+	VulkanImage2D::VulkanImage2D(const std::filesystem::path& path, const ImageCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device, std::string_view debugName)
+		: VulkanImage(path, createInfo, debugName), m_VulkanDevice(device) {
 		if (m_CreateInfo.ImageType != ImageType::Type2D)
 			LUCY_ASSERT(false);
 
 		RTCreateFromPath();
+
+		AddLabel(m_Image, device);
 	}
 
-	VulkanImage2D::VulkanImage2D(const ImageCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device)
-		: VulkanImage(createInfo), m_VulkanDevice(device) {
+	VulkanImage2D::VulkanImage2D(const ImageCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device, std::string_view debugName)
+		: VulkanImage(createInfo, debugName), m_VulkanDevice(device) {
 		if (m_CreateInfo.ImageType != ImageType::Type2D)
 			LUCY_ASSERT(false);
 
@@ -28,6 +28,8 @@ namespace Lucy {
 			RTCreateDepthImage();
 		else
 			RTCreateEmptyImage();
+
+		AddLabel(m_Image, device);
 	}
 
 	VulkanImage2D::VulkanImage2D(const Ref<VulkanImage2D>& other, const Ref<VulkanRenderDevice>& device)
@@ -42,6 +44,7 @@ namespace Lucy {
 
 		if (!other->m_Path.empty()) {
 			RTCreateFromPath();
+			AddLabel(m_Image, device);
 			return;
 		}
 
@@ -49,6 +52,8 @@ namespace Lucy {
 			RTCreateDepthImage();
 		else
 			RTCreateEmptyImage();
+
+		AddLabel(m_Image, device);
 	}
 
 	void VulkanImage2D::RTCreateFromPath() {
@@ -60,9 +65,8 @@ namespace Lucy {
 			data = (uint8_t*)stbi_loadf(pathInString.c_str(), (int32_t*)&m_CreateInfo.Width, (int32_t*)&m_CreateInfo.Height, &m_Channels, STBI_rgb_alpha);
 		else
 			data = stbi_load(pathInString.c_str(), (int32_t*)&m_CreateInfo.Width, (int32_t*)&m_CreateInfo.Height, &m_Channels, STBI_rgb_alpha);
-
-		if (m_CreateInfo.GenerateMipmap)
-			m_MaxMipLevel = (uint32_t)glm::floor(glm::log2(glm::max(m_CreateInfo.Width, m_CreateInfo.Height))) + 1u;
+		
+		CalculateMaxMipLevel();
 
 		LUCY_ASSERT(data != nullptr, "Failed to load a texture. Texture path: {0}", pathInString);
 		LUCY_ASSERT(m_CreateInfo.Width > 0 && m_CreateInfo.Height > 0, "Width or height of the image is less than zero.");
@@ -96,18 +100,18 @@ namespace Lucy {
 		if (m_CreateInfo.GenerateMipmap)
 			GenerateMipmapsImmediate();
 		else //transitioning only then, when we dont care about mipmapping. Mipmapping already transitions to the right layout
-			SetLayoutImmediate(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			SetLayoutImmediate(GetInitialImageLayout());
 
 		allocator.DestroyBuffer(imageStagingBuffer, imageStagingBufferVma);
 
+		RTCreateSampler(m_VulkanDevice);
 		RTCreateVulkanImageViewHandle(m_VulkanDevice);
 	}
 
 	void VulkanImage2D::RTCreateEmptyImage() {
 		LUCY_ASSERT(m_CreateInfo.Width > 0 && m_CreateInfo.Height > 0, "Width or height of the image is less than zero.");
 
-		if (m_CreateInfo.GenerateMipmap)
-			m_MaxMipLevel = (uint32_t)glm::floor(glm::log2(glm::max(m_CreateInfo.Width, m_CreateInfo.Height))) + 1u;
+		CalculateMaxMipLevel();
 
 		VkImageUsageFlags flags = GetImageFlagsBasedOnUsage();
 
@@ -118,16 +122,17 @@ namespace Lucy {
 		if (m_CreateInfo.GenerateMipmap)
 			GenerateMipmapsImmediate();
 		else
-			SetLayoutImmediate(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			SetLayoutImmediate(GetInitialImageLayout());
 
+		RTCreateSampler(m_VulkanDevice);
 		RTCreateVulkanImageViewHandle(m_VulkanDevice);
 	}
 
 	void VulkanImage2D::RTCreateDepthImage() {
 		LUCY_ASSERT(m_CreateInfo.Width > 0 && m_CreateInfo.Height > 0, "Width or height of the image is less than zero.");
 
-		if (m_CreateInfo.GenerateMipmap)
-			m_MaxMipLevel = (uint32_t)glm::floor(glm::log2(glm::max(m_CreateInfo.Width, m_CreateInfo.Height))) + 1u;
+		CalculateMaxMipLevel();
+		
 		//do the flags
 		VkImageUsageFlags flags = GetImageFlagsBasedOnUsage();
 
@@ -138,8 +143,9 @@ namespace Lucy {
 		if (m_CreateInfo.GenerateMipmap)
 			GenerateMipmapsImmediate();
 		else
-			SetLayoutImmediate(VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+			SetLayoutImmediate(GetInitialImageLayout());
 
+		RTCreateSampler(m_VulkanDevice);
 		RTCreateVulkanImageViewHandle(m_VulkanDevice);
 	}
 
@@ -151,6 +157,7 @@ namespace Lucy {
 			//ImGui_ImplVulkan_RemoveTexture((VkDescriptorSet)m_ImGuiID);
 
 		m_ImageView.RTDestroyResource();
+		m_Sampler.RTDestroyResource();
 
 		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
 		allocator.DestroyImage(m_Image, m_ImageVma);

@@ -15,7 +15,7 @@ void main() {
     uvec2 threadID = gl_GlobalInvocationID.xy;
     int face = int(gl_WorkGroupID.z);
     
-    vec3 samplingPos = threadIDToSamplingPos(threadID, face, cubemapSize);
+    vec3 samplingPos = ThreadIDToSamplingPos(threadID, face, cubemapSize);
     
 	vec3 normal = normalize(samplingPos);
     vec3 right = cross(vec3(0.0f, 1.0f, 0.0f), normal);
@@ -55,7 +55,7 @@ void main() {
             );
 
             // Branchless cube map sampling
-            vec2 uv = projectToFacePlane(sampleDir, face);
+            vec2 uv = ProjectToFacePlane(sampleDir, face);
             uv = (uv + 1.0) * 0.5 * cubemapSize;
             ivec3 srcCoord = ivec3(clamp(uv, vec2(0), cubemapSize - 1.0), face);
             
@@ -64,7 +64,7 @@ void main() {
             //vec3 sphereCoord = vec3(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
 			//vec3 sampleVector = sphereCoord.x * rightVector + sphereCoord.y * upVector + sphereCoord.z * normalVector;
             //
-            //ivec3 sampleCoord = sampleVectorToFaceUV(sampleVector, face, cubemapSize);
+            //ivec3 sampleCoord = SampleVectorToFaceUV(sampleVector, face, cubemapSize);
             //
             //irradianceColor += imageLoad(u_EnvironmentMap, sampleCoord).rgb * cosTheta * sinTheta;
 		}

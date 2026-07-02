@@ -88,11 +88,13 @@ namespace Lucy::VulkanAPI {
 	VkShaderModuleCreateInfo ShaderModuleCreateInfo(size_t codeSize, const uint32_t* const code);
 	VkPipelineShaderStageCreateInfo PipelineShaderStageCreateInfo(VkShaderStageFlagBits stage, VkShaderModule module, const char* name, const VkSpecializationInfo* const specializationInfo = nullptr, VkPipelineShaderStageCreateFlags flags = 0);
 
-	VkSemaphoreCreateInfo SemaphoreCreateInfo();
+	VkSemaphoreCreateInfo SemaphoreCreateInfo(VkSemaphoreCreateFlags flags, const void* pNext);
 	VkFenceCreateInfo FenceCreateInfo(VkFenceCreateFlags flags);
-	VkImageMemoryBarrier ImageMemoryBarrier(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkImageSubresourceRange subresourceRange,
-											VkAccessFlags srcAccessMask = VK_ACCESS_NONE_KHR, VkAccessFlags dstAccessMask = VK_ACCESS_NONE_KHR,
+	VkImageMemoryBarrier2 VulkanPipelineBarrier(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkImageSubresourceRange subresourceRange,
+		VkPipelineStageFlags2 srcStageMask, VkPipelineStageFlags2 dstStageMask, VkAccessFlags2 srcAccessMask = VK_ACCESS_2_NONE, VkAccessFlags2 dstAccessMask = VK_ACCESS_2_NONE,
 											uint32_t srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, uint32_t dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED);
+	VkBufferMemoryBarrier2 VulkanPipelineBarrier(VkBuffer buffer, VkPipelineStageFlags2 srcStageMask, VkPipelineStageFlags2 dstStageMask,
+		VkAccessFlags2 srcAccessMask, VkAccessFlags2 dstAccessMask, VkDeviceSize offset = 0, VkDeviceSize size = VK_WHOLE_SIZE, uint32_t srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, uint32_t dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED);
 
 	VkRenderPassCreateInfo RenderPassCreateInfo(uint32_t attachmentCount, const VkAttachmentDescription* const attachments,
 												uint32_t subpassCount, const VkSubpassDescription* const subpasses,
@@ -109,10 +111,11 @@ namespace Lucy::VulkanAPI {
 											const VkAttachmentReference* const resolveAttachments = nullptr);
 	VkSubpassDependency SubpassDependency(uint32_t srcSubpass, uint32_t dstSubpass, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask,
 										  VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask, VkDependencyFlags dependencyFlags);
-
-
 	VkQueryPoolCreateInfo QueryPoolCreateInfo(uint32_t queryCount, VkQueryType queryType, VkQueryPipelineStatisticFlags pipelineStatistics);
 	VkSubmitInfo QueueSubmitInfo(uint32_t commandBufferCount, const VkCommandBuffer* const commandBuffers,
 								 uint32_t waitSemaphoreCount, const VkSemaphore* const waitSemaphores, VkPipelineStageFlags* waitDstStageMask,
 								 uint32_t signalSemaphoreCount, const VkSemaphore* const signalSemaphores);
+	VkSubmitInfo2 QueueSubmitInfo2(uint32_t commandBufferInfoCount, const VkCommandBufferSubmitInfo* const commandBufferInfos,
+		uint32_t waitSemaphoreInfoCount, const VkSemaphoreSubmitInfo* const waitSemaphoreInfos,
+		uint32_t signalSemaphoreInfoCount, const VkSemaphoreSubmitInfo* const signalSemaphoreInfos);
 }

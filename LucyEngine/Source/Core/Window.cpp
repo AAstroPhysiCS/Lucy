@@ -57,50 +57,54 @@ namespace Lucy {
 				break;
 		}
 
+		glfwSetWindowUserPointer(m_Window, &m_Data);
+
 		//TODO: Icon for the window (later)
 		//GLFWimage icon;
 		//icon.pixels = stbi_load("Assets/Textures/lucy_logo.png", &icon.width, &icon.height, 0, STBI_rgb_alpha);
 		//glfwSetWindowIcon(m_Window, 1, &icon);
 	}
 
-	void WinWindow::SetEventCallback(const std::function<void(Event&)>& eventCallbackFunc) {
-		s_EventFunc = eventCallbackFunc;
+	void WinWindow::SetEventCallback(const std::function<void(std::unique_ptr<Event>)>& eventCallbackFunc) {
+		m_Data.EventCallback = eventCallbackFunc;
 
 		glfwSetWindowSizeCallback(m_Window, [](GLFWwindow* window, int32_t width, int32_t height) {
+			auto* data = static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+
 			if (width == 0 || height == 0)
 				return;
-			auto evt = WindowResizeEvent{ window, width, height };
-			s_EventFunc(evt);
+
+			data->EventCallback(Memory::CreateUnique<WindowResizeEvent>(window, width, height));
 		});
 
 		glfwSetWindowCloseCallback(m_Window, [](GLFWwindow* window) {
-			auto evt = WindowCloseEvent{ window };
-			s_EventFunc(evt);
+			auto* data = static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+			data->EventCallback(Memory::CreateUnique<WindowCloseEvent>(window));
 		});
 
 		glfwSetKeyCallback(m_Window, [](GLFWwindow* window, int32_t key, int32_t scanCode, int32_t action, int32_t mods) {
-			auto evt = KeyEvent{ window, key, scanCode, action, mods };
-			s_EventFunc(evt);
+			auto* data = static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+			data->EventCallback(Memory::CreateUnique<KeyEvent>(window, key, scanCode, action, mods));
 		});
 
 		glfwSetCharCallback(m_Window, [](GLFWwindow* window, uint32_t codePoint) {
-			auto evt = CharCallbackEvent{ window, codePoint };
-			s_EventFunc(evt);
+			auto* data = static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+			data->EventCallback(Memory::CreateUnique<CharCallbackEvent>(window, codePoint));
 		});
 
 		glfwSetScrollCallback(m_Window, [](GLFWwindow* window, double xOffset, double yOffset) {
-			auto evt = ScrollEvent{ window, xOffset, yOffset };
-			s_EventFunc(evt);
+			auto* data = static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+			data->EventCallback(Memory::CreateUnique<ScrollEvent>(window, xOffset, yOffset));
 		});
 
 		glfwSetCursorPosCallback(m_Window, [](GLFWwindow* window, double xPos, double yPos) {
-			auto evt = CursorPosEvent{ window, xPos, yPos };
-			s_EventFunc(evt);
+			auto* data = static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+			data->EventCallback(Memory::CreateUnique<CursorPosEvent>(window, xPos, yPos));
 		});
 
 		glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int32_t button, int32_t action, int32_t mods) {
-			auto evt = MouseEvent{ window, button, action, mods };
-			s_EventFunc(evt);
+			auto* data = static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+			data->EventCallback(Memory::CreateUnique<MouseEvent>(window, button, action, mods));
 		});
 	}
 

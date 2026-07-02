@@ -17,6 +17,8 @@ namespace Lucy {
 		void RTBind(void* commandBufferHandle) final override;
 		void RTRecreate() final override;
 		void RTDispatch(void* commandBufferHandle, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) final override;
+
+		void RTLoadDescriptors(const Ref<RenderDevice>& vulkanDevice) override;
 	private:
 		void Create(const Ref<VulkanRenderDevice>& vulkanDevice);
 		void RTDestroyResource() final override;

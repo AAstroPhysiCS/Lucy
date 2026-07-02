@@ -24,7 +24,7 @@ void main() {
     float currentRoughnessValue = u_PrefilterParams.z;
 
     ivec3 cubeCoord = ivec3(gl_GlobalInvocationID);
-    vec3 worldPos = cubeCoordToWorld(cubeCoord, currentMipMapSize);
+    vec3 worldPos = CubeCoordToWorld(cubeCoord, currentMipMapSize);
 
     vec3 N = normalize(worldPos);
     // assume view direction always equal to outgoing direction

@@ -13,16 +13,14 @@ namespace Lucy {
 		static void ImGui_DebugCallback(VkResult result);
 	};
 
-	class VulkanExternalFuncLinkage final {
+	struct VulkanExternalFuncLinkage final {
 		VulkanExternalFuncLinkage() = delete;
 		~VulkanExternalFuncLinkage() = delete;
 
 		inline static PFN_vkCmdBeginDebugUtilsLabelEXT vkCmdBeginDebugUtilsLabelEXT{ nullptr };
 		inline static PFN_vkCmdEndDebugUtilsLabelEXT vkCmdEndDebugUtilsLabelEXT{ nullptr };
 		inline static PFN_vkCmdInsertDebugUtilsLabelEXT vkCmdInsertDebugUtilsLabelEXT{ nullptr }; //not used for now
-
-		friend class VulkanRenderDevice;
-		friend class VulkanContext;
+		inline static PFN_vkSetDebugUtilsObjectNameEXT vkSetDebugUtilsObjectNameEXT{ nullptr };
 	};
 
 	class VulkanContext : public RenderContext {
@@ -46,7 +44,7 @@ namespace Lucy {
 		void DestroyDebugCallbacks();
 
 		std::vector<const char*> m_ValidationLayers = {
-			"VK_LAYER_KHRONOS_validation"
+			"VK_LAYER_KHRONOS_validation",
 		};
 
 		std::vector<const char*> m_InstanceExtensions = {
