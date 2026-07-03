@@ -34,17 +34,24 @@ namespace Lucy {
 		targetDesc.format = SLANG_SPIRV;
 		targetDesc.profile = m_GlobalSession->findProfile("sm_6_0");
 
-		slang::CompilerOptionEntry entry;
-		entry.name = slang::CompilerOptionName::Capability;
-		entry.value.kind = slang::CompilerOptionValueKind::String;
-		entry.value.stringValue0 = "vk_mem_model";
+		std::vector<slang::CompilerOptionEntry> stringOptions =
+		{
+			{
+				slang::CompilerOptionName::Capability,
+				{ slang::CompilerOptionValueKind::String, 0, 0, "vk_mem_model", "vk_mem_model" }
+			},
+			{
+				slang::CompilerOptionName::LanguageVersion,
+				{ slang::CompilerOptionValueKind::String, 0, 0, "2026", "2026" }
+			},
+		};
 
 		slang::SessionDesc sessionDesc = {};
 		sessionDesc.defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
 		sessionDesc.targets = &targetDesc;
 		sessionDesc.targetCount = 1;
-		sessionDesc.compilerOptionEntryCount = 1;
-		sessionDesc.compilerOptionEntries = &entry;
+		sessionDesc.compilerOptionEntryCount = static_cast<uint32_t>(stringOptions.size());
+		sessionDesc.compilerOptionEntries = stringOptions.data();
 
 		/*const std::array<slang::PreprocessorMacroDesc, 2> macros{
 			slang::PreprocessorMacroDesc{
@@ -74,12 +81,12 @@ namespace Lucy {
 				slang::CompilerOptionName::MatrixLayoutColumn,
 				{slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}
 			},
-			{
-				slang::CompilerOptionName::BindlessSpaceIndex,
-				{slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}
-			},
-#ifdef LUCY_DEBUG
 			/*{
+				slang::CompilerOptionName::BindlessSpaceIndex,
+				{slang::CompilerOptionValueKind::Int, 0, 0, nullptr, nullptr}
+			},*/
+#ifdef LUCY_DEBUG
+			/*{ DOES NOT WORK WITH AMD INTEGRATED GPUS
 				slang::CompilerOptionName::DebugInformation,
 				{slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_STANDARD, 0, nullptr, nullptr}
 			},*/

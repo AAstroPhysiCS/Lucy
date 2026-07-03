@@ -90,7 +90,7 @@ namespace Lucy {
 			return UndefinedDescriptorType;
 		}
 
-		switch (shape) {
+		switch (shape & SlangResourceShape::SLANG_RESOURCE_BASE_SHAPE_MASK) {
 			case SLANG_TEXTURE_1D:
 			case SLANG_TEXTURE_2D:
 				return access == SLANG_RESOURCE_ACCESS_READ_WRITE

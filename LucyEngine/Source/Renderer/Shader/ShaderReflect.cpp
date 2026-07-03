@@ -132,7 +132,7 @@ namespace Lucy {
 					break;
 				}
 				default: {
-					LUCY_CRITICAL("Unsupported descriptor shape in shader stage info");
+					LUCY_CRITICAL("Unsupported descriptor shape in shader stage info: {0}", variable.Name);
 					break;
 				}
 			}

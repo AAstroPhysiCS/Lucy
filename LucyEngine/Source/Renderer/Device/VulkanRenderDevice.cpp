@@ -192,14 +192,8 @@ namespace Lucy {
 
 		deviceCreateInfo.ppEnabledExtensionNames = m_DeviceExtensions.data();
 		deviceCreateInfo.enabledExtensionCount = (uint32_t)m_DeviceExtensions.size();
-
-#ifdef LUCY_DEBUG
-		deviceCreateInfo.enabledLayerCount = (uint32_t)enabledValidationLayers.size();
-		deviceCreateInfo.ppEnabledLayerNames = enabledValidationLayers.data();
-#else
 		deviceCreateInfo.enabledLayerCount = 0;
 		deviceCreateInfo.ppEnabledLayerNames = 0;
-#endif
 
 		LUCY_VK_ASSERT(vkCreateDevice(m_PhysicalDevice, &deviceCreateInfo, nullptr, &m_LogicalDevice));
 	}
