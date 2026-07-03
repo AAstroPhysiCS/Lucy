@@ -85,7 +85,15 @@ namespace Lucy {
 		createInfo.ppEnabledExtensionNames = instanceExtensions.data();
 
 		LUCY_VK_ASSERT(vkCreateInstance(&createInfo, nullptr, &m_Instance));
-		LUCY_INFO("Vulkan successfully initialized");
+
+		uint32_t version;
+		vkEnumerateInstanceVersion(&version);
+
+		uint32_t major = VK_VERSION_MAJOR(version);
+		uint32_t minor = VK_VERSION_MINOR(version);
+		uint32_t patch = VK_VERSION_PATCH(version);
+
+		LUCY_INFO("Vulkan successfully initialized: {0}.{1}.{2}", major, minor, patch);
 
 #ifdef LUCY_DEBUG
 		if (auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(m_Instance, "vkCreateDebugUtilsMessengerEXT"))

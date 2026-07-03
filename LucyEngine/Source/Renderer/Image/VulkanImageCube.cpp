@@ -17,7 +17,9 @@ namespace Lucy {
 
 		RTCreateFromPath();
 
+#if LUCY_DEBUG
 		AddLabel(m_Image, device);
+#endif
 	}
 
 	VulkanImageCube::VulkanImageCube(const ImageCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device, std::string_view debugName)
@@ -26,7 +28,9 @@ namespace Lucy {
 		LUCY_ASSERT(m_CreateInfo.ImageType == ImageType::TypeCube);
 		RTCreateEmptyImage();
 
+#if LUCY_DEBUG
 		AddLabel(m_Image, device);
+#endif
 	}
 
 	void VulkanImageCube::RTCreateFromPath() {

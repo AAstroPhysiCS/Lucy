@@ -2,7 +2,6 @@
 
 struct VertexInput {
     [[vk::location(0)]] float3 a_Pos : POSITION;
-    [[vk::location(1)]] float3 a_ID : ID;
     [[vk::location(2)]] float2 a_TextureCoords : TEXCOORD0;
     [[vk::location(3)]] float3 a_Normals : NORMAL;
     [[vk::location(4)]] float3 a_Tangents : TANGENT;

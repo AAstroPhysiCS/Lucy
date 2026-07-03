@@ -3,7 +3,7 @@ struct VertexInput {
 };
 
 struct VertexOutput {
-    float4 position : SV_Position;
+    float4 a_Pos : SV_Position;
     [[vk::location(0)]] float3 a_PosOut : POSITION0;
 };
 
@@ -34,9 +34,9 @@ VertexOutput main(VertexInput input) {
 
     float4 posView = mul(viewMatrix, posWorld);
     float4 posClip = mul(Camera.u_ProjMatrix, posView);
-    
+
     // Use .xyww for skybox rendering (depth = 1.0)
-    output.position = posClip.xyww;
+    output.a_Pos = posClip.xyww;
     
     return output;
 }
@@ -44,7 +44,6 @@ VertexOutput main(VertexInput input) {
 #include "LucyCommons.slang"
 
 struct PixelInput {
-    [[vk::location(0)]] float3 a_Pos : POSITION;
     [[vk::location(0)]] float3 a_PosOut : POSITION0;
 };
 

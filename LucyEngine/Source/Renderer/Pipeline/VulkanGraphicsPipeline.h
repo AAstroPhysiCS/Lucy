@@ -24,7 +24,7 @@ namespace Lucy {
 		void RTLoadDescriptors(const Ref<RenderDevice>& vulkanDevice) final override;
 
 		VkVertexInputBindingDescription CreateBindingDescription() const;
-		std::array<VkVertexInputAttributeDescription, 6> CreateAttributeDescription(uint32_t binding);
+		std::vector<VkVertexInputAttributeDescription> CreateAttributeDescription(uint32_t binding);
 		VkFormat GetVulkanTypeFromSize(ShaderMemberType type, uint32_t size) const;
 
 		VkPipeline m_PipelineHandle = VK_NULL_HANDLE;

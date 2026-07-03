@@ -8,7 +8,7 @@ struct VertexInput {
 };
 
 struct VertexOutput {
-    float4 position : SV_Position;
+    float4 a_Pos : SV_Position;
     [[vk::location(0)]] float3 a_PosOut : POSITION0;
 };
 
@@ -22,12 +22,11 @@ LocalPushConstant PushConstants;
 [shader("vertex")]
 VertexOutput main(VertexInput input, uint32_t viewIndex : SV_ViewID) {
     VertexOutput output;
-    
     output.a_PosOut = input.a_Pos;
     
     float4x4 viewMatrix = Inverse(CaptureViews[viewIndex]);
     float4x4 viewProjMatrix = mul(PushConstants.u_ProjMatrix, viewMatrix);
-    output.position = mul(viewProjMatrix, float4(input.a_Pos, 1.0));
+    output.a_Pos = mul(viewProjMatrix, float4(input.a_Pos, 1.0));
     
     return output;
 }
@@ -83,7 +82,6 @@ float3 CalculateIrradiance(float3 samplingPos, in SamplerCube environmentMap) {
 }
 
 struct PixelInput {
-    float4 position : SV_Position;
     [[vk::location(0)]] float3 a_PosOut : POSITION0;
 };
 

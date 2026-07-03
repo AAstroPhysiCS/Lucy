@@ -87,6 +87,7 @@ namespace Lucy {
 		inline std::filesystem::path GetPath() const { return m_Path; }
 		inline const std::string& GetName() const { return m_Name; }
 
+		inline const ShaderStageInfo& GetShaderInfo() const { return m_Reflect.GetShaderInfo(); }
 		inline std::vector<ShaderVariable>& GetShaderPushConstants() { return m_Reflect.GetShaderPushConstants(); }
 		inline std::unordered_multimap<uint32_t, std::vector<ShaderVariable>>& GetShaderUniformBlockMap() { return m_Reflect.GetShaderUniformBlockMap(); }
 
@@ -97,8 +98,6 @@ namespace Lucy {
 	protected:
 		Shader(const std::string& name, const std::filesystem::path& path);
 		virtual ~Shader() = default;
-
-		inline const ShaderStageInfo& GetShaderInfo() const { return m_Reflect.GetShaderInfo(); }
 	private:
 		void RunReflect(const Slang::ComPtr<slang::IComponentType>& program, ShaderStageType stageFlag);
 		void PrintReflectInfo();

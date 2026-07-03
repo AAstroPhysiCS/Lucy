@@ -46,6 +46,20 @@ namespace Lucy {
 		sessionDesc.compilerOptionEntryCount = 1;
 		sessionDesc.compilerOptionEntries = &entry;
 
+		/*const std::array<slang::PreprocessorMacroDesc, 2> macros{
+			slang::PreprocessorMacroDesc{
+				"PBR_HAS_NORMAL_MAP",
+				"1"
+			},
+			slang::PreprocessorMacroDesc{
+				"PBR_ALPHA_MASKED",
+				"1"
+			}
+		};
+
+		sessionDesc.preprocessorMacros = macros.data();
+		sessionDesc.preprocessorMacroCount = static_cast<uint32_t>(macros.size());*/
+
 		const char* searchPaths[] = { shaderFolderString.c_str() };
 		sessionDesc.searchPaths = searchPaths;
 		sessionDesc.searchPathCount = 1;
@@ -65,10 +79,10 @@ namespace Lucy {
 				{slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}
 			},
 #ifdef LUCY_DEBUG
-			{
+			/*{
 				slang::CompilerOptionName::DebugInformation,
 				{slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_STANDARD, 0, nullptr, nullptr}
-			},
+			},*/
 			{
 				slang::CompilerOptionName::EnableWarning,
 				{slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}

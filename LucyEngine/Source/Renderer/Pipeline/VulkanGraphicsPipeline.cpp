@@ -29,10 +29,10 @@ namespace Lucy {
 		if (!m_DescriptorPool) {
 #if USE_INTEGRATED_GRAPHICS
 			const std::vector<VkDescriptorPoolSize> poolSizes = {
-				{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_DYNAMIC_DESCRIPTOR_COUNT },
-				{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_DYNAMIC_DESCRIPTOR_COUNT },
-				{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, MAX_DYNAMIC_DESCRIPTOR_COUNT },
-				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, MAX_DYNAMIC_DESCRIPTOR_COUNT }
+				{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_DYNAMIC_DESCRIPTOR_COUNT * 2 },
+				{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_DYNAMIC_DESCRIPTOR_COUNT * 5 },
+				{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, MAX_DYNAMIC_DESCRIPTOR_COUNT * 5 },
+				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, MAX_DYNAMIC_DESCRIPTOR_COUNT * 2 }
 			};
 #else
 			const std::vector<VkDescriptorPoolSize> poolSizes = {
@@ -119,10 +119,9 @@ namespace Lucy {
 																								m_CreateInfo.Shader->As<VulkanGraphicsShader>(),
 																								renderPass);
 		LUCY_VK_ASSERT(vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_PipelineHandle));
-#ifdef LUCY_DEBUG
 		LUCY_INFO("Vulkan graphics pipeline '{0}' created successfully!", m_CreateInfo.Shader->GetName());
-
-		std::string objectName = std::format("{0} Graphics Pipeline", GetDebugName());
+#ifdef LUCY_DEBUG
+		std::string objectName = std::format("{0} Graphics Pipeline", m_CreateInfo.Shader->GetName());
 
 		VkDebugUtilsObjectNameInfoEXT nameInfo{};
 		nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
@@ -189,8 +188,20 @@ namespace Lucy {
 		return Vertex::GetBindingDescription();
 	}
 
-	std::array<VkVertexInputAttributeDescription, 6> VulkanGraphicsPipeline::CreateAttributeDescription(uint32_t binding) {
-		return Vertex::GetAttributeDescriptions(binding);
+	std::vector<VkVertexInputAttributeDescription> VulkanGraphicsPipeline::CreateAttributeDescription(uint32_t binding) {
+		std::vector<VkVertexInputAttributeDescription> result;
+		const auto& attributes = Vertex::GetAttributeDescriptions(binding);
+		const auto& shaderLayout = GetShader()->GetVertexShaderLayout();
+
+		for (const auto& element : shaderLayout) {
+			for (const auto& attribute : attributes) {
+				if (element.Location == attribute.location) {
+					result.push_back(attribute);
+				}
+			}
+		}
+
+		return result;
 	}
 
 	void VulkanGraphicsPipeline::RTDestroyResource() {

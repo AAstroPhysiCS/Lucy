@@ -58,8 +58,8 @@ namespace Lucy {
 
 		VkComputePipelineCreateInfo pipelineInfo = VulkanAPI::ComputePipelineCreateInfo(m_PipelineLayoutHandle, m_CreateInfo.Shader->As<VulkanComputeShader>()->GetShaderInfo());
 		LUCY_VK_ASSERT(vkCreateComputePipelines(logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_PipelineHandle));
-#ifdef LUCY_DEBUG
 		LUCY_INFO("Vulkan compute pipeline '{0}' created successfully!", m_CreateInfo.Shader->GetName());
+#ifdef LUCY_DEBUG
 		
 		std::string objectName = std::format("{0} Compute Pipeline", GetDebugName());
 

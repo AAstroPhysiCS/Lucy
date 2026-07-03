@@ -25,7 +25,7 @@ namespace Lucy {
 
 	class VulkanContext : public RenderContext {
 	private:
-		inline static constexpr uint32_t s_APIVersion = VK_API_VERSION_1_3;
+		inline static constexpr uint32_t s_APIVersion = VK_API_VERSION_1_4;
 	public:
 		VulkanContext(const Ref<Window>& window);
 		virtual ~VulkanContext() = default;

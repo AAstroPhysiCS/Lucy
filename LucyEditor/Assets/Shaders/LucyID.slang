@@ -1,14 +1,10 @@
 struct VertexInput {
     [[vk::location(0)]] float3 a_Pos : POSITION;
     [[vk::location(1)]] float3 a_ID : ID;
-    [[vk::location(2)]] float2 a_TextureCoords : TEXCOORD0;
-    [[vk::location(3)]] float3 a_Normals : NORMAL;
-    [[vk::location(4)]] float3 a_Tangents : TANGENT;
-    [[vk::location(5)]] float3 a_Bitangents : BITANGENT;
 };
 
 struct VertexOutput {
-    float4 position : SV_Position;
+    float4 a_Pos : SV_Position;
     [[vk::location(0)]] float3 a_IDOut : ID;
 };
 
@@ -39,13 +35,12 @@ VertexOutput main(VertexInput input) {
     float4 worldPos = mul(PushConstants.u_ModelMatrix, float4(input.a_Pos, 1.0));
     float4 viewPos = mul(Camera.u_ViewMatrix, worldPos);
     float4 clipPos = mul(Camera.u_ProjMatrix, viewPos);
-    
-    output.position = clipPos;
+
+    output.a_Pos = clipPos;
     return output;
 }
 
 struct PixelInput {
-    float4 position : SV_Position;
     [[vk::location(0)]] float3 a_IDOut : ID;
 };
 

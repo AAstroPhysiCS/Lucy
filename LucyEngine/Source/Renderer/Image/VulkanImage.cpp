@@ -302,8 +302,9 @@ namespace Lucy {
 		VkImageViewCreateInfo createInfo = VulkanAPI::ImageViewCreateInfo(m_CreateInfo.Image, GetImageType(m_CreateInfo.ImageType), m_CreateInfo.Format, subresourceRange, components);
 
 		LUCY_VK_ASSERT(vkCreateImageView(m_VulkanDevice->GetLogicalDevice(), &createInfo, nullptr, &m_ImageView));
-
+#if LUCY_DEBUG
 		AddLabel();
+#endif
 	}
 
 	void VulkanImageView::AddLabel() {

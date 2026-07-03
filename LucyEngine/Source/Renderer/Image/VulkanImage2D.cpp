@@ -16,7 +16,9 @@ namespace Lucy {
 
 		RTCreateFromPath();
 
+#if LUCY_DEBUG
 		AddLabel(m_Image, device);
+#endif
 	}
 
 	VulkanImage2D::VulkanImage2D(const ImageCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device, std::string_view debugName)
@@ -29,7 +31,9 @@ namespace Lucy {
 		else
 			RTCreateEmptyImage();
 
+#if LUCY_DEBUG
 		AddLabel(m_Image, device);
+#endif
 	}
 
 	VulkanImage2D::VulkanImage2D(const Ref<VulkanImage2D>& other, const Ref<VulkanRenderDevice>& device)
@@ -53,7 +57,9 @@ namespace Lucy {
 		else
 			RTCreateEmptyImage();
 
+#if LUCY_DEBUG
 		AddLabel(m_Image, device);
+#endif
 	}
 
 	void VulkanImage2D::RTCreateFromPath() {
