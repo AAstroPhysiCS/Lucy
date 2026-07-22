@@ -32,9 +32,14 @@ namespace Lucy {
 		static Ref<RendererBackend> Create(RendererConfiguration config, const Ref<Window>& window);
 	public:
 		virtual ~RendererBackend() = default;
+
+		RendererBackend(const RendererBackend& other) = delete;
+		RendererBackend(RendererBackend&& other) noexcept = delete;
+		RendererBackend& operator=(const RendererBackend& other) = delete;
+		RendererBackend& operator=(RendererBackend&& other) noexcept = delete;
 		
 		void EnqueueToRenderCommandQueue(RenderCommandFunc&& func);
-		void EnqueueResourceDestroy(RenderResourceHandle handle);
+		void EnqueueResourceDestroy(RenderDeviceResourceHandle handle);
 
 		virtual void SubmitBatchesToRender(std::vector<ExecutionBatch>& batches, const std::unordered_map<std::string, RenderFrameHandles>& renderFrameHandleMap) = 0;
 		virtual RenderContextResultCodes WaitAndPresent() = 0;

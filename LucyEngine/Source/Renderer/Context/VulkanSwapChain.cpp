@@ -97,19 +97,20 @@ namespace Lucy {
 		m_SwapChainFrameBuffer->RTRecreate(width, height);
 	}
 
-	RenderContextResultCodes VulkanSwapChain::AcquireNextImage(const VulkanSemaphore& currentFrameImageAvailSemaphore, uint32_t& imageIndex) {
+	RenderContextResultCodes VulkanSwapChain::AcquireNextImage(Semaphore* currentFrameImageAvailSemaphore, uint32_t& imageIndex) {
 		LUCY_PROFILE_NEW_EVENT("VulkanSwapChain::AcquireNextImage");
 		const auto& vulkanDevice = GetRenderDevice()->As<VulkanRenderDevice>();
 
-		VkResult result = vkAcquireNextImageKHR(vulkanDevice->GetLogicalDevice(), m_SwapChain, UINT64_MAX, currentFrameImageAvailSemaphore.GetSemaphore(), VK_NULL_HANDLE, &imageIndex);
+		VkResult result = vkAcquireNextImageKHR(vulkanDevice->GetLogicalDevice(), m_SwapChain, UINT64_MAX, 
+			static_cast<VkSemaphore>(currentFrameImageAvailSemaphore->GetHandle()), VK_NULL_HANDLE, &imageIndex);
 		return (RenderContextResultCodes)result;
 	}
 
-	RenderContextResultCodes VulkanSwapChain::Present(const VulkanSemaphore& signalSemaphore, uint32_t& imageIndex) {
+	RenderContextResultCodes VulkanSwapChain::Present(Semaphore* signalSemaphore, uint32_t& imageIndex) {
 		LUCY_PROFILE_NEW_EVENT("VulkanSwapChain::Present");
 		const auto& vulkanDevice = GetRenderDevice()->As<VulkanRenderDevice>();
 
-		auto semaphoreHandle = signalSemaphore.GetSemaphore();
+		auto semaphoreHandle = static_cast<VkSemaphore>(signalSemaphore->GetHandle());
 		VkPresentInfoKHR presentInfo = VulkanAPI::PresentInfoKHR(1, &m_SwapChain, &imageIndex, 1, &semaphoreHandle);
 		VkResult queuePresentResult = vkQueuePresentKHR(vulkanDevice->GetPresentQueue(), &presentInfo);
 

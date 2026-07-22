@@ -8,6 +8,7 @@
 namespace Lucy {
 
 	class Entity;
+	struct Event;
 
 	template <typename TComponent>
 	concept IsComponent = requires(TComponent&& component) {
@@ -18,6 +19,11 @@ namespace Lucy {
 	public:
 		Scene() = default;
 		~Scene() = default;
+
+		Scene(const Scene&) = delete;
+		Scene& operator=(const Scene&) = delete;
+		Scene(Scene&&) = delete;
+		Scene& operator=(Scene&&) = delete;
 
 		Entity CreateMesh(std::string& path);
 		Entity CreateMesh();

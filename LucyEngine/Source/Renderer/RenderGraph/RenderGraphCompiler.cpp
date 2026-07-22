@@ -3,6 +3,7 @@
 
 #include "RenderGraph.h"
 
+#include "Renderer/Renderer.h"
 #include "Renderer/ExecutionBatch.h"
 
 #include "Renderer/Device/VulkanRenderDevice.h"

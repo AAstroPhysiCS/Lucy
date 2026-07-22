@@ -1,4 +1,5 @@
 #include "LucySamplingUtilities.slang"
+#include "LucyResource.slang"
 
 // From the filament docs. Geometric Shadowing function
 // https://google.github.io/filament/Filament.html#toc4.4.2
@@ -41,18 +42,28 @@ float2 ComputeBRDF(float2 uv) {
     return LUT;
 }
 
-[[vk::binding(0, 0)]]
-RWTexture2D<float2> u_BRDFLut;
+struct LocalPushConstant {
+    uint4 u_BRDFData;           // x: width, y: height, z: input texture index, w: unused
+};
+
+[[vk::push_constant]]
+LocalPushConstant PushConstants;
 
 [shader("compute")]
 [numthreads(8, 8, 1)]
 void main(uint3 threadID : SV_DispatchThreadID) {
-	float width, height;
-	u_BRDFLut.GetDimensions(width, height);
+    uint width = PushConstants.u_BRDFData.x;
+    uint height = PushConstants.u_BRDFData.y;
+
+    if (threadID.x >= width || threadID.y >= height) {
+        return;
+    }
 
     float2 uv = (float2(threadID.x + 0.5f, threadID.y + 0.5f)) / float2(width, height);
     //uv.y = 1.0 - uv.y;
 
     float2 brdf = ComputeBRDF(uv);
-    u_BRDFLut[threadID.xy] = brdf;
+
+    RWTexture2D<float2> outputTexture = BindlessTable::StorageTextures2D_Float2[PushConstants.u_BRDFData.z];
+    outputTexture[threadID.xy] = brdf;
 }

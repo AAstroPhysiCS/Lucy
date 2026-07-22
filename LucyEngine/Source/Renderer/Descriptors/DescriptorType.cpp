@@ -15,13 +15,12 @@ namespace Lucy {
 			// Basic sampler (separate from textures)
 			case DescriptorBaseShape::Sampler:
 				return VK_DESCRIPTOR_TYPE_SAMPLER;
-			// Combined image+sampler types (typical for sampled textures)
+			// Read-only texture without embedded sampler (used with separate sampler)
 			case DescriptorBaseShape::Texture2D:
 			case DescriptorBaseShape::Texture2DArray:
 			case DescriptorBaseShape::TextureCube:
+			case DescriptorBaseShape::TextureCubeArray:
 			case DescriptorBaseShape::Texture3D:
-				return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			// Read-only texture without embedded sampler (used with separate sampler)
 			case DescriptorBaseShape::SampledImage:
 			case DescriptorBaseShape::SampledImageArray:
 				return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
@@ -31,7 +30,7 @@ namespace Lucy {
 			case DescriptorBaseShape::RWTexture3D:
 				return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 			// Uniform buffers
-			case DescriptorBaseShape::UniformBuffer:
+			case DescriptorBaseShape::ConstantBuffer:
 				return type.isDynamic
 					? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC
 					: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -70,7 +69,7 @@ namespace Lucy {
 			case slang::TypeReflection::Kind::SamplerState:
 				return { DescriptorBaseShape::Sampler, false };
 			case slang::TypeReflection::Kind::ConstantBuffer:
-				return { DescriptorBaseShape::UniformBuffer, false };
+				return { DescriptorBaseShape::ConstantBuffer, false };
 			case slang::TypeReflection::Kind::ShaderStorageBuffer:
 				return { DescriptorBaseShape::SharedStorageBuffer, false };
 			// TextureBuffer maps to structured buffer in our system
@@ -78,7 +77,7 @@ namespace Lucy {
 				return { DescriptorBaseShape::SharedStorageBuffer, false };
 			// ParameterBlocks are treated as constant buffers
 			case slang::TypeReflection::Kind::ParameterBlock:
-				return { DescriptorBaseShape::UniformBuffer, false };
+				return { DescriptorBaseShape::ConstantBuffer, false };
 			default:
 				return UndefinedDescriptorType;
 		}
@@ -92,33 +91,43 @@ namespace Lucy {
 
 		switch (shape & SlangResourceShape::SLANG_RESOURCE_BASE_SHAPE_MASK) {
 			case SLANG_TEXTURE_1D:
-			case SLANG_TEXTURE_2D:
+			case SLANG_TEXTURE_2D: {
 				return access == SLANG_RESOURCE_ACCESS_READ_WRITE
 					? DescriptorType{ DescriptorBaseShape::RWTexture2D, false } : DescriptorType{ DescriptorBaseShape::Texture2D, false };
-			case SLANG_TEXTURE_2D_ARRAY:
+			}
+			case SLANG_TEXTURE_2D_ARRAY: {
 				return access == SLANG_RESOURCE_ACCESS_READ_WRITE
 					? DescriptorType{ DescriptorBaseShape::RWTexture2DArray, false } : DescriptorType{ DescriptorBaseShape::Texture2DArray, false };
-			case SLANG_TEXTURE_CUBE:
+			}
+			case SLANG_TEXTURE_CUBE: {
 			// Cubemaps are typically read-only
 				return DescriptorType{ DescriptorBaseShape::TextureCube, false };
-			case SLANG_TEXTURE_3D:
+			}
+			case SLANG_TEXTURE_CUBE_ARRAY: {
+			// Cubemaps are typically read-only
+				return DescriptorType{ DescriptorBaseShape::TextureCubeArray, false };
+			}
+			case SLANG_TEXTURE_3D: {
 				return access == SLANG_RESOURCE_ACCESS_READ_WRITE
 					? DescriptorType{ DescriptorBaseShape::RWTexture3D, false } : DescriptorType{ DescriptorBaseShape::Texture3D, false };
-			case SLANG_TEXTURE_BUFFER:
-			// TBuffer<t> in HLSL
+			}
+			case SLANG_TEXTURE_BUFFER: {
+				// TBuffer<t> in HLSL
 				return DescriptorType{ DescriptorBaseShape::SharedStorageBuffer, false };
-			case SLANG_STRUCTURED_BUFFER:
+			}
+			case SLANG_STRUCTURED_BUFFER: {
 				return access == SLANG_RESOURCE_ACCESS_READ_WRITE
 					? DescriptorType{ DescriptorBaseShape::RWSharedStorageBuffer, false } : DescriptorType{ DescriptorBaseShape::SharedStorageBuffer, false };
-			/*
-			case SLANG_BYTE_ADDRESS_BUFFER:
+			}
+			// Special types
+			/*case SLANG_BYTE_ADDRESS_BUFFER: {
 				return access == SLANG_RESOURCE_ACCESS_READ_WRITE
 					? DescriptorType{ DescriptorBaseShape::RWByteAddressBuffer, false }
 				: DescriptorType{ DescriptorBaseShape::ByteAddressBuffer, false };
-			*/
-			// Special types
-			case SLANG_ACCELERATION_STRUCTURE:
+			}*/
+			case SLANG_ACCELERATION_STRUCTURE: {
 				return DescriptorType{ DescriptorBaseShape::AccelerationStructure, false };
+			}
 			default:
 				return UndefinedDescriptorType;
 		}

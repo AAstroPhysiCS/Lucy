@@ -1,5 +1,7 @@
 #include "lypch.h"
 #include "VulkanRenderDevice.h"
+#include "RenderDeviceScene.h"
+
 #include "Renderer/Context/VulkanContext.h"
 
 #include "Renderer/Pipeline/VulkanGraphicsPipeline.h"
@@ -8,6 +10,7 @@
 #include "Renderer/Descriptors/VulkanDescriptorSet.h"
 
 #include "Renderer/ExecutionBatch.h"
+#include "Renderer/RenderGraph/RenderGraphPass.h"
 
 #include "Renderer/Commands/VulkanCommandPool.h"
 
@@ -15,6 +18,8 @@
 #include "Renderer/Memory/Buffer/Vulkan/VulkanIndexBuffer.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 #include "Renderer/Memory/VulkanAllocator.h"
+
+#include "Renderer/Descriptors/DescriptorSetManager.h"
 
 #include "Renderer/Renderer.h"
 
@@ -47,6 +52,12 @@ namespace Lucy {
 		VkFenceCreateInfo fenceCreateInfo{};
 		fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 		LUCY_VK_ASSERT(vkCreateFence(m_LogicalDevice, &fenceCreateInfo, nullptr, &m_ImmediateSubmitFence));
+
+		m_DescriptorSetManager = Memory::CreateUnique<VulkanDescriptorSetManager>(this);
+		m_DeviceScene = Memory::CreateUnique<RenderDeviceScene>(this);
+
+		//const auto& globalPerFrameHandle = m_DescriptorSetManager->GetGlobalDescriptorSet(0);
+		//const auto& globalTextureTableHandle = m_DescriptorSetManager->GetGlobalDescriptorSet(1);
 	}
 
 	void VulkanRenderDevice::PickDeviceByRanking(const std::vector<VkPhysicalDevice>& devices) {
@@ -160,7 +171,10 @@ namespace Lucy {
 		vulkan12Features.shaderOutputLayer = VK_TRUE;
 		//For bindless descriptor sets
 		vulkan12Features.descriptorBindingPartiallyBound = VK_TRUE;
+		vulkan12Features.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+		vulkan12Features.descriptorBindingStorageImageUpdateAfterBind = VK_TRUE;
 		vulkan12Features.descriptorBindingVariableDescriptorCount = VK_TRUE;
+		vulkan12Features.bufferDeviceAddress = VK_TRUE;
 		vulkan12Features.descriptorIndexing = VK_TRUE;
 		vulkan12Features.runtimeDescriptorArray = VK_TRUE;
 		vulkan12Features.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
@@ -444,7 +458,10 @@ namespace Lucy {
 
 	void VulkanRenderDevice::Destroy() {
 		LUCY_PROFILE_DESTROY();
+		auto& scene = GetScene();
+		scene->RTDestroy();
 
+		m_DescriptorSetManager->RTDestroy();
 		m_Allocator.Destroy();
 		vkDestroyFence(m_LogicalDevice, m_ImmediateSubmitFence, nullptr);
 		vkDestroyDevice(m_LogicalDevice, nullptr);
@@ -452,7 +469,7 @@ namespace Lucy {
 
 	void VulkanRenderDevice::BeginCommandBuffer(Ref<CommandPool> cmdPool) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BeginCommandBuffer");
-		//something is wrong
+
 		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 		LUCY_ASSERT(cmdPool->GetState(frameIndex) == CommandBufferSlotState::Ready, "Current frame-slot command buffer is not ready!");
 
@@ -497,6 +514,57 @@ namespace Lucy {
 		indexBuffer->As<VulkanIndexBuffer>()->RTBind(indexInfo);
 	}
 
+	//TODO: Clean this up
+	uint32_t VulkanRenderDevice::BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<GraphicsPipeline>& pipeline, const Ref<Image>& image, uint32_t mip) {
+		const auto& descriptorSetHandle = pipeline->As<VulkanGraphicsPipeline>()->GetDescriptorSetHandles()[VulkanDescriptorSetManager::TEXTURE_BINDLESS_TABLE_SET_INDEX];
+		const auto& descriptorSet = AccessResource<VulkanDescriptorSet>(descriptorSetHandle);
+
+		if (auto imageSampler = descriptorSet->GetVulkanImageSampler(imageBufferName)) {
+			const auto& vulkanImage = image->As<VulkanImage>();
+			if (mip == static_cast<uint32_t>(-1)) {
+				imageSampler->ImageInfos.push_back(VulkanAPI::DescriptorImageInfo(vulkanImage->GetCurrentLayout(),
+					vulkanImage->GetImageView().GetVulkanHandle(),
+					Renderer::AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle())
+				);
+				return imageSampler->ImageInfos.size() - 1;
+			} else {
+				imageSampler->ImageInfos.push_back(VulkanAPI::DescriptorImageInfo(vulkanImage->GetCurrentLayout(),
+					vulkanImage->GetImageView().GetMipViewVulkanHandle(mip),
+					Renderer::AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle())
+				);
+				return imageSampler->ImageInfos.size() - 1;
+			}
+		}
+
+		LUCY_ASSERT(false, "BindGlobalImageHandleTo did not work for name: {0}", imageBufferName);
+		return INVALID_INDEX;
+	}
+	
+	//TODO: Clean this up
+	uint32_t VulkanRenderDevice::BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<ComputePipeline>& pipeline, const Ref<Image>& image, uint32_t mip) {
+		const auto& descriptorSetHandle = pipeline->As<VulkanComputePipeline>()->GetDescriptorSetHandles()[VulkanDescriptorSetManager::TEXTURE_BINDLESS_TABLE_SET_INDEX];
+		const auto& descriptorSet = AccessResource<VulkanDescriptorSet>(descriptorSetHandle);
+
+		if (auto imageSampler = descriptorSet->GetVulkanImageSampler(imageBufferName)) {
+			const auto& vulkanImage = image->As<VulkanImage>();
+			if (mip == static_cast<uint32_t>(-1)) {
+				imageSampler->ImageInfos.push_back(VulkanAPI::DescriptorImageInfo(vulkanImage->GetCurrentLayout(),
+					vulkanImage->GetImageView().GetVulkanHandle(),
+					Renderer::AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle())
+				);
+				return imageSampler->ImageInfos.size() - 1;
+			} else {
+				imageSampler->ImageInfos.push_back(VulkanAPI::DescriptorImageInfo(vulkanImage->GetCurrentLayout(),
+					vulkanImage->GetImageView().GetMipViewVulkanHandle(mip),
+					Renderer::AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle())
+				);
+				return imageSampler->ImageInfos.size() - 1;
+			}
+		}
+
+		return -1;
+	}
+	
 	void VulkanRenderDevice::BindPushConstant(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline, const PipelineConstant& pushConstant) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindPushConstant | Graphics");
 		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
@@ -524,8 +592,9 @@ namespace Lucy {
 	void VulkanRenderDevice::UpdateDescriptorSets(Ref<GraphicsPipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::UpdateDescriptorSets | Graphics");
 		const auto& castedPipeline = pipeline->As<VulkanGraphicsPipeline>();
-		
-		for (auto handle : castedPipeline->GetDescriptorSetHandles()) {
+		const auto& descriptorSetHandles = castedPipeline->GetDescriptorSetHandles();
+
+		for (auto handle : descriptorSetHandles) {
 			Ref<VulkanDescriptorSet> vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
 			vulkanSet->RTUpdate();
 		}
@@ -534,8 +603,9 @@ namespace Lucy {
 	void VulkanRenderDevice::UpdateDescriptorSets(Ref<ComputePipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::UpdateDescriptorSets | Compute");
 		const auto& castedPipeline = pipeline->As<VulkanComputePipeline>();
+		const auto& descriptorSetHandles = castedPipeline->GetDescriptorSetHandles();
 
-		for (auto handle : castedPipeline->GetDescriptorSetHandles()) {
+		for (auto handle : descriptorSetHandles) {
 			Ref<VulkanDescriptorSet> vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
 			vulkanSet->RTUpdate();	
 		}
@@ -545,13 +615,14 @@ namespace Lucy {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindAllDescriptorSets | Graphics");
 		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 		const auto& castedPipeline = pipeline->As<VulkanGraphicsPipeline>();
+		const auto& descriptorSetHandles = castedPipeline->GetDescriptorSetHandles();
 
 		VulkanDescriptorSetBindInfo bindInfo;
 		bindInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
 		bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		bindInfo.PipelineLayout = castedPipeline->GetPipelineLayout();
 
-		for (auto handle : castedPipeline->GetDescriptorSetHandles()) {
+		for (auto handle : descriptorSetHandles) {
 			Ref<VulkanDescriptorSet> vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
 			vulkanSet->RTBind(bindInfo);
 		}
@@ -561,13 +632,14 @@ namespace Lucy {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindDescriptorSet | Graphics");
 		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 		const auto& castedPipeline = pipeline->As<VulkanGraphicsPipeline>();
+		const auto& descriptorSetHandles = castedPipeline->GetDescriptorSetHandles();
 
 		VulkanDescriptorSetBindInfo bindInfo;
 		bindInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
 		bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		bindInfo.PipelineLayout = castedPipeline->GetPipelineLayout();
 
-		for (auto handle : castedPipeline->GetDescriptorSetHandles()) {
+		for (auto handle : descriptorSetHandles) {
 			const auto& vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
 			if (vulkanSet->GetSetIndex() == setIndex) {
 				vulkanSet->RTBind(bindInfo);
@@ -580,13 +652,14 @@ namespace Lucy {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindAllDescriptorSets | Compute");
 		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 		const auto& castedPipeline = pipeline->As<VulkanComputePipeline>();
+		const auto& descriptorSetHandles = castedPipeline->GetDescriptorSetHandles();
 
 		VulkanDescriptorSetBindInfo bindInfo;
 		bindInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
 		bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
 		bindInfo.PipelineLayout = castedPipeline->GetPipelineLayout();
 
-		for (auto handle : castedPipeline->GetDescriptorSetHandles()) {
+		for (auto handle : descriptorSetHandles) {
 			const auto& vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
 			vulkanSet->RTBind(bindInfo);
 		}
@@ -596,13 +669,14 @@ namespace Lucy {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindDescriptorSet | Compute");
 		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 		const auto& castedPipeline = pipeline->As<VulkanComputePipeline>();
+		const auto& descriptorSetHandles = castedPipeline->GetDescriptorSetHandles();
 
 		VulkanDescriptorSetBindInfo bindInfo;
 		bindInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
 		bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
 		bindInfo.PipelineLayout = castedPipeline->GetPipelineLayout();
 
-		for (auto handle : castedPipeline->GetDescriptorSetHandles()) {
+		for (auto handle : descriptorSetHandles) {
 			const auto& vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
 			if (vulkanSet->GetSetIndex() == setIndex) {
 				vulkanSet->RTBind(bindInfo);
@@ -665,6 +739,10 @@ namespace Lucy {
 #endif
 	}
 
+	void VulkanRenderDevice::RegisterShaderBindings(const Ref<Shader>& shader) {
+		m_DescriptorSetManager->RegisterShaderBindings(shader);
+	}
+
 	void VulkanRenderDevice::SubmitImmediateCommand(const std::function<void(VkCommandBuffer)>& func, const Ref<VulkanTransientCommandPool>& cmdPool) {
 		VkCommandBuffer commandBuffer = cmdPool->BeginSingleTimeCommand(m_LogicalDevice);
 		func(commandBuffer);
@@ -699,5 +777,9 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false);
 		}
+	}
+
+	std::vector<RenderDeviceResourceHandle> VulkanRenderDevice::GetResourceBindingHandles(const Ref<Shader>& shader) const {
+		return m_DescriptorSetManager->GetDescriptorSetHandles(shader);
 	}
 }

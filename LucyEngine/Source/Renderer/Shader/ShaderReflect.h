@@ -5,6 +5,8 @@
 
 #include "Renderer/Descriptors/DescriptorType.h"
 
+#include "Renderer/Memory/Buffer/RenderDeviceBuffer.h"
+
 namespace Lucy {
 
 	using namespace slang;
@@ -36,7 +38,8 @@ namespace Lucy {
 		AtomicCounter,
 		Half,
 		Float,
-		Double
+		Double,
+		DeviceAddress
 	};
 
 	enum class ShaderBlockType {
@@ -58,6 +61,15 @@ namespace Lucy {
 	};
 
 	/*
+	* e.g. PBRMaterials*, etc... 
+	*/
+	struct ShaderDeviceAddressMember {
+		std::string Name;
+		size_t Offset = 0;
+		size_t Size = 0;
+	};
+
+	/*
 	* e.g. struct, array, etc...
 	*/
 	struct ShaderBlockLayoutElement {
@@ -71,7 +83,7 @@ namespace Lucy {
 	};
 
 	/*
-	* e.g. UniformBuffer<Test> test;
+	* e.g. ConstantBuffer<Test> test;
 	*/
 	struct ShaderVariable {
 		std::string Name = "Unknown Shader Variable";
@@ -82,14 +94,15 @@ namespace Lucy {
 		DescriptorType Type = UndefinedDescriptorType;
 		VkShaderStageFlags StageFlag = VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
 		ShaderBlockLayoutElement Layout;
+		std::vector<ShaderDeviceAddressMember> DeviceAddressMembers;
 	};
 
 	struct VertexShaderLayoutElement {
 		std::string Name = "Unknown Input";
 		int32_t Location = -1;
 		ShaderMemberType Type = ShaderMemberType::Unknown;
-		uint32_t ShaderDataSize;
-		size_t ElementCount;
+		uint32_t ShaderDataSize = 0;
+		size_t ElementCount = 0;
 	};
 
 	using VertexShaderLayout = std::vector<VertexShaderLayoutElement>;
@@ -109,8 +122,8 @@ namespace Lucy {
 		void DestroyCachedData();
 		void Info(const std::filesystem::path& path, const Slang::ComPtr<IComponentType>& program, ShaderStageType stageFlag);
 	private:
-		ShaderBlockLayoutElement ParseShaderVariableLayout(VariableLayoutReflection* variable);
-		bool CheckIfAlreadyPresent(std::string_view blockName, std::vector<ShaderVariable>& buffer);
+		ShaderBlockLayoutElement ParseShaderVariableLayout(VariableLayoutReflection* variable, std::vector<ShaderDeviceAddressMember>& addressMembers);
+		bool CheckIfAlreadyPresent(const ShaderVariable& variable, std::vector<ShaderVariable>& buffer);
 
 		//key = individual set
 		//value = uniform blocks
@@ -150,6 +163,8 @@ namespace Lucy {
 				return sizeof(float);
 			case ShaderMemberType::Double:
 				return sizeof(double);
+			case ShaderMemberType::DeviceAddress:
+				return sizeof(RenderDeviceBufferReference);
 			case ShaderMemberType::Void:
 			default:
 				return 1; //unknown type

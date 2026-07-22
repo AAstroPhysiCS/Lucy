@@ -7,10 +7,12 @@
 #include "Renderer/ExecutionBatch.h"
 
 #include "Renderer/Image/VulkanImage.h"
+#include "Renderer/Renderer.h"
 
 namespace Lucy {
 	
-	RenderGraph::RenderGraph(RenderArchitecture arch, Ref<RenderDevice> device) {
+	RenderGraph::RenderGraph(RenderArchitecture arch, Ref<RenderDevice> device) 
+		: m_RenderDevice(device) {
 		switch (arch) {
 			case RenderArchitecture::Vulkan:
 				m_Compiler = Memory::CreateUnique<VulkanRenderGraphCompiler>(*this, device);
@@ -38,11 +40,11 @@ namespace Lucy {
 		m_Registry.Flush();
 	}
 
-	void RenderGraph::ImportExternalResource(const RenderGraphResource& rgResource, RenderResourceHandle handle) {
+	void RenderGraph::ImportExternalResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle) {
 		m_Registry.ImportExternalResource(rgResource, handle);
 	}
 
-	void RenderGraph::ImportExternalTransientResource(const RenderGraphResource& rgResource, RenderResourceHandle handle) {
+	void RenderGraph::ImportExternalTransientResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle) {
 		m_Registry.ImportExternalTransientResource(rgResource, handle);
 	}
 
@@ -51,7 +53,7 @@ namespace Lucy {
 	}
 
 	void RenderGraph::DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp, const RenderGraphResource& rgResourceDepth, const ImageCreateInfo& createDepthInfo, RenderPassLoadStoreAttachments loadStoreDepthAccessOp) {
-		const auto& imageHandle = Renderer::GetRenderDevice()->CreateImage(createInfo, "Image " + rgResource.GetName());
+		const auto& imageHandle = m_RenderDevice->CreateImage(createInfo, "Image " + rgResource.GetName());
 		LUCY_ASSERT(Renderer::IsValidRenderResource(imageHandle));
 
 		m_Registry.DeclareImage(rgResource,
@@ -65,7 +67,7 @@ namespace Lucy {
 		if (rgResourceDepth == UndefinedRenderGraphResource)
 			return;
 
-		const auto& imageDepthHandle = Renderer::GetRenderDevice()->CreateImage(createDepthInfo);
+		const auto& imageDepthHandle = m_RenderDevice->CreateImage(createDepthInfo, "Depth " + rgResource.GetName());
 		LUCY_ASSERT(Renderer::IsValidRenderResource(imageDepthHandle));
 
 		m_Registry.DeclareImage(rgResourceDepth,
@@ -85,7 +87,7 @@ namespace Lucy {
 		}
 
 		//see transient image comment section
-		ImportExternalResource(rgResourceToRead, InvalidRenderResourceHandle);
+		ImportExternalResource(rgResourceToRead, {});
 		ReadImage(currentPass, rgResourceToRead);
 	}
 
@@ -100,7 +102,7 @@ namespace Lucy {
 		//despite this, import it, but give it an invalid render resource handle
 		//rendergraph will cull passes that references this image, automatically
 		//the invalid render resource handle will be replaced if user decides to load the image.
-		ImportExternalTransientResource(rgResourceToRead, InvalidRenderResourceHandle);
+		ImportExternalTransientResource(rgResourceToRead, {});
 		ReadImage(currentPass, rgResourceToRead);
 	}
 
@@ -112,7 +114,7 @@ namespace Lucy {
 		}
 
 		//see transient image comment section
-		ImportExternalResource(rgResourceToWrite, InvalidRenderResourceHandle);
+		ImportExternalResource(rgResourceToWrite, {});
 		WriteImage(currentPass, rgResourceToWrite);
 	}
 

@@ -18,6 +18,28 @@ namespace Lucy {
 		: Image(createInfo, debugName) {
 	}
 
+	VulkanImage::VulkanImage(VulkanImage&& other) noexcept
+		: Image(std::move(other)),
+		m_Image(std::exchange(other.m_Image, VK_NULL_HANDLE)),
+		m_ImageVma(std::exchange(other.m_ImageVma, VK_NULL_HANDLE)),
+		m_CurrentLayout(std::exchange(other.m_CurrentLayout, VK_IMAGE_LAYOUT_UNDEFINED)),
+		m_ImageView(std::move(other.m_ImageView)),
+		m_SamplerHandle(std::exchange(other.m_SamplerHandle, {})) {
+	}
+
+	VulkanImage& VulkanImage::operator=(VulkanImage&& other) noexcept {
+		if (this == &other)
+			return *this;
+
+		m_Image = std::exchange(other.m_Image, VK_NULL_HANDLE);
+		m_ImageVma = std::exchange(other.m_ImageVma, VK_NULL_HANDLE);
+		m_CurrentLayout = std::exchange(other.m_CurrentLayout, VK_IMAGE_LAYOUT_UNDEFINED);
+		m_ImageView = std::move(other.m_ImageView);
+		m_SamplerHandle = std::exchange(other.m_SamplerHandle, {});
+
+		return *this;
+	}
+
 	void VulkanImage::CopyImageToImageImmediate(const Ref<VulkanImage>& destImage, const std::vector<VkImageCopy>& imageCopyRegions) {
 		CopyImageToImageImmediate(destImage->GetVulkanHandle(), destImage->GetCurrentLayout(), imageCopyRegions);
 	}
@@ -206,10 +228,12 @@ namespace Lucy {
 		if (m_CreateInfo.ImGuiUsage) {
 			if (!m_ImGuiID) {
 				Renderer::EnqueueToRenderCommandQueue([&]([[maybe_unused]] const Ref<RenderDevice>& device) {
-					m_ImGuiID = ImGui_ImplVulkan_AddTexture(m_Sampler.GetVulkanHandle(), m_ImageView.GetVulkanHandle(), m_CurrentLayout);
+					const auto& sampler = device->AccessResource<VulkanImageSampler>(m_SamplerHandle);
+					m_ImGuiID = ImGui_ImplVulkan_AddTexture(sampler->GetVulkanHandle(), m_ImageView.GetVulkanHandle(), m_CurrentLayout);
 				});
 			} else {
-				ImGui_ImplVulkanH_UpdateTexture((VkDescriptorSet)m_ImGuiID, m_Sampler.GetVulkanHandle(), m_ImageView.GetVulkanHandle(), m_CurrentLayout);
+				const auto& sampler = vulkanDevice->AccessResource<VulkanImageSampler>(m_SamplerHandle);
+				ImGui_ImplVulkanH_UpdateTexture((VkDescriptorSet)m_ImGuiID, sampler->GetVulkanHandle(), m_ImageView.GetVulkanHandle(), m_CurrentLayout);
 			}
 		}
 	}
@@ -231,7 +255,7 @@ namespace Lucy {
 	void VulkanImage::RTCreateSampler(const Ref<VulkanRenderDevice>& device) {
 		if (!m_CreateInfo.GenerateSampler)
 			return;
-		m_Sampler = std::move(VulkanImageSampler(ImageSamplerCreateInfo{
+		m_SamplerHandle = device->CreateSampler(ImageSamplerCreateInfo{
 			.MipmapEnabled = true,
 			.MipmapLevel = (float)m_MaxMipLevel,
 			.Parameter = {
@@ -241,12 +265,41 @@ namespace Lucy {
 				.Min = ImageFilterMode::LINEAR,
 				.Mag = ImageFilterMode::LINEAR,
 			},
-		}, device));
+		});
 	}
 
 	VulkanImageView::VulkanImageView(const ImageViewCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device, std::string_view debugName)
 		: m_CreateInfo(createInfo), m_VulkanDevice(device), m_DebugName(debugName) {
 		RTCreateView();
+	}
+
+	VulkanImageView::VulkanImageView(VulkanImageView&& other) noexcept
+		: m_ImageView(std::exchange(other.m_ImageView, VK_NULL_HANDLE)),
+		m_MipViews(std::move(other.m_MipViews)),
+		m_CreateInfo(std::exchange(other.m_CreateInfo, ImageViewCreateInfo{})),
+		m_DebugName(std::move(other.m_DebugName)),
+		m_VulkanDevice(std::move(other.m_VulkanDevice)) {
+		other.m_MipViews.clear();
+		other.m_DebugName = "Moved ImageView";
+	}
+
+	VulkanImageView& VulkanImageView::operator=(VulkanImageView&& other) noexcept {
+		if (this == &other) {
+			return *this;
+		}
+
+		RTDestroyResource();
+
+		m_ImageView = std::exchange(other.m_ImageView, VK_NULL_HANDLE);
+		m_MipViews = std::move(other.m_MipViews);
+		m_CreateInfo = std::exchange(other.m_CreateInfo, ImageViewCreateInfo{});
+		m_DebugName = std::move(other.m_DebugName);
+		m_VulkanDevice = std::move(other.m_VulkanDevice);
+
+		other.m_MipViews.clear();
+		other.m_DebugName = "Moved ImageView";
+
+		return *this;
 	}
 
 	void VulkanImageView::RTCreateView() {
@@ -326,15 +379,26 @@ namespace Lucy {
 	}
 
 	void VulkanImageView::RTDestroyResource() {
-		if (!m_ImageView)
+		if (!m_VulkanDevice) {
+			m_ImageView = VK_NULL_HANDLE;
+			m_MipViews.clear();
 			return;
+		}
 
-		vkDestroyImageView(m_VulkanDevice->GetLogicalDevice(), m_ImageView, nullptr);
-		for (size_t i = 0; i < m_MipViews.size(); i++)
-			vkDestroyImageView(m_VulkanDevice->GetLogicalDevice(), m_MipViews[i], nullptr);
+		VkDevice device = m_VulkanDevice->GetLogicalDevice();
 
-		m_ImageView = VK_NULL_HANDLE;
+		for (VkImageView mipView : m_MipViews) {
+			if (mipView != VK_NULL_HANDLE) {
+				vkDestroyImageView(device, mipView, nullptr);
+			}
+		}
+
 		m_MipViews.clear();
+
+		if (m_ImageView != VK_NULL_HANDLE) {
+			vkDestroyImageView(device, m_ImageView, nullptr);
+			m_ImageView = VK_NULL_HANDLE;
+		}
 	}
 
 	VkImageUsageFlags VulkanImage::GetImageFlagsBasedOnUsage() {

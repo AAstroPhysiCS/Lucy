@@ -3,7 +3,7 @@
 #include "Buffer.h"
 #include "Renderer/Descriptors/DescriptorType.h"
 
-#include "Renderer/Device/RenderResource.h"
+#include "Renderer/Device/RenderDeviceResource.h"
 
 namespace Lucy {
 
@@ -15,16 +15,22 @@ namespace Lucy {
 		uint32_t BufferSize = 0;
 		uint32_t ArraySize = 0; //default is 0, which means no array
 		DescriptorType Type = UndefinedDescriptorType;
+		std::vector<ShaderBlockLayoutElement> ShaderChildrenVariables;
 		std::vector<ShaderMemberVariable> ShaderMemberVariables;
 	};
 
-	class SharedStorageBuffer : public ByteBuffer, public RenderResource {
+	class SharedStorageBuffer : public ByteBuffer, public RenderDeviceResource {
 	public:
 		SharedStorageBuffer(const SharedStorageBufferCreateInfo& createInfo) 
-			: RenderResource("SharedStorageBuffer"), m_CreateInfo(createInfo) {
+			: RenderDeviceResource("SharedStorageBuffer"), m_CreateInfo(createInfo) {
 			Reserve(m_CreateInfo.BufferSize);
 		}
 		virtual ~SharedStorageBuffer() = default;
+
+		SharedStorageBuffer(const SharedStorageBuffer&) = delete;
+		SharedStorageBuffer& operator=(const SharedStorageBuffer&) = delete;
+		SharedStorageBuffer(SharedStorageBuffer&&) = delete;
+		SharedStorageBuffer& operator=(SharedStorageBuffer&&) = delete;
 
 		virtual void RTLoadToDevice() = 0;
 		

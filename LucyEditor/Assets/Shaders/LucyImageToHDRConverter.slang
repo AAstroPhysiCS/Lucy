@@ -1,5 +1,6 @@
 #include "LucyCommons.slang"
 #include "LucyIBLUtilities.slang"
+#include "LucyResource.slang"
 
 struct VertexInput {
     [[vk::location(0)]] float3 a_Pos : POSITION;
@@ -12,10 +13,11 @@ struct VertexOutput {
 
 struct LocalPushConstant {
     float4x4 u_ProjMatrix;
+    uint2 u_Data; // x: environment map index, y: sampler index
 };
 
-[[vk::push_constant]]
-LocalPushConstant PushConstants;
+[vk::push_constant]
+PushConstantGlobal<LocalPushConstant> PushConstants;
 
 [shader("vertex")]
 VertexOutput main(VertexInput input, uint32_t viewIndex: SV_ViewID) {
@@ -23,7 +25,7 @@ VertexOutput main(VertexInput input, uint32_t viewIndex: SV_ViewID) {
     output.a_PosOut = input.a_Pos;
 
     float4x4 viewMatrix = Inverse(CaptureViews[viewIndex]);
-    float4x4 viewProjMatrix = mul(PushConstants.u_ProjMatrix, viewMatrix);
+    float4x4 viewProjMatrix = mul(PushConstants.Data.u_ProjMatrix, viewMatrix);
 
     output.a_Pos = mul(viewProjMatrix, float4(input.a_Pos, 1.0));
     return output;
@@ -37,9 +39,6 @@ struct PixelOutput {
     float4 a_LayeredColorAttachments : SV_Target0;
 };
 
-[[vk::binding(0, 0)]]
-Sampler2D<float4> u_EquirectangularMap;
-
 float2 SampleSphericalMap(float3 v) {
     float2 uv = float2(atan2(v.z, v.x), asin(v.y));
     uv *= float2(0.1591, 0.3183);
@@ -51,7 +50,7 @@ float2 SampleSphericalMap(float3 v) {
 PixelOutput main(PixelInput input) {
     PixelOutput output;
 
-    float4 color = u_EquirectangularMap.Sample(SampleSphericalMap(normalize(input.a_PosOut)));
+    float4 color = BindlessTable::Textures2D[PushConstants.Data.u_Data.x].Sample(BindlessTable::Samplers[PushConstants.Data.u_Data.y], SampleSphericalMap(normalize(input.a_PosOut)));
     output.a_LayeredColorAttachments = color;
 
     return output;

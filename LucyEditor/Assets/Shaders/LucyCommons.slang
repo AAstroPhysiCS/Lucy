@@ -1,16 +1,16 @@
 #ifndef LUCY_COMMONS_SLANG
 #define LUCY_COMMONS_SLANG
 
-constexpr const static float PI = 3.1415926535897932384626433832795f;
-constexpr const static float TWO_PI = 6.283185307179586476925286766559f;
-constexpr const static float HALF_PI = 1.57079632679489661923132169163975f;
+static constexpr const float PI = 3.1415926535897932384626433832795f;
+static constexpr const float TWO_PI = 6.283185307179586476925286766559f;
+static constexpr const float HALF_PI = 1.57079632679489661923132169163975f;
 
-constexpr const static uint NUM_CASCADES = 4;
+static constexpr const uint NUM_CASCADES = 4;
 
-constexpr const static uint32_t NUM_PREFILTER_MIP_LEVELS = 5u;
+static constexpr const uint32_t NUM_PREFILTER_MIP_LEVELS = 5u;
 
-constexpr const static uint SAMPLE_COUNT = 1024u;
-constexpr const static uint MAX_MIP = 5u;
+static constexpr const uint SAMPLE_COUNT = 1024u;
+static constexpr const uint MAX_MIP = 5u;
 
 #define IDENTITY_MATRIX float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)
 

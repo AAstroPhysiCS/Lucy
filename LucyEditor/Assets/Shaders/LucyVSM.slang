@@ -1,4 +1,4 @@
-#include "LucyCommons.slang"
+#include "LucyResource.slang"
 
 struct VertexInput {
     [[vk::location(0)]] float3 a_Pos : POSITION;
@@ -8,26 +8,19 @@ struct VertexOutput {
     float4 position : SV_Position;
 };
 
-struct LucyCamera {
-    float4x4[NUM_CASCADES] u_LightMatrix;
-};
-
-[[vk::binding(0, 0)]]
-ConstantBuffer<LucyCamera> ShadowCameraVPs;
-
 struct LocalPushConstant {
     float4x4 u_ModelMatrix;
 };
 
-[[vk::push_constant]]
-LocalPushConstant PushConstants;
+[vk::push_constant]
+PushConstantGlobal<LocalPushConstant> PushConstants;
 
 [shader("vertex")]
 VertexOutput main(VertexInput input, uint viewIndex : SV_ViewID) {
     VertexOutput output;
 
-    float4 worldPos = mul(PushConstants.u_ModelMatrix, float4(input.a_Pos, 1.0));
-    float4 projPos = mul(ShadowCameraVPs.u_LightMatrix[viewIndex], worldPos);
+    float4 worldPos = mul(PushConstants.Data.u_ModelMatrix, float4(input.a_Pos, 1.0));
+    float4 projPos = mul(PushConstants.Root->DirectionalLight.DirLightShadowMatrices[viewIndex], worldPos);
     
     output.position = projPos;
     return output;

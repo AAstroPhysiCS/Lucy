@@ -13,8 +13,7 @@ namespace Lucy {
 
 	void VulkanVertexBuffer::RTCreate(size_t size) {
 		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
-		allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-										m_StagingBufferHandle, m_StagingBufferVma);
+		allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, false, m_StagingBufferHandle, m_StagingBufferVma);
 	}
 
 	void VulkanVertexBuffer::RTBind(const VulkanVertexBindInfo& info) {
@@ -32,7 +31,7 @@ namespace Lucy {
 		allocator.UnmapMemory(m_StagingBufferVma);
 
 		allocator.CreateVulkanBufferVma(VulkanBufferUsage::GPUOnly, m_Data.size() * sizeof(float),
-										VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, m_BufferHandle, m_BufferVma);
+										VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, false, m_BufferHandle, m_BufferVma);
 		Renderer::RTDirectCopyBuffer(m_StagingBufferHandle, m_BufferHandle, m_Data.size() * sizeof(float));
 
 		allocator.DestroyBuffer(m_StagingBufferHandle, m_StagingBufferVma);

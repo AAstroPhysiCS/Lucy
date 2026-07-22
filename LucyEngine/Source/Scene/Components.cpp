@@ -5,6 +5,8 @@
 #include "Renderer/RenderGraph/RenderGraphResource.h"
 #include "Renderer/RendererPasses.h"
 
+#include "Renderer/Image/Image.h"
+
 namespace Lucy {
 
 	void TransformComponent::CalculateMatrix() {
@@ -14,7 +16,7 @@ namespace Lucy {
 	}
 
 	void MeshComponent::LoadMesh(const std::string& path) {
-		m_Mesh = std::move(Mesh::Create(path));
+		m_Mesh = std::move(Memory::CreateRef<Mesh>(path));
 	}
 
 	void HDRCubemapComponent::LoadCubemap(const std::filesystem::path& path) {

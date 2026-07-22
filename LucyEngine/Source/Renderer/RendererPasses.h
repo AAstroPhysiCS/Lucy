@@ -1,10 +1,11 @@
 #pragma once
 
-#include "Scene/Scene.h"
-
-#include "RenderGraph/RenderGraph.h"
+#include "Scene/Camera.h"
 
 namespace Lucy {
+
+	class Scene;
+	class RenderGraph;
 
 #pragma region GeometryPass
 
@@ -49,7 +50,7 @@ namespace Lucy {
 	};
 
 	struct ShadowPass final {
-		static constexpr const uint32_t NUM_CASCADES = 4;
+		static inline constexpr const uint32_t NUM_CASCADES = 4;
 
 		ShadowPass(Ref<Scene> scene, uint32_t size);
 		~ShadowPass() = default;

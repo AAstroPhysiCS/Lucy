@@ -11,6 +11,11 @@ namespace Lucy {
 		VulkanCommandPool(const CommandPoolCreateInfo& createInfo);
 		virtual ~VulkanCommandPool() = default;
 
+		VulkanCommandPool(const VulkanCommandPool&) = delete;
+		VulkanCommandPool& operator=(const VulkanCommandPool&) = delete;
+		VulkanCommandPool(VulkanCommandPool&&) = delete;
+		VulkanCommandPool& operator=(VulkanCommandPool&&) = delete;
+
 		inline void* GetCommandBuffer(uint32_t frameIndex) final override { return m_CommandBuffers.at(frameIndex); }
 		inline const std::vector<VkCommandBuffer>& GetCommandBuffers() { return m_CommandBuffers; }
 
@@ -32,6 +37,11 @@ namespace Lucy {
 	public:
 		VulkanTransientCommandPool(const Ref<VulkanRenderDevice>& vulkanDevice);
 		virtual ~VulkanTransientCommandPool() = default;
+
+		VulkanTransientCommandPool(const VulkanTransientCommandPool&) = delete;
+		VulkanTransientCommandPool& operator=(const VulkanTransientCommandPool&) = delete;
+		VulkanTransientCommandPool(VulkanTransientCommandPool&&) = delete;
+		VulkanTransientCommandPool& operator=(VulkanTransientCommandPool&&) = delete;
 
 		VkCommandBuffer BeginSingleTimeCommand(VkDevice logicalDevice);
 		void EndSingleTimeCommand();

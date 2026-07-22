@@ -1,53 +1,59 @@
 #pragma once
 
 #include "Renderer/Memory/Memory.h"
-#include "RenderResource.h"
-#include "Utilities/Random.h"
+#include "RenderDeviceResource.h"
+#include "RenderDeviceHandles.h"
+
+#include "Utilities/UUID.h"
+#include "Utilities/GenerationalPool.h"
 
 namespace Lucy {
 
 	template <typename TResource>
-	concept IsRenderResource = std::is_base_of_v<MemoryTrackable, TResource> && std::is_base_of_v<RenderResource, TResource>;
+	concept IsRenderResource = std::is_base_of_v<MemoryTrackable, TResource> && std::is_base_of_v<RenderDeviceResource, TResource>;
+
+	using RenderDeviceResourcePool = GenerationalPool<RenderDeviceResourceHandle, Ref<RenderDeviceResource>>;
 
 	class RenderDeviceResourceManager final {
 		RenderDeviceResourceManager() = default;
 		~RenderDeviceResourceManager() = default;
 
-		template <typename TResource>
-		inline RenderResourceHandle PushResource(const TResource& r) {
-			static UniformRandom<uint64_t> randomGen;
+		RenderDeviceResourceManager(const RenderDeviceResourceManager&) = delete;
+		RenderDeviceResourceManager& operator=(const RenderDeviceResourceManager&) = delete;
+		RenderDeviceResourceManager(RenderDeviceResourceManager&&) = delete;
+		RenderDeviceResourceManager& operator=(RenderDeviceResourceManager&&) = delete;
 
-			r->As<RenderResource>()->SetInitialized(true);
-
-			RenderResourceHandle handle = randomGen.NextValue();
-			m_Resources.emplace(handle, std::move(r));
-			return handle;
+		template<IsRenderResource TResource>
+		[[nodiscard]] RenderDeviceResourceHandle PushResource(Ref<TResource> resource) {
+			LUCY_ASSERT(resource, "Cannot push nullptr render device resource.");
+			resource->SetInitialized(true);
+			return m_Resources.Create(std::move(resource));
 		}
 
-		inline bool ResourceExists(RenderResourceHandle handle) const {
-			return m_Resources.contains(handle);
+		[[nodiscard]] bool ResourceExists(RenderDeviceResourceHandle handle) const {
+			return m_Resources.IsValid(handle);
 		}
 
-		inline Ref<RenderResource> GetResource(RenderResourceHandle handle) {
-			LUCY_ASSERT(handle != InvalidRenderResourceHandle, "Resource handle is invalid!");
-			LUCY_ASSERT(ResourceExists(handle), "Resource handle {0} could not be found!", handle);
-			return m_Resources.at(handle);
+		[[nodiscard]] Ref<RenderDeviceResource> GetResource(RenderDeviceResourceHandle handle) {
+			return m_Resources.Get(handle);
 		}
+		
+		[[nodiscard]] const Ref<RenderDeviceResource>& GetResource(RenderDeviceResourceHandle handle) const {
+			return m_Resources.Get(handle);
+		}
+		
+		void RTDestroyResource(RenderDeviceResourceHandle& handle) {
+			LUCY_ASSERT(m_Resources.IsValid(handle), "Invalid render device resource handle.");
 
-		//frees the resource and deletes/invalidates the handle
-		inline void RTDestroyResource(RenderResourceHandle& handle) {
-			LUCY_ASSERT(handle != InvalidRenderResourceHandle, "Deleting handle that has already been deleted or that is invalid!");
-			m_Resources.at(handle)->RTDestroyResource();
-			m_Resources.erase(handle);
-			handle = InvalidRenderResourceHandle;
-		}
+			Ref<RenderDeviceResource>& resource = m_Resources.Get(handle);
+			resource->RTDestroyResource();
 
-		inline void Clear() {
-			m_Resources.clear();
+			m_Resources.Destroy(handle);
+			handle = {};
 		}
+	private:
+		RenderDeviceResourcePool m_Resources;
 
 		friend class RenderDevice;
-
-		std::unordered_map<RenderResourceHandle, Ref<RenderResource>> m_Resources;
 	};
 }

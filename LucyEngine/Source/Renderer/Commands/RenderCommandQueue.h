@@ -62,7 +62,7 @@ namespace Lucy {
 		void RecreateForQueue(TargetQueueFamily family);
 		void Recreate();
 		void FlushCommandQueue();
-		void Clear();
+		void ClearSubmitQueue();
 		void Destroy();
 	private:
 		RenderCommandQueueCreateInfo m_CreateInfo;

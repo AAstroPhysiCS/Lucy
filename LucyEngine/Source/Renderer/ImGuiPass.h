@@ -1,9 +1,11 @@
 #pragma once
 
-#include "Renderer/Descriptors/VulkanDescriptorPool.h"
-
 namespace Lucy {
 
+	class RendererBackend;
+	class RenderCommandList;
+
+	class VulkanDescriptorPool;
 	class VulkanSwapChain;
 
 	struct ImGuiVulkanImpl final {

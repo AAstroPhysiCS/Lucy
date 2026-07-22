@@ -15,20 +15,23 @@ namespace Lucy {
 		MaterialManager(const Unique<PipelineManager>& pipelineManager);
 		~MaterialManager() = default;
 
-		MaterialID CreateMaterialByPath(MaterialType materialType, aiMaterial* aiMaterial, const std::string& importedFilePath);
-		void RTDestroyMaterial(MaterialID materialID);
-		void RTDestroyMaterials(const std::vector<MaterialID>& materialIDs);
+		MaterialManager(const MaterialManager&) = delete;
+		MaterialManager& operator=(const MaterialManager&) = delete;
+		MaterialManager(MaterialManager&&) = delete;
+		MaterialManager& operator=(MaterialManager&&) = delete;
+
+		RenderDeviceObjectHandle CreateMaterialByPath(MaterialType materialType, aiMaterial* aiMaterial, const std::string& importedFilePath);
+		void RTDestroyMaterial(RenderDeviceObjectHandle materialID);
+		void RTDestroyMaterials(const std::vector<RenderDeviceObjectHandle>& materialIDs);
 		void DestroyAll();
 
-		void UpdateMaterialsIfNecessary();
-		inline const Ref<Material>& GetMaterialByID(MaterialID materialID) const { return m_Materials.at(materialID); }
+		inline const Ref<Material>& GetMaterialByID(RenderDeviceObjectHandle materialID) const { return m_Materials.at(materialID); }
 	private:
-		MaterialID CreatePBRMaterial(aiMaterial* aiMaterial, const std::string& importedFilePath);
-		
+		RenderDeviceObjectHandle CreatePBRMaterial(aiMaterial* aiMaterial, const std::string& importedFilePath);
+
 		void LoadMaterialTextures(aiMaterial* aiMaterial, const std::string& importedFilePath, const Ref<Material>& material);
 
-		std::map<MaterialID, Ref<Material>> m_Materials;
-		static inline MaterialIDProvider s_MaterialIDProvider;
+		std::map<RenderDeviceObjectHandle, Ref<Material>> m_Materials;
 
 		const Unique<PipelineManager>& m_PipelineManager; //we need this to create materials bcs it references pipelines
 	};

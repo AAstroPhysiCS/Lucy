@@ -13,7 +13,12 @@ namespace Lucy {
 		ViewportRenderPipeline(const RenderPipelineCreateInfo& createInfo, const Ref<Scene>& scene);
 		virtual ~ViewportRenderPipeline() = default;
 
-		void BeginFrame() final override;
+		ViewportRenderPipeline(const ViewportRenderPipeline&) = delete;
+		ViewportRenderPipeline& operator=(const ViewportRenderPipeline&) = delete;
+		ViewportRenderPipeline(ViewportRenderPipeline&&) = delete;
+		ViewportRenderPipeline& operator=(ViewportRenderPipeline&&) = delete;
+
+		void BeginFrame(const Ref<RenderDevice>& device, Ref<Scene>& scene) final override;
 		void RenderFrame() final override;
 		void EndFrame() final override;
 

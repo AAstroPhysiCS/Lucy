@@ -3,6 +3,8 @@
 #include "Core/Panel.h"
 #include "Scene/Entity.h"
 
+#include "Renderer/Device/RenderDeviceResource.h"
+
 namespace Lucy {
 
 	class DetailsPanel : public Panel {
@@ -21,7 +23,7 @@ namespace Lucy {
 				func(e.GetComponent<T>());
 		}
 
-		inline static RenderResourceHandle s_CheckerBoardTextureHandle = InvalidRenderResourceHandle;
+		inline static RenderDeviceResourceHandle s_CheckerBoardTextureHandle{};
 	};
 }
 

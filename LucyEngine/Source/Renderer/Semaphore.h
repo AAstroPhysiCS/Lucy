@@ -17,6 +17,11 @@ namespace Lucy {
         Semaphore(SemaphoreType type, const Ref<RenderDevice>& device);
         virtual ~Semaphore() = default;
 
+        Semaphore(const Semaphore& other) = default;
+        Semaphore(Semaphore&& other) noexcept = default;
+        Semaphore& operator=(const Semaphore& other) = default;
+        Semaphore& operator=(Semaphore&& other) noexcept = default;
+
         virtual void* GetHandle() const = 0;
         virtual void Destroy() = 0;
 
@@ -36,7 +41,7 @@ namespace Lucy {
         * this class D3D12-like for a better abstraction.
     */
     
-    class VulkanSemaphore final : private Semaphore {
+    class VulkanSemaphore final : public Semaphore {
     public:
         VulkanSemaphore() = default;
         VulkanSemaphore(SemaphoreType type, Ref<RenderDevice> device);

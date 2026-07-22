@@ -37,7 +37,7 @@ namespace Lucy {
 	}
 
 	VulkanImage2D::VulkanImage2D(const Ref<VulkanImage2D>& other, const Ref<VulkanRenderDevice>& device)
-		: VulkanImage(*other), m_VulkanDevice(device) {
+		: VulkanImage(other->m_CreateInfo, "Copied VulkanImage2D"), m_VulkanDevice(device) {
 		m_CreateInfo = other->m_CreateInfo;
 		m_Path = other->m_Path;
 		m_CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -46,13 +46,9 @@ namespace Lucy {
 		if (m_CreateInfo.ImageType != ImageType::Type2D)
 			LUCY_ASSERT(false);
 
-		if (!other->m_Path.empty()) {
+		if (!m_Path.empty())
 			RTCreateFromPath();
-			AddLabel(m_Image, device);
-			return;
-		}
-
-		if (m_CreateInfo.ImageUsage == ImageUsage::AsDepthAttachment)
+		else if (m_CreateInfo.ImageUsage == ImageUsage::AsDepthAttachment)
 			RTCreateDepthImage();
 		else
 			RTCreateEmptyImage();
@@ -83,7 +79,7 @@ namespace Lucy {
 		VmaAllocation imageStagingBufferVma = VK_NULL_HANDLE;
 
 		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
-		allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, imageStagingBuffer, imageStagingBufferVma);
+		allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, false, imageStagingBuffer, imageStagingBufferVma);
 
 		void* pixelData = nullptr;
 		allocator.MapMemory(imageStagingBufferVma, pixelData);
@@ -163,7 +159,7 @@ namespace Lucy {
 			//ImGui_ImplVulkan_RemoveTexture((VkDescriptorSet)m_ImGuiID);
 
 		m_ImageView.RTDestroyResource();
-		m_Sampler.RTDestroyResource();
+		m_VulkanDevice->RTDestroyResource(m_SamplerHandle);
 
 		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
 		allocator.DestroyImage(m_Image, m_ImageVma);

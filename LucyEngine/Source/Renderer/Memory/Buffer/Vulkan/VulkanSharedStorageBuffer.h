@@ -12,6 +12,11 @@ namespace Lucy {
 		VulkanSharedStorageBuffer(const SharedStorageBufferCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device);
 		virtual ~VulkanSharedStorageBuffer() = default;
 
+		VulkanSharedStorageBuffer(const VulkanSharedStorageBuffer&) = delete;
+		VulkanSharedStorageBuffer& operator=(const VulkanSharedStorageBuffer&) = delete;
+		VulkanSharedStorageBuffer(VulkanSharedStorageBuffer&&) = delete;
+		VulkanSharedStorageBuffer& operator=(VulkanSharedStorageBuffer&&) = delete;
+
 		void RTLoadToDevice() final override;
 
 		inline VkBuffer GetVulkanBufferHandle(const uint32_t index) { return m_Buffers[index]; }

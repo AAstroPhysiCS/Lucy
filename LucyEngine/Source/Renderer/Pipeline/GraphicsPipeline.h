@@ -1,7 +1,9 @@
 #pragma once
 
 #include "Pipeline.h"
+
 #include "Renderer/Shader/Shader.h"
+#include "Renderer/Device/RenderDeviceHandles.h"
 
 #include "PipelineConfigurations.h"
 
@@ -13,7 +15,7 @@ namespace Lucy {
 		DepthConfiguration DepthConfiguration;
 		BlendConfiguration BlendConfiguration;
 
-		RenderResourceHandle RenderPassHandle;
+		RenderDeviceResourceHandle RenderPassHandle;
 		Ref<Shader> Shader;
 	};
 
@@ -45,11 +47,16 @@ namespace Lucy {
 		GraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo);
 		virtual ~GraphicsPipeline() = default;
 
+		GraphicsPipeline(const GraphicsPipeline&) = delete;
+		GraphicsPipeline& operator=(const GraphicsPipeline&) = delete;
+		GraphicsPipeline(GraphicsPipeline&&) = delete;
+		GraphicsPipeline& operator=(GraphicsPipeline&&) = delete;
+
 		inline Topology GetTopology() const { return m_CreateInfo.Topology; }
 		inline Rasterization GetRasterization() const { return m_CreateInfo.Rasterization; }
 		inline const GraphicsPipelineStatistics& GetStatistics() { return m_Statistics; }
 
-		inline RenderResourceHandle GetRenderPassHandle() const { return m_CreateInfo.RenderPassHandle; }
+		inline RenderDeviceResourceHandle GetRenderPassHandle() const { return m_CreateInfo.RenderPassHandle; }
 
 		virtual void RTBind(void* commandBufferHandle) = 0;
 		virtual void RTRecreate() = 0;

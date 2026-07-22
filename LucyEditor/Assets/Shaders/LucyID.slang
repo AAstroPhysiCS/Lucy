@@ -1,3 +1,5 @@
+#include "LucyResource.slang"
+
 struct VertexInput {
     [[vk::location(0)]] float3 a_Pos : POSITION;
     [[vk::location(1)]] float3 a_ID : ID;
@@ -8,33 +10,24 @@ struct VertexOutput {
     [[vk::location(0)]] float3 a_IDOut : ID;
 };
 
-struct LucyCamera {
-    float4x4 u_ViewMatrix;
-    float4x4 u_ProjMatrix;
-    float4 u_CamPos;
-};
-
-[[vk::binding(0, 0)]]
-ConstantBuffer<LucyCamera> Camera;
-
 struct LocalPushConstant {
     float4x4 u_ModelMatrix;
-    float u_MaterialID;
 };
 
-[[vk::push_constant]]
-LocalPushConstant PushConstants;
+[vk::push_constant]
+PushConstantGlobal<LocalPushConstant> PushConstants;
 
 [shader("vertex")]
 VertexOutput main(VertexInput input) {
+    SceneCamera camera = PushConstants.Root->Camera;
+
     VertexOutput output;
-    
     output.a_IDOut = input.a_ID;
     
     // Calculate position in clip space
-    float4 worldPos = mul(PushConstants.u_ModelMatrix, float4(input.a_Pos, 1.0));
-    float4 viewPos = mul(Camera.u_ViewMatrix, worldPos);
-    float4 clipPos = mul(Camera.u_ProjMatrix, viewPos);
+    float4 worldPos = mul(PushConstants.Data.u_ModelMatrix, float4(input.a_Pos, 1.0));
+    float4 viewPos = mul(camera.u_ViewMatrix, worldPos);
+    float4 clipPos = mul(camera.u_ProjMatrix, viewPos);
 
     output.a_Pos = clipPos;
     return output;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Renderer/Device/RenderResource.h"
+#include "Renderer/Device/RenderDeviceResource.h"
 
 namespace Lucy {
 
@@ -13,15 +13,20 @@ namespace Lucy {
 		bool MultiSampled = false;
 		bool IsInFlight = false;
 		
-		RenderResourceHandle RenderPassHandle = InvalidRenderResourceHandle;
-		std::vector<RenderResourceHandle> ImageBufferHandles;
+		RenderDeviceResourceHandle RenderPassHandle{};
+		std::vector<RenderDeviceResourceHandle> ImageBufferHandles;
 
-		RenderResourceHandle DepthImageHandle = InvalidRenderResourceHandle;
+		RenderDeviceResourceHandle DepthImageHandle{};
 	};
 
-	class FrameBuffer : public RenderResource {
+	class FrameBuffer : public RenderDeviceResource {
 	public:
 		virtual ~FrameBuffer() = default;
+
+		FrameBuffer(const FrameBuffer&) = delete;
+		FrameBuffer& operator=(const FrameBuffer&) = delete;
+		FrameBuffer(FrameBuffer&&) = delete;
+		FrameBuffer& operator=(FrameBuffer&&) = delete;
 
 		virtual void RTRecreate(uint32_t width, uint32_t height) = 0;
 
@@ -29,7 +34,7 @@ namespace Lucy {
 		inline uint32_t GetHeight() const { return m_CreateInfo.Height; }
 	protected:
 		FrameBuffer(const FrameBufferCreateInfo& createInfo)
-			: RenderResource("FrameBuffer"), m_CreateInfo(createInfo) {
+			: RenderDeviceResource("FrameBuffer"), m_CreateInfo(createInfo) {
 		}
 		FrameBufferCreateInfo m_CreateInfo;
 	};

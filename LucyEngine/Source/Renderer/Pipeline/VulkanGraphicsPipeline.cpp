@@ -1,6 +1,6 @@
 #include "lypch.h"
 #include "VulkanGraphicsPipeline.h"
-#include "VulkanUniformImageSampler.h"
+#include "VulkanImageSamplerBindingInfo.h"
 
 #include "Renderer/Shader/VulkanGraphicsShader.h"
 
@@ -10,8 +10,9 @@
 
 #include "Renderer/Descriptors/VulkanDescriptorSet.h"
 #include "Renderer/Device/VulkanRenderDevice.h"
-
 #include "Renderer/Memory/Buffer/PushConstant.h"
+#include "Renderer/Mesh.h"
+#include "Renderer/Renderer.h"
 
 namespace Lucy {
 
@@ -24,35 +25,9 @@ namespace Lucy {
 	}
 
 	void VulkanGraphicsPipeline::Create(const Ref<VulkanRenderDevice>& vulkanDevice) {
+		VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
+		
 		const auto& renderPass = vulkanDevice->AccessResource<RenderPass>(m_CreateInfo.RenderPassHandle)->As<VulkanRenderPass>();
-
-		if (!m_DescriptorPool) {
-#if USE_INTEGRATED_GRAPHICS
-			const std::vector<VkDescriptorPoolSize> poolSizes = {
-				{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_DYNAMIC_DESCRIPTOR_COUNT * 2 },
-				{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_DYNAMIC_DESCRIPTOR_COUNT * 5 },
-				{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, MAX_DYNAMIC_DESCRIPTOR_COUNT * 5 },
-				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, MAX_DYNAMIC_DESCRIPTOR_COUNT * 2 }
-			};
-#else
-			const std::vector<VkDescriptorPoolSize> poolSizes = {
-				{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_DYNAMIC_DESCRIPTOR_COUNT * 2 },
-				{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_DYNAMIC_DESCRIPTOR_COUNT * 5 },
-				{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, MAX_DYNAMIC_DESCRIPTOR_COUNT * 5 },
-				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, MAX_DYNAMIC_DESCRIPTOR_COUNT * 2 }
-			};
-#endif
-			VulkanDescriptorPoolCreateInfo poolCreateInfo;
-			poolCreateInfo.PoolSizesVector = poolSizes;
-#if USE_INTEGRATED_GRAPHICS
-			poolCreateInfo.MaxSet = 10;
-#else
-			poolCreateInfo.MaxSet = 10;
-#endif
-			poolCreateInfo.PoolFlags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
-			poolCreateInfo.LogicalDevice = vulkanDevice->GetLogicalDevice();
-			m_DescriptorPool = Memory::CreateRef<VulkanDescriptorPool>(poolCreateInfo);
-		}
 
 		const auto& bindingDescriptor = CreateBindingDescription();
 		const auto& attributeDescriptor = CreateAttributeDescription(bindingDescriptor.binding);
@@ -86,16 +61,34 @@ namespace Lucy {
 
 		VkPipelineDynamicStateCreateInfo dynamicState = VulkanAPI::PipelineDynamicStateCreateInfo(3, dynamicStates);
 
-		RTLoadDescriptors(vulkanDevice);
-		const auto& descriptorSetsHandles = GetDescriptorSetHandles();
+		const auto& shader = GetShader();
+		const auto& reflectPushConstants = shader->GetShaderPushConstants();
+		for (auto& pc : reflectPushConstants)
+			AddPushConstant(pc);
+
+		m_DescriptorSetHandles = vulkanDevice->GetResourceBindingHandles(shader);
 		const auto& pushConstants = GetPipelineConstants();
 		
 		std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
-		descriptorSetLayouts.reserve(descriptorSetsHandles.size());
-		for (auto handle : descriptorSetsHandles) {
+
+		uint32_t highestSetIndex = 0;
+
+		for (RenderDeviceResourceHandle handle : m_DescriptorSetHandles) {
 			const auto& descriptorSet = vulkanDevice->AccessResource<VulkanDescriptorSet>(handle);
-			descriptorSetLayouts.emplace_back(descriptorSet->GetDescriptorSetLayout());
+			highestSetIndex = std::max(highestSetIndex, descriptorSet->GetSetIndex());
 		}
+
+		descriptorSetLayouts.resize(highestSetIndex + 1, VK_NULL_HANDLE);
+
+		for (RenderDeviceResourceHandle handle : m_DescriptorSetHandles) {
+			const auto& descriptorSet = vulkanDevice->AccessResource<VulkanDescriptorSet>(handle);
+
+			const uint32_t setIndex = descriptorSet->GetSetIndex();
+			descriptorSetLayouts[setIndex] = descriptorSet->GetDescriptorSetLayout();
+		}
+
+		for (uint32_t i = 0; i < descriptorSetLayouts.size(); i++)
+			LUCY_ASSERT(descriptorSetLayouts[i] != VK_NULL_HANDLE, "Missing descriptor set layout for set index {0}", i);
 
 		std::vector<VkPushConstantRange> pushConstantRanges;
 		for (const PipelineConstant& pc : pushConstants)
@@ -103,7 +96,6 @@ namespace Lucy {
 
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo = VulkanAPI::PipelineLayoutCreateInfo((uint32_t)descriptorSetLayouts.size(), descriptorSetLayouts.data(), (uint32_t)pushConstantRanges.size(), pushConstantRanges.data());
 
-		VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
 		LUCY_VK_ASSERT(vkCreatePipelineLayout(logicalDevice, &pipelineLayoutInfo, nullptr, &m_PipelineLayoutHandle));
 
 		VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = VulkanAPI::PipelineDepthStencilStateCreateInfo(m_CreateInfo.DepthConfiguration.DepthWriteEnable, 
@@ -163,27 +155,6 @@ namespace Lucy {
 		}
 	}
 
-	void VulkanGraphicsPipeline::RTLoadDescriptors(const Ref<RenderDevice>& device) {
-		const auto& shader = GetShader();
-
-		const auto& reflectPushConstants = shader->GetShaderPushConstants();
-		const auto& reflectUniformBlockMaps = shader->GetShaderUniformBlockMap();
-
-		for (const auto& [set, info] : reflectUniformBlockMaps) {
-			DescriptorSetCreateInfo createInfo{
-				.SetIndex = set,
-				.ShaderVariables = info,
-			};
-			RenderResourceHandle descriptorSetHandle = device->CreateDescriptorSet(createInfo);
-			const auto& descriptorSet = device->AccessResource<VulkanDescriptorSet>(descriptorSetHandle);
-			descriptorSet->RTBake(m_DescriptorPool);
-			AddDescriptorSetHandle(descriptorSetHandle); //maybe just store the handle?
-		}
-
-		for (auto& pc : reflectPushConstants)
-			AddPushConstant(pc);
-	}
-
 	VkVertexInputBindingDescription VulkanGraphicsPipeline::CreateBindingDescription() const {
 		return Vertex::GetBindingDescription();
 	}
@@ -211,8 +182,6 @@ namespace Lucy {
 			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
 			VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
 
-			m_DescriptorPool->RTDestroyResource();
-			m_DescriptorPool = nullptr;
 			vkDestroyPipelineLayout(logicalDevice, m_PipelineLayoutHandle, nullptr);
 			vkDestroyPipeline(logicalDevice, m_PipelineHandle, nullptr);
 

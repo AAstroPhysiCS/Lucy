@@ -3,6 +3,8 @@
 
 #include "VulkanRenderDevice.h"
 
+#include "Renderer/Renderer.h"
+
 namespace Lucy {
 	
 	Ref<RenderDeviceQuery> RenderDeviceQuery::Create(const RenderDeviceQueryCreateInfo& createInfo) {

@@ -2,7 +2,10 @@
 #include "MaterialManager.h"
 #include "PBRMaterial.h"
 
+#include "Renderer/Device/RenderDeviceScene.h"
+
 #include "Renderer/Pipeline/GraphicsPipeline.h"
+#include "Renderer/Image/Image.h"
 
 #include "Core/FileSystem.h"
 #include "assimp/material.h"
@@ -13,7 +16,7 @@ namespace Lucy {
 		: m_PipelineManager(pipelineManager) {
 	}
 
-	MaterialID MaterialManager::CreateMaterialByPath(MaterialType materialType, aiMaterial* aiMaterial, const std::string& importedFilePath) {
+	RenderDeviceObjectHandle MaterialManager::CreateMaterialByPath(MaterialType materialType, aiMaterial* aiMaterial, const std::string& importedFilePath) {
 		switch (materialType) {
 			case MaterialType::PBR:
 				return CreatePBRMaterial(aiMaterial, importedFilePath);
@@ -21,36 +24,27 @@ namespace Lucy {
 				LUCY_ASSERT(false, "Unknown material type!");
 				break;
 		}
-		return 0;
+		return {};
 	}
 
-	void MaterialManager::RTDestroyMaterial(MaterialID materialID) {
-		if (m_Materials.find(materialID) == m_Materials.end())
-			return;
-		s_MaterialIDProvider.ReturnID(materialID);
-		m_Materials.at(materialID)->RTDestroyResource();
-		m_Materials.erase(materialID);
+	void MaterialManager::RTDestroyMaterial(RenderDeviceObjectHandle handle) {
+		m_Materials.at(handle)->RTDestroyResource();
+		m_Materials.erase(handle);
 	}
 
-	void MaterialManager::RTDestroyMaterials(const std::vector<MaterialID>& materialIDs) {
-		for (MaterialID materialID : materialIDs)
-			RTDestroyMaterial(materialID);
+	void MaterialManager::RTDestroyMaterials(const std::vector<RenderDeviceObjectHandle>& materialIDs) {
+		for (RenderDeviceObjectHandle id : materialIDs)
+			RTDestroyMaterial(id);
 	}
 
 	void MaterialManager::DestroyAll() {
-		for (const auto& [id, material] : m_Materials)
+		for (auto& [id, material] : m_Materials) {
 			material->RTDestroyResource();
+		}
 		m_Materials.clear();
-		s_MaterialIDProvider.Reset();
 	}
 
-	void MaterialManager::UpdateMaterialsIfNecessary() {
-		LUCY_PROFILE_NEW_EVENT("MaterialManager::UpdateMaterialsIfNecessary");
-		for (const auto& [id, material] : m_Materials)
-			material->Update();
-	}
-
-	MaterialID MaterialManager::CreatePBRMaterial(aiMaterial* aiMaterial, const std::string& importedFilePath) {
+	RenderDeviceObjectHandle MaterialManager::CreatePBRMaterial(aiMaterial* aiMaterial, const std::string& importedFilePath) {
 		static constexpr const float NOT_SET_MATERIAL_PROPERTY = -1.0f;
 
 		aiColor3D diffuse{ 1.0f };
@@ -70,8 +64,7 @@ namespace Lucy {
 				aiMaterial->Get(AI_MATKEY_SHININESS, roughness);
 				// https://computergraphics.stackexchange.com/questions/1515/what-is-the-accepted-method-of-converting-shininess-to-roughness-and-vice-versa
 				roughness = sqrt(2 / (roughness + 2));
-				float specIntensity = std::max(specularColor.r,
-					std::max(specularColor.g, specularColor.b));
+				float specIntensity = std::max(specularColor.r, std::max(specularColor.g, specularColor.b));
 				metallic = glm::clamp((specIntensity - 0.04f) / (1.0f - 0.04f), 0.0f, 1.0f);
 				break;
 			}
@@ -95,22 +88,22 @@ namespace Lucy {
 		roughness = glm::clamp(roughness, 0.0f, 1.0f);
 		metallic = glm::clamp(metallic, 0.0f, 1.0f);
 
+		RenderDevicePBRMaterialData materialGPUData{};
+		materialGPUData.BaseColor = glm::vec4(diffuse.r, diffuse.g, diffuse.b, 1.0f);
+		materialGPUData.ORME = glm::vec4(aoContribution, roughness, metallic, 0.0f);
+		materialGPUData.NormalStrength = 1.0f;
+
+		RenderDeviceObjectHandle materialDeviceHandle = Renderer::GetRenderDevice()->GetScene()->RegisterPBRMaterial(materialGPUData);
+
 		MaterialCreateInfo createInfo;
-		createInfo.MaterialID = s_MaterialIDProvider.RequestID();
 		createInfo.MaterialType = MaterialType::PBR;
-		createInfo.Pipeline = m_PipelineManager->GetAs<Pipeline>("PBRGeometryPipeline");
-		
-		PBRMaterialData pbrMaterialData;
-		pbrMaterialData.Albedo = glm::vec3(diffuse.r, diffuse.g, diffuse.b);
-		pbrMaterialData.Metallic = metallic;
-		pbrMaterialData.Roughness = roughness;
-		pbrMaterialData.AOContribution = aoContribution;
+		createInfo.MaterialDeviceID = materialDeviceHandle;
 
-		const auto& pbrMaterial = Memory::CreateRef<PBRMaterial>(createInfo, pbrMaterialData);
-		LoadMaterialTextures(aiMaterial, importedFilePath, pbrMaterial);
+		Ref<PBRMaterial> material = Memory::CreateRef<PBRMaterial>(createInfo);
+		LoadMaterialTextures(aiMaterial, importedFilePath, material);
 
-		m_Materials.try_emplace(createInfo.MaterialID, pbrMaterial);
-		return createInfo.MaterialID;
+		m_Materials.try_emplace(materialDeviceHandle, material);
+		return materialDeviceHandle;
 	}
 
 	void MaterialManager::LoadMaterialTextures(aiMaterial* aiMaterial, const std::string& importedFilePath, const Ref<Material>& material) {
@@ -130,8 +123,11 @@ namespace Lucy {
 				createInfo.GenerateMipmap = MipmapCreateInfo::FromWidthAndHeight();
 				createInfo.ImGuiUsage = true;
 
-				RenderResourceHandle textureHandle = device->CreateImage(properTexturePath, createInfo, "PBR Image: " + std::string(path.C_Str()));
+				RenderDeviceResourceHandle textureHandle = device->CreateImage(properTexturePath, createInfo, "PBR Image: " + std::string(path.C_Str()));
 				material->SetTexture(slot, textureHandle);
+				
+				const auto& data = std::any_cast<RenderDevicePBRMaterialData>(material->BuildRenderData(device));
+				device->GetScene()->UpdatePBRMaterial(material->GetMaterialDeviceID(), data);
 			});
 
 			return true;
@@ -144,9 +140,11 @@ namespace Lucy {
 				if (!loadedNormal) {
 					TryLoadTextureIntoSlot(aiTextureType_NORMAL_CAMERA, PBRMaterial::NORMALS_TYPE, ImageFormat::R8G8B8A8_UNORM);
 				}
-				TryLoadTextureIntoSlot(aiTextureType_METALNESS, PBRMaterial::METALLIC_TYPE, ImageFormat::R8G8B8A8_UNORM);
-				TryLoadTextureIntoSlot(aiTextureType_DIFFUSE_ROUGHNESS, PBRMaterial::ROUGHNESS_TYPE, ImageFormat::R8G8B8A8_UNORM);
 				TryLoadTextureIntoSlot(aiTextureType_AMBIENT_OCCLUSION, PBRMaterial::AO_TYPE, ImageFormat::R8G8B8A8_UNORM);
+				TryLoadTextureIntoSlot(aiTextureType_DIFFUSE_ROUGHNESS, PBRMaterial::ROUGHNESS_TYPE, ImageFormat::R8G8B8A8_UNORM);
+				TryLoadTextureIntoSlot(aiTextureType_METALNESS, PBRMaterial::METALLIC_TYPE, ImageFormat::R8G8B8A8_UNORM);
+				//TODO:
+				//bool loadedGLTF = TryLoadTextureIntoSlot(aiTextureType_GLTF_METALLIC_ROUGHNESS, PBRMaterial::ORM_TYPE, ImageFormat::R8G8B8A8_UNORM);
 				break;
 			}
 			default:

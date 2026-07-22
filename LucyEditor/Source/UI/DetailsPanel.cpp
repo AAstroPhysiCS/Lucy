@@ -215,7 +215,7 @@ namespace Lucy {
 								Ref<Material> comboMaterial = materialManager->GetMaterialByID(submeshInner.MaterialID);
 								if (ImGui::Selectable(std::to_string(j).c_str())) {
 									selectedMaterial = j;
-									submeshInner.MaterialID = j;
+									submeshInner.MaterialID = mesh->GetSubmeshes()[j].MaterialID;
 								}
 								if (selectedMaterial == j)
 									ImGui::SetItemDefaultFocus();

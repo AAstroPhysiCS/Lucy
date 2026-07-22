@@ -14,9 +14,14 @@ namespace Lucy {
 	public:
 		VulkanFrameBuffer(const FrameBufferCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device);
 		virtual ~VulkanFrameBuffer() = default;
+
+		VulkanFrameBuffer(const VulkanFrameBuffer&) = delete;
+		VulkanFrameBuffer& operator=(const VulkanFrameBuffer&) = delete;
+		VulkanFrameBuffer(VulkanFrameBuffer&&) = delete;
+		VulkanFrameBuffer& operator=(VulkanFrameBuffer&&) = delete;
 		
 		inline const std::vector<VkFramebuffer>& GetVulkanHandles() const { return m_FrameBufferHandles; }
-		inline const std::vector<RenderResourceHandle>& GetImageHandles() const { return m_ImageHandles; }
+		inline const std::vector<RenderDeviceResourceHandle>& GetImageHandles() const { return m_ImageHandles; }
 		inline bool IsInFlight() const { return m_CreateInfo.IsInFlight; }
 
 		void RTRecreate(uint32_t width, uint32_t height) final override;
@@ -31,8 +36,8 @@ namespace Lucy {
 		Ref<VulkanRenderPass> GetRenderPass();
 
 		std::vector<VkFramebuffer> m_FrameBufferHandles;
-		std::vector<RenderResourceHandle> m_ImageHandles;
-		RenderResourceHandle m_DepthImageHandle = InvalidRenderResourceHandle;
+		std::vector<RenderDeviceResourceHandle> m_ImageHandles;
+		RenderDeviceResourceHandle m_DepthImageHandle{};
 
 		bool m_CreatedInFlightFrameBufferImages = false;
 

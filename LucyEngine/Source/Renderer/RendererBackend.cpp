@@ -45,9 +45,9 @@ namespace Lucy {
 		(*m_RenderCommandQueue) += RenderSubmitInfo{ .Batch = batch, .SubmitFuncs = submitFuncs };
 	}
 
-	void RendererBackend::EnqueueResourceDestroy(RenderResourceHandle handle) {
+	void RendererBackend::EnqueueResourceDestroy(RenderDeviceResourceHandle handle) {
 		m_ResourceDeletionQueues[GetCurrentFrameIndex()].emplace_back([&, handle]() mutable {
-			LUCY_INFO("Debug Name {0}, ", GetRenderDevice()->AccessResource<RenderResource>(handle)->GetDebugName());
+			LUCY_INFO("Debug Name {0}, ", GetRenderDevice()->AccessResource<RenderDeviceResource>(handle)->GetDebugName());
 			GetRenderDevice()->RTDestroyResource(handle);
 		});
 	}

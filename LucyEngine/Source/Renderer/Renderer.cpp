@@ -17,6 +17,7 @@
 
 #include "Image/Image.h"
 
+#include "Memory/Buffer/IndexBuffer.h"
 #include "Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 
 #include "Pipeline/ComputePipeline.h"
@@ -54,11 +55,17 @@ namespace Lucy {
 		LUCY_ASSERT(s_Backend, "RendererBackend is nullptr!");
 
 		const auto& device = GetRenderDevice();
-		
+
 		s_ShaderManager.InitializeShaders(device);
 
-		s_RenderGraph = Memory::CreateRef<RenderGraph>(s_Config.RenderArchitecture, s_Backend->GetRenderDevice());
-		s_PipelineManager = Memory::CreateUnique<PipelineManager>(GetRenderDevice());
+		EnqueueToRenderCommandQueue([](const Ref<RenderDevice>& device) {
+			for (const auto& [name, stageMap] : s_ShaderManager.GetShaderLibrary())
+				for (const auto& [type, shader] : stageMap)
+					device->RegisterShaderBindings(shader);
+		});
+
+		s_RenderGraph = Memory::CreateRef<RenderGraph>(s_Config.RenderArchitecture, device);
+		s_PipelineManager = Memory::CreateUnique<PipelineManager>(device);
 		s_MaterialManager = Memory::CreateUnique<MaterialManager>(s_PipelineManager);
 
 		EnqueueToRenderCommandQueue([](const Ref<RenderDevice>& device) {
@@ -78,57 +85,65 @@ namespace Lucy {
 			s_BlankArrayHandle = device->CreateImage(blankArrayCreateInfo);
 		});
 
-		static std::vector<float> vertices = {
-			//back face
-			-1.0f, -1.0f, -1.0f,
-			1.0f, 1.0f, -1.0f,
-			1.0f, -1.0f, -1.0f,
-			1.0f, 1.0f, -1.0f,
-			-1.0f, -1.0f, -1.0f,
-			-1.0f, 1.0f, -1.0f,
-			// front face
-			-1.0f, -1.0f, 1.0f,
-			1.0f, -1.0f, 1.0f,
-			1.0f, 1.0f, 1.0f,
-			1.0f, 1.0f, 1.0f,
-			-1.0f, 1.0f, 1.0f,
-			-1.0f, -1.0f, 1.0f,
-			// left face
-			-1.0f, 1.0f, 1.0f,
-			-1.0f, 1.0f, -1.0f,
-			-1.0f, -1.0f, -1.0f,
-			-1.0f, -1.0f, -1.0f,
-			-1.0f, -1.0f, 1.0f,
-			-1.0f, 1.0f, 1.0f,
-			// right face
-			1.0f, 1.0f, 1.0f,
-			1.0f, -1.0f, -1.0f,
-			1.0f, 1.0f, -1.0f,
-			1.0f, -1.0f, -1.0f,
-			1.0f, 1.0f, 1.0f,
-			1.0f, -1.0f, 1.0f,
-			// bottom face
-			-1.0f, -1.0f, -1.0f,
-			1.0f, -1.0f, -1.0f,
-			1.0f, -1.0f, 1.0f,
-			1.0f, -1.0f, 1.0f,
-			-1.0f, -1.0f, 1.0f,
-			-1.0f, -1.0f, -1.0f,
-			// top face
-			-1.0f, 1.0f, -1.0f,
-			1.0f, 1.0f, 1.0f,
-			1.0f, 1.0f, -1.0f,
-			1.0f, 1.0f, 1.0f,
-			-1.0f, 1.0f, -1.0f,
-			-1.0f, 1.0f, 1.0f
+		constexpr auto MakeSkyCube = []() {
+			constexpr std::array<float, 108> vertices = {
+				//back face
+				-1.0f, -1.0f, -1.0f,
+				1.0f, 1.0f, -1.0f,
+				1.0f, -1.0f, -1.0f,
+				1.0f, 1.0f, -1.0f,
+				-1.0f, -1.0f, -1.0f,
+				-1.0f, 1.0f, -1.0f,
+				// front face
+				-1.0f, -1.0f, 1.0f,
+				1.0f, -1.0f, 1.0f,
+				1.0f, 1.0f, 1.0f,
+				1.0f, 1.0f, 1.0f,
+				-1.0f, 1.0f, 1.0f,
+				-1.0f, -1.0f, 1.0f,
+				// left face
+				-1.0f, 1.0f, 1.0f,
+				-1.0f, 1.0f, -1.0f,
+				-1.0f, -1.0f, -1.0f,
+				-1.0f, -1.0f, -1.0f,
+				-1.0f, -1.0f, 1.0f,
+				-1.0f, 1.0f, 1.0f,
+				// right face
+				1.0f, 1.0f, 1.0f,
+				1.0f, -1.0f, -1.0f,
+				1.0f, 1.0f, -1.0f,
+				1.0f, -1.0f, -1.0f,
+				1.0f, 1.0f, 1.0f,
+				1.0f, -1.0f, 1.0f,
+				// bottom face
+				-1.0f, -1.0f, -1.0f,
+				1.0f, -1.0f, -1.0f,
+				1.0f, -1.0f, 1.0f,
+				1.0f, -1.0f, 1.0f,
+				-1.0f, -1.0f, 1.0f,
+				-1.0f, -1.0f, -1.0f,
+				// top face
+				-1.0f, 1.0f, -1.0f,
+				1.0f, 1.0f, 1.0f,
+				1.0f, 1.0f, -1.0f,
+				1.0f, 1.0f, 1.0f,
+				-1.0f, 1.0f, -1.0f,
+				-1.0f, 1.0f, 1.0f
+			};
+
+			std::array<uint32_t, vertices.size()> indices;
+			for (uint32_t i = 0; i < indices.size(); i++)
+				indices[i] = i;
+
+			return std::pair{ vertices, indices };
 		};
 
-		static std::vector<uint32_t> indices(vertices.size());
-		for (uint32_t i = 0; i < indices.size(); i++)
-			indices[i] = i;
+		constexpr auto skyCube = MakeSkyCube();
+		constexpr auto vertices = skyCube.first;
+		constexpr auto indices = skyCube.second;
 
-		s_CubeMesh = Mesh::Create(vertices, indices);
-
+		s_CubeMesh = Memory::CreateRef<Mesh>(vertices, indices);
+		
 		if (config.ThreadingPolicy == ThreadingPolicy::Singlethreaded)
 			s_Backend->FlushCommandQueue();
 	}
@@ -199,8 +214,8 @@ namespace Lucy {
 
 		const auto CreateFrameBuffer = [&](RenderGraphPass* currentPass, const RGRenderTargetElements& rgRenderTargetElements, auto renderPassHandle,
 												uint32_t frameBufferWidth, uint32_t frameBufferHeight, bool isInFlight) {
-			std::vector<RenderResourceHandle> imageBufferHandles;
-			RenderResourceHandle depthImageHandle = InvalidRenderResourceHandle;
+			std::vector<RenderDeviceResourceHandle> imageBufferHandles;
+			RenderDeviceResourceHandle depthImageHandle{};
 
 			for (const auto& rgRenderTarget : rgRenderTargetElements) {
 				const auto& image = s_RenderGraph->GetImageByRGResource(rgRenderTarget);
@@ -408,12 +423,12 @@ namespace Lucy {
 		device->CreateTimestampDeviceQueries(s_RenderGraph->GetPassCount());
 	}
 
-	void Renderer::ImportExternalRenderGraphResource(const RenderGraphResource& renderGraphResource, RenderResourceHandle renderResourceHandle) {
+	void Renderer::ImportExternalRenderGraphResource(const RenderGraphResource& renderGraphResource, RenderDeviceResourceHandle renderResourceHandle) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::ImportExternalRenderGraphResource");
 		s_RenderGraph->ImportExternalResource(renderGraphResource, renderResourceHandle);
 	}
 
-	void Renderer::ImportExternalRenderGraphTransientResource(const RenderGraphResource& renderGraphResource, RenderResourceHandle renderResourceHandle) {
+	void Renderer::ImportExternalRenderGraphTransientResource(const RenderGraphResource& renderGraphResource, RenderDeviceResourceHandle renderResourceHandle) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::ImportExternalRenderGraphTransientResource");
 		s_RenderGraph->ImportExternalTransientResource(renderGraphResource, renderResourceHandle);
 	}
@@ -427,7 +442,14 @@ namespace Lucy {
 	void Renderer::Flush() {
 		LUCY_PROFILE_NEW_EVENT("Renderer::Flush");
 		s_RenderGraph->Flush();
-		s_MaterialManager->UpdateMaterialsIfNecessary();
+	}
+
+	Ref<Image> Renderer::GetBlankCubeImage() { return GetRenderDevice()->AccessResource<Image>(s_BlankCubeHandle); }
+	
+	Ref<Image> Renderer::GetBlankArrayImage() { return GetRenderDevice()->AccessResource<Image>(s_BlankArrayHandle); }
+
+	uint32_t Renderer::GetEnvCubeMeshIndexCount() { 
+		return (uint32_t)GetRenderDevice()->AccessResource<IndexBuffer>(s_CubeMesh->GetIndexBufferHandle())->GetSize(); 
 	}
 
 	RenderContextResultCodes Renderer::WaitAndPresent() {
@@ -445,8 +467,8 @@ namespace Lucy {
 		* exclude those passes out, in order to not delete the same resource twice.
 		*/
 
-		std::unordered_set<RenderResourceHandle> distinctRenderPassHandles;
-		std::unordered_set<RenderResourceHandle> distinctFrameBufferHandles;
+		std::unordered_set<RenderDeviceResourceHandle> distinctRenderPassHandles;
+		std::unordered_set<RenderDeviceResourceHandle> distinctFrameBufferHandles;
 		distinctRenderPassHandles.reserve(s_RenderFrameHandleMap.size());
 		distinctFrameBufferHandles.reserve(s_RenderFrameHandleMap.size());
 
@@ -494,8 +516,8 @@ namespace Lucy {
 		s_Backend = backend;
 	}
 
-	Ref<Image> Renderer::GetOutputOfPass(const char* name) {
-		LUCY_ASSERT(s_RenderFrameHandleMap.contains(name), "GetOutputOfPass failed because no pass with the name of {0} could be found!", name);
+	Ref<Image> Renderer::GetFrameBufferOutputOfPass(const char* name) {
+		LUCY_ASSERT(s_RenderFrameHandleMap.contains(name), "GetFrameBufferOutputOfPass failed because no pass with the name of {0} could be found!", name);
 		const auto& device = GetRenderDevice();
 		const auto& frameBufferHandle = s_RenderFrameHandleMap.at(name).FrameBufferHandle;
 		const auto& frameBuffer = device->AccessResource<FrameBuffer>(frameBufferHandle);
@@ -518,7 +540,7 @@ namespace Lucy {
 		s_Backend->EnqueueToRenderCommandQueue(std::move(func));
 	}
 
-	void Renderer::EnqueueResourceDestroy(RenderResourceHandle& handle) {
+	void Renderer::EnqueueResourceDestroy(RenderDeviceResourceHandle& handle) {
 		s_Backend->EnqueueResourceDestroy(handle);
 	}
 
@@ -526,8 +548,8 @@ namespace Lucy {
 		s_Backend->InitializeImGui();
 	}
 
-	bool Renderer::IsValidRenderResource(RenderResourceHandle handle) {
-		bool isValid = (handle != InvalidRenderResourceHandle); //check if the handle is invalid
+	bool Renderer::IsValidRenderResource(RenderDeviceResourceHandle handle) {
+		bool isValid = handle; //check if the handle is invalid
 		isValid &= GetRenderDevice()->IsValidResource(handle);
 		return isValid;
 	}
@@ -547,6 +569,8 @@ namespace Lucy {
 
 		s_PipelineManager->RTRecreateAllPipelinesDependentOnShader(name);
 	}
+
+	Unique<MaterialManager>& Renderer::GetMaterialManager() { return s_MaterialManager; }
 
 	void Renderer::SubmitToRender(std::vector<ExecutionBatch>& batches) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::SubmitToRender");

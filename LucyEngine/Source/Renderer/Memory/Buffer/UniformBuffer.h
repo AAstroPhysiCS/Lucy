@@ -3,7 +3,7 @@
 #include "Buffer.h"
 #include "Renderer/Descriptors/DescriptorType.h"
 
-#include "Renderer/Device/RenderResource.h"
+#include "Renderer/Device/RenderDeviceResource.h"
 
 namespace Lucy {
 
@@ -15,12 +15,18 @@ namespace Lucy {
 		uint32_t BufferSize = 0;
 		uint32_t ArraySize = 0; //default is 0, which means no array
 		DescriptorType Type = UndefinedDescriptorType;
+		std::vector<ShaderBlockLayoutElement> ShaderChildrenVariables;
 		std::vector<ShaderMemberVariable> ShaderMemberVariables;
 	};
 
-	class UniformBuffer : public ByteBuffer, public RenderResource {
+	class UniformBuffer : public ByteBuffer, public RenderDeviceResource {
 	public:
 		virtual ~UniformBuffer() = default;
+
+		UniformBuffer(const UniformBuffer&) = delete;
+		UniformBuffer& operator=(const UniformBuffer&) = delete;
+		UniformBuffer(UniformBuffer&&) = delete;
+		UniformBuffer& operator=(UniformBuffer&&) = delete;
 
 		virtual void RTLoadToDevice() = 0;
 
@@ -31,7 +37,7 @@ namespace Lucy {
 		inline DescriptorType GetDescriptorType() const { return m_CreateInfo.Type; }
 	protected:
 		UniformBuffer(const UniformBufferCreateInfo& createInfo)
-			: RenderResource("Uniform Buffer"), m_CreateInfo(createInfo) {
+			: RenderDeviceResource("Uniform Buffer"), m_CreateInfo(createInfo) {
 			Reserve(createInfo.BufferSize);
 		}
 

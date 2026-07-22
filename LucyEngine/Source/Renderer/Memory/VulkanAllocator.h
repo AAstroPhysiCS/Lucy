@@ -15,6 +15,8 @@ namespace Lucy {
 		* Resides on the CPU Ram
 		*/
 		CPUOnly,
+
+		CPUToGPU,
 		
 		/*
 		* Any resources that you frequently write and read on GPU, e.g. images used as color attachments (aka "render targets"), 
@@ -31,14 +33,21 @@ namespace Lucy {
 
 	class VulkanAllocator {
 	public:
-		void CreateVulkanBufferVma(VulkanBufferUsage lucyBufferUsage, VkDeviceSize size,
-								   VkBufferUsageFlags usage, VkBuffer& bufferHandle, VmaAllocation& vmaAllocation);
+		VulkanAllocator(const VulkanAllocator&) = delete;
+		VulkanAllocator& operator=(const VulkanAllocator&) = delete;
+		VulkanAllocator(VulkanAllocator&&) = delete;
+		VulkanAllocator& operator=(VulkanAllocator&&) = delete;
 
-		void CreateVulkanImageVma(uint32_t width, uint32_t height, uint32_t mipLevel, VkFormat format, VkImageLayout currentLayout, VkImageUsageFlags usage, 
+		VmaAllocationInfo CreateVulkanBufferVma(VulkanBufferUsage lucyBufferUsage, VkDeviceSize size, VkBufferUsageFlags usage,
+			bool persistentlyMapped, VkBuffer& bufferHandle, VmaAllocation& vmaAllocation);
+
+		VmaAllocationInfo CreateVulkanImageVma(uint32_t width, uint32_t height, uint32_t mipLevel, VkFormat format, VkImageLayout currentLayout, VkImageUsageFlags usage,
 								  VkImageType imageType, VkImage& imageHandle, VmaAllocation& allocationHandle, VkImageCreateFlags flags = 0, uint32_t arrayLayer = 1);
 
 		void MapMemory(VmaAllocation allocation, void*& mappedData);
 		void UnmapMemory(VmaAllocation allocation);
+
+		void Flush(VmaAllocation allocation, VkDeviceSize offset, VkDeviceSize size);
 
 		void DestroyBuffer(VkBuffer buffer, VmaAllocation allocation);
 		void DestroyImage(VkImage buffer, VmaAllocation allocation);

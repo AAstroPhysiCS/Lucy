@@ -1,9 +1,8 @@
 #pragma once
 
-#include "RenderDevice.h"
-
 namespace Lucy {
 
+	class RenderDevice;
 	class CommandPool;
 
 	enum class RenderDeviceQueryType : uint8_t {
@@ -25,6 +24,11 @@ namespace Lucy {
 		RenderDeviceQuery(const RenderDeviceQueryCreateInfo& createInfo);
 		virtual ~RenderDeviceQuery() = default;
 
+		RenderDeviceQuery(const RenderDeviceQuery&) = delete;
+		RenderDeviceQuery& operator=(const RenderDeviceQuery&) = delete;
+		RenderDeviceQuery(RenderDeviceQuery&&) = delete;
+		RenderDeviceQuery& operator=(RenderDeviceQuery&&) = delete;
+
 		virtual uint32_t RTBegin(Ref<CommandPool> cmdPool) = 0;
 		virtual uint32_t RTEnd(Ref<CommandPool> cmdPool) = 0;
 		virtual void ResetPoolByIndex(size_t index) = 0;
@@ -41,6 +45,11 @@ namespace Lucy {
 	public:
 		VulkanRenderDeviceQuery(const RenderDeviceQueryCreateInfo& createInfo);
 		virtual ~VulkanRenderDeviceQuery() = default;
+
+		VulkanRenderDeviceQuery(const VulkanRenderDeviceQuery&) = delete;
+		VulkanRenderDeviceQuery& operator=(const VulkanRenderDeviceQuery&) = delete;
+		VulkanRenderDeviceQuery(VulkanRenderDeviceQuery&&) = delete;
+		VulkanRenderDeviceQuery& operator=(VulkanRenderDeviceQuery&&) = delete;
 
 		uint32_t RTBegin(Ref<CommandPool> cmdPool) final override;
 		uint32_t RTEnd(Ref<CommandPool> cmdPool) final override;

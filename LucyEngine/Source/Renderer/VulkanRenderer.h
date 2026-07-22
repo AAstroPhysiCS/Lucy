@@ -18,6 +18,11 @@ namespace Lucy {
 		VulkanRenderer(RendererConfiguration config, const Ref<Window>& window);
 		virtual ~VulkanRenderer() = default;
 
+		VulkanRenderer(const VulkanRenderer& other) = delete;
+		VulkanRenderer(VulkanRenderer&& other) noexcept = delete;
+		VulkanRenderer& operator=(const VulkanRenderer& other) = delete;
+		VulkanRenderer& operator=(VulkanRenderer&& other) noexcept = delete;
+
 		void SubmitBatchesToRender(std::vector<ExecutionBatch>& batches, const std::unordered_map<std::string, RenderFrameHandles>& renderFrameHandleMap) final override;
 		RenderContextResultCodes WaitAndPresent() final override;
 

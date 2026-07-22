@@ -1,8 +1,6 @@
 #include "lypch.h"
 #include "RenderCommand.h"
 
-#include "Renderer/Device/RenderDevice.h"
-
 #include "Renderer/Commands/CommandPool.h"
 #include "Renderer/Mesh.h"
 
@@ -10,11 +8,21 @@
 #include "Renderer/Pipeline/ComputePipeline.h"
 
 #include "Renderer/Image/VulkanImage.h"
+#include "Renderer/Renderer.h"
+#include "Renderer/Device/RenderDeviceScene.h"
+
+#include "Renderer/Memory/Buffer/IndexBuffer.h"
+#include "Renderer/Memory/Buffer/RenderDeviceBuffer.h"
 
 namespace Lucy {
 
 	RenderCommand::RenderCommand(const std::string& nameOfDraw, const Ref<RenderDevice>& renderDevice, const Ref<CommandPool>& primaryCmdPool)
 		: m_DebugName(nameOfDraw), m_RenderDevice(renderDevice), m_PrimaryCommandPool(primaryCmdPool) {
+	}
+
+	RenderDeviceBufferReference RenderCommand::GetGlobalBufferAddress() const {
+		const auto& handle = m_RenderDevice->GetScene()->GetBufferHandleByName("GPUScene");
+		return m_RenderDevice->AccessResource<RenderDeviceBuffer>(handle)->GetDeviceAddress();
 	}
 
 	void RenderCommand::BeginSecondaryRenderCommand() {
@@ -50,6 +58,13 @@ namespace Lucy {
 			return;
 		m_RenderDevice->RTEndPipelineQuery(m_PrimaryCommandPool);
 		m_BoundedGraphicsPipeline->Unbind(m_RenderDevice->GetQueryResults(RenderDeviceQueryType::Pipeline));
+	}
+
+	uint32_t RenderCommand::BindImageHandleTo(const std::string& imageBufferName, const Ref<Image>& image, uint32_t mip) {
+		LUCY_ASSERT(m_BoundedGraphicsPipeline || m_BoundedComputePipeline, "BindGlobalImageHandleTo needs to be called after a BindPipeline call.");
+		if (m_BoundedGraphicsPipeline)
+			return m_RenderDevice->BindGlobalImageHandleTo(imageBufferName, m_BoundedGraphicsPipeline, image, mip);
+		return m_RenderDevice->BindGlobalImageHandleTo(imageBufferName, m_BoundedComputePipeline, image, mip);
 	}
 
 	void RenderCommand::BindBuffers(Ref<Mesh> mesh) {
@@ -112,73 +127,10 @@ namespace Lucy {
 		m_RenderDevice->BindDescriptorSet(m_PrimaryCommandPool, m_BoundedComputePipeline, setIndex);
 	}
 
-	void RenderCommand::DrawIndexedMesh(Ref<Mesh> mesh, const glm::mat4& meshTransform) {
-		LUCY_ASSERT(m_BoundedGraphicsPipeline, "DrawIndexedMeshWithMaterial failed, bounded pipeline is nullptr.");
-		LUCY_ASSERT(m_Shader, "DrawIndexedMeshWithMaterial failed, shader is nullptr.");
-
-		BindBuffers(mesh);
-
-		PipelineConstant& meshPushConstant = m_BoundedGraphicsPipeline->GetPipelineConstants("PushConstants");
-
-		const auto& submeshes = mesh->GetSubmeshes();
-
-		for (uint32_t i = 0; i < submeshes.size(); i++) {
-			const Submesh& submesh = submeshes[i];
-
-			const glm::mat4& finalTransform = meshTransform * submesh.Transform;
-			const glm::mat4& inversedTransposedModelMatrix = glm::transpose(glm::inverse(finalTransform));
-
-			ByteBuffer pushConstantData;
-			pushConstantData.Append((uint8_t*)&finalTransform, sizeof(finalTransform));
-			if (meshPushConstant.GetSize() >= sizeof(finalTransform) + sizeof(inversedTransposedModelMatrix))
-				pushConstantData.Append((uint8_t*)&inversedTransposedModelMatrix, sizeof(inversedTransposedModelMatrix));
-
-			meshPushConstant.SetData(pushConstantData);
-
-			BindPushConstant(meshPushConstant);
-			DrawIndexed(submesh.IndexCount, 1, submesh.BaseIndexCount, submesh.BaseVertexCount, 0);
-		}
-	}
-
-	void RenderCommand::DrawIndexedMeshWithMaterial(Ref<Mesh> mesh, const glm::mat4& meshTransform) {
-		LUCY_ASSERT(m_BoundedGraphicsPipeline, "DrawIndexedMeshWithMaterial failed, bounded pipeline is nullptr.");
-		LUCY_ASSERT(m_Shader, "DrawIndexedMeshWithMaterial failed, shader is nullptr.");
-		
-		BindBuffers(mesh);
-
-		PipelineConstant& meshPushConstant = m_BoundedGraphicsPipeline->GetPipelineConstants("PushConstants");
-
-		const auto& submeshes = mesh->GetSubmeshes();
-
-		for (uint32_t i = 0; i < submeshes.size(); i++) {
-			const Submesh& submesh = submeshes[i];
-			MaterialID materialID = submesh.MaterialID;
-
-			ByteBuffer pushConstantData;
-
-			const glm::mat4& finalTransform = meshTransform * submesh.Transform;
-			const glm::mat4& inversedTransposedModelMatrix = glm::transpose(glm::inverse(finalTransform));
-			pushConstantData.Append((uint8_t*)&finalTransform, sizeof(finalTransform));
-			//TODO: temporary fix, delete this when we have a better solution
-			if (meshPushConstant.GetSize() >= sizeof(finalTransform) + sizeof(inversedTransposedModelMatrix))
-				pushConstantData.Append((uint8_t*)&inversedTransposedModelMatrix, sizeof(inversedTransposedModelMatrix));
-			pushConstantData.Append((uint8_t*)&materialID, sizeof(MaterialID));
-
-			meshPushConstant.SetData(pushConstantData);
-
-			BindPushConstant(meshPushConstant);
-			DrawIndexed(submesh.IndexCount, 1, submesh.BaseIndexCount, submesh.BaseVertexCount, 0);
-		}
-	}
-
 	void RenderCommand::DrawMesh(Ref<Mesh> mesh) {
 		LUCY_ASSERT(m_BoundedGraphicsPipeline, "DrawMesh failed, bounded pipeline is nullptr.");
 		BindBuffers(mesh);
 		m_RenderDevice->DrawIndexed(m_PrimaryCommandPool, (uint32_t)m_RenderDevice->AccessResource<IndexBuffer>(mesh->GetIndexBufferHandle())->GetSize(), 1, 0, 0, 0);
-	}
-
-	void RenderCommand::DrawMeshWithPushConstant(Ref<Mesh> mesh) {
-		LUCY_ASSERT(m_BoundedGraphicsPipeline, "DrawMeshWithPushConstant failed, bounded pipeline is nullptr.");
 	}
 
 	void RenderCommand::DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {

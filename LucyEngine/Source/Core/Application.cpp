@@ -22,7 +22,6 @@ namespace Lucy {
 
 	Application::~Application() {
 		FileSystem::Destroy();
-
 		Renderer::WaitForDevice();
 
 		m_Scene->Destroy();
@@ -32,7 +31,6 @@ namespace Lucy {
 		Renderer::Destroy();
 
 		m_Window->Destroy();
-
 		delete s_TaskScheduler;
 	}
 
@@ -64,7 +62,7 @@ namespace Lucy {
 		switch (m_CreateInfo.RendererConfiguration.RenderType) {
 			case RenderType::Rasterizer: {
 				RenderPipelineCreateInfo createInfo = {
-					.ViewMode = ViewMode::Lit,
+					.ViewMode = ViewMode::Lit
 				};
 				m_RenderPipeline = Memory::CreateRef<ViewportRenderPipeline>(createInfo, m_Scene);
 				break;
@@ -99,7 +97,7 @@ namespace Lucy {
 
 			m_Scene->Update();
 
-			m_RenderPipeline->BeginFrame();
+			m_RenderPipeline->BeginFrame(Renderer::GetRenderDevice(), m_Scene);
 			m_RenderPipeline->RenderFrame();
 			m_RenderPipeline->EndFrame();
 

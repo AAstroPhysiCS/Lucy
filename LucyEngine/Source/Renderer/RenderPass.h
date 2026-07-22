@@ -2,7 +2,7 @@
 
 #include "vulkan/vulkan.h"
 
-#include "Renderer/Device/RenderResource.h"
+#include "Renderer/Device/RenderDeviceResource.h"
 
 namespace Lucy {
 
@@ -87,15 +87,20 @@ namespace Lucy {
 		Multiview Multiview;
 	};
 
-	class RenderPass : public RenderResource {
+	class RenderPass : public RenderDeviceResource {
 	public:
+		RenderPass(const RenderPassCreateInfo& createInfo);
+		virtual ~RenderPass() = default;
+
+		RenderPass(const RenderPass& other) = delete;
+		RenderPass(RenderPass&& other) noexcept = delete;
+		RenderPass& operator=(const RenderPass& other) = delete;
+		RenderPass& operator=(RenderPass&& other) noexcept = delete;
+
 		virtual void RTRecreate() = 0;
 
 		inline bool IsDepthBuffered() const { return m_DepthBuffered; }
 		inline const RenderPassLayout& GetLayout() const { return m_CreateInfo.Layout; }
-
-		RenderPass(const RenderPassCreateInfo& createInfo);
-		virtual ~RenderPass() = default;
 
 		inline ClearColor GetClearColor() { return m_CreateInfo.ClearColor; }
 	protected:

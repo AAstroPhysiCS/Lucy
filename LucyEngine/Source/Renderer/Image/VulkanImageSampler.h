@@ -9,12 +9,15 @@ namespace Lucy {
 		VulkanImageSampler(const ImageSamplerCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device);
 		virtual ~VulkanImageSampler() = default;
 
+		VulkanImageSampler(const VulkanImageSampler&) = delete;
+		VulkanImageSampler& operator=(const VulkanImageSampler&) = delete;
+		VulkanImageSampler(VulkanImageSampler&&) = delete;
+		VulkanImageSampler& operator=(VulkanImageSampler&&) = delete;
+
 		void RTDestroyResource() final override;
 
 		inline VkSampler GetVulkanHandle() const { return m_Handle; }
 	private:
-		VulkanImageSampler() = default;
-
 		VkSampler m_Handle = VK_NULL_HANDLE;
 		Ref<VulkanRenderDevice> m_VulkanDevice = nullptr;
 

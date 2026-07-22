@@ -7,7 +7,7 @@
 namespace Lucy {
 
 	RenderPass::RenderPass(const RenderPassCreateInfo& createInfo)
-		: RenderResource("RenderPass"), m_CreateInfo(createInfo) {
+		: RenderDeviceResource("RenderPass"), m_CreateInfo(createInfo) {
 	}
 
 	std::array<uint32_t, 2> GetAPILoadStoreAttachments(RenderPassLoadStoreAttachments loadStoreOp) {

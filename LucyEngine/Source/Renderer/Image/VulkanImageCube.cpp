@@ -89,7 +89,7 @@ namespace Lucy {
 		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
 
 		m_ImageView.RTDestroyResource();
-		m_Sampler.RTDestroyResource();
+		m_VulkanDevice->RTDestroyResource(m_SamplerHandle);
 
 		allocator.DestroyImage(m_Image, m_ImageVma);
 		m_Image = VK_NULL_HANDLE;

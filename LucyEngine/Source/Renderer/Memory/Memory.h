@@ -14,29 +14,38 @@ namespace Lucy {
 	template <typename T>
 	using Unique = std::unique_ptr<T>;
 
+	template <typename T>
+	using Weak = std::weak_ptr<T>;
+
 	class MemoryTrackable : public std::enable_shared_from_this<MemoryTrackable> {
 	private:
 		template <std::derived_from<MemoryTrackable> TCasted>
 		struct AsProxy final {
 			Ref<MemoryTrackable> thisObj;
 
-			inline operator Ref<TCasted>() && { return std::dynamic_pointer_cast<TCasted>(thisObj); }
-			inline operator Unique<TCasted>() && = delete;
+			operator Ref<TCasted>() && { return std::dynamic_pointer_cast<TCasted>(std::move(thisObj)); }
+			operator Weak<TCasted>() && = delete;
+			operator Unique<TCasted>() && = delete;
+
+			operator Ref<TCasted>() & = delete;
+			operator Weak<TCasted>() & = delete;
 		};
 	public:
 		virtual ~MemoryTrackable() = default;
 
+		MemoryTrackable(const MemoryTrackable&) = delete;
+		MemoryTrackable& operator=(const MemoryTrackable&) = delete;
+		MemoryTrackable(MemoryTrackable&&) = delete;
+		MemoryTrackable& operator=(MemoryTrackable&&) = delete;
+
 		template <std::derived_from<MemoryTrackable> TCasted>
-		inline Ref<TCasted> As() {
-			return AsProxy<TCasted>{ .thisObj = shared_from_this() };
-		}
+		Ref<TCasted> As() { return AsProxy<TCasted>{ .thisObj = shared_from_this() }; }
 	protected:
 		MemoryTrackable() = default;
 	};
 
 	//TODO: Abstract this more
-	class Memory final {
-	public:
+	namespace Memory {
 		template <typename TType, typename ... TArgs>
 		static Ref<TType> CreateRef(TArgs&& ... args) {
 			return std::make_shared<TType>(std::forward<TArgs>(args)...);

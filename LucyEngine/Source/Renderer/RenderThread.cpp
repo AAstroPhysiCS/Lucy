@@ -27,6 +27,8 @@ namespace Lucy {
 		m_FinishedCondVar.wait(lock, [&]() { return m_Finished; });
 	}
 
+	const Ref<RendererBackend>& RenderThread::GetBackend() const { return m_Backend; }
+
 	bool RenderThread::OnInit() {
 		LUCY_PROFILE_NEW_EVENT("RenderThread::OnInit");
 		LUCY_ASSERT(IsOnRenderThread(), "OnInit function is being called on a another thread!");

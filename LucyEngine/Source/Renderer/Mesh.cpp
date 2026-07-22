@@ -1,6 +1,8 @@
 #include "lypch.h"
 #include "Mesh.h"
 
+#include "meshoptimizer.h"
+
 #include "assimp/Importer.hpp"
 #include "assimp/postprocess.h"
 
@@ -10,14 +12,27 @@
 #include "../Core/Application.h"
 
 #include "Renderer.h"
+#include "Material/MaterialManager.h"
 
 #include "Core/Timer.h"
 
-#include <unordered_map>
-
 namespace Lucy {
 
-	constexpr static inline uint32_t ASSIMP_FLAGS = aiProcess_FlipUVs | aiProcessPreset_TargetRealtime_MaxQuality;
+	//constexpr static inline uint32_t ASSIMP_FLAGS = aiProcess_FlipUVs | aiProcessPreset_TargetRealtime_Quality;
+
+	constexpr static uint32_t ASSIMP_FLAGS = aiProcess_CalcTangentSpace |
+		aiProcess_GenSmoothNormals |
+		aiProcess_FixInfacingNormals |
+		aiProcess_FlipUVs |
+		aiProcess_LimitBoneWeights |
+		aiProcess_RemoveRedundantMaterials |
+		aiProcess_ValidateDataStructure |
+		aiProcess_Triangulate |
+		//aiProcess_PreTransformVertices | (animations won't work, if you enable this)
+		aiProcess_SplitLargeMeshes |
+		aiProcess_OptimizeMeshes;
+
+	constexpr static float MESHOPT_OVERDRAW_THRESHOLD = 1.05f;
 
 	[[nodiscard]] glm::vec3 AllocateMeshID() {
 		const uint32_t id = Mesh::s_NextMeshID.fetch_add(1, std::memory_order_relaxed);
@@ -31,26 +46,8 @@ namespace Lucy {
 		};
 	}
 
-	Ref<Mesh> Mesh::Create(const std::vector<float>& vertices, const std::vector<uint32_t>& indices) {
-		LUCY_ASSERT(vertices.size() % 3 == 0, "Position array must contain complete vec3 values.");
-
-		const size_t vertexCount = vertices.size() / 3;
-		std::vector<Vertex> convertedVertices(vertexCount);
-
-		for (size_t i = 0; i < vertexCount; i++) {
-			const size_t sourceIndex = i * 3;
-			convertedVertices[i].Position = { vertices[sourceIndex + 0], vertices[sourceIndex + 1], vertices[sourceIndex + 2] };
-		}
-
-		return Memory::CreateRef<Mesh>(convertedVertices, indices);
-	}
-
-	Ref<Mesh> Mesh::Create(const std::string& path) {
-		return Memory::CreateRef<Mesh>(path);
-	}
-
 	Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices) {
-		Renderer::EnqueueToRenderCommandQueue([=](Ref<RenderDevice>& device) {
+		Renderer::EnqueueToRenderCommandQueue([this, vertices, indices](Ref<RenderDevice>& device) {
 			Load(device, vertices, indices);
 		});
 	}
@@ -90,11 +87,9 @@ namespace Lucy {
 		m_MetadataInfo = {};
 		m_Submeshes.clear();
 
+		m_MeshID = AllocateMeshID();
 		LoadProgram(scene);
 		TraverseHierarchy(scene->mRootNode, glm::mat4(1.0f));
-		m_MeshID = AllocateMeshID();
-
-		const glm::vec3 meshID = m_MeshID;
 
 		std::vector<Vertex> packedVertices(m_MetadataInfo.TotalVerticesSize);
 		std::vector<uint32_t> packedIndices(m_MetadataInfo.TotalIndicesSize);
@@ -139,10 +134,12 @@ namespace Lucy {
 
 			bool hasTangents = mesh->HasTangentsAndBitangents();
 			aiVector3D* tangents = hasTangents ? mesh->mTangents : nullptr;
-			aiVector3D* bitangents = hasTangents ? mesh->	mBitangents : nullptr;
+			aiVector3D* bitangents = hasTangents ? mesh->mBitangents : nullptr;
 
 			for (uint32_t vertexIndex = 0; vertexIndex < vertexCount; vertexIndex++) {
 				Vertex& vertex = submesh.Vertices[vertexIndex];
+				vertex = {};
+
 				vertex.MeshID = m_MeshID;
 
 				if (positions) {
@@ -181,6 +178,11 @@ namespace Lucy {
 
 				destination += 3;
 			}
+
+			OptimizeMeshData(submesh.Vertices, submesh.Indices);
+
+			submesh.VertexCount = static_cast<uint32_t>(submesh.Vertices.size());
+			submesh.IndexCount = static_cast<uint32_t>(submesh.Indices.size());
 		}, meshCount, 1);
 
 		taskScheduler->WaitForAllTasks();
@@ -201,9 +203,10 @@ namespace Lucy {
 		m_MetadataInfo.TotalVerticesSize = runningVertexOffset;
 		m_MetadataInfo.TotalIndicesSize = runningIndexOffset;
 
+		const auto& materialManager = Renderer::GetMaterialManager();
 		for (uint32_t i = 0; i < meshCount; i++) {
 			aiMesh* mesh = meshes[i];
-			m_Submeshes[i].MaterialID = Renderer::GetMaterialManager()->CreateMaterialByPath(MaterialType::PBR, scene->mMaterials[mesh->mMaterialIndex], m_Path);
+			m_Submeshes[i].MaterialID = materialManager->CreateMaterialByPath(MaterialType::PBR, scene->mMaterials[mesh->mMaterialIndex], m_Path);
 		}
 	}
 
@@ -220,6 +223,44 @@ namespace Lucy {
 			aiNode* childNode = node->mChildren[i];
 			TraverseHierarchy(childNode, transformed);
 		}
+	}
+	/* 
+	* NOTE FOR FUTURE:
+	* these optimizations reorder triangles. That is correct for ordinary opaque geometry, 
+	* but order-dependent alpha-blended submeshes should not use this triangle-reordering path unless 
+	* transparency is handled through sorting or order-independent transparency
+	*/
+	void Mesh::OptimizeMeshData(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices) {
+		meshopt_Stream vertexStreams[] = {
+			{ &vertices[0].Position.x, sizeof(float) * 3, sizeof(Vertex) },
+			{ &vertices[0].MeshID.x, sizeof(float) * 3, sizeof(Vertex) },
+			{ &vertices[0].TexCoords.x, sizeof(float) * 2, sizeof(Vertex) },
+			{ &vertices[0].Normal.x, sizeof(float) * 3, sizeof(Vertex) },
+			{ &vertices[0].Tangent.x, sizeof(float) * 3, sizeof(Vertex) },
+			{ &vertices[0].Bitangent.x, sizeof(float) * 3, sizeof(Vertex) }
+		};
+
+		std::vector<uint32_t> vertexRemap(vertices.size());
+
+		size_t optimizedVertexCount = meshopt_generateVertexRemapMulti(vertexRemap.data(), indices.data(), indices.size(),
+			vertices.size(), vertexStreams, sizeof(vertexStreams) / sizeof(vertexStreams[0]));
+
+		std::vector<Vertex> optimizedVertices(optimizedVertexCount);
+		std::vector<uint32_t> optimizedIndices(indices.size());
+
+		meshopt_remapVertexBuffer(optimizedVertices.data(), vertices.data(), vertices.size(), sizeof(Vertex), vertexRemap.data());
+		meshopt_remapIndexBuffer(optimizedIndices.data(), indices.data(), indices.size(), vertexRemap.data());
+		meshopt_optimizeVertexCache(optimizedIndices.data(), optimizedIndices.data(), optimizedIndices.size(), optimizedVertexCount);
+		meshopt_optimizeOverdraw(optimizedIndices.data(), optimizedIndices.data(), optimizedIndices.size(),
+			&optimizedVertices[0].Position.x, optimizedVertexCount, sizeof(Vertex), MESHOPT_OVERDRAW_THRESHOLD);
+
+		size_t finalVertexCount = meshopt_optimizeVertexFetch(optimizedVertices.data(), optimizedIndices.data(), optimizedIndices.size(),
+			optimizedVertices.data(), optimizedVertexCount, sizeof(Vertex));
+
+		optimizedVertices.resize(finalVertexCount);
+
+		vertices = std::move(optimizedVertices);
+		indices = std::move(optimizedIndices);
 	}
 
 	void Mesh::Destroy() {

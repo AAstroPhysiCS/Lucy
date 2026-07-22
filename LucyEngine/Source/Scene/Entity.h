@@ -16,6 +16,11 @@ namespace Lucy {
 		}
 		~Entity() = default;
 
+		Entity(const Entity&) = default;
+		Entity& operator=(const Entity&) = default;
+		Entity(Entity&&) = default;
+		Entity& operator=(Entity&&) = default;
+
 		inline bool operator==(Entity& other) {
 			return GetComponent<UUIDComponent>().GetUUID() == other.GetComponent<UUIDComponent>().GetUUID();
 		}
@@ -29,11 +34,6 @@ namespace Lucy {
 		inline bool IsValid() {
 			if ((ENTT_ID_TYPE)m_Entity == std::numeric_limits<ENTT_ID_TYPE>::max()) return false;
 			return m_Scene->m_Registry.valid(m_Entity);
-		}
-
-		template <typename ... Args>
-		void function(Args&& ... args) {
-
 		}
 
 		template <typename TComponent, typename ... Args>

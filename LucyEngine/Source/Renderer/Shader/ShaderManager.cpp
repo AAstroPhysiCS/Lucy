@@ -1,6 +1,8 @@
 #include "lypch.h"
+
 #include <ranges>
 #include <numeric>
+
 #include "ShaderManager.h"
 #include "Utilities/Utilities.h"
 
@@ -10,6 +12,8 @@
 
 #include "VulkanGraphicsShader.h"
 #include "VulkanComputeShader.h"
+
+#include "Renderer/Renderer.h"
 
 namespace Lucy {
 

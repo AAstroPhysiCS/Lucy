@@ -21,7 +21,7 @@ namespace Lucy::VulkanAPI {
 															VkPipelineLayout pipelineLayout,
 															const Ref<VulkanGraphicsShader>& shader, const Ref<VulkanRenderPass>& renderPass);
 	VkComputePipelineCreateInfo ComputePipelineCreateInfo(VkPipelineLayout pipelineLayout, VkPipelineShaderStageCreateInfo stage);
-	VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo(uint32_t setLayoutCount, const VkDescriptorSetLayout* const descriptorSetLayouts, uint32_t pushConstantRangeCount, const VkPushConstantRange* const pushConstantRanges);
+	VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo(uint32_t setLayoutCount, const VkDescriptorSetLayout* const descriptorSetLayouts, uint32_t pushConstantRangeCount, const VkPushConstantRange* const pushConstantRanges, VkPipelineLayoutCreateFlags flags = 0);
 	VkPipelineViewportStateCreateInfo PipelineViewportStateCreateInfo(uint32_t viewportCount, const VkViewport* const viewports, uint32_t scissorCount, const VkRect2D* const scissors);
 	VkPipelineRasterizationDepthClipStateCreateInfoEXT PipelineRasterizationDepthClipStateCreateInfo(VkBool32 depthClipEnable, VkPipelineRasterizationDepthClipStateCreateFlagsEXT flags = 0);
 	VkPipelineRasterizationStateCreateInfo PipelineRasterizationStateCreateInfo(VkFrontFace frontFace, float lineWidth,
@@ -60,7 +60,7 @@ namespace Lucy::VulkanAPI {
 	VkWriteDescriptorSet WriteDescriptorSet(VkDescriptorSet dstSet, uint32_t dstArrayElement, uint32_t dstBinding, uint32_t descriptorCount, VkDescriptorType type,
 											const VkDescriptorBufferInfo* const bufferInfo = nullptr, const VkDescriptorImageInfo* const imageInfo = nullptr, const VkBufferView* const texelBufferView = nullptr);
 
-	VkDescriptorSetLayoutCreateInfo DescriptorSetCreateInfo(uint32_t bindingCount, const VkDescriptorSetLayoutBinding* const layoutBindings);
+	VkDescriptorSetLayoutCreateInfo DescriptorSetCreateInfo(uint32_t bindingCount, const VkDescriptorSetLayoutBinding* const layoutBindings, VkDescriptorSetLayoutCreateFlags flags);
 	VkDescriptorSetLayoutBinding DescriptorSetLayoutBinding(uint32_t binding, uint32_t descriptorCount, DescriptorType type, VkShaderStageFlags stageFlag);
 	VkDescriptorSetLayoutBindingFlagsCreateInfo DescriptorSetLayoutBindingFlagsCreateInfo(uint32_t bindingCount, const VkDescriptorBindingFlags* const bindlessDescriptorFlags);
 

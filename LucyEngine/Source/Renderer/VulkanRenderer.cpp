@@ -1,5 +1,8 @@
 #include "lypch.h"
 #include "VulkanRenderer.h"
+#include "Renderer.h"
+
+#include "Semaphore.h"
 
 #include "ExecutionBatch.h"
 
@@ -7,6 +10,8 @@
 #include "Context/VulkanContext.h"
 
 #include "Device/VulkanRenderDevice.h"
+#include "Device/RenderDeviceScene.h"
+
 #include "RenderGraph/RenderGraphCompiler.h"
 
 #include "Memory/Buffer/Buffer.h"
@@ -76,6 +81,8 @@ namespace Lucy {
 
 			const uint64_t frameValue = m_FrameFenceValues[m_CurrentFrameIndex];
 			m_InFlightFences[m_CurrentFrameIndex].Wait(frameValue);
+			
+			m_RenderDevice->GetScene()->SyncFrame(m_CurrentFrameIndex);
 
 			m_RenderCommandQueue->ResetFrameSlotRecordersIfCompleted(m_CurrentFrameIndex, TargetQueueFamily::Graphics);
 			m_RenderCommandQueue->ResetFrameSlotRecordersIfCompleted(m_CurrentFrameIndex, TargetQueueFamily::Compute);
@@ -84,10 +91,14 @@ namespace Lucy {
 			m_ImGuiRenderCommandList->ResetRenderCommand(m_CurrentFrameIndex);
 		}
 
-		const auto& swapChain = GetSwapChain()->As<VulkanSwapChain>();
-		m_LastSwapChainResult = swapChain->AcquireNextImage(m_ImageAvailableSemaphores[m_CurrentFrameIndex], m_ImageIndex);
-		if (m_LastSwapChainResult == ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == SUBOPTIMAL_KHR || m_LastSwapChainResult == NOT_READY)
-			return;
+		{
+			LUCY_PROFILE_NEW_EVENT("VulkanRenderer::BeginFrame::AcquireNextImage");
+			
+			const auto& swapChain = GetSwapChain()->As<VulkanSwapChain>();
+			m_LastSwapChainResult = swapChain->AcquireNextImage(&m_ImageAvailableSemaphores[m_CurrentFrameIndex], m_ImageIndex);
+			if (m_LastSwapChainResult == ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == SUBOPTIMAL_KHR || m_LastSwapChainResult == NOT_READY)
+				return;
+		}
 	}
 
 	void VulkanRenderer::RenderFrame() {
@@ -105,6 +116,7 @@ namespace Lucy {
 		uint64_t signalValue = m_FrameFenceValues[m_CurrentFrameIndex] + 1;
 
 		const auto ExecuteVulkanBatchBarrier = [](VkCommandBuffer cmdBuffer, const VulkanBatchBarrier& barrier) {
+			LUCY_PROFILE_NEW_EVENT("VulkanRenderer::RenderFrame::SubmitQueue::ExecuteVulkanBatchBarrier");
 
 			std::vector<VkImageMemoryBarrier2> imageBarriers;
 			imageBarriers.reserve(barrier.ImageBarriers.size());
@@ -126,6 +138,8 @@ namespace Lucy {
 		};
 
 		if (hasSceneWork) {
+			LUCY_PROFILE_NEW_EVENT("VulkanRenderer::RenderFrame::SubmitQueue");
+
 			m_RenderCommandQueue->AllocateCommandLists(submitQueue);
 			LinkBatches(submitQueue, signalValue);
 
@@ -167,7 +181,7 @@ namespace Lucy {
 			return;
 
 		const auto& swapChain = GetSwapChain()->As<VulkanSwapChain>();
-		m_LastSwapChainResult = swapChain->Present(m_RenderFinishedSemaphores[m_ImageIndex], m_ImageIndex);
+		m_LastSwapChainResult = swapChain->Present(&m_RenderFinishedSemaphores[m_ImageIndex], m_ImageIndex);
 	}
 
 	void VulkanRenderer::FlushDeletionQueue() {
@@ -330,7 +344,7 @@ namespace Lucy {
 
 		m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % m_MaxFramesInFlight;
 
-		m_RenderCommandQueue->Clear();
+		m_RenderCommandQueue->ClearSubmitQueue();
 
 		return (RenderContextResultCodes)m_LastSwapChainResult;
 	}
@@ -368,6 +382,7 @@ namespace Lucy {
 
 	// Should not be used in a loop 
 	void VulkanRenderer::RTDirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::RTDirectCopyBuffer");
 		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
 		renderDevice->SubmitImmediateCommand([&](VkCommandBuffer commandBuffer) {
 			VkBufferCopy copyRegion = VulkanAPI::BufferCopy(0, 0, size);
@@ -444,7 +459,7 @@ namespace Lucy {
 
 		auto& allocator = GetRenderDevice()->As<VulkanRenderDevice>()->GetAllocator();
 		if (!s_IDBuffer)
-			allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, s_IDBuffer, s_IDBufferVma);
+			allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, false, s_IDBuffer, s_IDBufferVma);
 
 		image->SetLayoutImmediate(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 		image->CopyImageToBufferImmediate(s_IDBuffer);

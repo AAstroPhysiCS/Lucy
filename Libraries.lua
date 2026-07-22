@@ -10,6 +10,7 @@ LibraryPath["ImGui"] = "%{wks.location}/LucyEngine/ThirdParty/ImGui"
 LibraryPath["ImGuizmo"] = "%{wks.location}/LucyEditor/ThirdParty/ImGuizmo"
 LibraryPath["Tracy"] = "%{wks.location}/LucyEngine/ThirdParty/Tracy"
 LibraryPath["glm"] = "%{wks.location}/LucyEngine/ThirdParty/glm"
+LibraryPath["meshoptimizer"] = "%{wks.location}/LucyEngine/ThirdParty/meshoptimizer"
 
 LibraryPath["VulkanSDK"] = os.getenv("VULKAN_SDK")
 LibraryPath["VulkanInclude"] = "%{LibraryPath.VulkanSDK}/Include"

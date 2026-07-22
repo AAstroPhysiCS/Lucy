@@ -6,6 +6,8 @@ namespace Lucy {
 		glm::mat4 View;
 		glm::mat4 Proj;
 		glm::vec4 CamPos;
+
+		auto operator<=>(const CameraViewProjection&) const = default;
 	};
 
 	class Camera {

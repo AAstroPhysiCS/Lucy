@@ -3,6 +3,11 @@
 
 #include "Context/VulkanContext.h"
 
+#include "Renderer.h"
+#include "RendererBackend.h"
+
+#include "Descriptors/VulkanDescriptorPool.h"
+
 #include "../../ThirdParty/ImGui/imgui_impl_vulkan.h"
 #include "../../ThirdParty/ImGui/imgui_impl_glfw.h"
 

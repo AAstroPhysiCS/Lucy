@@ -1,97 +1,134 @@
 #pragma once
 
-namespace Lucy {
+#include "Random.h"
 
-	static constexpr inline const char* DefaultUUID = "00000000-0000-0000-0000-000000000000";
+namespace Lucy {
 
 	class UUID final {
 	public:
-		UUID();
+		UUID() {
+			std::stringstream ss;
+			int32_t i;
+			ss << std::hex;
+			for (i = 0; i < 8; i++) {
+				ss << s_RandomGen.NextValue();
+			}
+			ss << "-";
+			for (i = 0; i < 4; i++) {
+				ss << s_RandomGen.NextValue();
+			}
+			ss << "-4";
+			for (i = 0; i < 3; i++) {
+				ss << s_RandomGen.NextValue();
+			}
+			ss << "-";
+			ss << s_RandomGen2.NextValue();
+			for (i = 0; i < 3; i++) {
+				ss << s_RandomGen.NextValue();
+			}
+			ss << "-";
+			for (i = 0; i < 12; i++) {
+				ss << s_RandomGen.NextValue();
+			};
+
+			m_UUIDAsString = ss.str();
+		}
 		~UUID() = default;
+
+		UUID(const UUID&) = default;
+		UUID& operator=(const UUID&) = default;
+		UUID(UUID&&) noexcept = default;
+		UUID& operator=(UUID&&) noexcept = default;
 
 		inline bool operator==(const UUID& other) const = default;
 		inline bool operator==(const char* uuidAsString) const { return m_UUIDAsString == uuidAsString; }
 
 		inline const std::string& GetID() const { return m_UUIDAsString; }
 	private:
+		static constexpr const char* DefaultUUID = "00000000-0000-0000-0000-000000000000";
+	private:
 		std::string m_UUIDAsString = DefaultUUID;
+
+		static inline UniformRandom<uint64_t> s_RandomGen{ 0uLL, 15uLL };
+		static inline UniformRandom<uint64_t> s_RandomGen2{ 8uLL, 11uLL };
 	};
 
 	using LucyID = uint64_t;
 
-	template <typename T>
-	inline static constexpr const T InvalidID = T(~0);
+	template<typename T>
+	concept Arithmetic = std::integral<T> || std::floating_point<T>;
 
-	template <typename TID = LucyID, bool ReturnPolicy = true>
+	template<typename T> requires Arithmetic<T>
+	inline constexpr T InvalidID = std::numeric_limits<T>::max();
+
+	template<Arithmetic TID = LucyID, bool ReuseReturnedIDs = true>
 	class IDProvider final {
-		static inline constexpr const size_t s_PoolResizeStep = 100;
 	public:
 		IDProvider() = default;
 		~IDProvider() = default;
 
-		[[nodiscard]] TID RequestID();
-		void ReturnID(TID id);
-		[[nodiscard]] TID Renew(TID oldId);
+		IDProvider(const IDProvider&) = delete;
+		IDProvider& operator=(const IDProvider&) = delete;
+		IDProvider(IDProvider&&) noexcept = default;
+		IDProvider& operator=(IDProvider&&) noexcept = default;
 
-		void Reset();
-	private:
-		void IncreasePool(size_t step);
+		[[nodiscard]] TID RequestID() {
+			if constexpr (ReuseReturnedIDs) {
+				if (!m_FreeList.empty()) {
+					const TID id = m_FreeList.back();
+					m_FreeList.pop_back();
 
-		std::vector<TID> s_IDCount;
-	};
+					m_Alive[static_cast<size_t>(id)] = 1;
+					return id;
+				}
+			}
 
-	template<typename TID, bool ReturnPolicy>
-	TID IDProvider<TID, ReturnPolicy>::RequestID() {
-		//basically, init
-		if (s_IDCount.empty())
-			IncreasePool(s_PoolResizeStep);
+			LUCY_ASSERT(m_NextID != InvalidID<TID>, "IDProvider overflow!");
 
-		const auto& result = std::find(s_IDCount.begin(), s_IDCount.end(), 0);
+			const TID id = m_NextID++;
+			m_Alive.push_back(1);
 
-		if (result == s_IDCount.end()) {
-			IncreasePool(s_PoolResizeStep);
+			return id;
+		}
+
+		void ReturnID(TID id) {
+			if constexpr (!ReuseReturnedIDs) {
+				static_assert(ReuseReturnedIDs, "This IDProvider has ID returning disabled.");
+			} else {
+				const size_t index = static_cast<size_t>(id);
+
+				LUCY_ASSERT(index < m_Alive.size(), "IDProvider: ID does not exist!");
+				LUCY_ASSERT(m_Alive[index] != 0, "IDProvider: ID was already returned!");
+
+				m_Alive[index] = 0;
+				m_FreeList.push_back(id);
+			}
+		}
+
+		[[nodiscard]] TID Renew(TID oldID) {
+			ReturnID(oldID);
 			return RequestID();
 		}
 
-		ptrdiff_t index = std::distance(s_IDCount.begin(), result);
-		s_IDCount[index] = index + 1;
-
-		return index;
-	}
-
-	template<typename TID, bool ReturnPolicy>
-	void IDProvider<TID, ReturnPolicy>::ReturnID(TID id) {
-		if constexpr (!ReturnPolicy) {
-			static_assert(false, "Return policy is disabled and you are returning the id! You have to reset the provider every time!");
-		}
-		const auto& result = std::find(s_IDCount.begin(), s_IDCount.end(), id);
-
-		if (result != s_IDCount.end()) {
-			s_IDCount.erase(result);
-			return;
+		[[nodiscard]] bool IsAlive(TID id) const {
+			const size_t index = static_cast<size_t>(id);
+			return index < m_Alive.size() && m_Alive[index] != 0;
 		}
 
-		LUCY_ASSERT(false, "IDProvider: {0} does not exist!", id);
-	}
-
-	template<typename TID, bool ReturnPolicy>
-	TID IDProvider<TID, ReturnPolicy>::Renew(TID oldId) {
-		if constexpr (!ReturnPolicy) {
-			static_assert(false, "Return policy is disabled and you are returning the id! You have to reset the provider every time!");
+		[[nodiscard]] size_t GetCapacity() const {
+			return m_Alive.size();
 		}
-		ReturnID(oldId);
-		return RequestID();
-	}
 
-	template<typename TID, bool ReturnPolicy>
-	void IDProvider<TID, ReturnPolicy>::Reset() {
-		s_IDCount.clear();
-	}
-
-	template<typename TID, bool ReturnPolicy>
-	void IDProvider<TID, ReturnPolicy>::IncreasePool(size_t step) {
-		s_IDCount.resize(s_IDCount.size() + step);
-	}
+		void Reset() {
+			m_NextID = 0;
+			m_Alive.clear();
+			m_FreeList.clear();
+		}
+	private:
+		TID m_NextID = 0;
+		std::vector<uint8_t> m_Alive;
+		std::vector<TID> m_FreeList;
+	};
 }
 
 template<>

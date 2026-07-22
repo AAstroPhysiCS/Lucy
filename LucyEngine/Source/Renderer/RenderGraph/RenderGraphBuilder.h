@@ -16,6 +16,11 @@ namespace Lucy {
 		RenderGraphBuilder(RenderGraph* renderGraph, RenderGraphPass* pass);
 		~RenderGraphBuilder() = default;
 
+		RenderGraphBuilder(const RenderGraphBuilder& other) = delete;
+		RenderGraphBuilder(RenderGraphBuilder&& other) noexcept = delete;
+		RenderGraphBuilder& operator=(const RenderGraphBuilder& other) = delete;
+		RenderGraphBuilder& operator=(RenderGraphBuilder&& other) noexcept = delete;
+
 		void SetViewportArea(uint32_t width, uint32_t height);
 		void SetInFlightMode(bool mode);
 		void SetClearColor(ClearColor clearColor);

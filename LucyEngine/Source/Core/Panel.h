@@ -13,6 +13,11 @@ namespace Lucy {
 		Panel() = default;
 		virtual ~Panel() = default;
 
+		Panel(const Panel&) = delete;
+		Panel& operator=(const Panel&) = delete;
+		Panel(Panel&&) = delete;
+		Panel& operator=(Panel&&) = delete;
+
 		virtual void OnEvent(Event& e) { /* Could be overriden by the corresponding child class */ }
 		virtual void OnDestroy() { /* Could be overriden by the corresponding child class */ }
 		virtual void Render() = 0;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <filesystem>
 
 #include "Renderer/Memory/Memory.h"
@@ -32,8 +33,8 @@ namespace Lucy {
 		void RemovePass(RenderGraphPass* pass);
 		void RemovePass(const std::string& passName);
 
-		void ImportExternalResource(const RenderGraphResource& rgResource, RenderResourceHandle handle);
-		void ImportExternalTransientResource(const RenderGraphResource& rgResource, RenderResourceHandle handle);
+		void ImportExternalResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle);
+		void ImportExternalTransientResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle);
 
 		inline DirectedAcyclicGraph<RenderGraphPass, RenderGraphResource>& GetAcyclicGraph() { return m_AcyclicGraph; }
 		inline size_t GetPassCount() const { return m_Passes.size(); }
@@ -79,11 +80,11 @@ namespace Lucy {
 		inline Ref<Image> GetImageByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetImage(rgResource); }
 		inline Ref<Image> GetImageByRGResource(const RenderGraphResource& rgResource) const { return m_Registry.GetImage(rgResource); }
 
-		inline Ref<RenderResource> GetBufferByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetBuffer(rgResource); }
-		inline Ref<RenderResource> GetBufferByRGResource(const RenderGraphResource& rgResource) const { return m_Registry.GetBuffer(rgResource); }
+		inline Ref<RenderDeviceResource> GetBufferByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetBuffer(rgResource); }
+		inline Ref<RenderDeviceResource> GetBufferByRGResource(const RenderGraphResource& rgResource) const { return m_Registry.GetBuffer(rgResource); }
 
 		inline RenderPassLoadStoreAttachments GetLoadStoreAttachmentsByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetResourceEntry(rgResource).GetImageData().LoadStoreAttachment; }
-		inline RenderResourceHandle GetHandleByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetResourceEntry(rgResource).ResourceHandle; }
+		inline RenderDeviceResourceHandle GetHandleByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetResourceEntry(rgResource).ResourceHandle; }
 
 		RenderGraphBatches CreateBatchesForRendering() const;
 
@@ -94,6 +95,7 @@ namespace Lucy {
 		
 		DirectedAcyclicGraph<RenderGraphPass, RenderGraphResource> m_AcyclicGraph;
 
+		Ref<RenderDevice> m_RenderDevice = nullptr;
 		RenderGraphRegistry m_Registry;
 		Unique<RenderGraphCompiler> m_Compiler;
 

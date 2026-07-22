@@ -17,6 +17,11 @@ namespace Lucy {
 		}
 		virtual ~ComputePipeline() = default;
 
+		ComputePipeline(const ComputePipeline&) = delete;
+		ComputePipeline& operator=(const ComputePipeline&) = delete;
+		ComputePipeline(ComputePipeline&&) = delete;
+		ComputePipeline& operator=(ComputePipeline&&) = delete;
+
 		virtual void RTBind(void* commandBufferHandle) = 0;
 		virtual void RTRecreate() = 0;
 		virtual void RTDispatch(void* commandBufferHandle, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) = 0;

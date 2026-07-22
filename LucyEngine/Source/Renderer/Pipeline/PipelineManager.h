@@ -13,6 +13,11 @@ namespace Lucy {
 		PipelineManager(const Ref<RenderDevice>& device);
 		~PipelineManager() = default;
 
+		PipelineManager(const PipelineManager&) = delete;
+		PipelineManager& operator=(const PipelineManager&) = delete;
+		PipelineManager(PipelineManager&&) = delete;
+		PipelineManager& operator=(PipelineManager&&) = delete;
+
 		template <typename TPipeline>
 		inline Ref<TPipeline> GetAs(const std::string& name) const {
 			if (m_GraphicsPipelines.contains(name))
@@ -34,11 +39,11 @@ namespace Lucy {
 		void SaveToFileAsPSO();
 		void ReadFromFileAsPSO();
 	private:
-		RenderResourceHandle CreateGraphicsPipeline(const std::string& name, const GraphicsPipelineCreateInfo& createInfo);
-		RenderResourceHandle CreateComputePipeline(const std::string& name, const ComputePipelineCreateInfo& createInfo);
+		RenderDeviceResourceHandle CreateGraphicsPipeline(const std::string& name, const GraphicsPipelineCreateInfo& createInfo);
+		RenderDeviceResourceHandle CreateComputePipeline(const std::string& name, const ComputePipelineCreateInfo& createInfo);
 
-		std::unordered_map<std::string, RenderResourceHandle> m_GraphicsPipelines;
-		std::unordered_map<std::string, RenderResourceHandle> m_ComputePipelines;
+		std::unordered_map<std::string, RenderDeviceResourceHandle> m_GraphicsPipelines;
+		std::unordered_map<std::string, RenderDeviceResourceHandle> m_ComputePipelines;
 
 		Ref<RenderDevice> m_RenderDevice = nullptr;
 

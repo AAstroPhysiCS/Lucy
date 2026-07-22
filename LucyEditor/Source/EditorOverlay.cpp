@@ -34,7 +34,6 @@ namespace Lucy {
 		auto& metricsPanel = DebugPanel::GetInstance();
 		metricsPanel.ToggleShow();
 
-
 		sceneExplorerPanel.SetScene(m_Scene);
 
 		viewportPanel.SetRenderPipeline(m_RenderPipeline);

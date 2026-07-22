@@ -9,6 +9,7 @@ bin-obj/
 
 .vs/
 **.sln
+**.slnx
 **.vcxproj
 **.vcxproj.filters
 **.vcxproj.user
@@ -16,3 +17,4 @@ bin-obj/
 /x64/
 /x32/
 LucyEditor/imgui.ini
+LucyEditor/Assets/Shaders/Cached

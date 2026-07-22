@@ -4,6 +4,8 @@
 
 #include "Renderer/Image/VulkanImage.h"
 
+#include "Renderer/Renderer.h"
+
 namespace Lucy {
 
 	static inline RenderCommand* s_CurrentActiveRenderCommand = nullptr;

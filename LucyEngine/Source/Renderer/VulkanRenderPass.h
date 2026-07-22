@@ -20,6 +20,11 @@ namespace Lucy {
 		VulkanRenderPass(const RenderPassCreateInfo& createInfo, const Ref<VulkanRenderDevice>& vulkanDevice);
 		virtual ~VulkanRenderPass() = default;
 
+		VulkanRenderPass(const VulkanRenderPass&) = delete;
+		VulkanRenderPass& operator=(const VulkanRenderPass&) = delete;
+		VulkanRenderPass(VulkanRenderPass&&) = delete;
+		VulkanRenderPass& operator=(VulkanRenderPass&&) = delete;
+
 		void RTBegin(VulkanRenderPassBeginInfo& info);
 		void RTEnd();
 		void RTRecreate() final override;

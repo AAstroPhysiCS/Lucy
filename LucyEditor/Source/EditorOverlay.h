@@ -12,11 +12,17 @@ namespace Lucy {
 
 	class Scene;
 	class Window;
+	struct Event;
 
 	class EditorOverlay : public Overlay {
 	public:
 		EditorOverlay(const Ref<Scene>& scene);
 		virtual ~EditorOverlay() = default;
+
+		EditorOverlay(const EditorOverlay&) = delete;
+		EditorOverlay& operator=(const EditorOverlay&) = delete;
+		EditorOverlay(EditorOverlay&&) = delete;
+		EditorOverlay& operator=(EditorOverlay&&) = delete;
 
 		void Begin() final override;
 		void Render() final override;

@@ -4,10 +4,14 @@
 
 #include "Threading/RunnableThread.h"
 
+#include "Renderer/RendererConfiguration.h"
+
 namespace Lucy {
 
 	class Window;
 	class RenderCommandQueue;
+
+	class RendererBackend;
 
 	struct RenderThreadCreateInfo {
 		Ref<Window> Window = nullptr;
@@ -19,13 +23,18 @@ namespace Lucy {
 	public:
 		RenderThread(const RunnableThreadCreateInfo& createInfo, const RenderThreadCreateInfo& renderThreadCreateInfo);
 		virtual ~RenderThread() = default;
+
+		RenderThread(const RenderThread& other) = delete;
+		RenderThread(RenderThread&& other) noexcept = delete;
+		RenderThread& operator=(const RenderThread& other) = delete;
+		RenderThread& operator=(RenderThread&& other) noexcept = delete;
 	public:
 		inline bool IsOnRenderThread() const { return GetID() == std::this_thread::get_id(); }
 
 		void SignalToShutdown();
 		void WaitToShutdown();
 
-		inline const Ref<RendererBackend>& GetBackend() const { return m_Backend; }
+		const Ref<RendererBackend>& GetBackend() const;
 	private:
 		bool OnInit() final override;
 		uint32_t OnRun() final override;

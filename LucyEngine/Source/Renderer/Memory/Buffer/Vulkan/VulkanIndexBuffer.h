@@ -13,6 +13,11 @@ namespace Lucy {
 	public:
 		VulkanIndexBuffer(size_t size, const Ref<VulkanRenderDevice>& device);
 		virtual ~VulkanIndexBuffer() = default;
+
+		VulkanIndexBuffer(const VulkanIndexBuffer&) = delete;
+		VulkanIndexBuffer& operator=(const VulkanIndexBuffer&) = delete;
+		VulkanIndexBuffer(VulkanIndexBuffer&&) = delete;
+		VulkanIndexBuffer& operator=(VulkanIndexBuffer&&) = delete;
 		
 		void RTBind(const VulkanIndexBindInfo& info);
 		void RTLoadToDevice() final override;

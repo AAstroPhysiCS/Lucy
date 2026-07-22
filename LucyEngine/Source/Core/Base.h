@@ -33,9 +33,9 @@
 #define LUCY_BIND_FUNC(func, self, ...) std::bind(func, self, __VA_ARGS__)
 
 #ifdef LUCY_DEBUG
-#define LUCY_ENABLE_ASSERTS 1
+    #define LUCY_ENABLE_ASSERTS 1
 #else
-#define LUCY_ENABLE_ASSERTS 0
+    #define LUCY_ENABLE_ASSERTS 0
 #endif
 
 static void AppendLocationInfo(std::string& message, const std::source_location& location) noexcept {
@@ -56,43 +56,43 @@ static void HandleAssertFailure(const std::source_location& location, std::strin
 }
 
 #if LUCY_ENABLE_ASSERTS
-static void LucyAssert(bool condition, const std::source_location& location) {
-    if (!condition) [[unlikely]] {
-        HandleAssertFailure(location, "Assertion failed");
+    static void LucyAssert(bool condition, const std::source_location& location) {
+        if (!condition) [[unlikely]] {
+            HandleAssertFailure(location, "Assertion failed");
+        }
     }
-}
 
-template <typename... Args>
-static void LucyAssert(bool condition, const std::source_location& location,
-    std::string_view format, Args&&... args) {
-    if (!condition) [[unlikely]] {
-        std::string message = std::vformat(format, std::make_format_args(args...));
-        HandleAssertFailure(location, message);
+    template <typename... Args>
+    static void LucyAssert(bool condition, const std::source_location& location,
+        std::string_view format, Args&&... args) {
+        if (!condition) [[unlikely]] {
+            std::string message = std::vformat(format, std::make_format_args(args...));
+            HandleAssertFailure(location, message);
+        }
     }
-}
 
-template <typename T>
-static void LucyAssert(Lucy::Ref<T> ref, const std::source_location& location) {
-    if (!ref) [[unlikely]] {
-        HandleAssertFailure(location, "Ref assertion failed");
+    template <typename T>
+    static void LucyAssert(Lucy::Ref<T> ref, const std::source_location& location) {
+        if (!ref) [[unlikely]] {
+            HandleAssertFailure(location, "Ref assertion failed");
+        }
     }
-}
 
-template <typename T>
-static void LucyAssert(Lucy::Ref<T> ref, const std::source_location& location,
-    std::string_view message) {
-    if (!ref) [[unlikely]] {
-        HandleAssertFailure(location, message);
+    template <typename T>
+    static void LucyAssert(Lucy::Ref<T> ref, const std::source_location& location,
+        std::string_view message) {
+        if (!ref) [[unlikely]] {
+            HandleAssertFailure(location, message);
+        }
     }
-}
 #else
-static void LucyAssert(bool, const std::source_location&) noexcept {}
-template <typename... Args>
-static void LucyAssert(bool, const std::source_location&, std::string_view, Args&&...) noexcept {}
-template <typename T>
-static void LucyAssert(Lucy::Ref<T>, const std::source_location&) noexcept {}
-template <typename T>
-static void LucyAssert(Lucy::Ref<T>, const std::source_location&, std::string_view) noexcept {}
+    static void LucyAssert(bool, const std::source_location&) noexcept {}
+    template <typename... Args>
+    static void LucyAssert(bool, const std::source_location&, std::string_view, Args&&...) noexcept {}
+    template <typename T>
+    static void LucyAssert(Lucy::Ref<T>, const std::source_location&) noexcept {}
+    template <typename T>
+    static void LucyAssert(Lucy::Ref<T>, const std::source_location&, std::string_view) noexcept {}
 #endif
 
 static void LucyVulkanAssert(int32_t result, const std::source_location& location) {

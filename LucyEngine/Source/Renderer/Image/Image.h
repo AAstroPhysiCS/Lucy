@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Renderer/Device/RenderResource.h"
+#include "Renderer/Device/RenderDeviceResource.h"
 
 namespace Lucy {
 
@@ -125,9 +125,30 @@ namespace Lucy {
 	//Vulkan: Descriptor Set
 	using ImageImGuiID = void*;
 
-	class Image : public RenderResource {
+	class Image : public RenderDeviceResource {
 	public:
 		virtual ~Image() = default;
+
+		Image(const Image&) = delete;
+		Image& operator=(const Image&) = delete;
+		Image(Image&& other) noexcept 
+			: RenderDeviceResource(other.GetDebugName()) {
+			m_CreateInfo = std::exchange(other.m_CreateInfo, {});
+			m_Channels = std::exchange(other.m_Channels, 0);
+			m_MaxMipLevel = std::exchange(other.m_MaxMipLevel, 0);
+
+			m_ImGuiID = std::exchange(other.m_ImGuiID, nullptr);
+			m_Path = std::exchange(other.m_Path, {});
+		}
+		Image& operator=(Image&& other) noexcept {
+			if (this == &other)
+				return *this;
+			m_CreateInfo = std::exchange(other.m_CreateInfo, {});
+			m_Channels = std::exchange(other.m_Channels, 0);
+			m_MaxMipLevel = std::exchange(other.m_MaxMipLevel, 0);
+			m_ImGuiID = std::exchange(other.m_ImGuiID, nullptr);
+			m_Path = std::exchange(other.m_Path, {});
+		}
 
 		inline const std::filesystem::path& GetPath() const { return m_Path; }
 		inline int32_t GetChannels() const { return m_Channels; }
@@ -136,6 +157,7 @@ namespace Lucy {
 
 		inline ImageFormat GetFormat() const { return m_CreateInfo.Format; }
 		inline ImageUsage GetImageUsage() const { return m_CreateInfo.ImageUsage; }
+		inline ImageType GetType() const { return m_CreateInfo.ImageType; }
 		inline uint32_t GetSamples() const { return m_CreateInfo.Samples; }
 
 		inline uint32_t GetLayerCount() const { return m_CreateInfo.Layers; }
@@ -145,14 +167,14 @@ namespace Lucy {
 	protected:
 		//Creates an empty image
 		Image(const ImageCreateInfo& createInfo, std::string_view debugName = {})
-			: RenderResource(debugName.empty() ? "Image" : debugName), m_CreateInfo(createInfo) {
+			: RenderDeviceResource(debugName.empty() ? "Image" : debugName), m_CreateInfo(createInfo) {
 			CalculateMaxMipLevel();
 			LUCY_ASSERT(m_CreateInfo.ImageUsage != ImageUsage::Unknown, "Image usage is unknown.");
 		}
 
 		//Loads an asset
 		Image(const std::filesystem::path& path, const ImageCreateInfo& createInfo, std::string_view debugName = {})
-			: RenderResource(debugName.empty() ? "Image" : debugName), m_CreateInfo(createInfo), m_Path(path) {
+			: RenderDeviceResource(debugName.empty() ? "Image" : debugName), m_CreateInfo(createInfo), m_Path(path) {
 		}
 
 		void CalculateMaxMipLevel() {

@@ -2,6 +2,7 @@
 #include "RenderGraphRegistry.h"
 
 #include "Renderer/Renderer.h"
+#include "Renderer/Image/Image.h"
 
 namespace Lucy {
 	
@@ -13,7 +14,7 @@ namespace Lucy {
 		}
 	}
 
-	void RenderGraphRegistry::ImportExternalResource(const RenderGraphResource& rgResource, RenderResourceHandle handle) {
+	void RenderGraphRegistry::ImportExternalResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle) {
 		m_Resources.insert_or_assign(rgResource,
 			RGResourceEntry{
 				.ResourceHandle = handle,
@@ -23,7 +24,7 @@ namespace Lucy {
 		);
 	}
 
-	void RenderGraphRegistry::ImportExternalTransientResource(const RenderGraphResource& rgResource, RenderResourceHandle handle) {
+	void RenderGraphRegistry::ImportExternalTransientResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle) {
 		m_Resources.insert_or_assign(rgResource, 
 			RGResourceEntry {
 				.ResourceHandle = handle,
@@ -37,7 +38,7 @@ namespace Lucy {
 		return m_Resources.contains(rgResource);
 	}
 
-	void RenderGraphRegistry::DeclareImage(const RenderGraphResource& rgResource, RenderResourceHandle handle, const RGImageData& imageData) {
+	void RenderGraphRegistry::DeclareImage(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle, const RGImageData& imageData) {
 		LUCY_ASSERT(rgResource != UndefinedRenderGraphResource);
 		LUCY_ASSERT(Renderer::IsValidRenderResource(handle));
 
@@ -51,7 +52,7 @@ namespace Lucy {
 		);
 	}
 
-	void RenderGraphRegistry::DeclareBuffer(const RenderGraphResource& rgResource, RenderResourceHandle handle, const RGBufferData& bufferData) {
+	void RenderGraphRegistry::DeclareBuffer(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle, const RGBufferData& bufferData) {
 		LUCY_ASSERT(rgResource != UndefinedRenderGraphResource);
 		LUCY_ASSERT(Renderer::IsValidRenderResource(handle));
 
@@ -73,11 +74,11 @@ namespace Lucy {
 		return Renderer::AccessResource<Image>(m_Resources.at(rgResource).ResourceHandle);
 	}
 
-	Ref<RenderResource> RenderGraphRegistry::GetBuffer(const RenderGraphResource& rgResource) {
-		return Renderer::AccessResource<RenderResource>(m_Resources.at(rgResource).ResourceHandle);
+	Ref<RenderDeviceResource> RenderGraphRegistry::GetBuffer(const RenderGraphResource& rgResource) {
+		return Renderer::AccessResource<RenderDeviceResource>(m_Resources.at(rgResource).ResourceHandle);
 	}
 
-	Ref<RenderResource> RenderGraphRegistry::GetBuffer(const RenderGraphResource& rgResource) const {
-		return Renderer::AccessResource<RenderResource>(m_Resources.at(rgResource).ResourceHandle);
+	Ref<RenderDeviceResource> RenderGraphRegistry::GetBuffer(const RenderGraphResource& rgResource) const {
+		return Renderer::AccessResource<RenderDeviceResource>(m_Resources.at(rgResource).ResourceHandle);
 	}
 }

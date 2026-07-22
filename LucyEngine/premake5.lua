@@ -2,7 +2,7 @@ project "LucyEngine"
     location "."
     kind "StaticLib"
     language "C++"
-    cppdialect "C++20"
+    cppdialect "C++23"
     staticruntime "off"
 
     targetdir ("../bin/" .. outputdir .. "/%{prj.name}")
@@ -21,6 +21,7 @@ project "LucyEngine"
         "%{LibraryPath.spdlog}/include",
         "%{LibraryPath.GLFW}/include",
         "%{LibraryPath.entt}/include",
+        "%{LibraryPath.meshoptimizer}/src",
         "%{LibraryPath.stb}/include",
         "%{LibraryPath.assimp}/include",
         "%{LibraryPath.nativefiledialog}/include",
@@ -34,11 +35,12 @@ project "LucyEngine"
         "GLFW",
         "ImGui",
         "glm",
+        "meshoptimizer",
         
         "%{LibraryPath.nativefiledialog}/nfd.lib"
     }
 
-    filter "platforms:win64"
+    filter "system:windows"
         systemversion "latest"
 
         defines {

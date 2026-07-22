@@ -28,6 +28,11 @@ namespace Lucy {
 		}
 		virtual ~CommandPool() = default;
 
+		CommandPool(const CommandPool&) = delete;
+		CommandPool& operator=(const CommandPool&) = delete;
+		CommandPool(CommandPool&&) = delete;
+		CommandPool& operator=(CommandPool&&) = delete;
+
 		inline CommandBufferSlotState GetState(uint32_t frameIndex) { return m_CommandStates[frameIndex]; }
 		inline void SetState(uint32_t frameIndex, CommandBufferSlotState state) { m_CommandStates[frameIndex] = state; }
 

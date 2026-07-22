@@ -31,6 +31,7 @@ namespace Lucy {
 	}
 
 	void RenderCommandQueue::RecreateForQueue(TargetQueueFamily family) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommandQueue::RecreateForQueue");
 		auto& recorder = m_CommandLists[family];
 
 		for (auto& [family, cmdLists] : m_CommandLists) {
@@ -48,6 +49,7 @@ namespace Lucy {
 	}
 
 	void RenderCommandQueue::ResetFrameSlotRecordersIfCompleted(uint32_t frameIndex, TargetQueueFamily family) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommandQueue::ResetFrameSlotRecordersIfCompleted");
 		auto& cmdLists = m_CommandLists[family];
 		for (auto& cmdList : cmdLists)
 			cmdList.ResetRenderCommand(frameIndex);
@@ -69,6 +71,7 @@ namespace Lucy {
 	}
 
 	RenderCommandList& RenderCommandQueue::GetNextAvailableCommandList(uint32_t frameIndex, TargetQueueFamily family) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommandQueue::GetNextAvailableCommandList");
 		auto& cmdLists = GetCommandLists(family);
 
 		for (auto& cmdList : cmdLists) {
@@ -80,6 +83,8 @@ namespace Lucy {
 	}
 
 	void RenderCommandQueue::AllocateCommandLists(const RenderSubmitQueue& submitQueue) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommandQueue::AllocateCommandLists");
+		
 		std::array<size_t, static_cast<size_t>(TargetQueueFamily::Count)> batchIndexWithinFamily{};
 
 		for (const auto& [id, info] : submitQueue) {
@@ -98,13 +103,14 @@ namespace Lucy {
 		}
 	}
 
-	void RenderCommandQueue::Clear() {
+	void RenderCommandQueue::ClearSubmitQueue() {
 		m_RenderSubmitQueue.clear();
-		m_RenderCommandQueue.clear();
+		//m_RenderCommandQueue.clear();
 	}
 
 	void RenderCommandQueue::Destroy() {
-		Clear();
+		ClearSubmitQueue();
+		m_RenderCommandQueue.clear();
 
 		for (auto& [family, cmdLists] : m_CommandLists) {
 			for (auto& cmdList : cmdLists)

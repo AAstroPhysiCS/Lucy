@@ -1,13 +1,16 @@
 #pragma once
 
 #include "Core/Base.h"
-#include "Scene/Scene.h"
+#include "Core/RenderPipeline.h"
 
 #include "Renderer/RenderGraph/RenderGraph.h"
 
 namespace Lucy {
 
 	class Image;
+	class Scene;
+
+	struct Event;
 
 	enum class ViewMode : uint8_t {
 		Lit,
@@ -24,7 +27,12 @@ namespace Lucy {
 		RenderPipeline(const RenderPipelineCreateInfo& createInfo);
 		virtual ~RenderPipeline() = default;
 
-		virtual void BeginFrame() = 0;
+		RenderPipeline(const RenderPipeline&) = delete;
+		RenderPipeline& operator=(const RenderPipeline&) = delete;
+		RenderPipeline(RenderPipeline&&) = delete;
+		RenderPipeline& operator=(RenderPipeline&&) = delete;
+
+		virtual void BeginFrame(const Ref<RenderDevice>& device, Ref<Scene>& scene) = 0;
 		virtual void RenderFrame() = 0;
 		virtual void EndFrame() = 0;
 		virtual void OnEvent(Event& e);
@@ -37,12 +45,12 @@ namespace Lucy {
 			m_ViewportHeight = height; 
 		}
 
-		inline auto GetViewportArea() const {
+		auto GetViewportArea() const {
 			struct Size { int32_t Width, Height; };
 			return Size{ m_ViewportWidth, m_ViewportHeight };
 		}
 
-		inline auto GetViewportMousePos() const {
+		auto GetViewportMousePos() const {
 			struct Size { float Width, Height; };
 			return Size{ m_ViewportMouseX, m_ViewportMouseY };
 		}

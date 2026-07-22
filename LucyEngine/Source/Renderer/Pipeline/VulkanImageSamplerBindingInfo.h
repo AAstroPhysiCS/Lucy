@@ -4,8 +4,8 @@
 
 namespace Lucy {
 
-	struct VulkanUniformImageSampler {
-		VulkanUniformImageSampler(uint32_t binding, const std::string& name, DescriptorType descriptorType)
+	struct VulkanImageSamplerBindingInfo {
+		VulkanImageSamplerBindingInfo(uint32_t binding, const std::string& name, DescriptorType descriptorType)
 			: Binding(binding), Name(name), DescriptorType(descriptorType) {}
 
 		uint32_t Binding = 0;

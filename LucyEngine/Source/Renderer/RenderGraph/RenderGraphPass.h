@@ -11,6 +11,8 @@ namespace Lucy {
 	class RenderGraphRegistry;
 	class RenderGraphBuilder;
 
+	class RenderGraphPass;
+
 	enum class RenderGraphExecutionPolicy : uint8_t {
 		Once,
 		Always
@@ -117,6 +119,11 @@ namespace Lucy {
 	public:
 		RenderGraphPass(const RenderGraphPassCreateInfo& createInfo);
 		~RenderGraphPass() = default;
+
+		RenderGraphPass(const RenderGraphPass& other) = delete;
+		RenderGraphPass(RenderGraphPass&& other) noexcept = delete;
+		RenderGraphPass& operator=(const RenderGraphPass& other) = delete;
+		RenderGraphPass& operator=(RenderGraphPass&& other) noexcept = delete;
 
 		void Execute(RenderCommandList& cmdList);
 		void Setup(RenderGraphBuilder& build);

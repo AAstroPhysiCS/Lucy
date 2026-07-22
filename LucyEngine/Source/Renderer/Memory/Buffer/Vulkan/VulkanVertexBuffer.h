@@ -16,6 +16,11 @@ namespace Lucy {
 		VulkanVertexBuffer(size_t size, const Ref<VulkanRenderDevice>& device);
 		virtual ~VulkanVertexBuffer() = default;
 
+		VulkanVertexBuffer(const VulkanVertexBuffer&) = delete;
+		VulkanVertexBuffer& operator=(const VulkanVertexBuffer&) = delete;
+		VulkanVertexBuffer(VulkanVertexBuffer&&) = delete;
+		VulkanVertexBuffer& operator=(VulkanVertexBuffer&&) = delete;
+
 		void RTBind(const VulkanVertexBindInfo& info);
 		void RTLoadToDevice() final override;
 	private:

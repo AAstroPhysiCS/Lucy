@@ -29,8 +29,8 @@ namespace Lucy {
 
 		void Init() final override;
 		void Recreate() final override;
-		RenderContextResultCodes AcquireNextImage(const VulkanSemaphore& currentFrameImageAvailSemaphore, uint32_t& imageIndex) final override;
-		RenderContextResultCodes Present(const VulkanSemaphore& signalSemaphore, uint32_t& imageIndex) final override;
+		RenderContextResultCodes AcquireNextImage(Semaphore* currentFrameImageAvailSemaphore, uint32_t& imageIndex) final override;
+		RenderContextResultCodes Present(Semaphore* signalSemaphore, uint32_t& imageIndex) final override;
 
 		void Destroy() final override;
 

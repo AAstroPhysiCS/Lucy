@@ -10,6 +10,11 @@ namespace Lucy {
 		VulkanUniformBuffer(const UniformBufferCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device);
 		virtual ~VulkanUniformBuffer() = default;
 
+		VulkanUniformBuffer(const VulkanUniformBuffer&) = delete;
+		VulkanUniformBuffer& operator=(const VulkanUniformBuffer&) = delete;
+		VulkanUniformBuffer(VulkanUniformBuffer&&) = delete;
+		VulkanUniformBuffer& operator=(VulkanUniformBuffer&&) = delete;
+
 		void RTLoadToDevice() final override;
 
 		inline VkBuffer GetVulkanBufferHandle(const uint32_t index) { return m_Buffers[index]; }

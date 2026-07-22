@@ -5,11 +5,13 @@
 
 #include "Renderer/Device/VulkanRenderDevice.h"
 
+#include "Renderer/Renderer.h"
+
 namespace Lucy {
 
 	VulkanFrameBuffer::VulkanFrameBuffer(const FrameBufferCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device)
 		: FrameBuffer(createInfo), m_ImageHandles(m_CreateInfo.ImageBufferHandles), m_DepthImageHandle(createInfo.DepthImageHandle), m_VulkanDevice(device) {
-		LUCY_ASSERT(!m_ImageHandles.empty() || m_DepthImageHandle != InvalidRenderResourceHandle, "Imagebuffer and depth is empty!");
+		LUCY_ASSERT(!m_ImageHandles.empty() || m_DepthImageHandle, "Imagebuffer and depth is empty!");
 		
 		RTCreate();
 	}

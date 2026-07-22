@@ -13,6 +13,11 @@ namespace Lucy {
 		VulkanImage2D(const Ref<VulkanImage2D>& other, const Ref<VulkanRenderDevice>& device);
 		virtual ~VulkanImage2D() = default;
 
+		VulkanImage2D(const VulkanImage2D&) = delete;
+		VulkanImage2D& operator=(const VulkanImage2D&) = delete;
+		VulkanImage2D(VulkanImage2D&&) = delete;
+		VulkanImage2D& operator=(VulkanImage2D&&) = delete;
+
 		void RTRecreate(uint32_t width, uint32_t height) final override;
 	private:
 		void RTCreateFromPath();

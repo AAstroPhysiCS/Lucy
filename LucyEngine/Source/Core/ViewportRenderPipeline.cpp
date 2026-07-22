@@ -3,8 +3,12 @@
 
 #include "Renderer/Renderer.h"
 #include "Renderer/RendererPasses.h"
+#include "Renderer/Device/RenderDeviceScene.h"
 
 #include "Utilities/Utilities.h"
+
+#include "Scene/Components.h"
+#include "Scene/Scene.h"
 
 namespace Lucy {
 
@@ -21,8 +25,36 @@ namespace Lucy {
 		Renderer::AddRendererPass<ShadowPass>(scene, 2048);
 	}
 
-	void ViewportRenderPipeline::BeginFrame() {
+	void ViewportRenderPipeline::BeginFrame(const Ref<RenderDevice>& device, Ref<Scene>& scene) {
 		LUCY_PROFILE_NEW_EVENT("ViewportRenderPipeline::BeginFrame");
+
+		auto& deviceScene = device->GetScene();
+
+		scene->ViewForEach<DirectionalLightComponent>([&](DirectionalLightComponent& lightComponent) {
+			RenderDeviceSceneGlobalData::LightValues lightValues{};
+
+			lightValues.Direction = lightComponent.GetDirection();
+			lightValues.Color = lightComponent.GetColor();
+
+			ShadowCamera::ResetSplit();
+
+			auto& shadowCameras = ShadowPass::GetShadowCameras();
+
+			for (size_t i = 0; i < shadowCameras.size(); i++) {
+				ShadowCamera& shadowCamera = shadowCameras[i];
+
+				shadowCamera.SetRotation(lightValues.Direction);
+
+				lightValues.DirLightShadowCascadeSplits[i] = shadowCamera.GetCascadeSplitDepth();
+
+				const auto& vp = shadowCamera.GetCameraViewProjection();
+				lightValues.DirLightShadowMatrices[i] = vp.Proj * vp.View;
+			}
+
+			deviceScene->UpdateLightValues(lightValues);
+		});
+
+		deviceScene->UpdateCamera(scene->GetEditorCamera().GetCameraViewProjection());
 	}
 
 	void ViewportRenderPipeline::RenderFrame() {
@@ -35,6 +67,6 @@ namespace Lucy {
 	}
 
 	Ref<Image> ViewportRenderPipeline::GetOutputImage() {
-		return Renderer::GetOutputOfPass("PBRGeometryPass");
+		return Renderer::GetFrameBufferOutputOfPass("PBRGeometryPass");
 	}
 }

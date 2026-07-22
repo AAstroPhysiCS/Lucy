@@ -17,6 +17,11 @@ namespace Lucy {
 		TaskScheduler(const TaskSchedulerCreateInfo& createInfo);
 		~TaskScheduler();
 
+		TaskScheduler(const TaskScheduler& other) = delete;
+		TaskScheduler(TaskScheduler&& other) noexcept = delete;
+		TaskScheduler& operator=(const TaskScheduler& other) = delete;
+		TaskScheduler& operator=(TaskScheduler&& other) noexcept = delete;
+
 		enum Launch : uint8_t {
 			Async,
 			Deferred

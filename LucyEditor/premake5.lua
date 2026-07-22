@@ -2,7 +2,7 @@ project "LucyEditor"
     location "."
     kind "ConsoleApp"
     language "C++"
-    cppdialect "C++20"
+    cppdialect "C++23"
     staticruntime "off"
 
     targetdir ("../bin/" .. outputdir .. "/%{prj.name}")
@@ -35,7 +35,7 @@ project "LucyEditor"
         "LucyEngine"
     }
 
-    filter "platforms:win64"
+    filter "system:windows"
         systemversion "latest"
 
         defines {

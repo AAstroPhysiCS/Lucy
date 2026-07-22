@@ -23,6 +23,7 @@ namespace Lucy {
 		createInfo.physicalDevice = m_PhysicalDevice;
 		createInfo.device = m_LogicalDevice;
 		createInfo.instance = instance;
+		createInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 
 		LUCY_VK_ASSERT(vmaCreateAllocator(&createInfo, &m_Allocator));
 	}
@@ -33,6 +34,10 @@ namespace Lucy {
 
 	void VulkanAllocator::UnmapMemory(VmaAllocation allocation) {
 		vmaUnmapMemory(m_Allocator, allocation);
+	}
+
+	void VulkanAllocator::Flush(VmaAllocation allocation, VkDeviceSize offset, VkDeviceSize size) {
+		vmaFlushAllocation(m_Allocator, allocation, offset, size);
 	}
 
 	void VulkanAllocator::DestroyBuffer(VkBuffer buffer, VmaAllocation allocation) {
@@ -81,8 +86,8 @@ namespace Lucy {
 		return 0;
 	}
 
-	void VulkanAllocator::CreateVulkanBufferVma(VulkanBufferUsage lucyBufferUsage, VkDeviceSize size, VkBufferUsageFlags usage,
-												VkBuffer& bufferHandle, VmaAllocation& vmaAllocation) {
+	VmaAllocationInfo VulkanAllocator::CreateVulkanBufferVma(VulkanBufferUsage lucyBufferUsage, VkDeviceSize size, VkBufferUsageFlags usage,
+												bool persistentlyMapped, VkBuffer& bufferHandle, VmaAllocation& vmaAllocation) {
 		VkBufferCreateInfo createInfo = VulkanAPI::BufferCreateInfo(size, usage, VK_SHARING_MODE_EXCLUSIVE);
 
 		VmaAllocationCreateInfo vmaCreateInfo{};
@@ -101,16 +106,26 @@ namespace Lucy {
 				vmaCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 				//vmaCreateInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
 				break;
+			case VulkanBufferUsage::CPUToGPU:
+				vmaCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+				vmaCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+				break;
 			case VulkanBufferUsage::Readback:
 				vmaCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
 				vmaCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
 				break;
 		}
 
-		LUCY_VK_ASSERT(vmaCreateBuffer(m_Allocator, &createInfo, &vmaCreateInfo, &bufferHandle, &vmaAllocation, nullptr));
+		if (persistentlyMapped)
+			vmaCreateInfo.flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+		VmaAllocationInfo resultInfo{};
+		LUCY_VK_ASSERT(vmaCreateBuffer(m_Allocator, &createInfo, &vmaCreateInfo, &bufferHandle, &vmaAllocation, &resultInfo));
+
+		return resultInfo;
 	}
 
-	void VulkanAllocator::CreateVulkanImageVma(uint32_t width, uint32_t height, uint32_t mipLevel, VkFormat format, VkImageLayout currentLayout, VkImageUsageFlags usage,
+	VmaAllocationInfo VulkanAllocator::CreateVulkanImageVma(uint32_t width, uint32_t height, uint32_t mipLevel, VkFormat format, VkImageLayout currentLayout, VkImageUsageFlags usage,
 											   VkImageType imageType, VkImage& imageHandle, VmaAllocation& allocationHandle, VkImageCreateFlags flags, uint32_t arrayLayers) {
 		VkImageCreateInfo imageCreateInfo = VulkanAPI::ImageCreateInfo(imageType, { width, height, 1 }, mipLevel, arrayLayers, 
 																	   format, VK_IMAGE_TILING_OPTIMAL, currentLayout, usage, 
@@ -119,6 +134,8 @@ namespace Lucy {
 		allocationCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
 		allocationCreateInfo.flags = 0;
 
-		LUCY_VK_ASSERT(vmaCreateImage(m_Allocator, &imageCreateInfo, &allocationCreateInfo, &imageHandle, &allocationHandle, nullptr));
+		VmaAllocationInfo resultInfo{};
+		LUCY_VK_ASSERT(vmaCreateImage(m_Allocator, &imageCreateInfo, &allocationCreateInfo, &imageHandle, &allocationHandle, &resultInfo));
+		return resultInfo;
 	}
 }

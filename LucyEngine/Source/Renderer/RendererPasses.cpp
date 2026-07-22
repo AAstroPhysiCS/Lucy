@@ -1,9 +1,17 @@
 #include "lypch.h"
 #include "RendererPasses.h"
 
+#include "Scene/Scene.h"
+
 #include "Renderer.h"
+
+#include "RenderGraph/RenderGraph.h"
 #include "RenderGraph/RenderGraphBuilder.h"
 #include "RenderGraph/RenderGraphRegistry.h"
+
+#include "Device/RenderDeviceScene.h"
+
+#include "Image/Image.h"
 
 #include "Memory/Buffer/Buffer.h"
 #include "Memory/Buffer/PushConstant.h"
@@ -13,15 +21,6 @@
 #include "Scene/Components.h"
 
 namespace Lucy {
-
-	/*
-	TODO:
-		Material should indicate which shader we gonna render on to
-		Group meshes by material / shader. And loop it through.
-		with that we can bind image handle to accordingly and with no performance drop
-
-		we have to separate mesh and materials. materials should set each thing
-	*/
 
 #pragma region ForwardPBRPass
 
@@ -56,8 +55,6 @@ namespace Lucy {
 
 			build.ReadImage(RGResource(ShadowImages), RenderGraphResourceAccess::ShaderSampledRead);
 			build.ReadExternalImage(RGResource(BRDFLutImage), RenderGraphResourceAccess::ShaderSampledRead);
-			//build.ReadImage(RGResource(PrefilterImage), RenderGraphResourceAccess::ShaderSampledRead);
-			//build.ReadImage(RGResource(IrradianceImage), RenderGraphResourceAccess::ShaderSampledRead);
 
 			build.BindRenderTarget(RGResource(GeometryImage), RGResource(GeometryDepthImage));
 
@@ -65,64 +62,61 @@ namespace Lucy {
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("PBRGeometryPipeline");
 				const auto& settings = Renderer::GetRendererSettings();
 
-				m_Scene->ViewForEach<DirectionalLightComponent>([&](DirectionalLightComponent& lightComponent) {
-					const auto& lightningAttributes = pipeline->GetUniformBufferIfExists("LightValues");
-					lightningAttributes->SetData((uint8_t*)&lightComponent, sizeof(DirectionalLightComponent));
+				RenderCommand& draw = cmdList.BeginRenderCommand("PBRForwardPass");
+				draw.BindPipeline(pipeline);
 
-					glm::vec4 shadowCameraFarPlanes;
+				uint32_t shadowImagesIndex = draw.BindImageHandleTo("TextureArrays2D_Float2", registry.GetImage(RGResource(ShadowImages)));
+				uint32_t brdfImageIndex = draw.BindImageHandleTo("Textures2D_Float2", registry.GetImage(RGResource(BRDFLutImage)));
 
-					ShadowCamera::ResetSplit();
-
-					auto& shadowCameras = ShadowPass::GetShadowCameras();
-					for (size_t i = 0; ShadowCamera& shadowCamera : shadowCameras) {
-						shadowCamera.SetRotation(lightComponent.GetDirection());
-
-						shadowCameraFarPlanes[i++] = shadowCamera.GetCascadeSplitDepth();
-
-						const auto& vp = shadowCamera.GetCameraViewProjection();
-						glm::mat4 shadowCameraMatrix = vp.Proj * vp.View;
-						lightningAttributes->Append((uint8_t*)&shadowCameraMatrix, sizeof(glm::mat4));
-					}
-
-					lightningAttributes->Append((uint8_t*)&shadowCameraFarPlanes, sizeof(glm::vec4));
-				});
-
-				pipeline->BindImageHandleTo("u_ShadowMap", registry.GetImage(RGResource(ShadowImages)));
-				pipeline->BindImageHandleTo("u_BRDFLut", registry.GetImage(RGResource(BRDFLutImage)));
+				uint32_t irradianceIndex = INVALID_INDEX;
 
 				bool imageBound = false;
 
-				m_Scene->ViewForEach<HDRCubemapComponent>([&pipeline, &registry, &imageBound, &settings](const HDRCubemapComponent& hdrComponent) {
+				m_Scene->ViewForEach<HDRCubemapComponent>([&draw, &registry, &irradianceIndex, &imageBound, &settings](const HDRCubemapComponent& hdrComponent) {
 					if (!hdrComponent.IsPrimary || imageBound)
 						return;
 #if USE_COMPUTE_FOR_CUBEMAP_GEN
-					pipeline->BindImageHandleTo("u_IrradianceMap", hdrComponent.GetIrradianceImage());
+					irradianceIndex = draw.BindImageHandleTo("StorageTextureArrays2D", hdrComponent.GetIrradianceImage());
 #else
-					pipeline->BindImageHandleTo("u_IrradianceMap", registry.GetImage(RGResource(IrradianceImage)));
+					irradianceIndex = draw.BindImageHandleTo("StorageTextureArrays2D", registry.GetImage(RGResource(IrradianceImage)));
 #endif
-					pipeline->BindImageHandleTo("u_PrefilterMap", registry.GetImage(RGResource(PrefilterImage)));
 					imageBound = true;
 				});
 
-				if (!pipeline->HasImageHandleBoundTo("u_IrradianceMap"))
-					pipeline->BindImageHandleTo("u_IrradianceMap", Renderer::GetBlankCubeImage());
+				uint32_t prefilterIndex = draw.BindImageHandleTo("StorageTextureArrays2D", registry.GetImage(RGResource(PrefilterImage)));
 
-				if (!pipeline->HasImageHandleBoundTo("u_PrefilterMap"))
-					pipeline->BindImageHandleTo("u_PrefilterMap", Renderer::GetBlankCubeImage());
+				if (prefilterIndex == INVALID_INDEX)
+					prefilterIndex = draw.BindImageHandleTo("CubeTextures", Renderer::GetBlankCubeImage());
+				if (irradianceIndex == INVALID_INDEX)
+					irradianceIndex = draw.BindImageHandleTo("CubeTextures", Renderer::GetBlankCubeImage());
 
-				if (auto cameraBuffer = pipeline->GetUniformBufferIfExists("Camera")) {
-					auto vp = m_Scene->GetEditorCamera().GetCameraViewProjection();
-					cameraBuffer->SetData((uint8_t*)&vp, sizeof(vp));
-				}
-
-				RenderCommand& draw = cmdList.BeginRenderCommand("PBRForwardPass");
-
-				draw.BindPipeline(pipeline);
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
 
+				RenderDeviceTextureResource env[4] = {
+					{ .TextureIndex = irradianceIndex, .SamplerIndex = 0 },
+					{ .TextureIndex = prefilterIndex, .SamplerIndex = 0 },
+					{ .TextureIndex = shadowImagesIndex, .SamplerIndex = 0 },
+					{ .TextureIndex = brdfImageIndex, .SamplerIndex = 0 }
+				};
+
+				struct LocalPushConstant {
+					glm::mat4 ModelMatrix;
+					glm::mat4 ModelMatrixInversedTransposed;
+					uint32_t MaterialID;
+					RenderDeviceTextureResource PBRTextureResources[4];
+					uint32_t Padding[3]{};
+				};
+
 				m_Scene->ViewRForEach<MeshComponent, TransformComponent>([&](MeshComponent& meshComponent, TransformComponent& transformComponent) {
-					draw.DrawIndexedMeshWithMaterial(meshComponent.GetMesh(), transformComponent.GetMatrix());
+					draw.DrawIndexedMeshWithPushConstant<LocalPushConstant>(meshComponent.GetMesh(), transformComponent.GetMatrix(),
+						[env](LocalPushConstant& data, const Submesh& submesh, const glm::mat4& finalTransform) {
+						data.ModelMatrix = finalTransform;
+						data.ModelMatrixInversedTransposed = glm::transpose(glm::inverse(finalTransform));
+						data.MaterialID = submesh.MaterialID.Index;
+
+						memcpy(data.PBRTextureResources, env, sizeof(env));
+					});
 				});
 
 				cmdList.EndRenderCommand();
@@ -155,18 +149,20 @@ namespace Lucy {
 			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("IDPipeline");
 
-				if (auto cameraBuffer = pipeline->GetUniformBufferIfExists("Camera")) {
-					auto vp = m_Scene->GetEditorCamera().GetCameraViewProjection();
-					cameraBuffer->SetData((uint8_t*)&vp, sizeof(vp));
-				}
-
 				RenderCommand& draw = cmdList.BeginRenderCommand("IDPass");
 				draw.BindPipeline(pipeline);
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
 
+				struct LocalPushConstant {
+					glm::mat4 ModelMatrix;
+				};
+
 				m_Scene->ViewRForEach<MeshComponent, TransformComponent>([&](MeshComponent& meshComponent, TransformComponent& transformComponent) {
-					draw.DrawIndexedMeshWithMaterial(meshComponent.GetMesh(), transformComponent.GetMatrix());
+					draw.DrawIndexedMeshWithPushConstant<LocalPushConstant>(meshComponent.GetMesh(), transformComponent.GetMatrix(),
+						[](LocalPushConstant& data, const Submesh& submesh, const glm::mat4& finalTransform) {
+						data.ModelMatrix = finalTransform;
+					});
 				});
 
 				cmdList.EndRenderCommand();
@@ -215,28 +211,20 @@ namespace Lucy {
 			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("VSMPipeline");
 
-				if (auto cameraBuffer = pipeline->GetUniformBufferIfExists("ShadowCameraVPs")) {
-					glm::mat4 projMatrix[NUM_CASCADES];
-
-					ShadowCamera::ResetSplit();
-					for (size_t i = 0; ShadowCamera& shadowCamera : s_ShadowCameras) {
-						shadowCamera.Update();
-
-						const auto& vp = shadowCamera.GetCameraViewProjection();
-						projMatrix[i] = vp.Proj * vp.View;
-						i++;
-					}
-
-					cameraBuffer->SetData((uint8_t*)&projMatrix, sizeof(projMatrix));
-				}
-
 				RenderCommand& draw = cmdList.BeginRenderCommand("VSM Draw");
 				draw.BindPipeline(pipeline);
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
 
+				struct LocalPushConstant {
+					glm::mat4 ModelMatrix;
+				};
+
 				m_Scene->ViewRForEach<MeshComponent, TransformComponent>([&](MeshComponent& meshComponent, TransformComponent& transformComponent) {
-					draw.DrawIndexedMesh(meshComponent.GetMesh(), transformComponent.GetMatrix());
+					draw.DrawIndexedMeshWithPushConstant<LocalPushConstant>(meshComponent.GetMesh(), transformComponent.GetMatrix(), 
+						[](LocalPushConstant& data, const Submesh& submesh, const glm::mat4& finalTransform) {
+						data.ModelMatrix = finalTransform;
+					});
 				});
 
 				cmdList.EndRenderCommand();
@@ -262,18 +250,33 @@ namespace Lucy {
 			RenderCommand& cmd = cmdList.BeginRenderCommand(direction == GaussianBlurDirection::Horizontal ? "VSMHorizontalBlur" : "VSMVerticalBlur");
 			cmd.BindPipeline(blurPipeline);
 
+			struct BlurData {
+				int32_t BlurData[4];            // x, y, width, height
+				uint32_t TextureIndicesData[4]; // x: input texture index, y: output texture index, z: sampler index, w: unused
+			};
+
 			if (direction == GaussianBlurDirection::Horizontal) {
-				int32_t dir[4] = { 1, 0, width, height };
-				pushConstant.SetData(reinterpret_cast<uint8_t*>(&dir), sizeof(dir));
+				uint32_t inputIndex = cmd.BindImageHandleTo("TextureArrays2D_Float2", shadowImages);
+				uint32_t outputIndex = cmd.BindImageHandleTo("StorageTextureArrays2D_Float2", shadowImagesBlurred);
+				uint32_t samplerIndex = 0; //TODO:
 
-				blurPipeline->BindImageHandleTo("u_InputMoments", shadowImages);
-				blurPipeline->BindImageHandleTo("u_OutputMoments", shadowImagesBlurred);
+				BlurData data = {
+					.BlurData = { 1, 0, width, height },
+					.TextureIndicesData = { inputIndex, outputIndex, samplerIndex, 0 }
+				};
+
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&data), sizeof(data));
 			} else {
-				int32_t dir[4] = { 0, 1, width, height };
-				pushConstant.SetData(reinterpret_cast<uint8_t*>(&dir), sizeof(dir));
+				uint32_t inputIndex = cmd.BindImageHandleTo("TextureArrays2D_Float2", shadowImagesBlurred);
+				uint32_t outputIndex = cmd.BindImageHandleTo("StorageTextureArrays2D_Float2", shadowImages);
+				uint32_t samplerIndex = 0;
 
-				blurPipeline->BindImageHandleTo("u_InputMoments", shadowImagesBlurred);
-				blurPipeline->BindImageHandleTo("u_OutputMoments", shadowImages);
+				BlurData data = {
+					.BlurData = { 0, 1, width, height },
+					.TextureIndicesData = { inputIndex, outputIndex, samplerIndex, 0 }
+				};
+
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&data), sizeof(data));
 			}
 
 			cmd.UpdateDescriptorSets();
@@ -476,32 +479,41 @@ namespace Lucy {
 				const auto& settings = Renderer::GetRendererSettings();
 
 				bool imageBound = false;
+				const Ref<Mesh>& cubeMesh = Renderer::GetEnvCubeMesh();
 
-				m_Scene->ViewForEach<HDRCubemapComponent>([&pipeline, &imageBound, &registry](const HDRCubemapComponent& hdrComponent) {
+				RenderCommand& draw = cmdList.BeginRenderCommand("Skybox Draw");
+				draw.BindPipeline(pipeline);
+
+				uint32_t index = INVALID_INDEX;
+
+				m_Scene->ViewForEach<HDRCubemapComponent>([&imageBound, &index, &draw, &registry](const HDRCubemapComponent& hdrComponent) {
 					if (!hdrComponent.IsPrimary || imageBound)
 						return;
-					pipeline->BindImageHandleTo("u_EnvironmentMap", registry.GetImage(RGResource(PrefilterImage)));
+					index = draw.BindImageHandleTo("CubeTextures", registry.GetImage(RGResource(PrefilterImage)));
 					imageBound = true;
 				});
 
-				if (!pipeline->HasImageHandleBoundTo("u_EnvironmentMap"))
+				if (!imageBound) {
+					cmdList.EndRenderCommand();
 					return;
-
-				if (auto cameraBuffer = pipeline->GetUniformBufferIfExists("Camera")) {
-					const auto& vp = m_Scene->GetEditorCamera().GetCameraViewProjection();
-					cameraBuffer->SetData((uint8_t*)&vp, sizeof(vp));
 				}
 
-				if (auto paramBuffer = pipeline->GetUniformBufferIfExists("Params")) {
-					paramBuffer->SetData((uint8_t*)&settings.EnvironmentLOD, sizeof(float));
-				}
+				struct LocalPushConstant {
+					glm::uvec3 Data; // x: environment map index, y: sampler index, z: mip level
+				};
 
-				const Ref<Mesh>& cubeMesh = Renderer::GetEnvCubeMesh();
-				RenderCommand& draw = cmdList.BeginRenderCommand("Skybox Draw");
+				GlobalPushConstant<LocalPushConstant> pushConstantData {
+					draw.GetGlobalBufferAddress(),
+					0,
+					{ .Data = { index, 0, settings.EnvironmentLOD } }
+				};
 
-				draw.BindPipeline(pipeline);
+				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
+				draw.BindPushConstant(pushConstant);
 				draw.DrawMesh(cubeMesh);
 
 				cmdList.EndRenderCommand();
@@ -525,25 +537,39 @@ namespace Lucy {
 			build.BindRenderTarget(RGResource(HDRLayeredImage));
 
 			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
-				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("HDRImageToLayeredImageConvertPipeline");
+				static const glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
 
-				pipeline->BindImageHandleTo("u_EquirectangularMap", registry.GetImage(RGResource(OriginalHDRImage)));
+				struct LocalPushConstant {
+					glm::mat4 CaptureProjection;
+					glm::vec2 Data;
+				};
+
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("HDRImageToLayeredImageConvertPipeline");
 
 				const auto& cubeMesh = Renderer::GetEnvCubeMesh();
 				const uint32_t cubeMeshIndexCount = Renderer::GetEnvCubeMeshIndexCount();
 
 				RenderCommand& draw = cmdList.BeginRenderCommand("Cubemap Prep Draw");
 				draw.BindPipeline(pipeline);
+
+				uint32_t originalHDRImageIndex = draw.BindImageHandleTo("Textures2D", registry.GetImage(RGResource(OriginalHDRImage)));
+
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
 				draw.BindBuffers(cubeMesh);
 
-				static const glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+				GlobalPushConstant<LocalPushConstant> localPushConstant{
+					.Root = draw.GetGlobalBufferAddress(),
+					.Data = {
+						.CaptureProjection = captureProjection, 
+						.Data = { originalHDRImageIndex, 0 } 
+					}
+				};
 
 				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
 
 				ByteBuffer pushConstantData;
-				pushConstantData.SetData((uint8_t*)&captureProjection, sizeof(captureProjection));
+				pushConstantData.SetData((uint8_t*)&localPushConstant, sizeof(localPushConstant));
 				pushConstant.SetData(pushConstantData);
 
 				for (uint32_t i = 0; i < 6; i++) {
@@ -573,6 +599,8 @@ namespace Lucy {
 			build.WriteImage(RGResource(IrradianceImage), RenderGraphResourceAccess::StorageWrite);
 
 			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+				static const glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+				
 				static constexpr const uint32_t layerCount = 6;
 				static constexpr const uint32_t workGroupSize = 8;
 
@@ -582,16 +610,34 @@ namespace Lucy {
 				const auto& irradianceImage = registry.GetImage(RGResource(IrradianceImage));
 
 				RenderCommand& draw = cmdList.BeginRenderCommand("Irradiance Draw Compute");
+				draw.BindPipeline(pipeline);
+
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+
+				uint32_t layeredImageIndex = draw.BindImageHandleTo("CubeTextures", cubeImage);
+				uint32_t irradianceImageIndex = draw.BindImageHandleTo("StorageTextureArrays2D", irradianceImage);
+
+				struct LocalPushConstant {
+					glm::mat4 ProjMatrix;
+					glm::vec4 Data; // x: size, y: sampler index, z: environment map index, w: environment irradiance compute index
+				};
+
+				GlobalPushConstant<LocalPushConstant> pushConstantData{
+					.Root = draw.GetGlobalBufferAddress(),
+					.Data = {
+						.ProjMatrix = captureProjection,
+						.Data = { m_Size, 0, layeredImageIndex, irradianceImageIndex, }
+					}
+				};
+
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
 
 				//draw.SetImageLayout(cubeImage, VK_IMAGE_LAYOUT_GENERAL, 0, 0, 1, layerCount);
 				//draw.SetImageLayout(irradianceImage, VK_IMAGE_LAYOUT_GENERAL, 0, 0, 1, layerCount);
 
-				pipeline->BindImageHandleTo("u_EnvironmentMapCompute", cubeImage);
-				pipeline->BindImageHandleTo("u_EnvironmentIrradianceMapCompute", irradianceImage);
-
-				draw.BindPipeline(pipeline);
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
+				draw.BindPushConstant(pushConstant);
 				draw.DispatchCompute(m_Size / workGroupSize, m_Size / workGroupSize, layerCount);
 
 				//draw.SetImageLayout(cubeImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, 1, layerCount);
@@ -626,7 +672,7 @@ namespace Lucy {
 				RenderCommand& draw = cmdList.BeginRenderCommand("Irradiance Draw");
 				const auto& environmentMap = registry.GetImage(RGResource(HDRLayeredImage));
 
-				pipeline->BindImageHandleTo("u_EnvironmentMap", environmentMap);
+				pipeline->BindGlobalImageHandleTo("u_EnvironmentMap", environmentMap);
 
 				draw.BindPipeline(pipeline);
 				draw.UpdateDescriptorSets();
@@ -665,24 +711,39 @@ namespace Lucy {
 			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("PrefilterComputePipeline");
 
-				static constexpr const uint32_t workGroupSize = 8;
+				static constexpr uint32_t workGroupSize = 8;
 				
-				pipeline->BindImageHandleTo("u_EnvironmentMap", registry.GetImage(RGResource(HDRLayeredImage)));
+				struct LocalPushConstant {
+					glm::vec4 PrefilterParams; // x: sizeX, y: sizeY, z: roughness, w: mip
+					glm::uvec3 TextureData;    // x: environment map index, y: prefilter map index, z: sampler index
+				};
 
 				RenderCommand& cmd = cmdList.BeginRenderCommand("Prefilter Draw Compute");
 				cmd.BindPipeline(pipeline);
 
-				for (size_t mip = 0; mip < MAX_MIP_LEVELS; mip++) {
-					pipeline->BindImageHandleTo("u_EnvironmentPrefilterMapOut", registry.GetImage(RGResource(PrefilterImage)), mip);
+				uint32_t layeredImageIndex = cmd.BindImageHandleTo("CubeTextures", registry.GetImage(RGResource(HDRLayeredImage)));
+
+				std::array<uint32_t, MAX_MIP_LEVELS> prefilterImageIndices{};
+				for (uint32_t mip = 0; mip < MAX_MIP_LEVELS; mip++) {
+					prefilterImageIndices[mip] = cmd.BindImageHandleTo("StorageTextureArrays2D", registry.GetImage(RGResource(PrefilterImage)), mip);
 				}
+
 				cmd.UpdateDescriptorSets();
 				cmd.BindAllDescriptorSets();
 
 				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
 				for (uint32_t mip = 0; mip < MAX_MIP_LEVELS; mip++) {
 					const uint32_t mipSize = std::max(1u, m_CubemapSize >> mip);
-					glm::vec4 prefilterParams = glm::vec4(mipSize, mipSize, mip / float(MAX_MIP_LEVELS - 1), mip);
-					pushConstant.SetData((uint8_t*)&prefilterParams, sizeof(glm::vec4));
+
+					GlobalPushConstant<LocalPushConstant> params{
+						.Root = cmd.GetGlobalBufferAddress(),
+						.Data = {
+							.PrefilterParams = glm::vec4(mipSize, mipSize, mip / float(MAX_MIP_LEVELS - 1), mip),
+							.TextureData = { layeredImageIndex, prefilterImageIndices[mip], 0}
+						}
+					};
+
+					pushConstant.SetData((uint8_t*)&params, sizeof(params));
 
 					const uint32_t groupsX = (mipSize + workGroupSize - 1) / workGroupSize;
 					const uint32_t groupsY = (mipSize + workGroupSize - 1) / workGroupSize;
@@ -711,16 +772,28 @@ namespace Lucy {
 			build.WriteExternalImage(RGResource(BRDFLutImage), RenderGraphResourceAccess::StorageWrite);
 
 			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
-				static constexpr const uint32_t workGroupSize = 8;
+				static constexpr uint32_t workGroupSize = 8;
 
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("BRDFLutComputePipeline");
 				const auto& brdfLutImage = registry.GetImage(RGResource(BRDFLutImage));
 
 				RenderCommand& draw = cmdList.BeginRenderCommand("BRDFLut Draw Compute");
-
-				pipeline->BindImageHandleTo("u_BRDFLut", brdfLutImage);
-
 				draw.BindPipeline(pipeline);
+
+				struct LocalPushConstant {
+					glm::uvec4 u_BRDFData;           // x: width, y: height, z: input texture index, w: unused
+				};
+
+				uint32_t brdfIndex = draw.BindImageHandleTo("StorageTextures2D_Float2", brdfLutImage);
+
+				LocalPushConstant pushConstantData {
+					{ m_Size, m_Size, brdfIndex, 0 }
+				};
+
+				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				draw.BindPushConstant(pushConstant);
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
 				draw.DispatchCompute(m_Size / workGroupSize, m_Size / workGroupSize, 1);

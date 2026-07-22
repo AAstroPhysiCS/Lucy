@@ -1,18 +1,15 @@
 #pragma once
 
-#include "Utilities/UUID.h"
+#include <any>
 
-#include "Renderer/Device/RenderResource.h"
+#include "Renderer/Device/RenderDeviceResource.h"
+#include "Renderer/Device/RenderDeviceHandles.h"
 
 namespace Lucy {
 
 	class RenderDevice;
 	class Image;
 	class Pipeline;
-
-	using MaterialID = float;
-
-	using MaterialIDProvider = IDProvider<MaterialID>;
 
 	enum class MaterialType {
 		PBR,
@@ -22,9 +19,8 @@ namespace Lucy {
 	};
 
 	struct MaterialCreateInfo {
-		MaterialID MaterialID = InvalidID<float>;
+		RenderDeviceObjectHandle MaterialDeviceID{};
 		MaterialType MaterialType = MaterialType::PBR;
-		Ref<Pipeline> Pipeline = nullptr;
 	};
 
 	struct MaterialImageType {
@@ -36,27 +32,34 @@ namespace Lucy {
 	public:
 		Material(const MaterialCreateInfo& createInfo);
 		virtual ~Material() = default;
-		virtual void Update() = 0;
+
+		Material(const Material&) = delete;
+		Material& operator=(const Material&) = delete;
+		Material(Material&&) = delete;
+		Material& operator=(Material&&) = delete;
+
+		virtual std::any BuildRenderData(const Ref<RenderDevice>& device) = 0;
 		virtual void RTDestroyResource() = 0;
 
-		inline MaterialID GetMaterialID() const { return m_MaterialID; }
-		inline MaterialType GetMaterialType() const { return m_MaterialType; }
-		inline Ref<Pipeline> GetPipeline() const { return m_Pipeline; }
+		inline RenderDeviceObjectHandle GetMaterialDeviceID() const { return m_MaterialDeviceID; }
+		inline RenderDeviceObjectHandle& GetMaterialDeviceID() { return m_MaterialDeviceID; }
 
-		virtual void SetTexture(const MaterialImageType& type, RenderResourceHandle textureHandle) = 0;
+		inline MaterialType GetMaterialType() const { return m_MaterialType; }
+
+		virtual void SetTexture(const MaterialImageType& type, RenderDeviceResourceHandle textureHandle) = 0;
 		
 		Ref<Image> GetImage(const MaterialImageType& type) const;
 		bool HasImage(const MaterialImageType& type) const;
 	protected:
-		void AddTexture(size_t pos, RenderResourceHandle textureHandle);
+		void AddTexture(size_t pos, RenderDeviceResourceHandle textureHandle);
 
-		inline const std::vector<RenderResourceHandle>& GetAllTextureHandles() const { return m_TextureHandles; }
-		inline RenderResourceHandle GetTextureHandle(size_t index) const { return m_TextureHandles.at(index); }
+		inline std::vector<RenderDeviceResourceHandle>& GetAllTextureHandles() { return m_TextureHandles; }
+		inline const std::vector<RenderDeviceResourceHandle>& GetAllTextureHandles() const { return m_TextureHandles; }
+		inline RenderDeviceResourceHandle GetTextureHandle(size_t index) const { return m_TextureHandles.at(index); }
 	private:
-		MaterialID m_MaterialID = InvalidID<MaterialID>;
+		RenderDeviceObjectHandle m_MaterialDeviceID{};
 		MaterialType m_MaterialType = MaterialType::PBR;
-		Ref<Pipeline> m_Pipeline = nullptr;
 
-		std::vector<RenderResourceHandle> m_TextureHandles;
+		std::vector<RenderDeviceResourceHandle> m_TextureHandles;
 	};
 }

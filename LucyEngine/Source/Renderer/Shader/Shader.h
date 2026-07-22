@@ -4,6 +4,8 @@
 
 namespace Lucy {
 
+	class RenderDevice;
+
 	enum class ShaderStageType {
 		Vertex = 1 << 0,
 		Fragment = 1 << 1,

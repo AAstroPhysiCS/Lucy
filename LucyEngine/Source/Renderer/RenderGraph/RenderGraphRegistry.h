@@ -3,12 +3,13 @@
 #include <variant>
 
 #include "Renderer/Memory/Memory.h"
-#include "Renderer/Device/RenderResource.h"
+#include "Renderer/Device/RenderDeviceResource.h"
 #include "Renderer/RenderPass.h"
 
 #include "RenderGraphResource.h"
 
 namespace Lucy {
+
     class Image;
 
     enum class RGResourceType : uint8_t {
@@ -29,7 +30,7 @@ namespace Lucy {
     using RGResourceData = std::variant<RGImageData, RGBufferData>;
 
     struct RGResourceEntry {
-        RenderResourceHandle ResourceHandle;
+        RenderDeviceResourceHandle ResourceHandle;
         RGResourceType Type = RGResourceType::Internal;
         RGResourceData Data;
 
@@ -53,21 +54,26 @@ namespace Lucy {
         RenderGraphRegistry() = default;
         ~RenderGraphRegistry() = default;
 
+        RenderGraphRegistry(const RenderGraphRegistry& other) = delete;
+        RenderGraphRegistry(RenderGraphRegistry&& other) noexcept = delete;
+        RenderGraphRegistry& operator=(const RenderGraphRegistry& other) = delete;
+        RenderGraphRegistry& operator=(RenderGraphRegistry&& other) noexcept = delete;
+
         void Flush();
 
-        void ImportExternalResource(const RenderGraphResource& rgResource, RenderResourceHandle handle);
-        void ImportExternalTransientResource(const RenderGraphResource& rgResource, RenderResourceHandle handle);
+        void ImportExternalResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle);
+        void ImportExternalTransientResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle);
 
-        void DeclareImage(const RenderGraphResource& rgResource, RenderResourceHandle handle, const RGImageData& imageData);
-        void DeclareBuffer(const RenderGraphResource& rgResource, RenderResourceHandle handle, const RGBufferData& bufferData);
+        void DeclareImage(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle, const RGImageData& imageData);
+        void DeclareBuffer(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle, const RGBufferData& bufferData);
 
         [[nodiscard]] bool Contains(const RenderGraphResource& rgResource) const;
 
         [[nodiscard]] Ref<Image> GetImage(const RenderGraphResource& rgResource);
         [[nodiscard]] Ref<Image> GetImage(const RenderGraphResource& rgResource) const;
 
-        [[nodiscard]] Ref<RenderResource> GetBuffer(const RenderGraphResource& rgResource);
-        [[nodiscard]] Ref<RenderResource> GetBuffer(const RenderGraphResource& rgResource) const;
+        [[nodiscard]] Ref<RenderDeviceResource> GetBuffer(const RenderGraphResource& rgResource);
+        [[nodiscard]] Ref<RenderDeviceResource> GetBuffer(const RenderGraphResource& rgResource) const;
     private:
         [[nodiscard]] RGResourceEntry& GetResourceEntry(const RenderGraphResource& rgResource) { return m_Resources.at(rgResource); }
         [[nodiscard]] const RGResourceEntry& GetResourceEntry(const RenderGraphResource& rgResource) const { return m_Resources.at(rgResource); }

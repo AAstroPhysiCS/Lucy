@@ -4,19 +4,21 @@
 #include "GraphicsPipeline.h"
 #include "ComputePipeline.h"
 
+#include "Renderer/Renderer.h"
+
 namespace Lucy {
 
 	PipelineManager::PipelineManager(const Ref<RenderDevice>& device) 
 		: m_RenderDevice(device) {
 	}
 
-	RenderResourceHandle PipelineManager::CreateGraphicsPipeline(const std::string& name, const GraphicsPipelineCreateInfo& createInfo) {
+	RenderDeviceResourceHandle PipelineManager::CreateGraphicsPipeline(const std::string& name, const GraphicsPipelineCreateInfo& createInfo) {
 		auto [tuple, success] = m_GraphicsPipelines.try_emplace(name, m_RenderDevice->CreateGraphicsPipeline(createInfo));
 		LUCY_ASSERT(success);
 		return tuple->second;
 	}
 
-	RenderResourceHandle PipelineManager::CreateComputePipeline(const std::string& name, const ComputePipelineCreateInfo& createInfo) {
+	RenderDeviceResourceHandle PipelineManager::CreateComputePipeline(const std::string& name, const ComputePipelineCreateInfo& createInfo) {
 		auto [tuple, success] = m_ComputePipelines.try_emplace(name, m_RenderDevice->CreateComputePipeline(createInfo));
 		LUCY_ASSERT(success);
 		return tuple->second;
@@ -46,13 +48,13 @@ namespace Lucy {
 
 	void PipelineManager::DestroyPipeline(const std::string& name) {
 		if (m_GraphicsPipelines.contains(name)) {
-			RenderResourceHandle handle = m_GraphicsPipelines.at(name);
+			RenderDeviceResourceHandle handle = m_GraphicsPipelines.at(name);
 			m_RenderDevice->RTDestroyResource(handle);
 			m_GraphicsPipelines.erase(name);
 			return;
 		}
 		LUCY_ASSERT(m_ComputePipelines.contains(name), "Destroying pipeline that does not exist in the cache!");
-		RenderResourceHandle handle = m_ComputePipelines.at(name);
+		RenderDeviceResourceHandle handle = m_ComputePipelines.at(name);
 		m_RenderDevice->RTDestroyResource(handle);
 		m_ComputePipelines.erase(name);
 	}

@@ -2,6 +2,8 @@
 
 #include "vulkan/vulkan.h"
 
+#include "Renderer/Descriptors/DescriptorType.h"
+
 namespace Lucy {
 
 	struct VulkanDescriptorPoolCreateInfo {
@@ -16,8 +18,21 @@ namespace Lucy {
 		VulkanDescriptorPool(const VulkanDescriptorPoolCreateInfo& createInfo);
 		~VulkanDescriptorPool() = default;
 
+		VulkanDescriptorPool(const VulkanDescriptorPool&) = delete;
+		VulkanDescriptorPool& operator=(const VulkanDescriptorPool&) = delete;
+		VulkanDescriptorPool(VulkanDescriptorPool&&) = delete;
+		VulkanDescriptorPool& operator=(VulkanDescriptorPool&&) = delete;
+
 		void RTDestroyResource();
 
+		inline size_t GetPoolSizeMax(DescriptorType type) const {
+			auto it = std::ranges::find_if(m_CreateInfo.PoolSizesVector, [&](const VkDescriptorPoolSize& size) {
+				return size.type == ConvertDescriptorType(type);
+			});
+			if (it != m_CreateInfo.PoolSizesVector.end())
+				return it->descriptorCount;
+			return 0;
+		}
 		inline VkDescriptorPool GetVulkanHandle() const noexcept { return m_DescriptorPool; }
 	private:
 		void RTCreate();

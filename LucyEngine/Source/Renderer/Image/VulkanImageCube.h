@@ -10,6 +10,11 @@ namespace Lucy {
 		VulkanImageCube(const ImageCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device, std::string_view debugName);
 		virtual ~VulkanImageCube() = default;
 
+		VulkanImageCube(const VulkanImageCube&) = delete;
+		VulkanImageCube& operator=(const VulkanImageCube&) = delete;
+		VulkanImageCube(VulkanImageCube&&) = delete;
+		VulkanImageCube& operator=(VulkanImageCube&&) = delete;
+
 		void RTRecreate(uint32_t width, uint32_t height) final override;
 	private:
 		void RTCreateFromPath();

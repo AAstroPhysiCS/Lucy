@@ -1,3 +1,4 @@
+#include "LucyResource.slang"
 struct VertexInput {
     [[vk::location(0)]] float3 a_Pos : POSITION;
 };
@@ -7,33 +8,32 @@ struct VertexOutput {
     [[vk::location(0)]] float3 a_PosOut : POSITION0;
 };
 
-struct LucyCamera {
-    float4x4 u_ViewMatrix;
-    float4x4 u_ProjMatrix;
-    float4 u_CamPos;
+struct LocalPushConstant {
+    uint3 u_Data; // x: environment map index, y: sampler index, z: mip level
 };
 
-[[vk::binding(0, 0)]]
-ConstantBuffer<LucyCamera> Camera;
+[vk::push_constant]
+PushConstantGlobal<LocalPushConstant> PushConstants;
 
 [shader("vertex")]
 VertexOutput main(VertexInput input) {
+    SceneCamera camera = PushConstants.Root->Camera;
+
     VertexOutput output;
-    
     output.a_PosOut = input.a_Pos;
     output.a_PosOut.xy *= -1.0f;
 
     float4 posWorld = float4(input.a_Pos, 1.0);
 
     float4x4 viewMatrix = float4x4(
-        float4(Camera.u_ViewMatrix[0].xyz, 0.0f),
-        float4(Camera.u_ViewMatrix[1].xyz, 0.0f),
-        float4(Camera.u_ViewMatrix[2].xyz, 0.0f),
+        float4(camera.u_ViewMatrix[0].xyz, 0.0f),
+        float4(camera.u_ViewMatrix[1].xyz, 0.0f),
+        float4(camera.u_ViewMatrix[2].xyz, 0.0f),
         float4(0.0f, 0.0f, 0.0f, 1.0f)
     );
 
     float4 posView = mul(viewMatrix, posWorld);
-    float4 posClip = mul(Camera.u_ProjMatrix, posView);
+    float4 posClip = mul(camera.u_ProjMatrix, posView);
 
     // Use .xyww for skybox rendering (depth = 1.0)
     output.a_Pos = posClip.xyww;
@@ -51,16 +51,6 @@ struct PixelOutput {
     float4 a_Color : SV_Target0;
 };
 
-struct Parameters {
-    float u_MipLevelToSampleFrom;
-};
-
-[[vk::binding(1, 0)]]
-SamplerCube<float4> u_EnvironmentMap;
-
-[[vk::binding(2, 0)]]
-ConstantBuffer<Parameters> Params;
-
 [shader("fragment")]
 PixelOutput main(PixelInput input) {
     PixelOutput output;
@@ -73,7 +63,8 @@ PixelOutput main(PixelInput input) {
     //float2 uv = uvWithFaceIndex.xy;
     //uv = uv * (1.0 - 2.0 * texelSize) + texelSize;
 
-    float3 envColor = u_EnvironmentMap.SampleLevel(input.a_PosOut, Params.u_MipLevelToSampleFrom).rgb;
+    float3 envColor = BindlessTable::CubeTextures[uint(PushConstants.Data.u_Data.x)]
+        .SampleLevel(BindlessTable::Samplers[uint(PushConstants.Data.u_Data.y)], input.a_PosOut, PushConstants.Data.u_Data.z).rgb;
 
     const float gamma = 2.2;
     envColor = pow(envColor, 1.0 / gamma);

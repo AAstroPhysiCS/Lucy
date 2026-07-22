@@ -18,7 +18,7 @@ namespace Lucy {
 
 		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
 		for (uint32_t i = 0; i < maxFramesInFlight; i++)
-			allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, m_CreateInfo.BufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, m_Buffers[i], m_BufferVma[i]);
+			allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, m_CreateInfo.BufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, false, m_Buffers[i], m_BufferVma[i]);
 	}
 
 	void VulkanUniformBuffer::RTLoadToDevice() {

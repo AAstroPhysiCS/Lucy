@@ -1,7 +1,9 @@
 #pragma once
 
 #include "Utilities/UUID.h"
+
 #include "Renderer/Mesh.h"
+#include "Renderer/Image/Image.h"
 #include "Renderer/Renderer.h"
 
 namespace Lucy {
@@ -31,7 +33,7 @@ namespace Lucy {
 	struct MeshComponent {
 		MeshComponent() = default;
 		MeshComponent(const std::string& path)
-			: m_Mesh(Mesh::Create(path)) {
+			: m_Mesh(Memory::CreateRef<Mesh>(path)) {
 		}
 		MeshComponent(const MeshComponent& other) = default;
 
@@ -108,7 +110,7 @@ namespace Lucy {
 	private:
 		std::filesystem::path m_Path;
 
-		RenderResourceHandle m_OriginalImageHandle = InvalidRenderResourceHandle;
-		RenderResourceHandle m_IrradianceImageHandle = InvalidRenderResourceHandle;
+		RenderDeviceResourceHandle m_OriginalImageHandle{};
+		RenderDeviceResourceHandle m_IrradianceImageHandle{};
 	};
 }

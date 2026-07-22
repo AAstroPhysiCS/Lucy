@@ -1,5 +1,6 @@
 #include "lypch.h"
 #include "RenderDevice.h"
+#include "RenderDeviceScene.h"
 #include "VulkanRenderDevice.h"
 
 #include "Renderer/Renderer.h"
@@ -16,6 +17,7 @@
 #include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanUniformBuffer.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanSharedStorageBuffer.h"
+#include "Renderer/Memory/Buffer/Vulkan/VulkanDeviceAddressBuffer.h"
 
 namespace Lucy {
 
@@ -87,7 +89,7 @@ namespace Lucy {
 		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo) {
+	RenderDeviceResourceHandle RenderDevice::CreateGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo) {
 		static std::mutex pipelineCreationMutex;
 
 		switch (Renderer::GetRenderArchitecture()) {
@@ -101,10 +103,10 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateComputePipeline(const ComputePipelineCreateInfo& createInfo) {
+	RenderDeviceResourceHandle RenderDevice::CreateComputePipeline(const ComputePipelineCreateInfo& createInfo) {
 		static std::mutex pipelineCreationMutex;
 
 		switch (Renderer::GetRenderArchitecture()) {
@@ -118,10 +120,10 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateRenderPass(const RenderPassCreateInfo& createInfo) {
+	RenderDeviceResourceHandle RenderDevice::CreateRenderPass(const RenderPassCreateInfo& createInfo) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				auto resource = Memory::CreateRef<VulkanRenderPass>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
@@ -131,10 +133,10 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateImage(const ImageCreateInfo& createInfo, std::string_view debugName) {
+	RenderDeviceResourceHandle RenderDevice::CreateImage(const ImageCreateInfo& createInfo, std::string_view debugName) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				if (createInfo.ImageType == ImageType::TypeCube) {
@@ -149,10 +151,10 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateImage(const std::filesystem::path& path, ImageCreateInfo& createInfo, std::string_view debugName) {
+	RenderDeviceResourceHandle RenderDevice::CreateImage(const std::filesystem::path& path, ImageCreateInfo& createInfo, std::string_view debugName) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				if (createInfo.ImageType == ImageType::TypeCube) {
@@ -167,10 +169,10 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateImage(const Ref<VulkanImage2D>& other) {
+	RenderDeviceResourceHandle RenderDevice::CreateImage(const Ref<VulkanImage2D>& other) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				auto resource = Memory::CreateRef<VulkanImage2D>(other, shared_from_this()->As<VulkanRenderDevice>());
@@ -180,10 +182,10 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 	
-	RenderResourceHandle RenderDevice::CreateFrameBuffer(const FrameBufferCreateInfo& createInfo) {
+	RenderDeviceResourceHandle RenderDevice::CreateFrameBuffer(const FrameBufferCreateInfo& createInfo) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				auto resource = Memory::CreateRef<VulkanFrameBuffer>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
@@ -193,10 +195,10 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateVertexBuffer(size_t size) {
+	RenderDeviceResourceHandle RenderDevice::CreateVertexBuffer(size_t size) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				auto resource = Memory::CreateRef<VulkanVertexBuffer>(size, shared_from_this()->As<VulkanRenderDevice>());
@@ -206,10 +208,10 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateIndexBuffer(size_t size) {
+	RenderDeviceResourceHandle RenderDevice::CreateIndexBuffer(size_t size) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				auto resource = Memory::CreateRef<VulkanIndexBuffer>(size, shared_from_this()->As<VulkanRenderDevice>());
@@ -219,10 +221,23 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateDescriptorSet(const DescriptorSetCreateInfo& createInfo) {
+	RenderDeviceResourceHandle RenderDevice::CreateDeviceAddressBuffer(size_t size) {
+		switch (Renderer::GetRenderArchitecture()) {
+			case RenderArchitecture::Vulkan: {
+				auto resource = Memory::CreateRef<VulkanDeviceAddressBuffer>(size, shared_from_this()->As<VulkanRenderDevice>());
+				auto handle = m_ResourceManager.PushResource(resource);
+				return handle;
+			}
+			default:
+				LUCY_ASSERT(false, "No suitable API found to create the resource!");
+		}
+		return {};
+	}
+
+	RenderDeviceResourceHandle RenderDevice::CreateDescriptorSet(const DescriptorSetCreateInfo& createInfo) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				auto resource = Memory::CreateRef<VulkanDescriptorSet>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
@@ -232,10 +247,23 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateSharedStorageBuffer(const SharedStorageBufferCreateInfo& createInfo) {
+	RenderDeviceResourceHandle RenderDevice::CreateSampler(const ImageSamplerCreateInfo& createInfo) {
+		switch (Renderer::GetRenderArchitecture()) {
+			case RenderArchitecture::Vulkan: {
+				auto resource = Memory::CreateRef<VulkanImageSampler>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
+				auto handle = m_ResourceManager.PushResource(resource);
+				return handle;
+			}
+			default:
+				LUCY_ASSERT(false, "No suitable API found to create the resource!");
+		}
+		return {};
+	}
+
+	RenderDeviceResourceHandle RenderDevice::CreateSharedStorageBuffer(const SharedStorageBufferCreateInfo& createInfo) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				auto resource = Memory::CreateRef<VulkanSharedStorageBuffer>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
@@ -245,10 +273,10 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateUniformBuffer(const UniformBufferCreateInfo& createInfo) {
+	RenderDeviceResourceHandle RenderDevice::CreateUniformBuffer(const UniformBufferCreateInfo& createInfo) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				auto resource = Memory::CreateRef<VulkanUniformBuffer>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
@@ -258,14 +286,14 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	bool RenderDevice::IsValidResource(RenderResourceHandle handle) const {
+	bool RenderDevice::IsValidResource(RenderDeviceResourceHandle handle) const {
 		return m_ResourceManager.ResourceExists(handle);
 	}
 
-	void RenderDevice::RTDestroyResource(RenderResourceHandle& handle) {
+	void RenderDevice::RTDestroyResource(RenderDeviceResourceHandle& handle) {
 		m_ResourceManager.RTDestroyResource(handle);
 	}
 }

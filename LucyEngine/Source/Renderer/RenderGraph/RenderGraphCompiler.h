@@ -3,11 +3,12 @@
 #include "RenderGraphResource.h"
 #include "RenderGraphPass.h"
 
+#include "Renderer/ExecutionBatch.h"
+#include "Renderer/Device/RenderDevice.h"
+
 #include "Utilities/UUID.h"
 
 namespace Lucy {
-
-	struct ExecutionBatch;
 
 	class RenderGraph;
 
@@ -15,6 +16,11 @@ namespace Lucy {
 	public:
 		RenderGraphCompiler(const RenderGraph& renderGraph, const Ref<RenderDevice>& device);
 		virtual ~RenderGraphCompiler() = default;
+
+		RenderGraphCompiler(const RenderGraphCompiler& other) = delete;
+		RenderGraphCompiler(RenderGraphCompiler&& other) noexcept = delete;
+		RenderGraphCompiler& operator=(const RenderGraphCompiler& other) = delete;
+		RenderGraphCompiler& operator=(RenderGraphCompiler&& other) noexcept = delete;
 
 		virtual std::vector<ExecutionBatch> Compile(const RenderGraphBatches& batches) = 0;
 	protected:

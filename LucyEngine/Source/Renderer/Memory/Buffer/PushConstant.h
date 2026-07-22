@@ -10,6 +10,11 @@ namespace Lucy {
 		PipelineConstant(const std::string& name, uint32_t size, uint32_t offset, VkShaderStageFlags shaderStage);
 		virtual ~PipelineConstant() = default;
 
+		PipelineConstant(const PipelineConstant&) = delete;
+		PipelineConstant& operator=(const PipelineConstant&) = delete;
+		PipelineConstant(PipelineConstant&&) = default;
+		PipelineConstant& operator=(PipelineConstant&&) = default;
+
 		void RTBind(VkCommandBuffer commandBuffer, VkPipelineLayout layout) const;
 
 		inline std::string GetName() const { return m_Name; }

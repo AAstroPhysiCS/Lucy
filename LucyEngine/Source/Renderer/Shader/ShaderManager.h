@@ -14,6 +14,7 @@ namespace Lucy {
 
 	class RenderDevice;
 	class Shader;
+	class VulkanDescriptorSetManager;
 
 	//per name, it could have multiple shader programs
 	//that means, that each file can uphold multiple shader programs (multiple entrypoints) (e.g. VertexFragment and Compute and Tessellation etc...)

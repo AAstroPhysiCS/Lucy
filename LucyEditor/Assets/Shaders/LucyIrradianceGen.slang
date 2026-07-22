@@ -2,6 +2,7 @@
 #include "LucyIBLUtilities.slang"
 #include "LucySamplingUtilities.slang"
 #include "LucyComputeUtilities.slang"
+#include "LucyResource.slang"
 
 struct VertexInput {
     [[vk::location(0)]] float3 a_Pos : POSITION;
@@ -14,10 +15,11 @@ struct VertexOutput {
 
 struct LocalPushConstant {
     float4x4 u_ProjMatrix;
+    float4 u_Data; // x: size, y: sampler index, z: environment map index, w: environment irradiance compute index
 };
 
-[[vk::push_constant]]
-LocalPushConstant PushConstants;
+[vk::push_constant]
+PushConstantGlobal<LocalPushConstant> PushConstants;
 
 [shader("vertex")]
 VertexOutput main(VertexInput input, uint32_t viewIndex : SV_ViewID) {
@@ -25,7 +27,7 @@ VertexOutput main(VertexInput input, uint32_t viewIndex : SV_ViewID) {
     output.a_PosOut = input.a_Pos;
     
     float4x4 viewMatrix = Inverse(CaptureViews[viewIndex]);
-    float4x4 viewProjMatrix = mul(PushConstants.u_ProjMatrix, viewMatrix);
+    float4x4 viewProjMatrix = mul(PushConstants.Data.u_ProjMatrix, viewMatrix);
     output.a_Pos = mul(viewProjMatrix, float4(input.a_Pos, 1.0));
     
     return output;
@@ -35,7 +37,7 @@ VertexOutput main(VertexInput input, uint32_t viewIndex : SV_ViewID) {
 
 static const float SAMPLE_DELTA = 0.025f;
 
-float3 CalculateIrradiance(float3 samplingPos, in SamplerCube environmentMap) {
+float3 CalculateIrradiance(float3 samplingPos, in TextureCube environmentMap, in SamplerState sampler) {
     float3 irradiance = 0.0;
     float3 normal = normalize(samplingPos);
 
@@ -73,7 +75,7 @@ float3 CalculateIrradiance(float3 samplingPos, in SamplerCube environmentMap) {
             );
 
             // Project to face plane and sample
-            irradiance += environmentMap.Sample(sampleDir).rgb * cosTheta * sinTheta;
+            irradiance += environmentMap.Sample(sampler, sampleDir).rgb * cosTheta * sinTheta;
         }
     }
 
@@ -89,37 +91,34 @@ struct PixelOutput {
     float4 a_LayeredColorAttachments : SV_Target0;
 };
 
-[[vk::binding(0, 0)]]
-SamplerCube u_EnvironmentMap;
-
 [shader("fragment")]
 PixelOutput main(PixelInput input) {
     PixelOutput output;
-    
-    float3 irradiance = CalculateIrradiance(input.a_PosOut, u_EnvironmentMap);
+
+    SamplerState sampler = BindlessTable::Samplers[uint(PushConstants.Data.u_Data.y)];
+    TextureCube<float4> environmentMap = BindlessTable::CubeTextures[uint(PushConstants.Data.u_Data.z)];
+
+    float3 irradiance = CalculateIrradiance(input.a_PosOut, environmentMap, sampler);
     output.a_LayeredColorAttachments = float4(irradiance, 1.0);
     
     return output;
 }
 
-[[vk::binding(1, 0)]]
-SamplerCube<float4> u_EnvironmentMapCompute;
-
-[[vk::binding(2, 0)]]
-RWTexture2DArray<float4> u_EnvironmentIrradianceMapCompute;
-
 [shader("compute")]
 [numthreads(8, 8, 1)]
-void main(uint3 dispatchID : SV_DispatchThreadID) {
-    float width, height, layers;
-    u_EnvironmentIrradianceMapCompute.GetDimensions(width, height, layers);
-    const float2 cubemapSize = float2(width, height);
-    
+void main(uint3 dispatchID: SV_DispatchThreadID) {
+    const float2 cubemapSize = float2(PushConstants.Data.u_Data.x);
+
+    SamplerState sampler = BindlessTable::Samplers[uint(PushConstants.Data.u_Data.y)];
+    TextureCube<float4> environmentMap = BindlessTable::CubeTextures[uint(PushConstants.Data.u_Data.z)];
+
     uint face = dispatchID.z;
     float3 samplingPos = ThreadIDToSamplingPos(dispatchID.xy, face, cubemapSize);
-    float3 irradiance = CalculateIrradiance(samplingPos, u_EnvironmentMapCompute);
+    float3 irradiance = CalculateIrradiance(samplingPos, environmentMap, sampler);
+
+    RWTexture2DArray<float4> environmentIrradianceCompute = BindlessTable::StorageTextureArrays2D[uint(PushConstants.Data.u_Data.w)];
 
     uint3 uv = dispatchID;
-    //uv.y = uint(height) - uv.y - 1u;
-    u_EnvironmentIrradianceMapCompute[uv] = float4(irradiance, 1.0f);
+    // uv.y = uint(height) - uv.y - 1u;
+    environmentIrradianceCompute[uv] = float4(irradiance, 1.0f);
 }

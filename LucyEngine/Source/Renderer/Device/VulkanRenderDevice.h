@@ -8,6 +8,8 @@
 #include "Renderer/Semaphore.h"
 #include "Renderer/ExecutionBatch.h"
 
+#include "Renderer/Descriptors/DescriptorSetManager.h"
+
 namespace Lucy {
 
 	class Mesh;
@@ -41,6 +43,11 @@ namespace Lucy {
 		VulkanRenderDevice() = default;
 		virtual ~VulkanRenderDevice() = default;
 
+		VulkanRenderDevice(const VulkanRenderDevice&) = delete;
+		VulkanRenderDevice& operator=(const VulkanRenderDevice&) = delete;
+		VulkanRenderDevice(VulkanRenderDevice&&) = delete;
+		VulkanRenderDevice& operator=(VulkanRenderDevice&&) = delete;
+
 		void Init(VkInstance instance, const std::vector<const char*>& enabledValidationLayers, VkSurfaceKHR surface, uint32_t apiVersion);
 		void Destroy() final override;
 
@@ -49,6 +56,9 @@ namespace Lucy {
 
 		void BindBuffers(Ref<CommandPool> cmdPool, Ref<Mesh> mesh) final override;
 		void BindBuffers(Ref<CommandPool> cmdPool, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) final override;
+
+		[[nodiscard]] uint32_t BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<GraphicsPipeline>& pipeline, const Ref<Image>& image, uint32_t mip) final override;
+		[[nodiscard]] uint32_t BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<ComputePipeline>& pipeline, const Ref<Image>& image, uint32_t mip) final override;
 
 		void BindPushConstant(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline, const PipelineConstant& pushConstant) final override;
 		void BindPushConstant(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline, const PipelineConstant& pushConstant) final override;
@@ -75,6 +85,8 @@ namespace Lucy {
 		void BeginDebugMarker(Ref<CommandPool> cmdPool, const char* labelName) final override;
 		void EndDebugMarker(Ref<CommandPool> cmdPool) final override;
 
+		void RegisterShaderBindings(const Ref<Shader>& shader) final override;
+
 		void SubmitWorkToGPU(const RenderCommandList& renderCommandList, VulkanSemaphore& waitSemaphore, VkPipelineStageFlags2 waitStage,
 			VulkanSemaphore& renderFinishedSemaphore, VulkanSemaphore& frameTimelineSemaphore, uint64_t signalValue);
 		void SubmitWorkToGPUAsBatch(const RenderCommandList& renderCommandList, const ExecutionBatch& batch) final override;
@@ -85,6 +97,8 @@ namespace Lucy {
 		void WaitForQueue(TargetQueueFamily queueFamily) final override;
 
 		inline VulkanDeviceInfo& GetDeviceInformation() { return m_DeviceInfo; }
+
+		std::vector<RenderDeviceResourceHandle> GetResourceBindingHandles(const Ref<Shader>& shader) const final override;
 
 		inline VkPhysicalDevice GetPhysicalDevice() const { return m_PhysicalDevice; }
 		inline VkDevice GetLogicalDevice() const { return m_LogicalDevice; }
@@ -153,5 +167,7 @@ namespace Lucy {
 		VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
 
 		VkFence m_ImmediateSubmitFence = VK_NULL_HANDLE;
+
+		Unique<VulkanDescriptorSetManager> m_DescriptorSetManager = nullptr;
 	};
 }

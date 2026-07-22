@@ -51,13 +51,14 @@ namespace Lucy::VulkanAPI {
 		return pipelineInfo;
 	}
 
-	VkPipelineLayoutCreateInfo VulkanAPI::PipelineLayoutCreateInfo(uint32_t setLayoutCount, const VkDescriptorSetLayout* const descriptorSetLayouts, uint32_t pushConstantRangeCount, const VkPushConstantRange* const pushConstantRanges) {
+	VkPipelineLayoutCreateInfo VulkanAPI::PipelineLayoutCreateInfo(uint32_t setLayoutCount, const VkDescriptorSetLayout* const descriptorSetLayouts, uint32_t pushConstantRangeCount, const VkPushConstantRange* const pushConstantRanges, VkPipelineLayoutCreateFlags flags) {
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		pipelineLayoutInfo.setLayoutCount = setLayoutCount;
 		pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts;
 		pipelineLayoutInfo.pushConstantRangeCount = pushConstantRangeCount;
 		pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges;
+		pipelineLayoutInfo.flags = flags;
 
 		return pipelineLayoutInfo;
 	}
@@ -367,12 +368,13 @@ namespace Lucy::VulkanAPI {
 		return setWrite;
 	}
 
-	VkDescriptorSetLayoutCreateInfo VulkanAPI::DescriptorSetCreateInfo(uint32_t bindingCount, const VkDescriptorSetLayoutBinding* const layoutBindings) {
+	VkDescriptorSetLayoutCreateInfo VulkanAPI::DescriptorSetCreateInfo(uint32_t bindingCount, const VkDescriptorSetLayoutBinding* const layoutBindings, VkDescriptorSetLayoutCreateFlags flags) {
 		VkDescriptorSetLayoutCreateInfo descriptorLayoutInfo{};
 		descriptorLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		descriptorLayoutInfo.bindingCount = bindingCount;
 		descriptorLayoutInfo.pBindings = layoutBindings;
 		descriptorLayoutInfo.pNext = nullptr;
+		descriptorLayoutInfo.flags = flags;
 
 		return descriptorLayoutInfo;
 	}

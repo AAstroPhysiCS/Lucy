@@ -1,13 +1,9 @@
 #include "LucyCommons.slang"
-
-[[vk::binding(0, 0)]]
-Texture2DArray<float2> u_InputMoments;
-
-[[vk::binding(1, 0)]]
-RWTexture2DArray<float2> u_OutputMoments;
+#include "LucyResource.slang"
 
 struct BlurData {
-    int4 u_BlurData; // x, y, width, height
+    int4 u_BlurData;            // x, y, width, height
+    uint4 u_TextureIndicesData; // x: input texture index, y: output texture index, z: sampler index, w: unused
 };
 
 [[vk::push_constant]]
@@ -32,7 +28,10 @@ void main(uint3 dispatchID : SV_DispatchThreadID) {
     int2 uv = int2(dispatchID.xy);
     int layer = int(dispatchID.z);
 
-    float2 blurredMoments = u_InputMoments.Load(int4(uv, layer, 0)) * GAUSSIAN_WEIGHTS[0];
+    Texture2DArray<float2> inputTexture = BindlessTable::TextureArrays2D_Float2[NonUniformResourceIndex(PushConstants.u_TextureIndicesData.x)];
+    RWTexture2DArray<float2> outputTexture = BindlessTable::StorageTextureArrays2D_Float2[NonUniformResourceIndex(PushConstants.u_TextureIndicesData.y)];
+
+    float2 blurredMoments = inputTexture.Load(int4(uv, layer, 0)) * GAUSSIAN_WEIGHTS[0];
 
     for (int i = 1; i <= BLUR_RADIUS; i++) {
         int2 offset = PushConstants.u_BlurData.xy * i;
@@ -40,10 +39,10 @@ void main(uint3 dispatchID : SV_DispatchThreadID) {
         int2 coordA = clamp(uv + offset, int2(0, 0), int2(int(width) - 1, int(height) - 1));
         int2 coordB = clamp(uv - offset, int2(0, 0), int2(int(width) - 1, int(height) - 1));
 
-        blurredMoments += u_InputMoments.Load(int4(coordA, layer, 0)) * GAUSSIAN_WEIGHTS[i];
-        blurredMoments += u_InputMoments.Load(int4(coordB, layer, 0)) * GAUSSIAN_WEIGHTS[i];
+        blurredMoments += inputTexture.Load(int4(coordA, layer, 0)) * GAUSSIAN_WEIGHTS[i];
+        blurredMoments += inputTexture.Load(int4(coordB, layer, 0)) * GAUSSIAN_WEIGHTS[i];
     }
 
     blurredMoments.y = max(blurredMoments.y, blurredMoments.x * blurredMoments.x + 1e-6f);
-    u_OutputMoments[dispatchID] = blurredMoments;
+    outputTexture[dispatchID] = blurredMoments;
 }

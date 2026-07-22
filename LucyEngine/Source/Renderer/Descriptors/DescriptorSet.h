@@ -1,33 +1,33 @@
 #pragma once
 
-#include "Renderer/Device/RenderResource.h"
+#include "Renderer/Device/RenderDeviceResource.h"
+#include "Renderer/Device/RenderDeviceHandles.h"
+#include "Renderer/Renderer.h"
 
 #include "Renderer/Shader/ShaderReflect.h"
 
 namespace Lucy {
 
-#if USE_INTEGRATED_GRAPHICS
-	constexpr uint32_t MAX_DYNAMIC_DESCRIPTOR_COUNT = 1024u;
-	constexpr uint32_t MAX_DYNAMICALLY_ALLOCATED_BUFFER_SIZE = MAX_DYNAMIC_DESCRIPTOR_COUNT * 10u;
-#else
-	constexpr uint32_t MAX_DYNAMIC_DESCRIPTOR_COUNT = 1024u;
-	constexpr uint32_t MAX_DYNAMICALLY_ALLOCATED_BUFFER_SIZE = MAX_DYNAMIC_DESCRIPTOR_COUNT * 10u; //10 kilobytes
-#endif
-
 	struct DescriptorSetCreateInfo {
 		uint32_t SetIndex = 0;
+		uint32_t Count = Renderer::GetMaxFramesInFlight();
 		std::vector<ShaderVariable> ShaderVariables;
 	};
 
-	class DescriptorSet : public RenderResource {
+	class DescriptorSet : public RenderDeviceResource {
 	public:
 		DescriptorSet(const DescriptorSetCreateInfo& createInfo);
 		virtual ~DescriptorSet() = default;
+
+		DescriptorSet(const DescriptorSet&) = delete;
+		DescriptorSet& operator=(const DescriptorSet&) = delete;
+		DescriptorSet(DescriptorSet&&) = delete;
+		DescriptorSet& operator=(DescriptorSet&&) = delete;
 		
 		virtual void RTUpdate() = 0;
 
-		void AddUniformBuffer(const std::string& name, RenderResourceHandle bufferHandle);
-		void AddSharedStorageBuffer(const std::string& name, RenderResourceHandle bufferHandle);
+		void AddUniformBuffer(const std::string& name, RenderDeviceResourceHandle bufferHandle);
+		void AddSharedStorageBuffer(const std::string& name, RenderDeviceResourceHandle bufferHandle);
 
 		inline uint32_t GetSetIndex() const { return m_CreateInfo.SetIndex; }
 
@@ -38,8 +38,8 @@ namespace Lucy {
 
 		DescriptorSetCreateInfo m_CreateInfo;
 	private:
-		std::unordered_map<std::string, RenderResourceHandle> m_UniformBufferHandles;
-		std::unordered_map<std::string, RenderResourceHandle> m_SharedStorageBufferHandles;
+		std::unordered_map<std::string, RenderDeviceResourceHandle> m_UniformBufferHandles;
+		std::unordered_map<std::string, RenderDeviceResourceHandle> m_SharedStorageBufferHandles;
 	};
 }
 

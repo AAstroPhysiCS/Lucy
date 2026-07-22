@@ -77,7 +77,9 @@ namespace Lucy {
 			SetData(other.m_Data);
 		}
 
-		inline T* operator&() const { return m_Data.data(); }
+		inline T* operator&() { return m_Data.data(); }
+
+		inline const T* operator&() const { return m_Data.data(); }
 
 		inline void Append(const std::vector<T>& data) {
 			m_Data.insert(m_Data.end(), data.begin(), data.end());
@@ -88,6 +90,11 @@ namespace Lucy {
 		}
 
 		inline void Append(T* data, size_t size) {
+			InsertPadding(alignof(T));
+			m_Data.insert(m_Data.end(), data, data + size);
+		}
+		
+		inline void Append(const T* data, size_t size) {
 			InsertPadding(alignof(T));
 			m_Data.insert(m_Data.end(), data, data + size);
 		}

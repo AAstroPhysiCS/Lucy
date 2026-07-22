@@ -1,22 +1,27 @@
 #pragma once
 
-#include "Renderer/RendererBackend.h"
+#include "RendererBackend.h"
 
-#include "RenderGraph/RenderGraphPass.h"
+#include "Shader/ShaderManager.h"
+
+#include "RendererConfiguration.h"
 
 #include "Pipeline/PipelineManager.h"
 #include "Material/MaterialManager.h"
 
-#include "Device/RenderDeviceResourceManager.h"
 #include "Device/RenderDevice.h"
-#include "Shader/ShaderManager.h"
-#include "Image/Image.h"
-#include "Memory/Buffer/IndexBuffer.h"
-#include "Renderer/Mesh.h"
+#include "Device/RenderDeviceHandles.h"
 
 namespace Lucy {
 
+	class RenderGraph;
+	
+	class MaterialManager;
+
+	class RenderThread;
 	class RenderPipeline;
+
+	class Mesh;
 
 	class RenderGraphPass;
 	class RenderGraphResource;
@@ -29,22 +34,27 @@ namespace Lucy {
 	};
 
 	struct RenderFrameHandles {
-		RenderResourceHandle RenderPassHandle;
-		RenderResourceHandle FrameBufferHandle;
+		RenderDeviceResourceHandle RenderPassHandle{};
+		RenderDeviceResourceHandle FrameBufferHandle{};
 	};
 
 	class Renderer final {
-	public:
+	private:
 		Renderer() = delete;
 		~Renderer() = delete;
 
+		Renderer(const Renderer&) = delete;
+		Renderer& operator=(const Renderer&) = delete;
+		Renderer(Renderer&&) = delete;
+		Renderer& operator=(Renderer&&) = delete;
+	public:
 #pragma region RenderGraph
 		static void ExecuteRenderGraph();
 		static void CompileRenderGraph();
 		static void Flush();
 
-		static void ImportExternalRenderGraphResource(const RenderGraphResource& renderGraphResource, RenderResourceHandle renderResourceHandle);
-		static void ImportExternalRenderGraphTransientResource(const RenderGraphResource& renderGraphResource, RenderResourceHandle renderResourceHandle);
+		static void ImportExternalRenderGraphResource(const RenderGraphResource& renderGraphResource, RenderDeviceResourceHandle renderResourceHandle);
+		static void ImportExternalRenderGraphTransientResource(const RenderGraphResource& renderGraphResource, RenderDeviceResourceHandle renderResourceHandle);
 	public:
 		template <typename TRendererPass, typename ... TArgs> requires IsRendererPass<TRendererPass>
 		static inline void AddRendererPass(TArgs ... args) {
@@ -52,13 +62,13 @@ namespace Lucy {
 			rendererPass.AddPass(s_RenderGraph);
 		}
 
-		static Ref<Image> GetOutputOfPass(const char* name);
+		static Ref<Image> GetFrameBufferOutputOfPass(const char* name);
 #pragma endregion RenderGraph
 
 #pragma region RenderDevice
 		template <typename TResource> requires IsRenderResource<TResource>
-		static inline Ref<TResource> AccessResource(RenderResourceHandle handle) {
-			if (handle == InvalidRenderResourceHandle)
+		static inline Ref<TResource> AccessResource(RenderDeviceResourceHandle handle) {
+			if (!handle)
 				return nullptr;
 			auto& device = GetRenderDevice();
 			return device->AccessResource<TResource>(handle);
@@ -68,11 +78,11 @@ namespace Lucy {
 		static void SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func);
 
 		static void EnqueueToRenderCommandQueue(RenderCommandFunc&& func);
-		static void EnqueueResourceDestroy(RenderResourceHandle& handle);
+		static void EnqueueResourceDestroy(RenderDeviceResourceHandle& handle);
 #pragma endregion RenderDevice
 		static void InitializeImGui();
 
-		static bool IsValidRenderResource(RenderResourceHandle handle);
+		static bool IsValidRenderResource(RenderDeviceResourceHandle handle);
 
 		static inline uint32_t GetCurrentImageIndex() { return s_Backend->GetCurrentImageIndex(); }
 		static inline uint32_t GetCurrentFrameIndex() { return s_Backend->GetCurrentFrameIndex(); }
@@ -84,16 +94,17 @@ namespace Lucy {
 		static inline const ShaderLibrary& GetShaderLibrary() { return s_ShaderManager.GetShaderLibrary(); }
 
 		static inline Unique<PipelineManager>& GetPipelineManager() { return s_PipelineManager; }
-		static inline Unique<MaterialManager>& GetMaterialManager() { return s_MaterialManager; }
+		static Unique<MaterialManager>& GetMaterialManager();
 
 		static inline RenderArchitecture GetRenderArchitecture() { return s_Config.RenderArchitecture; }
 		static inline RendererSettings& GetRendererSettings() { return s_Config.Settings; }
 
-		static inline RenderResourceHandle GetBlankCubeImageHandle() { return s_BlankCubeHandle; }
-		static inline Ref<Image> GetBlankCubeImage() { return GetRenderDevice()->AccessResource<Image>(s_BlankCubeHandle); }
-		static inline Ref<Image> GetBlankArrayImage() { return GetRenderDevice()->AccessResource<Image>(s_BlankArrayHandle); }
-		static inline const Ref<Mesh>& GetEnvCubeMesh() { return s_CubeMesh; }
-		static inline uint32_t GetEnvCubeMeshIndexCount() { return (uint32_t)GetRenderDevice()->AccessResource<IndexBuffer>(s_CubeMesh->GetIndexBufferHandle())->GetSize(); }
+		static inline RenderDeviceResourceHandle GetBlankCubeImageHandle() { return s_BlankCubeHandle; }
+		static Ref<Image> GetBlankCubeImage();
+		static Ref<Image> GetBlankArrayImage();
+
+		static const Ref<Mesh>& GetEnvCubeMesh() { return s_CubeMesh; }
+		static uint32_t GetEnvCubeMeshIndexCount();
 
 		static RenderContextResultCodes WaitAndPresent();
 
@@ -127,14 +138,14 @@ namespace Lucy {
 
 		static inline std::unordered_map<std::string, RenderFrameHandles> s_RenderFrameHandleMap;
 
-		static inline Unique<PipelineManager> s_PipelineManager;
-		static inline Unique<MaterialManager> s_MaterialManager;
+		static inline Unique<PipelineManager> s_PipelineManager = nullptr;
+		static inline Unique<MaterialManager> s_MaterialManager = nullptr;
 
-		static inline RenderResourceHandle s_BlankCubeHandle = InvalidRenderResourceHandle;
-		static inline RenderResourceHandle s_BlankArrayHandle = InvalidRenderResourceHandle;
+		static inline RenderDeviceResourceHandle s_BlankCubeHandle{};
+		static inline RenderDeviceResourceHandle s_BlankArrayHandle{};
 		static inline Ref<Mesh> s_CubeMesh = nullptr;
 
 		friend class Application; //for Init etc.
-		friend class RenderGraph; //for CreateImage etc.
+		friend class MaterialManager; //for creating materials TODO: change this
 	};
 }
