@@ -58,7 +58,7 @@ namespace Lucy {
 		allocator.CreateVulkanImageVma(m_CreateInfo.Width, m_CreateInfo.Height, m_MaxMipLevel, (VkFormat)GetAPIImageFormat(m_CreateInfo.Format), m_CurrentLayout,
 			flags, VK_IMAGE_TYPE_2D, m_Image, m_ImageVma, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT, m_CreateInfo.Layers);
 		
-		SetLayoutImmediate(GetInitialImageLayout(), 0, 0, 1, m_CreateInfo.Layers);
+		SetLayoutImmediate(GetInitialImageLayout(), 0, 0, m_MaxMipLevel, m_CreateInfo.Layers);
 
 		RTCreateSampler(m_VulkanDevice);
 		RTCreateVulkanImageViewHandle(m_VulkanDevice);

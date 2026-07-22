@@ -76,14 +76,14 @@ namespace Lucy {
 					if (!hdrComponent.IsPrimary || imageBound)
 						return;
 #if USE_COMPUTE_FOR_CUBEMAP_GEN
-					irradianceIndex = draw.BindImageHandleTo("StorageTextureArrays2D", hdrComponent.GetIrradianceImage());
+					irradianceIndex = draw.BindImageHandleTo("CubeTextures", hdrComponent.GetIrradianceImage());
 #else
-					irradianceIndex = draw.BindImageHandleTo("StorageTextureArrays2D", registry.GetImage(RGResource(IrradianceImage)));
+					irradianceIndex = draw.BindImageHandleTo("CubeTextures", registry.GetImage(RGResource(IrradianceImage)));
 #endif
 					imageBound = true;
 				});
 
-				uint32_t prefilterIndex = draw.BindImageHandleTo("StorageTextureArrays2D", registry.GetImage(RGResource(PrefilterImage)));
+				uint32_t prefilterIndex = draw.BindImageHandleTo("CubeTextures", registry.GetImage(RGResource(PrefilterImage)));
 
 				if (prefilterIndex == INVALID_INDEX)
 					prefilterIndex = draw.BindImageHandleTo("CubeTextures", Renderer::GetBlankCubeImage());
@@ -94,10 +94,10 @@ namespace Lucy {
 				draw.BindAllDescriptorSets();
 
 				RenderDeviceTextureResource env[4] = {
-					{ .TextureIndex = irradianceIndex, .SamplerIndex = 0 },
-					{ .TextureIndex = prefilterIndex, .SamplerIndex = 0 },
 					{ .TextureIndex = shadowImagesIndex, .SamplerIndex = 0 },
-					{ .TextureIndex = brdfImageIndex, .SamplerIndex = 0 }
+					{ .TextureIndex = prefilterIndex, .SamplerIndex = 0 },
+					{ .TextureIndex = brdfImageIndex, .SamplerIndex = 0 },
+					{ .TextureIndex = irradianceIndex, .SamplerIndex = 0 },
 				};
 
 				struct LocalPushConstant {
@@ -298,7 +298,7 @@ namespace Lucy {
 				.GenerateSampler = true,
 			}, RenderPassLoadStoreAttachments::ClearDontCare);
 
-			build.ReadImage(RGResource(ShadowImages), RenderGraphResourceAccess::StorageRead);
+			build.ReadImage(RGResource(ShadowImages), RenderGraphResourceAccess::ShaderSampledRead);
 			build.WriteImage(RGResource(ShadowImagesBlurred), RenderGraphResourceAccess::StorageWrite);
 
 			return std::bind(
@@ -310,7 +310,7 @@ namespace Lucy {
 		});
 
 		renderGraph->AddPass(TargetQueueFamily::Compute, "VSMVerticalBlurCompute", [=, *this](RenderGraphBuilder& build) {
-			build.ReadImage(RGResource(ShadowImagesBlurred), RenderGraphResourceAccess::StorageRead);
+			build.ReadImage(RGResource(ShadowImagesBlurred), RenderGraphResourceAccess::ShaderSampledRead);
 			build.WriteImage(RGResource(ShadowImages), RenderGraphResourceAccess::StorageWrite);
 
 			return std::bind(
@@ -345,6 +345,9 @@ namespace Lucy {
 			float C_i = lambda * (C_iLog - C_iUniform) + C_iUniform;
 			cascadeSplits[i] = (C_i - n) / clipRange;
 		}
+
+		s_ShadowCameras.clear();
+		s_ShadowCameras.reserve(NUM_CASCADES);
 
 		for (uint32_t i = 0; i < NUM_CASCADES; i++)
 			s_ShadowCameras.emplace_back(size, editorCamera, cascadeSplits[i]);
@@ -422,7 +425,7 @@ namespace Lucy {
 
 		const auto& lightDir = GetRotation();
 
-		float radiusDistWS = std::ceil((frustumCornersWS[0] - frustumCornersWS[6]).length() * 16.0f) / 2.0f;
+		float radiusDistWS = std::ceil(glm::length(frustumCornersWS[0] - frustumCornersWS[6]) * 16.0f) / 2.0f;
 
 		float texelsPerUnitWS = m_ShadowMapSize / (radiusDistWS * 2.0f);
 
@@ -448,6 +451,8 @@ namespace Lucy {
 		m_Top = maxExtents.y;
 		m_NearPlane = minExtents.z * 6.0f;
 		m_FarPlane = maxExtents.z * 6.0f;
+
+		UpdateProjection();
 
 		s_LastSplitDist = m_CascadeSplit;
 	}
