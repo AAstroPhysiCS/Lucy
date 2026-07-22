@@ -298,7 +298,7 @@ namespace Lucy {
 				.GenerateSampler = true,
 			}, RenderPassLoadStoreAttachments::ClearDontCare);
 
-			build.ReadImage(RGResource(ShadowImages), RenderGraphResourceAccess::ShaderSampledRead);
+			build.ReadImage(RGResource(ShadowImages), RenderGraphResourceAccess::StorageRead);
 			build.WriteImage(RGResource(ShadowImagesBlurred), RenderGraphResourceAccess::StorageWrite);
 
 			return std::bind(
@@ -310,7 +310,7 @@ namespace Lucy {
 		});
 
 		renderGraph->AddPass(TargetQueueFamily::Compute, "VSMVerticalBlurCompute", [=, *this](RenderGraphBuilder& build) {
-			build.ReadImage(RGResource(ShadowImagesBlurred), RenderGraphResourceAccess::ShaderSampledRead);
+			build.ReadImage(RGResource(ShadowImagesBlurred), RenderGraphResourceAccess::StorageRead);
 			build.WriteImage(RGResource(ShadowImages), RenderGraphResourceAccess::StorageWrite);
 
 			return std::bind(

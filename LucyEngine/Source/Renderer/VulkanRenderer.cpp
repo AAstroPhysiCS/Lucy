@@ -82,8 +82,6 @@ namespace Lucy {
 			const uint64_t frameValue = m_FrameFenceValues[m_CurrentFrameIndex];
 			m_InFlightFences[m_CurrentFrameIndex].Wait(frameValue);
 			
-			m_RenderDevice->GetScene()->SyncFrame(m_CurrentFrameIndex);
-
 			m_RenderCommandQueue->ResetFrameSlotRecordersIfCompleted(m_CurrentFrameIndex, TargetQueueFamily::Graphics);
 			m_RenderCommandQueue->ResetFrameSlotRecordersIfCompleted(m_CurrentFrameIndex, TargetQueueFamily::Compute);
 			m_RenderCommandQueue->ResetFrameSlotRecordersIfCompleted(m_CurrentFrameIndex, TargetQueueFamily::Transfer);
@@ -338,6 +336,9 @@ namespace Lucy {
 		
 		BeginFrame();
 		FlushCommandQueue();
+
+		m_RenderDevice->GetScene()->SyncFrame(m_CurrentFrameIndex);
+
 		RenderFrame();
 		EndFrame();
 		FlushDeletionQueue();
