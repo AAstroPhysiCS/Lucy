@@ -9,6 +9,7 @@
 
 #include "Renderer/Device/RenderDeviceHandles.h"
 #include "Renderer/Device/RenderDeviceSceneData.h"
+#include "Renderer/Device/RenderDevice.h"
 
 #include "Renderer/Memory/Buffer/Buffer.h"
 #include "Renderer/Memory/Buffer/RenderDeviceBuffer.h"
@@ -17,7 +18,6 @@
 
 namespace Lucy {
 	
-	class RenderDevice;
 	class Shader;
 	class CommandPool;
 
@@ -28,10 +28,10 @@ namespace Lucy {
 	class Image;
 	enum class ImageType : uint8_t;
 
-	class ComputePipeline;
-
-	class VertexBuffer;
 	class IndexBuffer;
+	class VertexBuffer;
+
+	class ComputePipeline;
 
 	class RenderCommand final {
 	public:
@@ -64,8 +64,11 @@ namespace Lucy {
 
 		[[nodiscard]] uint32_t BindImageHandleTo(const std::string& imageBufferName, const Ref<Image>& image, uint32_t mip = -1);
 
+		void FillBuffer(Ref<RenderDeviceBuffer> buffer, size_t offset, size_t size, uint32_t value);
+
 		void BindBuffers(Ref<Mesh> mesh);
 		void BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer);
+		void BindBuffers(Ref<RenderDeviceBuffer> indexBuffer);
 		
 		void BindPushConstant(const PipelineConstant& pushConstant);
 		
@@ -78,16 +81,16 @@ namespace Lucy {
 		
 		void DrawMesh(Ref<Mesh> mesh);
 
-		template <typename TLocalPushConstant, typename TFunction >
+		template <typename TLocalPushConstant, typename TFunction>
 		void DrawIndexedMeshWithPushConstant(Ref<Mesh> mesh, const glm::mat4& meshTransform, TFunction&& function) {
 			LUCY_ASSERT(m_BoundedGraphicsPipeline, "DrawIndexedMeshWithPushConstant failed, bounded pipeline is nullptr.");
 			LUCY_ASSERT(m_Shader, "DrawIndexedMeshWithPushConstant failed, shader is nullptr.");
 
 			using TPushConstant = GlobalPushConstant<TLocalPushConstant>;
 
-			const auto globalAddress = GetGlobalBufferAddress();
-
-			BindBuffers(mesh);
+			auto globalAddress = m_RenderDevice->AccessResource<RenderDeviceBuffer>(m_RenderDevice->GetScene()->GetCurrentFrameBufferHandle("GPUScene"))->GetDeviceAddress();
+			auto globalIndexBuffer = m_RenderDevice->AccessResource<RenderDeviceBuffer>(GetGlobalIndexBufferHandle());
+			BindBuffers(globalIndexBuffer);
 
 			PipelineConstant& meshPushConstant = m_BoundedGraphicsPipeline->GetPipelineConstants("PushConstants");
 
@@ -107,17 +110,21 @@ namespace Lucy {
 				meshPushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
 
 				BindPushConstant(meshPushConstant);
-				DrawIndexed(submesh.IndexCount, 1, submesh.BaseIndexCount, submesh.BaseVertexCount, 0);
+				//DrawIndexed(submesh.IndexCount, 1, submesh.GlobalFirstIndex, submesh.GlobalVertexOffset, 0);
 			}
 		}
 
 		void DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance);
+		void DrawIndexedIndirectCount(Ref<RenderDeviceBuffer> buffer, size_t offset, Ref<RenderDeviceBuffer> countBuffer, size_t countBufferOffset, uint32_t maxDrawCount, uint32_t stride);
+
 		void DispatchCompute(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+		void DispatchComputeIndirect(const Ref<RenderDeviceBuffer>& resource, size_t offset);
 
 		double GetRenderTime(const std::vector<uint64_t>& renderTimes) const { return (double)(renderTimes[m_EndTimestampIndex] - renderTimes[m_BeginTimestampIndex]); }
 		const std::string& GetDebugName() const { return m_DebugName; }
-		RenderDeviceBufferReference GetGlobalBufferAddress() const;
 	private:
+		RenderDeviceResourceHandle GetGlobalIndexBufferHandle() const;
+
 		void BeginSecondaryRenderCommand();
 		void EndSecondaryRenderCommand();
 

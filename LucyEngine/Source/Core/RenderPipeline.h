@@ -19,6 +19,7 @@ namespace Lucy {
 
 	struct RenderPipelineCreateInfo {
 		ViewMode ViewMode = ViewMode::Wireframe;
+		Ref<RenderDevice> RenderDevice = nullptr;
 		//TODO: Settings etc...
 	};
 
@@ -45,14 +46,12 @@ namespace Lucy {
 			m_ViewportHeight = height; 
 		}
 
-		auto GetViewportArea() const {
-			struct Size { int32_t Width, Height; };
-			return Size{ m_ViewportWidth, m_ViewportHeight };
+		std::pair<int32_t, int32_t> GetViewportArea() const {
+			return std::pair{ m_ViewportWidth, m_ViewportHeight };
 		}
 
-		auto GetViewportMousePos() const {
-			struct Size { float Width, Height; };
-			return Size{ m_ViewportMouseX, m_ViewportMouseY };
+		std::pair<float, float> GetViewportMousePos() const {
+			return std::pair{ m_ViewportMouseX, m_ViewportMouseY };
 		}
 	private:
 		RenderPipelineCreateInfo m_CreateInfo;

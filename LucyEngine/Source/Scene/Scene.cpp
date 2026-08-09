@@ -4,6 +4,8 @@
 #include "Scene.h"
 #include "Components.h"
 
+#include "Renderer/Device/RenderDeviceScene.h"
+
 #include "Events/EventHandler.h"
 
 namespace Lucy {
@@ -11,6 +13,14 @@ namespace Lucy {
 	Entity Scene::CreateMesh(std::string& path) {
 		Entity e = CreateEntity();
 		e.AddComponent<MeshComponent>(path);
+
+		Renderer::EnqueueToRenderCommandQueue([this, e](const Ref<RenderDevice>& device) mutable {
+			auto& component = e.GetComponent<MeshComponent>();
+			const auto& mesh = component.GetMesh();
+			const auto& transform = e.GetComponent<TransformComponent>().GetMatrix();
+			component.SetObjectHandle(device->GetScene()->RegisterObject(mesh->GetRenderDeviceMeshHandle(), transform, RenderDeviceObjectFlags::None));
+		});
+
 		return e;
 	}
 

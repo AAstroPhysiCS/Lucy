@@ -24,12 +24,8 @@ namespace Lucy {
 		glm::vec3 Bitangent = glm::vec3{0.0f};
 
 		[[nodiscard]] static consteval uint32_t GetComponentCount() {
-			return decltype(Position)::length()
-				+ decltype(MeshID)::length()
-				+ decltype(TexCoords)::length()
-				+ decltype(Normal)::length()
-				+ decltype(Tangent)::length()
-				+ decltype(Bitangent)::length();
+			return decltype(Position)::length() + decltype(MeshID)::length() + decltype(TexCoords)::length() 
+				+ decltype(Normal)::length() + decltype(Tangent)::length() + decltype(Bitangent)::length();
 		}
 
 		[[nodiscard]] static constexpr VkVertexInputBindingDescription GetBindingDescription() {
@@ -82,32 +78,81 @@ namespace Lucy {
 		}
 	};
 
+	struct Meshlet {
+		uint32_t VertexOffset = 0;
+		uint32_t TriangleOffset = 0;
+		uint32_t VertexCount = 0;
+		uint32_t TriangleCount = 0;
+
+		uint32_t FirstIndex = 0;
+		uint32_t IndexCount = 0;
+
+		glm::vec4 BoundingSphere = glm::vec4{ 0.0f };
+		glm::vec4 NormalCone = glm::vec4{ 0.0f };
+	};
+
+	struct SubmeshLOD {
+		uint32_t FirstMeshlet = 0;
+		uint32_t MeshletCount = 0;
+
+		uint32_t FirstMeshletIndex = 0;
+		uint32_t MeshletIndexCount = 0;
+
+		float MinimumProjectedRadius = 0.0f;
+		float Error = 0.0f;
+	};
+
 	struct Submesh {
 		std::vector<Vertex> Vertices;
 		std::vector<uint32_t> Indices;
 
+		std::vector<Meshlet> Meshlets;
+
+		std::vector<SubmeshLOD> LODs;
+
+		//Contains indices into the submesh vertex array.
+		std::vector<uint32_t> MeshletVertices;
+
+		//Contains three meshlet-local 8-bit vertex indices per triangle.
+		std::vector<uint8_t> MeshletTriangles;
+
+		//Flattened uint32_t index stream used by ordinary indexed rendering.
+		std::vector<uint32_t> MeshletIndices;
+
 		RenderDeviceObjectHandle MaterialID{};
 
-		glm::mat4 Transform = glm::mat4{1.0f};
+		glm::mat4 Transform = glm::mat4{ 1.0f };
 
 		uint32_t VertexCount = 0;
 		uint32_t IndexCount = 0;
+		uint32_t MeshletCount = 0;
+
 		uint32_t BaseVertexCount = 0;
 		uint32_t BaseIndexCount = 0;
+
+		uint32_t BaseMeshletCount = 0;
+		uint32_t BaseMeshletIndexCount = 0;
+		uint32_t BaseMeshletVertexCount = 0;
+		uint32_t BaseMeshletTriangleCount = 0;
 	};
 
 	struct MetadataInfo {
 		uint32_t TotalIndicesSize = 0;
 		uint32_t TotalVerticesSize = 0;
+		uint32_t TotalMeshletsSize = 0;
+		uint32_t TotalMeshletVerticesSize = 0;
+		uint32_t TotalMeshletTrianglesSize = 0;
+		uint32_t TotalMeshletIndicesSize = 0;
 	};
 
 	class Mesh : public MemoryTrackable {
 	public:
 		template <size_t N>
-		Mesh(const std::array<float, N>& vertices, const std::array<uint32_t, N>& indices) 
+		Mesh(const std::array<float, N>& vertices, const std::array<uint32_t, N>& indices)
 			: Mesh(ConvertVerticesFromFloatToVertex(vertices), std::vector<uint32_t>(indices.begin(), indices.end())) {
 		}
-		Mesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
+		Mesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
+		Mesh(std::vector<Vertex>&& vertices, std::vector<uint32_t>&& indices);
 		Mesh(const std::string& path);
 		~Mesh() = default;
 
@@ -116,47 +161,81 @@ namespace Lucy {
 		Mesh& operator=(const Mesh& other) = delete;
 		Mesh& operator=(Mesh&& other) noexcept = delete;
 
-		inline std::vector<Submesh>& GetSubmeshes() { return m_Submeshes; }
+		std::vector<Submesh>& GetSubmeshes() { return m_Submeshes; }
 
-		inline std::string& GetName() { return m_Name; }
-		inline const glm::vec3& GetMeshID() const { return m_MeshID; }
-		inline std::string& GetPath() { return m_Path; }
+		std::string& GetName() { return m_Name; }
+		const glm::vec3& GetMeshID() const { return m_MeshID; }
+		std::string& GetPath() { return m_Path; }
 
-		inline RenderDeviceResourceHandle GetVertexBufferHandle() { return m_VertexBufferHandle; }
-		inline RenderDeviceResourceHandle GetIndexBufferHandle() { return m_IndexBufferHandle; }
+		MetadataInfo GetMetadataInfo() const { return m_MetadataInfo; }
 
-		inline MetadataInfo GetMetadataInfo() const { return m_MetadataInfo; }
+		const RenderDeviceObjectHandle& GetRenderDeviceMeshHandle() const { return m_RenderDeviceMeshHandle; }
 
 		void Destroy();
 	private:
 		static inline std::atomic_uint32_t s_NextMeshID = 1;
 
 		template <size_t N>
-		[[nodiscard]] constexpr static auto ConvertVerticesFromFloatToVertex(const std::array<float, N>& vertices) -> std::vector<Vertex> {
+		[[nodiscard]] constexpr static std::vector<Vertex> ConvertVerticesFromFloatToVertex(const std::array<float, N>& vertices) {
 			LUCY_ASSERT(vertices.size() % 3 == 0, "Position array must contain complete vec3 values.");
 
-			const size_t vertexCount = vertices.size() / 3;
+			size_t vertexCount = vertices.size() / 3;
 			std::vector<Vertex> convertedVertices(vertexCount);
 
 			for (size_t i = 0; i < vertexCount; i++) {
-				const size_t sourceIndex = i * 3;
+				size_t sourceIndex = i * 3;
 				convertedVertices[i].Position = { vertices[sourceIndex + 0], vertices[sourceIndex + 1], vertices[sourceIndex + 2] };
 			}
 
 			return convertedVertices;
 		}
 
-		void Load(const Ref<RenderDevice>& device, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
+		void Load(const Ref<RenderDevice>& device, std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
 		void Load();
 
 		void LoadProgram(const aiScene* scene);
 		void TraverseHierarchy(const aiNode* node, const glm::mat4& parentTransform);
-		void OptimizeMeshData(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
+	private:
+		constexpr static inline float MESHOPT_OVERDRAW_THRESHOLD = 1.05f;
 
-		RenderDeviceResourceHandle m_VertexBufferHandle{};
-		RenderDeviceResourceHandle m_IndexBufferHandle{};
+		constexpr static inline uint32_t MESH_LOD_COUNT = 4;
+		/*
+		* LOD 0: radius >= 256 pixels
+		* LOD 1: radius >= 128 pixels
+		* LOD 2: radius >= 64 pixels
+		* LOD 3: everything smaller
+		*/
+		constexpr static inline std::array<float, MESH_LOD_COUNT> MESH_LOD_RATIOS = {
+			1.0f,
+			0.50f,
+			0.20f,
+			0.05f
+		};
+		constexpr static inline std::array<float, MESH_LOD_COUNT> MESH_LOD_MIN_PROJECTED_RADIUS = {
+			2000.0f,
+			1000.0f,
+			500.0f,
+			0.0f
+		};
+
+		constexpr static inline float MESH_LOD_TARGET_ERROR = 0.02f;
+
+		constexpr static inline size_t MESHLET_MIN_TRIANGLES = 20;
+		constexpr static inline size_t MESHLET_MAX_VERTICES = 64;
+		constexpr static inline size_t MESHLET_MAX_TRIANGLES = 64;
+		constexpr static inline float MESHLET_CONE_WEIGHT = 0.25f;
+	private:
+		void ReleaseCPUData();
+
+		void OptimizeMeshData(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
+		void BuildLODs(Submesh& submesh);
+
+		void BuildMeshlets(Submesh& submesh, const std::vector<uint32_t>& indices, float lodError, uint32_t lodIndex);
+
+		RenderDeviceObjectHandle m_RenderDeviceMeshHandle{};
 
 		std::vector<Submesh> m_Submeshes;
+
 		std::string m_Path;
 		std::string m_Name;
 

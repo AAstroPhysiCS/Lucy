@@ -1,13 +1,5 @@
 #include "LucyCommons.slang"
 
-struct VertexInput {
-    [[vk::location(0)]] float3 a_Pos : POSITION;
-    [[vk::location(2)]] float2 a_TextureCoords : TEXCOORD0;
-    [[vk::location(3)]] float3 a_Normals : NORMAL;
-    [[vk::location(4)]] float3 a_Tangents : TANGENT;
-    [[vk::location(5)]] float3 a_Bitangents : BITANGENT;
-};
-
 struct VertexOutput {
     float4 a_Pos : SV_Position;
     [[vk::location(0)]] float3 a_PosOutWS : POSITION0;
@@ -15,12 +7,11 @@ struct VertexOutput {
     [[vk::location(2)]] float3 a_NormalsWSOut : NORMAL;
     [[vk::location(3)]] float4 a_TangentWSOut : TANGENT0;
     [[vk::location(4)]] float a_ViewDepthOut : TEXCOORD1;
+    [[vk::location(5)]] uint a_MaterialID : TEXCOORD2;
 };
 
 struct LocalPushConstant {
-    float4x4 u_ModelMatrix;
-    float4x4 u_ModelMatrixInversedTransposed;
-    uint u_MaterialID;
+    GPUVisibleDraw* u_VisibleDraws;
     GPUTextureResource u_PBRTextureResources[4];
 };
 
@@ -28,17 +19,23 @@ struct LocalPushConstant {
 PushConstantGlobal<LocalPushConstant> PushConstants;
 
 [shader("vertex")]
-VertexOutput main(VertexInput input) {
+VertexOutput main(uint vertexIndex: SV_VulkanVertexID, uint drawIndex: SV_VulkanInstanceID) {
     SceneCamera camera = PushConstants.Root->Camera;
 
-    float4 worldPos = mul(PushConstants.Data.u_ModelMatrix, float4(input.a_Pos, 1.0));
+    GPUVisibleDraw visibleDraw = PushConstants.Data.u_VisibleDraws[drawIndex];
+    GPUObject object = PushConstants.Root->Addresses.Objects[visibleDraw.ObjectIndex];
+    GPUSubmesh submesh = PushConstants.Root->Addresses.Submeshes[visibleDraw.SubmeshIndex];
+    GPUVertex input = PushConstants.Root->Addresses.Vertices[vertexIndex];
+
+    float4x4 modelMatrix = mul(object.Transform, submesh.Transform);
+    float4x4 normalMatrix = mul(object.TransformInversedTransposed, submesh.TransformInversedTransposed);
+
+    float4 worldPos = mul(modelMatrix, float4(input.Position, 1.0f));
     float4 viewPos = mul(camera.u_ViewMatrix, worldPos);
 
-    float3x3 normalMatrix = float3x3(PushConstants.Data.u_ModelMatrixInversedTransposed);
-
-    float3 N = normalize(mul(normalMatrix, input.a_Normals));
-    float3 T = normalize(mul(normalMatrix, input.a_Tangents));
-    float3 B = normalize(mul(normalMatrix, input.a_Bitangents));
+    float3 N = normalize(mul(float3x3(normalMatrix), input.Normals));
+    float3 T = normalize(mul(float3x3(modelMatrix), input.Tangents));
+    float3 B = normalize(mul(float3x3(modelMatrix), input.Bitangents));
 
     // Make tangent perpendicular to the normal.
     T = normalize(T - N * dot(N, T));
@@ -49,10 +46,11 @@ VertexOutput main(VertexInput input) {
     VertexOutput output;
     output.a_Pos = mul(camera.u_ProjMatrix, viewPos);
     output.a_PosOutWS = worldPos.xyz;
-    output.a_TextureCoordsOut = input.a_TextureCoords;
+    output.a_TextureCoordsOut = input.TextureCoords;
+    output.a_NormalsWSOut = N;
     output.a_TangentWSOut = float4(T, handedness);
     output.a_ViewDepthOut = viewPos.z;
-    output.a_NormalsWSOut = N;
+    output.a_MaterialID = submesh.Draw.w;
 
     return output;
 }
@@ -66,6 +64,7 @@ struct PixelInput {
     [[vk::location(2)]] float3 a_NormalsWSOut : NORMAL;
     [[vk::location(3)]] float4 a_TangentWSOut : TANGENT0;
     [[vk::location(4)]] float a_ViewDepthOut : TEXCOORD1;
+    [[vk::location(5)]] uint a_MaterialID : TEXCOORD2;
 };
 
 struct PixelOutput {
@@ -164,7 +163,7 @@ PixelOutput main(PixelInput input) {
 
     const float gamma = 2.2f;
 
-    PBRMaterial material = PushConstants.Root->Addresses.PBRMaterials[PushConstants.Data.u_MaterialID];
+    PBRMaterial material = PushConstants.Root->Addresses.PBRMaterials[input.a_MaterialID];
     PBRMaterialSample materialSample = material.Sample(input.a_TextureCoordsOut);
 
     float alpha = materialSample.BaseColor.a;

@@ -8,7 +8,8 @@ namespace Lucy {
 
 	class VulkanGraphicsShader final : public GraphicsShader {
 	public:
-		VulkanGraphicsShader(const std::string& name, const std::filesystem::path& path, Ref<RenderDevice> device, const std::span<const uint32_t>& dataVertex, const std::span<const uint32_t>& dataFragment);
+		VulkanGraphicsShader(const std::string& name, const std::filesystem::path& path, const std::string& shaderEntryPointName, Ref<RenderDevice> device,
+			const std::span<const uint32_t>& dataVertex, const std::span<const uint32_t>& dataFragment);
 		virtual ~VulkanGraphicsShader() = default;
 
 		void RTDestroyResource(const Ref<RenderDevice>& device) final override;

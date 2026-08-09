@@ -26,9 +26,9 @@ namespace Lucy {
 
 		void RTRecreate(uint32_t width, uint32_t height) final override;
 	private:
-		void RTCreate();
-		void RTDestroyResource() final override;
-		void DestroyHandles();
+		void RTCreate(const Ref<VulkanRenderDevice>& vulkanDevice);
+		void RTDestroyResource(RenderDevice* device) final override;
+		void DestroyHandles(VulkanRenderDevice* device);
 
 		//Helper functions
 		Ref<VulkanImage> GetImage(uint32_t index);
@@ -40,8 +40,6 @@ namespace Lucy {
 		RenderDeviceResourceHandle m_DepthImageHandle{};
 
 		bool m_CreatedInFlightFrameBufferImages = false;
-
-		Ref<VulkanRenderDevice> m_VulkanDevice = nullptr;
 	};
 
 	class VulkanSwapChainFrameBuffer : private FrameBuffer {
@@ -54,9 +52,9 @@ namespace Lucy {
 		inline uint32_t GetWidth() const { return m_CreateInfo.Width; }
 		inline uint32_t GetHeight() const { return m_CreateInfo.Height; }
 
-		void RTDestroyResource() final override;
+		void RTDestroyResource(RenderDevice* device) final override;
 	private:
-		void CreateForSwapChain();
+		void CreateForSwapChain(const Ref<VulkanRenderDevice>& vulkanDevice);
 
 		void RTRecreate(uint32_t width, uint32_t height) final override;
 
@@ -66,7 +64,6 @@ namespace Lucy {
 		const Ref<VulkanRenderPass>& m_RenderPass = nullptr;
 
 		std::vector<VkFramebuffer> m_FrameBufferHandles;
-		Ref<VulkanRenderDevice> m_VulkanDevice = nullptr;
 
 		friend class VulkanSwapChain;
 	};

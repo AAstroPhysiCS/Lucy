@@ -27,10 +27,21 @@ namespace Lucy {
 		}
 	}
 	
-	void ShaderReflect::Info(const std::filesystem::path& path, const Slang::ComPtr<IComponentType>& linkedProgram, ShaderStageType stageFlag) {
+	void ShaderReflect::Info(const std::filesystem::path& path, const Slang::ComPtr<IComponentType>& linkedProgram, ShaderStageType stageFlag, std::string_view entryPointName) {
 		ProgramLayout* layout = linkedProgram->getLayout(0);
 
 		DebugInfo(layout);
+
+		EntryPointReflection* entryPointRef = nullptr;
+		for (uint32_t i = 0; i < layout->getEntryPointCount(); i++) {
+			EntryPointReflection* currentEntryPoint = layout->getEntryPointByIndex(i);
+			if (entryPointName == currentEntryPoint->getName()) {
+				entryPointRef = currentEntryPoint;
+				break;
+			}
+		}
+
+		LUCY_ASSERT(entryPointRef, "Failed to find reflected entry point '{0}' in shader: {1}", entryPointName, path.string());
 
 		const auto UnwrapArrayType = [](TypeReflection* type) {
 			while (type && type->getKind() == TypeReflection::Kind::Array) {
@@ -40,28 +51,25 @@ namespace Lucy {
 		};
 
 		if (stageFlag == ShaderStageType::Vertex) {
-			for (uint32_t j = 0; j < layout->getEntryPointCount(); j++) {
-				EntryPointReflection* entryPointRef = layout->getEntryPointByIndex(j);
-				for (uint32_t k = 0; k < layout->getParameterCount(); k++) {
-					auto parameters = entryPointRef->getParameterByIndex(k);
-					auto type = parameters->getTypeLayout();
+			for (uint32_t k = 0; k < layout->getParameterCount(); k++) {
+				auto parameters = entryPointRef->getParameterByIndex(k);
+				auto type = parameters->getTypeLayout();
 
-					for (uint32_t l = 0; l < type->getFieldCount(); l++) {
-						auto field = type->getFieldByIndex(l);
-						auto fieldType = field->getType();
+				for (uint32_t l = 0; l < type->getFieldCount(); l++) {
+					auto field = type->getFieldByIndex(l);
+					auto fieldType = field->getType();
 
-						VertexShaderLayoutElement element;
-						element.Name = field->getName();
-						element.Location = field->getBindingIndex();
-						element.Type = SlangScalarTypeToShaderMemberType(fieldType->getElementType()->getScalarType());
-						if (element.Type == ShaderMemberType::Unknown) {
-							element.Type = SlangScalarTypeToShaderMemberType(fieldType->getScalarType());
-						}
-						element.ShaderDataSize = ShaderMemberTypeToSize(element.Type);
-						element.ElementCount = fieldType->getElementCount();
-
-						m_VertexShaderLayout.push_back(element);
+					VertexShaderLayoutElement element;
+					element.Name = field->getName();
+					element.Location = field->getBindingIndex();
+					element.Type = SlangScalarTypeToShaderMemberType(fieldType->getElementType()->getScalarType());
+					if (element.Type == ShaderMemberType::Unknown) {
+						element.Type = SlangScalarTypeToShaderMemberType(fieldType->getScalarType());
 					}
+					element.ShaderDataSize = ShaderMemberTypeToSize(element.Type);
+					element.ElementCount = fieldType->getElementCount();
+
+					m_VertexShaderLayout.push_back(element);
 				}
 			}
 		}

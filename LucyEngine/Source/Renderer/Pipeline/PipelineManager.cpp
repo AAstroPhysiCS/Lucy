@@ -12,14 +12,14 @@ namespace Lucy {
 		: m_RenderDevice(device) {
 	}
 
-	RenderDeviceResourceHandle PipelineManager::CreateGraphicsPipeline(const std::string& name, const GraphicsPipelineCreateInfo& createInfo) {
-		auto [tuple, success] = m_GraphicsPipelines.try_emplace(name, m_RenderDevice->CreateGraphicsPipeline(createInfo));
+	RenderDeviceResourceHandle PipelineManager::CreateGraphicsPipeline(const std::string& name, const Ref<Shader>& shader, const GraphicsPipelineCreateInfo& createInfo) {
+		auto [tuple, success] = m_GraphicsPipelines.try_emplace(name, m_RenderDevice->CreateGraphicsPipeline(createInfo, shader));
 		LUCY_ASSERT(success);
 		return tuple->second;
 	}
 
-	RenderDeviceResourceHandle PipelineManager::CreateComputePipeline(const std::string& name, const ComputePipelineCreateInfo& createInfo) {
-		auto [tuple, success] = m_ComputePipelines.try_emplace(name, m_RenderDevice->CreateComputePipeline(createInfo));
+	RenderDeviceResourceHandle PipelineManager::CreateComputePipeline(const std::string& name, const Ref<Shader>& shader, const ComputePipelineCreateInfo& createInfo) {
+		auto [tuple, success] = m_ComputePipelines.try_emplace(name, m_RenderDevice->CreateComputePipeline(createInfo, shader));
 		LUCY_ASSERT(success);
 		return tuple->second;
 	}
@@ -31,14 +31,18 @@ namespace Lucy {
 		return statistics;
 	}
 
-	void PipelineManager::RTRecreateAllPipelinesDependentOnShader(const std::string_view& shaderName) {
+	void PipelineManager::RTRecreateAllPipelinesDependentOnShader(const std::vector<Ref<Shader>>& shadersThatAreReloaded) {
 		const auto RecreateAllPipelines = [&]<typename TPipeline>() {
 			for (auto handle : (std::same_as<TPipeline, GraphicsPipeline>
 				? m_GraphicsPipelines : m_ComputePipelines)
 				| std::views::values) {
 				const auto& pipeline = m_RenderDevice->AccessResource<TPipeline>(handle);
-				if (pipeline->GetShader()->GetName() == shaderName)
-					pipeline->RTRecreate();
+				for (const auto& shader : shadersThatAreReloaded) {
+					if (pipeline->GetShader()->GetName() == shader->GetName()) {
+						pipeline->RTRecreate(shader);
+						break;
+					}
+				}
 			}
 		};
 

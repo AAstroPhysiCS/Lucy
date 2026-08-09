@@ -16,8 +16,8 @@
 
 namespace Lucy {
 
-	VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo, const Ref<VulkanRenderDevice>& vulkanDevice)
-		: GraphicsPipeline(createInfo) {
+	VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo, const Ref<Shader>& shader, const Ref<VulkanRenderDevice>& vulkanDevice)
+		: GraphicsPipeline(createInfo, shader) {
 		Renderer::EnqueueToRenderCommandQueue([&](const auto& device) {
 			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
 			Create(vulkanDevice);
@@ -106,14 +106,12 @@ namespace Lucy {
 																													  m_CreateInfo.DepthConfiguration.StencilTestEnable);
 
 		VkGraphicsPipelineCreateInfo pipelineCreateInfo = VulkanAPI::GraphicsPipelineCreateInfo(&vertexInputInfo, &inputAssemblyInfo, &viewportState, &rasterizationCreateInfo,
-																								&multisamplingCreateInfo, &depthStencilCreateInfo, &colorBlending, &dynamicState,
-																								m_PipelineLayoutHandle,
-																								m_CreateInfo.Shader->As<VulkanGraphicsShader>(),
-																								renderPass);
+				&multisamplingCreateInfo, &depthStencilCreateInfo, &colorBlending, &dynamicState, m_PipelineLayoutHandle, shader->As<VulkanGraphicsShader>(), renderPass);
+
 		LUCY_VK_ASSERT(vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_PipelineHandle));
-		LUCY_INFO("Vulkan graphics pipeline '{0}' created successfully!", m_CreateInfo.Shader->GetName());
+		LUCY_INFO("Vulkan graphics pipeline '{0}' created successfully!", shader->GetName());
 #ifdef LUCY_DEBUG
-		std::string objectName = std::format("{0} Graphics Pipeline", m_CreateInfo.Shader->GetName());
+		std::string objectName = std::format("{0} Graphics Pipeline", shader->GetName());
 
 		VkDebugUtilsObjectNameInfoEXT nameInfo{};
 		nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
@@ -175,25 +173,25 @@ namespace Lucy {
 		return result;
 	}
 
-	void VulkanGraphicsPipeline::RTDestroyResource() {
-		Pipeline::RTDestroyResource();
+	void VulkanGraphicsPipeline::RTDestroyResource(RenderDevice* device) {
+		Pipeline::RTDestroyResource(device);
+
+		const auto& vulkanDevice = reinterpret_cast<VulkanRenderDevice*>(device);
+		VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
+
+		vkDestroyPipelineLayout(logicalDevice, m_PipelineLayoutHandle, nullptr);
+		vkDestroyPipeline(logicalDevice, m_PipelineHandle, nullptr);
+
+		m_PipelineHandle = VK_NULL_HANDLE;
+		m_PipelineLayoutHandle = VK_NULL_HANDLE;
+	}
+
+	void VulkanGraphicsPipeline::RTRecreate(Ref<Shader> newShader) {
+		Renderer::EnqueueResourceDestroy(GetMyHandle());
 
 		Renderer::EnqueueToRenderCommandQueue([=](const auto& device) {
 			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
-			VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
-
-			vkDestroyPipelineLayout(logicalDevice, m_PipelineLayoutHandle, nullptr);
-			vkDestroyPipeline(logicalDevice, m_PipelineHandle, nullptr);
-
-			m_PipelineHandle = VK_NULL_HANDLE;
-			m_PipelineLayoutHandle = VK_NULL_HANDLE;
-		});
-	}
-
-	void VulkanGraphicsPipeline::RTRecreate() {
-		RTDestroyResource();
-		Renderer::EnqueueToRenderCommandQueue([&](const auto& device) {
-			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+			SetShader(newShader);
 			Create(vulkanDevice);
 		});
 	}

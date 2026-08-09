@@ -168,7 +168,7 @@ namespace Lucy {
 				ImGui::Text("Path");
 				ImGui::SameLine();
 				if (ImGui::InputText("##hideLabel MeshPath", buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
-					c.LoadMesh(buf);
+					c.LoadMesh(entityContext, buf);
 					entityContext.GetComponent<TagComponent>().SetTag(c.GetMesh()->GetName());
 				}
 
@@ -178,7 +178,7 @@ namespace Lucy {
 					std::string outPath;
 					Utils::OpenDialog(outPath, Utils::MeshFilterList, 1, "Assets/");
 					if (!outPath.empty()) {
-						c.LoadMesh(outPath);
+						c.LoadMesh(entityContext, outPath);
 						entityContext.GetComponent<TagComponent>().SetTag(c.GetMesh()->GetName());
 					}
 				}

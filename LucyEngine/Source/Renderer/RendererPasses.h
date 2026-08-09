@@ -2,10 +2,57 @@
 
 #include "Scene/Camera.h"
 
+#include "Memory/Buffer/RenderDeviceBuffer.h"
+#include "Device/RenderDeviceHandles.h"
+
 namespace Lucy {
 
 	class Scene;
 	class RenderGraph;
+	class RenderGraphRegistry;
+
+#pragma region GPUDrivenRendererPasses
+
+	enum RenderBin : uint32_t {
+		Opaque = 0,
+		OpaqueDoubleSided, //TODO:
+		AlphaTest, //TODO:
+		AlphaTestDoubleSided, //TODO:
+		Count
+	};
+
+	struct RenderDeviceGPUCullData {
+		RenderDeviceBufferReference VisibleObjects = 0;
+		RenderDeviceBufferReference VisibleObjectCount = 0;
+		RenderDeviceBufferReference MeshletDispatchIndirect = 0;
+		RenderDeviceBufferReference VisibleDraws = 0;
+		RenderDeviceBufferReference IndirectCommands = 0;
+		RenderDeviceBufferReference DrawCounts = 0;
+
+		uint32_t ObjectCapacity = 0;
+		uint32_t CommandCapacityPerBin = 0;
+		uint32_t ViewIndex = 0;
+		uint32_t RenderBinCount = RenderBin::Count;
+	};
+
+	template<typename T>
+	struct GlobalPushConstant;
+
+	struct GPUDrivenRendererPass final {
+		GPUDrivenRendererPass(Ref<RenderDevice> device);
+		~GPUDrivenRendererPass() = default;
+
+		void AddPass(const Ref<RenderGraph>& renderGraph);
+	private:
+		static void AddHiZPass(const Ref<RenderGraph>& renderGraph);
+		static void AddDrawCommandsBuildPass(const Ref<RenderGraph>& renderGraph);
+		static void AddObjectCullPass(const Ref<RenderGraph>& renderGraph);
+		static void AddMeshletCullPass(const Ref<RenderGraph>& renderGraph);
+
+		static GlobalPushConstant<RenderDeviceGPUCullData> CreateGPUCullPushConstant(RenderGraphRegistry& registry, uint32_t viewIndex);
+	};
+
+#pragma endregion GPUDrivenRendererPasses
 
 #pragma region GeometryPass
 
@@ -35,6 +82,10 @@ namespace Lucy {
 		inline static constexpr const float GetNearPlaneFactor() { return s_NearPlaneFactor; }
 		inline static constexpr const float GetFarPlaneFactor() { return s_FarPlaneFactor; }
 
+		uint32_t GetShadowMapSize() const { return m_ShadowMapSize; }
+		void CreateCullView(const Ref<RenderDevice>& device);
+		const RenderDeviceObjectHandle& GetCullViewHandle() const { return m_CullViewHandle; }
+
 		static void ResetSplit();
 	private:
 		const EditorCamera& m_EditorCamera;
@@ -47,12 +98,23 @@ namespace Lucy {
 
 		inline static constexpr const float s_NearPlaneFactor = 1.0f;
 		inline static constexpr const float s_FarPlaneFactor = 1.0f;
+
+		RenderDeviceObjectHandle m_CullViewHandle;
+	};
+
+	struct RenderDeviceGPUShadowCullData {
+		RenderDeviceBufferReference VisibleObjects = 0;
+		RenderDeviceBufferReference VisibleObjectCounts = 0;
+		RenderDeviceBufferReference MeshletDispatches = 0;
+
+		glm::uvec4 ViewIndices{0};
+		glm::uvec4 Data{0}; // x: object capacity, y: command capacity, z: cascade count
 	};
 
 	struct ShadowPass final {
 		static inline constexpr const uint32_t NUM_CASCADES = 4;
 
-		ShadowPass(Ref<Scene> scene, uint32_t size);
+		ShadowPass(Ref<RenderDevice> device, Ref<Scene> scene, uint32_t size);
 		~ShadowPass() = default;
 
 		void AddPass(const Ref<RenderGraph>& renderGraph);
@@ -60,9 +122,12 @@ namespace Lucy {
 		static inline std::vector<ShadowCamera>& GetShadowCameras() { return s_ShadowCameras; }
 	private:
 		void InitializeShadowCameras(uint32_t size, const EditorCamera& editorCamera) const;
-		
+
+		GlobalPushConstant<RenderDeviceGPUShadowCullData> CreateGPUCullPushConstant(RenderGraphRegistry& registry) const;
+		GlobalPushConstant<RenderDeviceGPUCullData> CreateGPUMeshletCullPushConstant(RenderGraphRegistry& registry, uint32_t cascadeIndex) const;
 		static inline std::vector<ShadowCamera> s_ShadowCameras;
 
+		Ref<RenderDevice> m_Device;
 		Ref<Scene> m_Scene;
 		uint32_t m_ShadowMapSize;
 	};

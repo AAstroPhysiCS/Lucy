@@ -12,6 +12,8 @@
 #include "../Core/Application.h"
 
 #include "Renderer.h"
+#include "Renderer/Device/RenderDeviceScene.h"
+
 #include "Material/MaterialManager.h"
 
 #include "Core/Timer.h"
@@ -46,8 +48,14 @@ namespace Lucy {
 		};
 	}
 
-	Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices) {
-		Renderer::EnqueueToRenderCommandQueue([this, vertices, indices](Ref<RenderDevice>& device) {
+	Mesh::Mesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices) {
+		Renderer::EnqueueToRenderCommandQueue([this, vertices = std::move(vertices), indices = std::move(indices)](const Ref<RenderDevice>& device) mutable {
+			Load(device, vertices, indices);
+		});
+	}
+
+	Mesh::Mesh(std::vector<Vertex>&& vertices, std::vector<uint32_t>&& indices) {
+		Renderer::EnqueueToRenderCommandQueue([this, vertices = std::move(vertices), indices = std::move(indices)](const Ref<RenderDevice>& device) mutable {
 			Load(device, vertices, indices);
 		});
 	}
@@ -57,18 +65,12 @@ namespace Lucy {
 		Load();
 	}
 
-	void Mesh::Load(const Ref<RenderDevice>& device, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices) {
-		m_VertexBufferHandle = device->CreateVertexBuffer(vertices.size() * sizeof(Vertex));
-		m_IndexBufferHandle = device->CreateIndexBuffer(indices.size());
-
-		const auto& vertexBuffer = Renderer::AccessResource<VertexBuffer>(m_VertexBufferHandle);
-		const auto& indexBuffer = Renderer::AccessResource<IndexBuffer>(m_IndexBufferHandle);
-
-		vertexBuffer->SetData(vertices);
-		indexBuffer->SetData(indices);
-
-		vertexBuffer->RTLoadToDevice();
-		indexBuffer->RTLoadToDevice();
+	void Mesh::Load(const Ref<RenderDevice>& device, std::vector<Vertex>& vertices, std::vector<uint32_t>& indices) {
+		m_RenderDeviceMeshHandle = device->GetScene()->RegisterMesh(vertices, indices, m_Submeshes);
+		//need to submit since registermesh also submits
+		Renderer::EnqueueToRenderCommandQueue([this](const auto& device) {
+			ReleaseCPUData();
+		});
 	}
 
 	void Mesh::Load() {
@@ -92,14 +94,14 @@ namespace Lucy {
 		TraverseHierarchy(scene->mRootNode, glm::mat4(1.0f));
 
 		std::vector<Vertex> packedVertices(m_MetadataInfo.TotalVerticesSize);
-		std::vector<uint32_t> packedIndices(m_MetadataInfo.TotalIndicesSize);
+		std::vector<uint32_t> packedIndices(m_MetadataInfo.TotalMeshletIndicesSize);
 
 		for (const Submesh& submesh : m_Submeshes) {
 			memcpy(&packedVertices[submesh.BaseVertexCount], submesh.Vertices.data(), submesh.Vertices.size() * sizeof(Vertex));
-			memcpy(&packedIndices[submesh.BaseIndexCount], submesh.Indices.data(), submesh.Indices.size() * sizeof(uint32_t));
+			memcpy(&packedIndices[submesh.BaseMeshletIndexCount], submesh.MeshletIndices.data(), submesh.MeshletIndices.size() * sizeof(uint32_t));
 		}
 
-		Renderer::EnqueueToRenderCommandQueue([this, packedVertices = std::move(packedVertices), packedIndices = std::move(packedIndices)](const Ref<RenderDevice>& device) {
+		Renderer::EnqueueToRenderCommandQueue([this, packedVertices = std::move(packedVertices), packedIndices = std::move(packedIndices)](const Ref<RenderDevice>& device) mutable {
 			Load(device, packedVertices, packedIndices);
 		});
 	}
@@ -180,6 +182,7 @@ namespace Lucy {
 			}
 
 			OptimizeMeshData(submesh.Vertices, submesh.Indices);
+			BuildLODs(submesh);
 
 			submesh.VertexCount = static_cast<uint32_t>(submesh.Vertices.size());
 			submesh.IndexCount = static_cast<uint32_t>(submesh.Indices.size());
@@ -189,19 +192,35 @@ namespace Lucy {
 
 		uint32_t runningVertexOffset = 0;
 		uint32_t runningIndexOffset = 0;
+		uint32_t runningMeshletOffset = 0;
+		uint32_t runningMeshletIndexOffset = 0;
+		uint32_t runningMeshletVertexOffset = 0;
+		uint32_t runningMeshletTriangleOffset = 0;
 
 		for (uint32_t i = 0; i < meshCount; i++) {
 			Submesh& submesh = m_Submeshes[i];
 
 			submesh.BaseVertexCount = runningVertexOffset;
 			submesh.BaseIndexCount = runningIndexOffset;
+			submesh.BaseMeshletCount = runningMeshletOffset;
+			submesh.BaseMeshletIndexCount = runningMeshletIndexOffset;
+			submesh.BaseMeshletVertexCount = runningMeshletVertexOffset;
+			submesh.BaseMeshletTriangleCount = runningMeshletTriangleOffset;
 
 			runningVertexOffset += submesh.VertexCount;
 			runningIndexOffset += submesh.IndexCount;
+			runningMeshletOffset += static_cast<uint32_t>(submesh.Meshlets.size());
+			runningMeshletIndexOffset += static_cast<uint32_t>(submesh.MeshletIndices.size());
+			runningMeshletVertexOffset += static_cast<uint32_t>(submesh.MeshletVertices.size());
+			runningMeshletTriangleOffset += static_cast<uint32_t>(submesh.MeshletTriangles.size());
 		}
 
 		m_MetadataInfo.TotalVerticesSize = runningVertexOffset;
 		m_MetadataInfo.TotalIndicesSize = runningIndexOffset;
+		m_MetadataInfo.TotalMeshletsSize = runningMeshletOffset;
+		m_MetadataInfo.TotalMeshletIndicesSize = runningMeshletIndexOffset;
+		m_MetadataInfo.TotalMeshletVerticesSize = runningMeshletVertexOffset;
+		m_MetadataInfo.TotalMeshletTrianglesSize = runningMeshletTriangleOffset;
 
 		const auto& materialManager = Renderer::GetMaterialManager();
 		for (uint32_t i = 0; i < meshCount; i++) {
@@ -263,11 +282,156 @@ namespace Lucy {
 		indices = std::move(optimizedIndices);
 	}
 
+	void Mesh::BuildLODs(Submesh& submesh) {
+		submesh.LODs.reserve(MESH_LOD_COUNT);
+
+		if (submesh.Vertices.empty() || submesh.Indices.empty()) {
+			submesh.LODs.resize(MESH_LOD_COUNT);
+			submesh.MeshletCount = 0;
+			return;
+		}
+
+		const std::vector<uint32_t>& baseIndices = submesh.Indices;
+
+		for (uint32_t lodIndex = 0; lodIndex < MESH_LOD_COUNT; lodIndex++) {
+			std::vector<uint32_t> lodIndices;
+			float lodError = 0.0f;
+
+			if (lodIndex == 0) {
+				lodIndices = baseIndices;
+			} else {
+				size_t targetIndexCount = static_cast<size_t>(baseIndices.size() * MESH_LOD_RATIOS[lodIndex]);
+				targetIndexCount = (targetIndexCount / 3) * 3;
+				targetIndexCount = std::max<size_t>(targetIndexCount, 3);
+
+				lodIndices.resize(baseIndices.size());
+
+				const size_t simplifiedIndexCount = meshopt_simplify(lodIndices.data(), baseIndices.data(), baseIndices.size(),
+					&submesh.Vertices[0].Position.x, submesh.Vertices.size(), sizeof(Vertex), targetIndexCount,
+					MESH_LOD_TARGET_ERROR, 0, &lodError);
+
+				if (simplifiedIndexCount < 3) {
+					lodIndices = baseIndices;
+					lodError = 0.0f;
+				} else {
+					lodIndices.resize(simplifiedIndexCount);
+				}
+
+				meshopt_optimizeVertexCache(lodIndices.data(), lodIndices.data(), lodIndices.size(), submesh.Vertices.size());
+			}
+
+			BuildMeshlets(submesh, lodIndices, lodError, lodIndex);
+		}
+
+		submesh.MeshletCount = static_cast<uint32_t>(submesh.Meshlets.size());
+	}
+
+	void Mesh::BuildMeshlets(Submesh& submesh, const std::vector<uint32_t>& indices, float lodError, uint32_t lodIndex) {
+		SubmeshLOD lod{};
+		lod.FirstMeshlet = static_cast<uint32_t>(submesh.Meshlets.size());
+		lod.FirstMeshletIndex = static_cast<uint32_t>(submesh.MeshletIndices.size());
+		lod.Error = lodError;
+		lod.MinimumProjectedRadius = MESH_LOD_MIN_PROJECTED_RADIUS[lodIndex];
+
+		if (submesh.Vertices.empty() || indices.empty()) {
+			submesh.LODs.push_back(lod);
+			return;
+		}
+
+		size_t maxMeshletCount = meshopt_buildMeshletsBound(indices.size(), MESHLET_MAX_VERTICES, MESHLET_MAX_TRIANGLES);
+
+		std::vector<meshopt_Meshlet> generatedMeshlets(maxMeshletCount);
+		submesh.MeshletVertices.resize(indices.size());
+		submesh.MeshletTriangles.resize(indices.size());
+
+		size_t meshletCount = meshopt_buildMeshletsFlex(generatedMeshlets.data(), submesh.MeshletVertices.data(), submesh.MeshletTriangles.data(),
+			indices.data(), indices.size(), &submesh.Vertices[0].Position.x, submesh.Vertices.size(), sizeof(Vertex), 
+			MESHLET_MAX_VERTICES, MESHLET_MIN_TRIANGLES, MESHLET_MAX_TRIANGLES, MESHLET_CONE_WEIGHT, 2.0f);
+
+		size_t baseMeshletVertexOffset = submesh.MeshletVertices.size();
+		size_t baseMeshletTriangleOffset = submesh.MeshletTriangles.size();
+
+		generatedMeshlets.resize(meshletCount);
+		submesh.Meshlets.reserve(meshletCount);
+
+		if (generatedMeshlets.empty()) {
+			submesh.MeshletVertices.clear();
+			submesh.MeshletTriangles.clear();
+			submesh.MeshletCount = 0;
+
+			submesh.LODs.push_back(lod);
+			return;
+		}
+
+		for (size_t meshletIndex = 0; meshletIndex < generatedMeshlets.size(); meshletIndex++) {
+			const meshopt_Meshlet& generatedMeshlet = generatedMeshlets[meshletIndex];
+
+			meshopt_optimizeMeshlet(submesh.MeshletVertices.data() + generatedMeshlet.vertex_offset, submesh.MeshletTriangles.data() + generatedMeshlet.triangle_offset,
+				generatedMeshlet.triangle_count, generatedMeshlet.vertex_count);
+
+			meshopt_Bounds bounds = meshopt_computeMeshletBounds(submesh.MeshletVertices.data() + generatedMeshlet.vertex_offset, 
+				submesh.MeshletTriangles.data() + generatedMeshlet.triangle_offset, generatedMeshlet.triangle_count, &submesh.Vertices[0].Position.x,
+				submesh.Vertices.size(), sizeof(Vertex));
+
+			Meshlet meshlet{};
+			//Meshlet& meshlet = submesh.Meshlets[meshletIndex];
+			meshlet.VertexOffset = baseMeshletVertexOffset + generatedMeshlet.vertex_offset;
+			meshlet.TriangleOffset = baseMeshletTriangleOffset + generatedMeshlet.triangle_offset;
+			meshlet.VertexCount = generatedMeshlet.vertex_count;
+			meshlet.TriangleCount = generatedMeshlet.triangle_count;
+
+			meshlet.FirstIndex = static_cast<uint32_t>(submesh.MeshletIndices.size());
+			meshlet.IndexCount = generatedMeshlet.triangle_count * 3;
+
+			for (uint32_t index = 0; index < meshlet.IndexCount; index++) {
+				uint8_t meshletVertexIndex = submesh.MeshletTriangles[generatedMeshlet.triangle_offset + index];
+				uint32_t submeshVertexIndex = submesh.MeshletVertices[generatedMeshlet.vertex_offset + meshletVertexIndex];
+
+				submesh.MeshletIndices.push_back(submeshVertexIndex);
+			}
+
+			meshlet.BoundingSphere = { bounds.center[0], bounds.center[1], bounds.center[2], bounds.radius };
+			meshlet.NormalCone = { bounds.cone_axis[0], bounds.cone_axis[1], bounds.cone_axis[2], bounds.cone_cutoff };
+
+			submesh.Meshlets.push_back(meshlet);
+		}
+
+		const meshopt_Meshlet& lastMeshlet = generatedMeshlets.back();
+
+		size_t usedMeshletVertexCount = static_cast<size_t>(lastMeshlet.vertex_offset) + static_cast<size_t>(lastMeshlet.vertex_count);
+		size_t lastTriangleByteCount = (static_cast<size_t>(lastMeshlet.triangle_count) * 3 + 3) & ~size_t(3);
+		size_t usedMeshletTriangleCount = static_cast<size_t>(lastMeshlet.triangle_offset) + lastTriangleByteCount;
+
+		submesh.MeshletVertices.resize(usedMeshletVertexCount);
+		submesh.MeshletTriangles.resize(usedMeshletTriangleCount);
+		submesh.MeshletCount = static_cast<uint32_t>(meshletCount);
+
+		lod.MeshletCount = static_cast<uint32_t>(meshletCount);
+		lod.MeshletIndexCount = static_cast<uint32_t>(submesh.MeshletIndices.size()) - lod.FirstMeshletIndex;
+
+		submesh.LODs.push_back(lod);
+	}
+
+	void Mesh::ReleaseCPUData() {
+		for (Submesh& submesh : m_Submeshes) {
+			submesh.Vertices.clear();
+			submesh.Indices.clear();
+			submesh.Meshlets.clear();
+			submesh.MeshletVertices.clear();
+			submesh.MeshletTriangles.clear();
+			submesh.MeshletIndices.clear();
+
+			submesh.Vertices.shrink_to_fit();
+			submesh.Indices.shrink_to_fit();
+			submesh.Meshlets.shrink_to_fit();
+			submesh.MeshletVertices.shrink_to_fit();
+			submesh.MeshletTriangles.shrink_to_fit();
+			submesh.MeshletIndices.shrink_to_fit();
+		}
+	}
+
 	void Mesh::Destroy() {
 		for (Submesh& submesh : m_Submeshes)
 			Renderer::GetMaterialManager()->RTDestroyMaterial(submesh.MaterialID);
-
-		Renderer::EnqueueResourceDestroy(m_VertexBufferHandle);
-		Renderer::EnqueueResourceDestroy(m_IndexBufferHandle);
 	}
 }

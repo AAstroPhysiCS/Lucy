@@ -26,12 +26,12 @@ namespace Lucy {
 		}
 
 		template <typename ... TComponent>
-		inline bool HasComponent() {
+		inline bool HasComponent() const {
 			LUCY_ASSERT(IsValid());
 			return m_Scene->m_Registry.all_of<TComponent...>(m_Entity);
 		}
 
-		inline bool IsValid() {
+		inline bool IsValid() const {
 			if ((ENTT_ID_TYPE)m_Entity == std::numeric_limits<ENTT_ID_TYPE>::max()) return false;
 			return m_Scene->m_Registry.valid(m_Entity);
 		}
@@ -44,6 +44,12 @@ namespace Lucy {
 
 		template <typename TComponent>
 		inline TComponent& GetComponent() {
+			LUCY_ASSERT(IsValid());
+			return m_Scene->m_Registry.get<TComponent>(m_Entity);
+		}
+		
+		template <typename TComponent>
+		inline const TComponent& GetComponent() const {
 			LUCY_ASSERT(IsValid());
 			return m_Scene->m_Registry.get<TComponent>(m_Entity);
 		}

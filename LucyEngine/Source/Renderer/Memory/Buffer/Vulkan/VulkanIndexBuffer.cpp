@@ -7,12 +7,12 @@
 namespace Lucy {
 
 	VulkanIndexBuffer::VulkanIndexBuffer(size_t size, const Ref<VulkanRenderDevice>& device)
-		: IndexBuffer(size), m_VulkanDevice(device) {
-		RTCreate(size); //staging buffer allocation
+		: IndexBuffer(size) {
+		RTCreate(device, size); //staging buffer allocation
 	}
 
-	void VulkanIndexBuffer::RTCreate(size_t size) {
-		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
+	void VulkanIndexBuffer::RTCreate(const Ref<VulkanRenderDevice>& device, size_t size) {
+		VulkanAllocator& allocator = device->GetAllocator();
 		allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, size * sizeof(uint32_t), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, false,
 										m_StagingBufferHandle, m_StagingBufferVma);
 	}
@@ -22,8 +22,9 @@ namespace Lucy {
 		vkCmdBindIndexBuffer(info.CommandBuffer, m_BufferHandle, 0, VK_INDEX_TYPE_UINT32);
 	}
 
-	void VulkanIndexBuffer::RTLoadToDevice() {
-		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
+	void VulkanIndexBuffer::RTLoadToDevice(RenderDevice* device) {
+		auto vulkanDevice = reinterpret_cast<VulkanRenderDevice*>(device);
+		VulkanAllocator& allocator = vulkanDevice->GetAllocator();
 
 		void* data;
 		allocator.MapMemory(m_StagingBufferVma, data);
@@ -37,8 +38,9 @@ namespace Lucy {
 		allocator.DestroyBuffer(m_StagingBufferHandle, m_StagingBufferVma);
 	}
 
-	void VulkanIndexBuffer::RTDestroyResource() {
-		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
+	void VulkanIndexBuffer::RTDestroyResource(RenderDevice* device) {
+		auto vulkanDevice = reinterpret_cast<VulkanRenderDevice*>(device);
+		VulkanAllocator& allocator = vulkanDevice->GetAllocator();
 		allocator.DestroyBuffer(m_BufferHandle, m_BufferVma);
 	}
 }

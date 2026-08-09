@@ -6,7 +6,7 @@
 namespace Lucy {
 
 	VulkanImageSampler::VulkanImageSampler(const ImageSamplerCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device)
-		: ImageSampler(createInfo), m_VulkanDevice(device) {
+		: ImageSampler(createInfo) {
 		auto GetImageFilter = [](ImageFilterMode mode) {
 			switch (mode) {
 				case ImageFilterMode::LINEAR:
@@ -42,11 +42,11 @@ namespace Lucy {
 		LUCY_VK_ASSERT(vkCreateSampler(device->GetLogicalDevice(), &vkCreateInfo, nullptr, &m_Handle));
 	}
 
-	void VulkanImageSampler::RTDestroyResource() {
+	void VulkanImageSampler::RTDestroyResource(RenderDevice* device) {
 		if (!m_Handle)
 			return;
 
-		vkDestroySampler(m_VulkanDevice->GetLogicalDevice(), m_Handle, nullptr);
+		vkDestroySampler(reinterpret_cast<VulkanRenderDevice*>(device)->GetLogicalDevice(), m_Handle, nullptr);
 		m_Handle = VK_NULL_HANDLE;
 	}
 }

@@ -17,19 +17,20 @@ namespace Lucy {
 	class VulkanDescriptorSetManager;
 
 	//per name, it could have multiple shader programs
-	//that means, that each file can uphold multiple shader programs (multiple entrypoints) (e.g. VertexFragment and Compute and Tessellation etc...)
-	using ShaderStageMap = std::unordered_map<ShaderStageType, Ref<Shader>>;
+	//that means, that each file can uphold multiple in multiple shader programs (multiple entrypoints) (e.g. VertexFragment and Compute and Tessellation etc...)
+	using ShaderStageMap = std::unordered_map<ShaderStageType, std::vector<Ref<Shader>>>;
 	using ShaderLibrary = std::unordered_map<std::string, ShaderStageMap>;
 
 	class ShaderManager final {
 	private:
-		inline static std::filesystem::path s_ShaderFolder = "Assets/Shaders";
-		inline static std::filesystem::path s_CacheFolder = "Assets/Shaders/Cached";
+		static inline std::filesystem::path s_ShaderFolder = "Assets/Shaders";
+		static inline std::filesystem::path s_CacheFolder = "Assets/Shaders/Cached";
 
 		struct ShaderProgram {
-			ShaderStageType Stage;
-			std::vector<Slang::ComPtr<slang::IBlob>> Blobs;
-			Slang::ComPtr<IComponentType> LinkedProgram;
+			ShaderStageType Stage = ShaderStageType::Unknown;
+			std::string EntryPointName;
+			Slang::ComPtr<slang::IBlob> Blob;
+			Slang::ComPtr<slang::IComponentType> LinkedProgram;
 		};
 	public:
 		ShaderManager();
@@ -42,18 +43,19 @@ namespace Lucy {
 
 		void InitializeShaders(Ref<RenderDevice> device, const std::initializer_list<const char*> excludeList = {});
 		
-		inline static std::filesystem::path& GetShaderFolder() { return s_ShaderFolder; }
-		inline static std::filesystem::path& GetCacheFolder() { return s_CacheFolder; }
+		static std::filesystem::path& GetShaderFolder() { return s_ShaderFolder; }
+		static std::filesystem::path& GetCacheFolder() { return s_CacheFolder; }
 
-		void ReloadShader(Ref<RenderDevice> device, const std::string& name);
-		inline bool HasShader(const std::string& name) const { return m_Shaders.contains(name); }
+		std::vector<Ref<Shader>> ReloadShader(Ref<RenderDevice> device, const std::string& name);
+		bool HasShader(const std::string& name) const { return m_Shaders.contains(name); }
 
 		void DestroyAllShaders(Ref<RenderDevice> device);
 		void Destroy();
 
-		inline const ShaderLibrary& GetShaderLibrary() const { return m_Shaders; };
-		inline const ShaderStageMap& GetShaderStageMap(const std::string& name) const { return m_Shaders.at(name); };
-		Ref<Shader> GetShader(ShaderStageType type, const std::string& name) const { return m_Shaders.at(name).at(type); }
+		const ShaderStageMap& GetShaderStageMap(const std::string& name) const { return m_Shaders.at(name); }
+		const ShaderLibrary& GetShaderLibrary() const { return m_Shaders; };
+
+		Ref<Shader> GetShader(ShaderStageType type, const std::string& name, std::string_view entryPointName) const;
 	private:
 		Slang::ComPtr<slang::ISession> CreateNewSlangSession();
 
@@ -67,7 +69,7 @@ namespace Lucy {
 
 		//key: shader stage, value: vector of compiled blobs
 		std::vector<ShaderManager::ShaderProgram> RunSlangCompiler(const std::filesystem::path& path, Slang::ComPtr<slang::IModule> slangModule, Slang::ComPtr<ISession> session);
-		Slang::ComPtr<slang::IComponentType> LoadProgram(const std::filesystem::path& path, Slang::ComPtr<slang::IEntryPoint> entryPoint, Slang::ComPtr<ISession> session, ShaderStageType shaderStage);
+		Slang::ComPtr<slang::IComponentType> LoadProgram(const std::filesystem::path& path, Slang::ComPtr<slang::IModule> slangModule, Slang::ComPtr<slang::IEntryPoint> entryPoint, Slang::ComPtr<ISession> session, ShaderStageType shaderStage);
 		IModule* LoadSlangModuleFromCache(std::string_view name, const std::filesystem::path& cachedFilePath, Slang::ComPtr<ISession> session);
 
 		ShaderStageMap CreateShaders(const std::string& name, const std::filesystem::path& path, const Ref<RenderDevice>& device, const std::vector<ShaderManager::ShaderProgram>& shaderPrograms);

@@ -33,7 +33,9 @@ namespace Lucy {
 		void RemovePass(RenderGraphPass* pass);
 		void RemovePass(const std::string& passName);
 
-		void ImportExternalResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle);
+		void ImportExternalResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle, RGResourceData data = {});
+		void ImportExternalResource(const RenderGraphResource& rgResource, 
+			const std::vector<RenderDeviceResourceHandle>& handles, RGResourceData data = {});
 		void ImportExternalTransientResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle);
 
 		inline DirectedAcyclicGraph<RenderGraphPass, RenderGraphResource>& GetAcyclicGraph() { return m_AcyclicGraph; }
@@ -63,28 +65,33 @@ namespace Lucy {
 		void DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp);
 		void DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp,
 			const RenderGraphResource& rgResourceDepth, const ImageCreateInfo& createDepthInfo, RenderPassLoadStoreAttachments loadStoreDepthAccessOp);
+		void DeclareBuffer(const RenderGraphResource& rgResource, const RenderDeviceBufferCreateInfo& createInfo, bool isInFlightMode = false);
 
 		void ReadExternalImage(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToRead);
 		void ReadExternalTransientImage(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToRead);
 		void WriteExternalImage(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToWrite);
-
 		void BindRenderTarget(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToBind, const RenderGraphResource& rgResourceDepthToBind);
 		void BindRenderTarget(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToBind);
 
 		void ReadBuffer(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToRead);
 		void WriteBuffer(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToWrite);
+		
+		void ReadExternalBuffer(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToRead);
+		void WriteExternalBuffer(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToWrite);
 
 		void ReadImage(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToRead);
 		void WriteImage(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToWrite);
 #pragma endregion Builder
-		inline Ref<Image> GetImageByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetImage(rgResource); }
-		inline Ref<Image> GetImageByRGResource(const RenderGraphResource& rgResource) const { return m_Registry.GetImage(rgResource); }
+		Ref<Image> GetImageByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetImage(rgResource); }
+		Ref<Image> GetImageByRGResource(const RenderGraphResource& rgResource) const { return m_Registry.GetImage(rgResource); }
 
-		inline Ref<RenderDeviceResource> GetBufferByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetBuffer(rgResource); }
-		inline Ref<RenderDeviceResource> GetBufferByRGResource(const RenderGraphResource& rgResource) const { return m_Registry.GetBuffer(rgResource); }
+		Ref<RenderDeviceResource> GetBufferByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetBuffer(rgResource); }
+		Ref<RenderDeviceResource> GetBufferByRGResource(const RenderGraphResource& rgResource) const { return m_Registry.GetBuffer(rgResource); }
 
-		inline RenderPassLoadStoreAttachments GetLoadStoreAttachmentsByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetResourceEntry(rgResource).GetImageData().LoadStoreAttachment; }
-		inline RenderDeviceResourceHandle GetHandleByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetResourceEntry(rgResource).ResourceHandle; }
+		RenderPassLoadStoreAttachments GetLoadStoreAttachmentsByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetResourceEntry(rgResource).GetImageData().LoadStoreAttachment; }
+
+		RenderDeviceResourceHandle GetHandleByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetResourceEntry(rgResource).ResourceHandles[0]; }
+		const std::vector<RenderDeviceResourceHandle>& GetHandlesByRGResource(const RenderGraphResource& rgResource) const { return m_Registry.GetResourceEntry(rgResource).ResourceHandles; }
 
 		RenderGraphBatches CreateBatchesForRendering() const;
 

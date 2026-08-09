@@ -17,9 +17,24 @@
 
 namespace Lucy {
 
+#ifdef LUCY_DEBUG
+	static void WriteSpirvForNsight(const std::filesystem::path& directory, std::string_view moduleName, std::string_view entryPointName, const Slang::ComPtr<slang::IBlob>& blob) {
+		LUCY_ASSERT(blob, "Cannot write an empty SPIR-V blob!");
+
+		std::filesystem::create_directories(directory);
+		const std::filesystem::path outputPath = directory / std::format("{}__{}.spv", moduleName, entryPointName);
+
+		std::ofstream output(outputPath, std::ios::binary | std::ios::trunc);
+
+		LUCY_ASSERT(output.is_open(), "Failed to open SPIR-V output file: {0}", outputPath.string());
+		output.write(static_cast<const char*>(blob->getBufferPointer()), static_cast<std::streamsize>(blob->getBufferSize()));
+		LUCY_ASSERT(output.good(), "Failed to write SPIR-V output file: {0}", outputPath.string());
+	}
+#endif
+
 	ShaderManager::ShaderManager() {
 		SlangGlobalSessionDesc desc = {};
-		desc.minLanguageVersion = SLANG_LANGUAGE_VERSION_2025;
+		desc.minLanguageVersion = SLANG_LANGUAGE_VERSION_LATEST;
 
 		createGlobalSession(&desc, m_GlobalSession.writeRef());
 
@@ -30,13 +45,29 @@ namespace Lucy {
 		shutdown();
 	}
 
+	Ref<Shader> ShaderManager::GetShader(ShaderStageType type, const std::string& name, std::string_view entryPointName) const {
+		const auto moduleIt = m_Shaders.find(name);
+		LUCY_ASSERT(moduleIt != m_Shaders.end(), "Shader module {0} does not exist!", name);
+
+		const auto stageIt = moduleIt->second.find(type);
+		LUCY_ASSERT(stageIt != moduleIt->second.end(), "Shader module {0} does not contain stage {1}!", name, ShaderStageToShaderString(type));
+
+		const auto shaderIt = std::ranges::find_if(stageIt->second, [entryPointName](const Ref<Shader>& shader) {
+			return shader->GetEntryPointName() == entryPointName;
+		});
+
+		LUCY_ASSERT(shaderIt != stageIt->second.end(), "Shader module {0} does not contain entry point {1}!", name, entryPointName);
+
+		return *shaderIt;
+	}
+
 	Slang::ComPtr<slang::ISession> ShaderManager::CreateNewSlangSession() {
 		const auto& shaderFolder = GetShaderFolder();
 		std::string shaderFolderString = shaderFolder.string();
 
 		slang::TargetDesc targetDesc = {};
 		targetDesc.format = SLANG_SPIRV;
-		targetDesc.profile = m_GlobalSession->findProfile("sm_6_0");
+		targetDesc.profile = m_GlobalSession->findProfile("sm_6_6");
 
 		std::vector<slang::CompilerOptionEntry> stringOptions =
 		{
@@ -54,8 +85,8 @@ namespace Lucy {
 		sessionDesc.defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
 		sessionDesc.targets = &targetDesc;
 		sessionDesc.targetCount = 1;
-		sessionDesc.compilerOptionEntryCount = static_cast<uint32_t>(stringOptions.size());
-		sessionDesc.compilerOptionEntries = stringOptions.data();
+		//sessionDesc.compilerOptionEntryCount = static_cast<uint32_t>(stringOptions.size());
+		//sessionDesc.compilerOptionEntries = stringOptions.data();warning[E41012]: profile implicitly upgraded
 
 		/*const std::array<slang::PreprocessorMacroDesc, 2> macros{
 			slang::PreprocessorMacroDesc{
@@ -78,6 +109,18 @@ namespace Lucy {
 		std::vector<slang::CompilerOptionEntry> options =
 		{
 			{
+				slang::CompilerOptionName::Capability,
+				{ slang::CompilerOptionValueKind::String, 0, 0, "vk_mem_model", "vk_mem_model" },
+			},
+			{
+				slang::CompilerOptionName::Capability,
+				{ slang::CompilerOptionValueKind::String, 0, 0, "spvGroupNonUniform", "spvGroupNonUniform" },
+			},
+			{
+				slang::CompilerOptionName::Capability,
+				{ slang::CompilerOptionValueKind::String, 0, 0, "scalar-block-layout", "scalar-block-layout" },
+			},
+			{
 				slang::CompilerOptionName::EmitSpirvDirectly,
 				{slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}
 			},
@@ -90,10 +133,10 @@ namespace Lucy {
 				{slang::CompilerOptionValueKind::Int, 0, 0, nullptr, nullptr}
 			},*/
 #ifdef LUCY_DEBUG
-			/*{ DOES NOT WORK WITH AMD INTEGRATED GPUS
+			{	// DOES NOT WORK WITH AMD INTEGRATED GPUS
 				slang::CompilerOptionName::DebugInformation,
 				{slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_STANDARD, 0, nullptr, nullptr}
-			},*/
+			},
 			{
 				slang::CompilerOptionName::EnableWarning,
 				{slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}
@@ -112,8 +155,12 @@ namespace Lucy {
 				{slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}
 			},
 			{
+				slang::CompilerOptionName::VulkanUseEntryPointName,
+				{slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}
+			},
+			{
 				slang::CompilerOptionName::GLSLForceScalarLayout,
-				{slang::CompilerOptionValueKind::Int, 0, 0, nullptr, nullptr}
+				{slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}
 			},
 			{
 				slang::CompilerOptionName::VulkanUseDxPositionW,
@@ -208,7 +255,7 @@ namespace Lucy {
 			const auto& cachedFileExtension = GetCachedFileExtension();
 			auto cachedFolderWithName = cachedFolder / (std::filesystem::path(name));
 
-			std::ranges::sort(shaderPrograms, {}, &ShaderProgram::Stage);
+			std::ranges::stable_sort(shaderPrograms, {}, &ShaderProgram::Stage);
 
 			const ShaderStageMap& shaderResources = CreateShaders(name, path, device, shaderPrograms);
 
@@ -237,7 +284,7 @@ namespace Lucy {
 			if (shaderPrograms.empty())
 				return;
 
-			std::ranges::sort(shaderPrograms, {}, &ShaderProgram::Stage);
+			std::ranges::stable_sort(shaderPrograms, {}, &ShaderProgram::Stage);
 
 			const auto& shaderResources = CreateShaders(name, path, device, shaderPrograms);
 
@@ -264,57 +311,46 @@ namespace Lucy {
 		resources.reserve(shaderPrograms.size());
 
 		for (size_t i = 0; i < shaderPrograms.size(); i++) {
-			const auto& [shaderStage, blobs, linkedProgram] = shaderPrograms[i];
+			const auto& shaderProgram = shaderPrograms[i];
 
-			if (shaderStage == ShaderStageType::Fragment)
+			if (shaderProgram.Stage == ShaderStageType::Fragment)
 				continue;
 
-			if (blobs.empty()) {
-				LUCY_CRITICAL("No compiled blobs found for shader stage: {0} in shader: {1}", ShaderStageToShaderString(shaderStage), name);
+			if (!shaderProgram.Blob) {
+				LUCY_CRITICAL("No compiled blobs found for shader stage: {0} in shader: {1}", ShaderStageToShaderString(shaderProgram.Stage), name);
 				continue;
 			}
 
-			const auto& blobsInSpan = blobs | std::views::transform(ProgramBlobToSpan);
-			size_t totalSize = std::accumulate(blobsInSpan.begin(), blobsInSpan.end(), size_t{ 0 }, [](size_t sum, const auto& blob) {
-				return sum + blob.size_bytes();
-			});
+			LUCY_INFO("Shader {0} has {1} bytes of compiled code", path.string(), shaderProgram.Blob->getBufferSize());
 
-			LUCY_INFO("Shader {0} has {1} bytes of compiled code", path.string(), totalSize);
-
-			switch (shaderStage) {
+			/*
+			* We cant use here the entry point name that we arbitarily set... some drivers still replace the name with "main"... so just default it to main
+			*/
+			switch (shaderProgram.Stage) {
 				case ShaderStageType::Vertex: {
-					//the next shader stage must be Fragment
-					const auto& [fragmentStage, fragmentBlob, fragmentLinkedProgram] = shaderPrograms[i + 1];
-					LUCY_ASSERT(fragmentStage == ShaderStageType::Fragment, "Shader {0} has vertex stage but next stage is not fragment, it is: {1}", path.string(), ShaderStageToShaderString(fragmentStage));
+					//the next shader stage must be Fragment (the name of fragment and entrypoint must be the same as the vertex shader stage)
+					const auto& fragmentProgram = shaderPrograms[i + 1];
+					LUCY_ASSERT(fragmentProgram.Stage == ShaderStageType::Fragment, 
+						"Shader {0} has vertex stage but next stage is not fragment, it is: {1}", path.string(), ShaderStageToShaderString(fragmentProgram.Stage));
 
-					if (!resources.contains(ShaderStageType::VertexAndFragment))
-						resources.emplace(ShaderStageType::VertexAndFragment, nullptr);
+					auto shader = Memory::CreateRef<VulkanGraphicsShader>(name, path, shaderProgram.EntryPointName, device, ProgramBlobToSpan(shaderProgram.Blob), ProgramBlobToSpan(fragmentProgram.Blob));
+					shader->RunReflect(shaderProgram.LinkedProgram, ShaderStageType::Vertex, shaderProgram.EntryPointName);
+					shader->RunReflect(fragmentProgram.LinkedProgram, ShaderStageType::Fragment, fragmentProgram.EntryPointName);
+					shader->PrintReflectInfo();
 
-					auto& resource = resources.at(ShaderStageType::VertexAndFragment);
-
-					for (size_t j = 0; j < blobsInSpan.size(); j++)
-						resource = Memory::CreateRef<VulkanGraphicsShader>(name, path, device, blobsInSpan[j], ProgramBlobToSpan(fragmentBlob[j]));
-					resource->RunReflect(linkedProgram, ShaderStageType::Vertex);
-					resource->RunReflect(fragmentLinkedProgram, ShaderStageType::Fragment);
-
-					resource->PrintReflectInfo();
+					resources[ShaderStageType::VertexAndFragment].emplace_back(std::move(shader));
 					break;
 				}
 				case ShaderStageType::Compute: {
+					auto shader = Memory::CreateRef<VulkanComputeShader>(name, path, shaderProgram.EntryPointName, device, ProgramBlobToSpan(shaderProgram.Blob));
+					shader->RunReflect(shaderProgram.LinkedProgram, ShaderStageType::Compute, shaderProgram.EntryPointName);
+					shader->PrintReflectInfo();
 
-					if (!resources.contains(ShaderStageType::Compute))
-						resources.emplace(ShaderStageType::Compute, nullptr);
-
-					auto& resource = resources.at(ShaderStageType::Compute);
-
-					for (size_t j = 0; j < blobsInSpan.size(); j++)
-						resource = Memory::CreateRef<VulkanComputeShader>(name, path, device, blobsInSpan[j]);
-					resource->RunReflect(linkedProgram, ShaderStageType::Compute);
-					resource->PrintReflectInfo();
-					break;
+					resources[ShaderStageType::Compute].emplace_back(std::move(shader));
+					break;	
 				}
 				default: 
-					LUCY_ASSERT(false, "Shader stage {0} is not supported yet!", ShaderStageToShaderString(shaderStage));
+					LUCY_ASSERT(false, "Shader stage {0} is not supported yet!", ShaderStageToShaderString(shaderProgram.Stage));
 			}
 		}
 
@@ -336,9 +372,9 @@ namespace Lucy {
 			const char* nameOfEntry = entryPoint->getFunctionReflection()->getName();
 			ShaderStageType shaderStage = SlangStageToShaderStage(entryPoint->getLayout()->getEntryPointByIndex(0)->getStage());
 
-			//LUCY_INFO("Compiling {0} shader entry point: {1}", ShaderStageToShaderString(shaderStage), nameOfEntry);
+			LUCY_INFO("Compiling {0} shader entry point: {1}", ShaderStageToShaderString(shaderStage), nameOfEntry);
 
-			Slang::ComPtr<IComponentType> linkedProgram = LoadProgram(path, entryPoint, session, shaderStage);
+			Slang::ComPtr<IComponentType> linkedProgram = LoadProgram(path, slangModule, entryPoint, session, shaderStage);
 
 			Slang::ComPtr<IBlob> blob;
 			linkedProgram->getEntryPointCode(0, 0, blob.writeRef(), diagnosticsBlob.writeRef());
@@ -346,11 +382,54 @@ namespace Lucy {
 			LUCY_ASSERT(blob, "Failed to load {0} shader from path: {1}", ShaderStageToShaderString(shaderStage), path.string());
 
 			shaderPrograms[i].Stage = shaderStage;
-			shaderPrograms[i].Blobs.push_back(blob);
+			shaderPrograms[i].EntryPointName = nameOfEntry;
+			shaderPrograms[i].Blob = blob;
 			shaderPrograms[i].LinkedProgram = linkedProgram;
+
+#ifdef LUCY_DEBUG
+			WriteSpirvForNsight(GetCacheFolder() / "Nsight", path.stem().string(), nameOfEntry, blob);
+#endif
 		}
 
 		return shaderPrograms;
+	}
+
+	Slang::ComPtr<slang::IComponentType> ShaderManager::LoadProgram(const std::filesystem::path& path, Slang::ComPtr<slang::IModule> slangModule, Slang::ComPtr<slang::IEntryPoint> entryPoint, Slang::ComPtr<ISession> session, ShaderStageType shaderStage) {
+		const auto LoadSlangInternals = [&]() -> Slang::ComPtr<slang::IComponentType> {
+			LUCY_ASSERT(entryPoint, "Failed to find entry point 'main' in shader module from path: {0}", path.string());
+
+			std::array<slang::IComponentType*, 2> componentTypes = {
+				slangModule,
+				entryPoint
+			};
+
+			Slang::ComPtr<slang::IComponentType> composedProgram;
+			Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+
+			SlangResult result = session->createCompositeComponentType(
+				componentTypes.data(),
+				componentTypes.size(),
+				composedProgram.writeRef(),
+				diagnosticsBlob.writeRef());
+			PrintDiagnosticsIfFails(diagnosticsBlob, path, shaderStage);
+			if (SLANG_FAILED(result)) {
+				LUCY_CRITICAL("Failed to create composite component type for shader. Path: {0}", path.string());
+				return nullptr;
+			}
+
+			Slang::ComPtr<slang::IComponentType> linkedProgram;
+			result = composedProgram->link(linkedProgram.writeRef(), diagnosticsBlob.writeRef());
+			PrintDiagnosticsIfFails(diagnosticsBlob, path, shaderStage);
+
+			if (SLANG_FAILED(result)) {
+				LUCY_CRITICAL("Failed to link shader. Path: {0}", path.string());
+				return nullptr;
+			}
+
+			return linkedProgram;
+		};
+
+		return LoadSlangInternals();
 	}
 
 	Slang::ComPtr<IModule> ShaderManager::CreateSlangModule(const std::string& name, const std::filesystem::path& path, Ref<RenderDevice> device, Slang::ComPtr<ISession> session) {
@@ -370,14 +449,18 @@ namespace Lucy {
 		return slangModule;
 	}
 
-	void ShaderManager::ReloadShader(Ref<RenderDevice> device, const std::string& name) {
-		auto shaderStageMap = m_Shaders.at(name);
+	std::vector<Ref<Shader>> ShaderManager::ReloadShader(Ref<RenderDevice> device, const std::string& name) {
+		auto& shaderStageMap = m_Shaders.at(name);
+		auto type = ShaderStageType::Vertex;
+
 		std::filesystem::path path;
-		if (shaderStageMap.contains(ShaderStageType::VertexAndFragment)) {
-			path = shaderStageMap.at(ShaderStageType::VertexAndFragment)->GetPath();
-		} else {
-			path = shaderStageMap.at(ShaderStageType::Compute)->GetPath();
-		}
+		if (shaderStageMap.contains(ShaderStageType::VertexAndFragment))
+			type = ShaderStageType::VertexAndFragment;
+		else
+			type = ShaderStageType::Compute;
+
+		path = shaderStageMap.at(type)[0]->GetPath();
+		shaderStageMap.at(type).clear();
 
 		if (path.parent_path() == GetCacheFolder())
 			path = (GetShaderFolder() / path.stem().stem()).replace_extension(".slang");
@@ -387,103 +470,64 @@ namespace Lucy {
 		auto slangModule = CreateSlangModule(name, path, device, hotReloadSession);
 
 		const std::vector<ShaderProgram>& shaderPrograms = RunSlangCompiler(path, slangModule, hotReloadSession);
-		if (shaderPrograms.empty())
-			return;
-
+		if (shaderPrograms.empty()) {
+			LUCY_CRITICAL("Failed to compile shader: {0}", path.string());
+			return {};
+		}
 		//TODO: Maybe clean it?
 
 		for (size_t i = 0; i < shaderPrograms.size(); i++) {
-			const auto& [shaderStage, blobs, linkedProgram] = shaderPrograms[i];
+			const auto& shaderProgram = shaderPrograms[i];
 
-			if (shaderStage == ShaderStageType::Fragment)
+			if (shaderProgram.Stage == ShaderStageType::Fragment)
 				continue;
 
-			if (blobs.empty()) {
-				LUCY_CRITICAL("No compiled blobs found for shader stage: {0} in shader: {1}", ShaderStageToShaderString(shaderStage), name);
+			if (!shaderProgram.Blob) {
+				LUCY_CRITICAL("No compiled blobs found for shader stage: {0} in shader: {1}", ShaderStageToShaderString(shaderProgram.Stage), name);
 				continue;
 			}
 
-			const auto& blobsInSpan = blobs | std::views::transform(ProgramBlobToSpan);
-			size_t totalSize = std::accumulate(blobsInSpan.begin(), blobsInSpan.end(), size_t{ 0 }, [](size_t sum, const auto& blob) {
-				return sum + blob.size_bytes();
-			});
+			LUCY_INFO("Shader {0} has {1} bytes of compiled code", path.string(), shaderProgram.Blob->getBufferSize());
 
-			LUCY_INFO("Shader {0} has {1} bytes of compiled code", path.string(), totalSize);
-
-			switch (shaderStage) {
+			/*
+			* We cant use here the entry point name that we arbitarily set... some drivers still replace the name with "main"... so just default it to main
+			*/
+			switch (shaderProgram.Stage) {
 				case ShaderStageType::Vertex: {
-					//the next shader stage must be Fragment
-					const auto& [fragmentStage, fragmentBlob, fragmentLinkedProgram] = shaderPrograms[i + 1];
-					LUCY_ASSERT(fragmentStage == ShaderStageType::Fragment, "Shader {0} has vertex stage but next stage is not fragment, it is: {1}", path.string(), ShaderStageToShaderString(fragmentStage));
+					//the next shader stage must be Fragment (the name of fragment and entrypoint must be the same as the vertex shader stage)
+					const auto& fragmentProgram = shaderPrograms[i + 1];
+					LUCY_ASSERT(fragmentProgram.Stage == ShaderStageType::Fragment, 
+						"Shader {0} has vertex stage but next stage is not fragment, it is: {1}", path.string(), ShaderStageToShaderString(fragmentProgram.Stage));
 
-					const auto& resource = m_Shaders[name][ShaderStageType::VertexAndFragment];
+					auto shader = Memory::CreateRef<VulkanGraphicsShader>(name, path, shaderProgram.EntryPointName, device, ProgramBlobToSpan(shaderProgram.Blob), ProgramBlobToSpan(fragmentProgram.Blob));
+					shader->RunReflect(shaderProgram.LinkedProgram, ShaderStageType::Vertex, shaderProgram.EntryPointName);
+					shader->RunReflect(fragmentProgram.LinkedProgram, ShaderStageType::Fragment, fragmentProgram.EntryPointName);
+					shader->PrintReflectInfo();
 
-					for (size_t j = 0; j < blobsInSpan.size(); j++)
-						resource->RTLoad(device, {blobsInSpan[j], ProgramBlobToSpan(fragmentBlob[j])});
-					resource->RunReflect(linkedProgram, ShaderStageType::Vertex);
-					resource->RunReflect(fragmentLinkedProgram, ShaderStageType::Fragment);
-		
-					resource->PrintReflectInfo();
+					shaderStageMap[type].emplace_back(std::move(shader));
 					break;
 				}
 				case ShaderStageType::Compute: {
-					const auto& resource = m_Shaders[name][ShaderStageType::Compute];
+					auto shader = Memory::CreateRef<VulkanComputeShader>(name, path, shaderProgram.EntryPointName, device, ProgramBlobToSpan(shaderProgram.Blob));
+					shader->RunReflect(shaderProgram.LinkedProgram, ShaderStageType::Compute, shaderProgram.EntryPointName);
+					shader->PrintReflectInfo();
 
-					for (size_t j = 0; j < blobsInSpan.size(); j++)
-						resource->RTLoad(device, { blobsInSpan[j] });
-					resource->RunReflect(linkedProgram, ShaderStageType::Compute);
-
-					resource->PrintReflectInfo();
-					break;
+					shaderStageMap[type].emplace_back(std::move(shader));
+					break;	
 				}
 				default: 
-					LUCY_ASSERT(false, "Shader stage {0} is not supported yet!", ShaderStageToShaderString(shaderStage));
+					LUCY_ASSERT(false, "Shader stage {0} is not supported yet!", ShaderStageToShaderString(shaderProgram.Stage));
 			}
 		}
+
+		return shaderStageMap[type];
 	}
 
 	void ShaderManager::DestroyAllShaders(Ref<RenderDevice> device) {
 		for (const auto& shadersPerStage : m_Shaders | std::views::values)
-			for (const auto& shader : shadersPerStage | std::views::values)
-				shader->RTDestroyResource(device);
-	}
-
-	Slang::ComPtr<slang::IComponentType> ShaderManager::LoadProgram(const std::filesystem::path& path, Slang::ComPtr<slang::IEntryPoint> entryPoint, Slang::ComPtr<ISession> session, ShaderStageType shaderStage) {
-		const auto LoadSlangInternals = [&]() -> Slang::ComPtr<slang::IComponentType> {
-			LUCY_ASSERT(entryPoint, "Failed to find entry point 'main' in shader module from path: {0}", path.string());
-
-			std::array<slang::IComponentType*, 1> componentTypes = {
-				entryPoint
-			};
-
-			Slang::ComPtr<slang::IComponentType> composedProgram;
-			Slang::ComPtr<slang::IBlob> diagnosticsBlob;
-
-			SlangResult result = session->createCompositeComponentType(
-				componentTypes.data(),
-				componentTypes.size(),
-				composedProgram.writeRef(),
-				diagnosticsBlob.writeRef());
-			PrintDiagnosticsIfFails(diagnosticsBlob, path, shaderStage);
-			if (SLANG_FAILED(result)) {
-				LUCY_CRITICAL("Failed to create composite component type for shader. Path: {0}", path.string());
-				return nullptr;
-			}
-
-			Slang::ComPtr<slang::IComponentType> linkedProgram;
-			result = composedProgram->link(
-				linkedProgram.writeRef(),
-				diagnosticsBlob.writeRef());
-			PrintDiagnosticsIfFails(diagnosticsBlob, path, shaderStage);
-			if (SLANG_FAILED(result)) {
-				LUCY_CRITICAL("Failed to link shader. Path: {0}", path.string());
-				return nullptr;
-			}
-
-			return linkedProgram;
-		};
-
-		return LoadSlangInternals();
+			for (const auto& shaderList : shadersPerStage | std::views::values)
+				for (const auto& shader : shaderList)
+					shader->RTDestroyResource(device);
 	}
 
 	IModule* ShaderManager::LoadSlangModuleFromCache(std::string_view name, const std::filesystem::path& cachedFilePath, Slang::ComPtr<ISession> session) {

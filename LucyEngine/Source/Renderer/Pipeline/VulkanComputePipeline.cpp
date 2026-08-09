@@ -12,8 +12,8 @@
 
 namespace Lucy {
 
-	VulkanComputePipeline::VulkanComputePipeline(const ComputePipelineCreateInfo& createInfo, const Ref<VulkanRenderDevice>& vulkanDevice)
-		: ComputePipeline(createInfo) {
+	VulkanComputePipeline::VulkanComputePipeline(const ComputePipelineCreateInfo& createInfo, const Ref<Shader>& shader, const Ref<VulkanRenderDevice>& vulkanDevice)
+		: ComputePipeline(createInfo, shader) {
 		Renderer::EnqueueToRenderCommandQueue([=](const auto& device) {
 			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
 			Create(vulkanDevice);
@@ -61,9 +61,9 @@ namespace Lucy {
 
 		LUCY_VK_ASSERT(vkCreatePipelineLayout(logicalDevice, &pipelineLayoutInfo, nullptr, &m_PipelineLayoutHandle));
 
-		VkComputePipelineCreateInfo pipelineInfo = VulkanAPI::ComputePipelineCreateInfo(m_PipelineLayoutHandle, m_CreateInfo.Shader->As<VulkanComputeShader>()->GetShaderInfo());
+		VkComputePipelineCreateInfo pipelineInfo = VulkanAPI::ComputePipelineCreateInfo(m_PipelineLayoutHandle, shader->As<VulkanComputeShader>()->GetShaderInfo());
 		LUCY_VK_ASSERT(vkCreateComputePipelines(logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_PipelineHandle));
-		LUCY_INFO("Vulkan compute pipeline '{0}' created successfully!", m_CreateInfo.Shader->GetName());
+		LUCY_INFO("Vulkan compute pipeline '{0}' created successfully!", shader->GetName());
 #ifdef LUCY_DEBUG
 		
 		std::string objectName = std::format("{0} Compute Pipeline", GetDebugName());
@@ -86,22 +86,22 @@ namespace Lucy {
 		vkCmdDispatch((VkCommandBuffer)commandBufferHandle, groupCountX, groupCountY, groupCountZ);
 	}
 
-	void VulkanComputePipeline::RTRecreate() {
-		RTDestroyResource();
-		Renderer::EnqueueToRenderCommandQueue([&](const auto& device) {
+	void VulkanComputePipeline::RTRecreate(Ref<Shader> newShader) {
+		Renderer::EnqueueResourceDestroy(GetMyHandle());
+
+		Renderer::EnqueueToRenderCommandQueue([=](const auto& device) {
 			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+			SetShader(newShader);
 			Create(vulkanDevice);
 		});
 	}
 
-	void VulkanComputePipeline::RTDestroyResource() {
-		Pipeline::RTDestroyResource();
+	void VulkanComputePipeline::RTDestroyResource(RenderDevice* device) {
+		Pipeline::RTDestroyResource(device);
 
-		Renderer::EnqueueToRenderCommandQueue([=](const auto& device) {
-			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+		const auto& vulkanDevice = reinterpret_cast<VulkanRenderDevice*>(device);
 
-			vkDestroyPipelineLayout(vulkanDevice->GetLogicalDevice(), m_PipelineLayoutHandle, nullptr);
-			vkDestroyPipeline(vulkanDevice->GetLogicalDevice(), m_PipelineHandle, nullptr);
-		});
+		vkDestroyPipelineLayout(vulkanDevice->GetLogicalDevice(), m_PipelineLayoutHandle, nullptr);
+		vkDestroyPipeline(vulkanDevice->GetLogicalDevice(), m_PipelineHandle, nullptr);
 	}
 }

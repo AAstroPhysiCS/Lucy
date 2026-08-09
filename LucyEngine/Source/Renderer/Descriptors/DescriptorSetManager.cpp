@@ -82,7 +82,7 @@ namespace Lucy {
 		const auto CreateDescriptorSet = [&](auto& descriptorSets, const auto& descriptorPool, const auto& createInfo) {
 			RenderDeviceResourceHandle descriptorSetHandle = m_RenderDevice->CreateDescriptorSet(createInfo);
 			const auto& descriptorSet = m_RenderDevice->AccessResource<VulkanDescriptorSet>(descriptorSetHandle);
-			descriptorSet->RTBake(descriptorPool);
+			descriptorSet->RTBake(descriptorPool, m_RenderDevice);
 			descriptorSets.try_emplace(createInfo.SetIndex, descriptorSetHandle);
 		};
 
@@ -114,9 +114,9 @@ namespace Lucy {
 
 	void VulkanDescriptorSetManager::RTDestroy() {
 		for (auto& [_, handle] : m_DescriptorSetsPerShader)
-			m_RenderDevice->RTDestroyResource(handle);
+			Renderer::EnqueueResourceDestroy(handle);
 		for (auto& [_, handle] : m_GlobalDescriptorSets)
-			m_RenderDevice->RTDestroyResource(handle);
+			Renderer::EnqueueResourceDestroy(handle);
 		
 		m_DescriptorSetsPerShader.clear();
 		m_GlobalDescriptorSets.clear();

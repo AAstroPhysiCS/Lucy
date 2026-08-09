@@ -10,6 +10,7 @@ namespace Lucy {
 	enum class RenderGraphExecutionPolicy : uint8_t;
 
 	struct ImageCreateInfo;
+	struct RenderDeviceBufferCreateInfo;
 
 	class RenderGraphBuilder final {
 	public:
@@ -29,6 +30,7 @@ namespace Lucy {
 		void DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp);
 		void DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp,
 						const RenderGraphResource& rgResourceDepth, const ImageCreateInfo& createDepthInfo, RenderPassLoadStoreAttachments loadStoreDepthAccessOp);
+		void DeclareBuffer(const RenderGraphResource& rgResource, const RenderDeviceBufferCreateInfo& createInfo);
 
 		void BindRenderTarget(const RenderGraphResource& rgResourceToBind, const RenderGraphResource& rgResourceDepthToBind);
 		void BindRenderTarget(const RenderGraphResource& rgResourceToBind);
@@ -39,6 +41,9 @@ namespace Lucy {
 #pragma region Compute
 		void ReadBuffer(const RenderGraphResource& rgResourceToRead, RenderGraphResourceAccess access);
 		void WriteBuffer(const RenderGraphResource& rgResourceToWrite, RenderGraphResourceAccess access);
+
+		void ReadExternalBuffer(const RenderGraphResource& rgResource, RenderGraphResourceAccess access);
+		void WriteExternalBuffer(const RenderGraphResource& rgResource, RenderGraphResourceAccess access);
 
 		void ReadImage(const RenderGraphResource& rgResourceToRead, RenderGraphResourceAccess access);
 		void WriteImage(const RenderGraphResource& rgResourceToWrite, RenderGraphResourceAccess access);

@@ -89,12 +89,12 @@ namespace Lucy {
 		return {};
 	}
 
-	RenderDeviceResourceHandle RenderDevice::CreateGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo) {
+	RenderDeviceResourceHandle RenderDevice::CreateGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo, const Ref<Shader>& shader) {
 		static std::mutex pipelineCreationMutex;
 
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
-				auto resource = Memory::CreateRef<VulkanGraphicsPipeline>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
+				auto resource = Memory::CreateRef<VulkanGraphicsPipeline>(createInfo, shader, shared_from_this()->As<VulkanRenderDevice>());
 
 				std::unique_lock<std::mutex> lock(pipelineCreationMutex);
 				auto handle = m_ResourceManager.PushResource(resource);
@@ -106,12 +106,12 @@ namespace Lucy {
 		return {};
 	}
 
-	RenderDeviceResourceHandle RenderDevice::CreateComputePipeline(const ComputePipelineCreateInfo& createInfo) {
+	RenderDeviceResourceHandle RenderDevice::CreateComputePipeline(const ComputePipelineCreateInfo& createInfo, const Ref<Shader>& shader) {
 		static std::mutex pipelineCreationMutex;
 
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
-				auto resource = Memory::CreateRef<VulkanComputePipeline>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
+				auto resource = Memory::CreateRef<VulkanComputePipeline>(createInfo, shader, shared_from_this()->As<VulkanRenderDevice>());
 
 				std::unique_lock<std::mutex> lock(pipelineCreationMutex);
 				auto handle = m_ResourceManager.PushResource(resource);
@@ -224,10 +224,10 @@ namespace Lucy {
 		return {};
 	}
 
-	RenderDeviceResourceHandle RenderDevice::CreateDeviceAddressBuffer(size_t size) {
+	RenderDeviceResourceHandle RenderDevice::CreateDeviceAddressBuffer(const RenderDeviceBufferCreateInfo& createInfo) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
-				auto resource = Memory::CreateRef<VulkanDeviceAddressBuffer>(size, shared_from_this()->As<VulkanRenderDevice>());
+				auto resource = Memory::CreateRef<VulkanDeviceAddressBuffer>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
 				auto handle = m_ResourceManager.PushResource(resource);
 				return handle;
 			}

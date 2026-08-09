@@ -12,6 +12,7 @@
 #include "Renderer/Device/RenderDeviceScene.h"
 
 #include "Renderer/Memory/Buffer/IndexBuffer.h"
+#include "Renderer/Memory/Buffer/VertexBuffer.h"
 #include "Renderer/Memory/Buffer/RenderDeviceBuffer.h"
 
 namespace Lucy {
@@ -20,9 +21,8 @@ namespace Lucy {
 		: m_DebugName(nameOfDraw), m_RenderDevice(renderDevice), m_PrimaryCommandPool(primaryCmdPool) {
 	}
 
-	RenderDeviceBufferReference RenderCommand::GetGlobalBufferAddress() const {
-		const auto& handle = m_RenderDevice->GetScene()->GetBufferHandleByName("GPUScene");
-		return m_RenderDevice->AccessResource<RenderDeviceBuffer>(handle)->GetDeviceAddress();
+	RenderDeviceResourceHandle RenderCommand::GetGlobalIndexBufferHandle() const {
+		return m_RenderDevice->GetScene()->GetGlobalIndexBufferHandle();
 	}
 
 	void RenderCommand::BeginSecondaryRenderCommand() {
@@ -67,6 +67,10 @@ namespace Lucy {
 		return m_RenderDevice->BindGlobalImageHandleTo(imageBufferName, m_BoundedComputePipeline, image, mip);
 	}
 
+	void RenderCommand::FillBuffer(Ref<RenderDeviceBuffer> buffer, size_t offset, size_t size, uint32_t value) {
+		m_RenderDevice->FillBuffer(m_PrimaryCommandPool, buffer, offset, size, value);
+	}
+
 	void RenderCommand::BindBuffers(Ref<Mesh> mesh) {
 		LUCY_ASSERT(m_BoundedGraphicsPipeline, "BindBuffers failed, bounded pipeline is nullptr.");
 		m_RenderDevice->BindBuffers(m_PrimaryCommandPool, mesh);
@@ -75,6 +79,11 @@ namespace Lucy {
 	void RenderCommand::BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) {
 		LUCY_ASSERT(m_BoundedGraphicsPipeline, "BindBuffers failed, bounded pipeline is nullptr.");
 		m_RenderDevice->BindBuffers(m_PrimaryCommandPool, vertexBuffer, indexBuffer);
+	}
+	
+	void RenderCommand::BindBuffers(Ref<RenderDeviceBuffer> indexBuffer) {
+		LUCY_ASSERT(m_BoundedGraphicsPipeline, "BindBuffers failed, bounded pipeline is nullptr.");
+		m_RenderDevice->BindBuffers(m_PrimaryCommandPool, indexBuffer);
 	}
 
 	void RenderCommand::BindPushConstant(const PipelineConstant& pushConstant) {
@@ -129,17 +138,32 @@ namespace Lucy {
 
 	void RenderCommand::DrawMesh(Ref<Mesh> mesh) {
 		LUCY_ASSERT(m_BoundedGraphicsPipeline, "DrawMesh failed, bounded pipeline is nullptr.");
-		BindBuffers(mesh);
-		m_RenderDevice->DrawIndexed(m_PrimaryCommandPool, (uint32_t)m_RenderDevice->AccessResource<IndexBuffer>(mesh->GetIndexBufferHandle())->GetSize(), 1, 0, 0, 0);
+		const auto& gpuScene = m_RenderDevice->GetScene();
+
+		auto globalIndexBuffer = m_RenderDevice->AccessResource<RenderDeviceBuffer>(gpuScene->GetGlobalIndexBufferHandle());
+		BindBuffers(globalIndexBuffer);
+
+		const auto& submeshes = mesh->GetSubmeshes();
+		for (const Submesh& submesh : submeshes) {
+			//DrawIndexed(submesh.IndexCount, 1, submesh.GlobalFirstIndex, submesh.GlobalVertexOffset, 0);
+		}
 	}
 
 	void RenderCommand::DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {
 		m_RenderDevice->DrawIndexed(m_PrimaryCommandPool, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 	}
 
+	void RenderCommand::DrawIndexedIndirectCount(Ref<RenderDeviceBuffer> buffer, size_t offset, Ref<RenderDeviceBuffer> countBuffer, size_t countBufferOffset, uint32_t maxDrawCount, uint32_t stride) {
+		m_RenderDevice->DrawIndexedIndirectCount(m_PrimaryCommandPool, buffer, offset, countBuffer, countBufferOffset, maxDrawCount, stride);
+	}
+
 	void RenderCommand::DispatchCompute(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) {
 		LUCY_ASSERT(m_BoundedComputePipeline, "DispatchCompute failed, bounded pipeline is nullptr.");
 		m_RenderDevice->DispatchCompute(m_PrimaryCommandPool, m_BoundedComputePipeline, groupCountX, groupCountY, groupCountZ);
+	}
+
+	void RenderCommand::DispatchComputeIndirect(const Ref<RenderDeviceBuffer>& buffer, size_t offset) {
+		m_RenderDevice->DispatchComputeIndirect(m_PrimaryCommandPool, buffer, offset);
 	}
 
 	/*void RenderCommand::SetImageLayout(Ref<Image> image, uint32_t newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {

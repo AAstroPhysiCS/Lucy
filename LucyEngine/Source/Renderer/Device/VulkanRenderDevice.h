@@ -54,7 +54,10 @@ namespace Lucy {
 		void BeginCommandBuffer(Ref<CommandPool> cmdPool);
 		void EndCommandBuffer(Ref<CommandPool> cmdPool);
 
+		void FillBuffer(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset, size_t size, uint32_t value);
+
 		void BindBuffers(Ref<CommandPool> cmdPool, Ref<Mesh> mesh) final override;
+		void BindBuffers(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> indexBuffer) final override;
 		void BindBuffers(Ref<CommandPool> cmdPool, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) final override;
 
 		[[nodiscard]] uint32_t BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<GraphicsPipeline>& pipeline, const Ref<Image>& image, uint32_t mip) final override;
@@ -75,10 +78,14 @@ namespace Lucy {
 		void BindAllDescriptorSets(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline) final override;
 		void BindDescriptorSet(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline, uint32_t setIndex) final override;
 
+		void DrawIndexedIndirectCount(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset, 
+			Ref<RenderDeviceBuffer> countBuffer, size_t countBufferOffset, uint32_t maxDrawCount, uint32_t stride) final override;
 		void DrawIndexed(Ref<CommandPool> cmdPool, uint32_t indexCount, uint32_t instanceCount,
 						 uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) final override;
+
 		void DispatchCompute(Ref<CommandPool> cmdPool, Ref<ComputePipeline> computePipeline, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) final override;
-		
+		void DispatchComputeIndirect(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset) final override;
+
 		void BeginRenderPass(Ref<RenderPass> renderPass, Ref<FrameBuffer> frameBuffer, Ref<CommandPool> cmdPool) final override;
 		void EndRenderPass(Ref<RenderPass> renderPass) final override;
 

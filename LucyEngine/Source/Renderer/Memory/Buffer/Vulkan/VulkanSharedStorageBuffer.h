@@ -17,16 +17,14 @@ namespace Lucy {
 		VulkanSharedStorageBuffer(VulkanSharedStorageBuffer&&) = delete;
 		VulkanSharedStorageBuffer& operator=(VulkanSharedStorageBuffer&&) = delete;
 
-		void RTLoadToDevice() final override;
+		void RTLoadToDevice(RenderDevice* device) final override;
 
 		inline VkBuffer GetVulkanBufferHandle(const uint32_t index) { return m_Buffers[index]; }
 	private:
-		void RTDestroyResource() final override;
+		void RTDestroyResource(RenderDevice* device) final override;
 
 		std::vector<VkBuffer> m_Buffers;
 		std::vector<VmaAllocation> m_BufferVma;
-
-		Ref<VulkanRenderDevice> m_VulkanDevice = nullptr;
 	};
 }
 

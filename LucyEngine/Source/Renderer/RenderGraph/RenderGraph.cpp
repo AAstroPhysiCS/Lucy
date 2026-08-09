@@ -40,8 +40,12 @@ namespace Lucy {
 		m_Registry.Flush();
 	}
 
-	void RenderGraph::ImportExternalResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle) {
-		m_Registry.ImportExternalResource(rgResource, handle);
+	void RenderGraph::ImportExternalResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle, RGResourceData data) {
+		m_Registry.ImportExternalResource(rgResource, handle, data);
+	}
+
+	void RenderGraph::ImportExternalResource(const RenderGraphResource& rgResource, const std::vector<RenderDeviceResourceHandle>& handles, RGResourceData data) {
+		m_Registry.ImportExternalResource(rgResource, handles, data);
 	}
 
 	void RenderGraph::ImportExternalTransientResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle) {
@@ -79,6 +83,22 @@ namespace Lucy {
 		);
 	}
 
+	void RenderGraph::DeclareBuffer(const RenderGraphResource& rgResource, const RenderDeviceBufferCreateInfo& createInfo, bool isInFlightMode) {
+		const uint32_t bufferCount = isInFlightMode ? Renderer::GetMaxFramesInFlight() : 1;
+		std::vector<RenderDeviceResourceHandle> bufferHandles;
+		bufferHandles.reserve(bufferCount);
+		for (uint32_t i = 0; i < bufferCount; i++)
+			bufferHandles.emplace_back(m_RenderDevice->CreateDeviceAddressBuffer(createInfo));
+
+		m_Registry.DeclareBuffer(
+			rgResource,
+			bufferHandles,
+			RGBufferData {
+				.InFlightMode = isInFlightMode
+			}
+		);
+	}
+
 	void RenderGraph::ReadExternalImage(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToRead) {
 		if (m_Registry.Contains(rgResourceToRead)) {
 			//const auto& image = device->AccessResource<Image>(externalResources.at(resource));
@@ -87,7 +107,7 @@ namespace Lucy {
 		}
 
 		//see transient image comment section
-		ImportExternalResource(rgResourceToRead, {});
+		ImportExternalResource(rgResourceToRead, RenderDeviceResourceHandle{});
 		ReadImage(currentPass, rgResourceToRead);
 	}
 
@@ -114,7 +134,7 @@ namespace Lucy {
 		}
 
 		//see transient image comment section
-		ImportExternalResource(rgResourceToWrite, {});
+		ImportExternalResource(rgResourceToWrite, RenderDeviceResourceHandle{});
 		WriteImage(currentPass, rgResourceToWrite);
 	}
 
@@ -134,6 +154,30 @@ namespace Lucy {
 
 	void RenderGraph::WriteBuffer(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToWrite) {
 		m_AcyclicGraph.AddWriteDependency(currentPass, rgResourceToWrite);
+	}
+
+	void RenderGraph::ReadExternalBuffer(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToRead) {
+		if (m_Registry.Contains(rgResourceToRead)) {
+			//const auto& buffer = device->AccessResource<Buffer>(externalResources.at(resource));
+			ReadBuffer(currentPass, rgResourceToRead);
+			return;
+		}
+
+		//see transient image comment section
+		ImportExternalResource(rgResourceToRead, RenderDeviceResourceHandle{});
+		ReadBuffer(currentPass, rgResourceToRead);
+	}
+
+	void RenderGraph::WriteExternalBuffer(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToWrite) {
+		if (m_Registry.Contains(rgResourceToWrite)) {
+			//const auto& buffer = device->AccessResource<Buffer>(externalResources.at(resource));
+			WriteBuffer(currentPass, rgResourceToWrite);
+			return;
+		}
+
+		//see transient image comment section
+		ImportExternalResource(rgResourceToWrite, RenderDeviceResourceHandle{});
+		WriteBuffer(currentPass, rgResourceToWrite);
 	}
 
 	void RenderGraph::ReadImage(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToRead) {
@@ -161,8 +205,12 @@ namespace Lucy {
 		const auto CheckIfExternalResourcesAreValid = [&](const std::unordered_set<RenderGraphResource>& rgResources) {
 			LUCY_PROFILE_NEW_EVENT("RenderGraph::CheckIfExternalResourcesAreValid");
 			for (const RenderGraphResource& rgResource : rgResources) {
-				if (m_Registry.Contains(rgResource) && !Renderer::IsValidRenderResource(m_Registry.GetResourceEntry(rgResource).ResourceHandle))
-					return false;
+				bool exists = m_Registry.Contains(rgResource);
+				for (auto& handle : m_Registry.GetResourceEntry(rgResource).ResourceHandles)
+					if (exists && !Renderer::IsValidRenderResource(handle)) {
+						//LUCY_INFO("RenderGraph::CheckIfExternalResourcesAreValid: External resource {} is not valid, pass {} will be culled.", rgResource.GetName(), pass->GetName());
+						return false;
+					}
 			}
 			return true;
 		};
@@ -221,11 +269,8 @@ namespace Lucy {
 		const auto IsReadOnlyAccess = [](RenderGraphResourceAccess access) {
 			switch (access) {
 				case RenderGraphResourceAccess::ShaderSampledRead:
-				case RenderGraphResourceAccess::StorageRead:
 				case RenderGraphResourceAccess::TransferRead:
-				case RenderGraphResourceAccess::VertexRead:
-				case RenderGraphResourceAccess::IndexRead:
-				case RenderGraphResourceAccess::IndirectRead:
+				case RenderGraphResourceAccess::IndexRead: 
 					return true;
 				default:
 					return false;

@@ -1,6 +1,15 @@
 #ifndef LUCY_RESOURCES_SLANG
 #define LUCY_RESOURCES_SLANG
 
+static const uint OBJECT_FLAG_ALIVE = 1u << 0u;
+static const uint OBJECT_FLAG_FORCE_HIGHEST_LOD = 1u << 1u;
+static const uint OBJECT_FLAG_FORCE_LOWEST_LOD = 1u << 2u;
+
+static const uint VIEW_FLAG_FRUSTUM = 1u << 0u;
+static const uint VIEW_FLAG_CONE = 1u << 1u;
+static const uint VIEW_FLAG_OCCLUSION = 1u << 2u;
+static const uint VIEW_FLAG_ORTHOGRAPHIC = 1u << 4u;
+
 #include "LucyCommons.slang"
 
 static constexpr const uint INVALID_BINDLESS_INDEX = 0xFFFFFFFFu;
@@ -96,7 +105,6 @@ public struct PBRMaterial {
     GPUTextureResource EmissiveMap;
 
     float NormalStrength = 1.0f;
-    float3 _padding0;
 
     private static constexpr float AlphaCutoff = 0.5f;
 
@@ -148,43 +156,97 @@ public struct PBRMaterial {
     }
 };
 
-struct GPUSceneAddresses {
-    PBRMaterial* PBRMaterials;
-    GPUMesh* Meshes;
-    //GPUInstance* Instances;
-    //GPUSubmesh *Submeshes;
-    //uint64_t _padding0;
-    //GPUMeshlet* Meshlets;
-    //PackedVertex* Vertices;
-    //uint* MeshletVertexIndices;
-    //GPUVisibleDraw* VisibleDraws;
+struct GPUVertex {
+    float3 Position;
+    float3 MeshID;
+    float2 TextureCoords;
+    float3 Normals;
+    float3 Tangents;
+    float3 Bitangents;
+};
+
+struct GPUObject {
+    float4x4 Transform;
+    float4x4 TransformInversedTransposed;
+    float4x4 PreviousTransform;
+
+    float4 BoundingSphere;
+    float4 ObjectID;
+    uint4 Data; // x = MeshIndex y = RenderDeviceObjectFlags z = unused w = float LOD bias encoded using floatBitsToUint
 };
 
 struct GPUMesh {
-    uint64_t VertexBufferAddress;
-    uint64_t IndexBufferAddress;
+    float4 BoundingSphere;
+    uint4 Data; // x = unused y = unused z = FirstSubmesh w = SubmeshCount
+};
 
-    float4x4 Transform;
-
-    uint FirstSubmesh;
-    uint SubmeshCount;
-
-    float4 BoundsSphere;
+struct GPUMeshLOD {
+    uint4 Meshlets; // x = FirstMeshlet y = MeshletCount z = unused w = unused
+    float4 LODData; // x = minimum projected radius in pixels yzw = unused
 };
 
 struct GPUSubmesh {
-    uint MeshIndex;
+    float4x4 Transform;
+    float4x4 TransformInversedTransposed;
 
-    uint FirstIndex;
+    float4 BoundingSphere;
+    uint4 Draw; // x = FirstIndex y = IndexCount z = int32 VertexOffset bit-cast to uint32 w = MaterialIndex
+    uint4 Meshlets; // x = FirstMeshlet y = MeshletCount z = RenderBin w = flags
+    uint4 LODs; // x = FirstLOD, y = LODCount
+};
+
+struct GPUMeshlet {
+    float4 BoundingSphere;
+    float4 NormalCone;
+    uint4 Draw; // x = FirstIndex y = IndexCount z = int32 VertexOffset bit-cast to uint32 w = SubmeshIndex
+};
+
+struct GPUVisibleObject {
+    uint ObjectIndex;
+};
+
+struct GPUVisibleDraw {
+    uint ObjectIndex;
+    uint SubmeshIndex;
+    uint MeshletIndex;
+};
+
+struct GPUIndexedIndirectCommand {
     uint IndexCount;
+    uint InstanceCount;
+    uint FirstIndex;
     int VertexOffset;
+    uint FirstInstance;
+};
 
-    uint FirstMeshlet;
-    uint MeshletCount;
+struct GPUDispatchIndirectCommand {
+    uint GroupCountX;
+    uint GroupCountY;
+    uint GroupCountZ;
+};
 
-    uint MaterialIndex;
+struct GPUCullView {
+    float4x4 View;
+    float4x4 Projection;
+    float4x4 ViewProjection;
 
-    float4 BoundsSphere;
+    float4 FrustumPlanes[6];
+
+    float4 CameraPosition;
+    float4 Viewport;
+    uint4 Data; // x = Hi-Z texture index, y = Hi-Z sampler index, z = Hi-Z mip count, w = GPUCullViewFlags
+};
+
+struct GPUSceneAddresses {
+    PBRMaterial* PBRMaterials;
+    GPUObject* Objects;
+    GPUMesh* Meshes;
+    GPUMeshLOD* MeshLODs;
+    GPUSubmesh* Submeshes;
+    GPUMeshlet* Meshlets;
+    GPUVertex* Vertices;
+    uint* Indices;
+    GPUCullView* CullViews;
 };
 
 struct SceneCamera {
@@ -195,9 +257,7 @@ struct SceneCamera {
 
 struct DirectionalLight {
     float3 Direction;
-    float _padding0;
     float3 Color;
-    float _padding1;
     float4x4 DirLightShadowMatrices[NUM_CASCADES];
     float4 DirLightShadowCascadeSplits; // x = 0, y = 1, z = 2, w = 3 cascadeIndex
 };
@@ -211,8 +271,7 @@ struct GPUScene {
 //adds 8 bytes to the already existing sizeof(T)
 //take that in to consideration okidoki!!!!
 struct PushConstantGlobal<T> {
-    GPUScene *Root;
-    uint64_t _padding0;
+    GPUScene* Root;
     T Data;
 };
 
@@ -248,7 +307,45 @@ namespace BindlessTable {
     RWTexture2DArray<float2> StorageTextureArrays2D_Float2[];
 
     [[vk::binding(10, 0)]]
+    Texture2D<float> Textures2D_Float[];
+
+    [[vk::binding(11, 0)]]
+    RWTexture2D<float> StorageTextures2D_Float[];
+
+    [[vk::binding(12, 0)]]
     SamplerState Samplers[];
+}
+
+float GetMaximumScale(float4x4 transform) {
+    float scaleX = length(transform[0].xyz);
+    float scaleY = length(transform[1].xyz);
+    float scaleZ = length(transform[2].xyz);
+
+    return max(scaleX, max(scaleY, scaleZ));
+}
+
+bool IsSphereInsideFrustum(float3 center, float radius, GPUCullView view) {
+    [unroll]
+    for (uint planeIndex = 0; planeIndex < 6; planeIndex++) {
+        float4 plane = view.FrustumPlanes[planeIndex];
+        float distance = dot(plane.xyz, center) + plane.w;
+        // basic stuff... n*p+d < -r => sphere is outside of the plane, where p = center of sphere, n = (x,y,z)
+        if (distance < -radius)
+            return false;
+    }
+    return true;
+}
+
+bool IsSphereInsideFrustumShadow(float3 center, float radius, GPUCullView view) {
+    [unroll]
+    for (uint planeIndex = 0; planeIndex < 4; planeIndex++) {
+        float4 plane = view.FrustumPlanes[planeIndex];
+        float distance = dot(plane.xyz, center) + plane.w;
+        // basic stuff... n*p+d < -r => sphere is outside of the plane, where p = center of sphere, n = (x,y,z)
+        if (distance < -radius)
+            return false;
+    }
+    return true;
 }
 
 #endif

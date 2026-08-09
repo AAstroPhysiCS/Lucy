@@ -14,12 +14,11 @@ namespace Lucy {
 		VulkanImageSampler(VulkanImageSampler&&) = delete;
 		VulkanImageSampler& operator=(VulkanImageSampler&&) = delete;
 
-		void RTDestroyResource() final override;
+		void RTDestroyResource(RenderDevice* device) final override;
 
 		inline VkSampler GetVulkanHandle() const { return m_Handle; }
 	private:
 		VkSampler m_Handle = VK_NULL_HANDLE;
-		Ref<VulkanRenderDevice> m_VulkanDevice = nullptr;
 
 		friend class VulkanImage;
 		friend class VulkanImage2D;

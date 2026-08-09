@@ -54,6 +54,13 @@ namespace Lucy {
 		GenerationalPool(GenerationalPool&&) noexcept = default;
 		GenerationalPool& operator=(GenerationalPool&&) noexcept = default;
 
+	private:
+		struct Slot {
+			TData Data{};
+			uint32_t Generation = 1;
+			bool Alive = false;
+		};
+	public:
 		template<typename... TArgs>
 		[[nodiscard]] THandle Create(TArgs&&... args) {
 			IndexType index;
@@ -112,6 +119,8 @@ namespace Lucy {
 			LUCY_ASSERT(index < m_Slots.size(), "Index out of range.");
 			return m_Slots[index].Data;
 		}
+
+		[[nodiscard]] const Slot& Back() { return m_Slots.back(); }
 		
 		[[nodiscard]] TData& Get(const THandle& handle) {
 			LUCY_ASSERT(IsValid(handle), "Invalid or stale handle.");
@@ -134,12 +143,6 @@ namespace Lucy {
 			m_Slots.clear();
 			m_FreeList.clear();
 		}
-	private:
-		struct Slot {
-			TData Data{};
-			uint32_t Generation = 1;
-			bool Alive = false;
-		};
 	public:
 		using Iterator = std::vector<Slot>::iterator;
 		using CIterator = std::vector<Slot>::const_iterator;

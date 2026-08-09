@@ -1,28 +1,34 @@
 #include "LucyResource.slang"
 
-struct VertexInput {
-    [[vk::location(0)]] float3 a_Pos : POSITION;
-};
-
 struct VertexOutput {
     float4 position : SV_Position;
+    uint Layer : SV_RenderTargetArrayIndex;
 };
 
 struct LocalPushConstant {
-    float4x4 u_ModelMatrix;
+    GPUVisibleDraw* VisibleDraws;
+    uint CascadeIndex;
 };
 
 [vk::push_constant]
 PushConstantGlobal<LocalPushConstant> PushConstants;
 
 [shader("vertex")]
-VertexOutput main(VertexInput input, uint viewIndex : SV_ViewID) {
-    VertexOutput output;
+VertexOutput main(uint vertexIndex: SV_VulkanVertexID, uint drawIndex: SV_VulkanInstanceID) {
+    const uint cascadeIndex = PushConstants.Data.CascadeIndex;
 
-    float4 worldPos = mul(PushConstants.Data.u_ModelMatrix, float4(input.a_Pos, 1.0));
-    float4 projPos = mul(PushConstants.Root->DirectionalLight.DirLightShadowMatrices[viewIndex], worldPos);
+    GPUVisibleDraw visibleDraw = PushConstants.Data.VisibleDraws[drawIndex];
+    GPUObject object = PushConstants.Root->Addresses.Objects[visibleDraw.ObjectIndex];
+    GPUSubmesh submesh = PushConstants.Root->Addresses.Submeshes[visibleDraw.SubmeshIndex];
+    GPUVertex vertex = PushConstants.Root->Addresses.Vertices[vertexIndex];
+
+    float4x4 modelMatrix = object.Transform * submesh.Transform;
+    float4 worldPosition = modelMatrix * float4(vertex.Position, 1.0f);
+
+    VertexOutput output;
+    output.position = PushConstants.Root->DirectionalLight.DirLightShadowMatrices[PushConstants.Data.CascadeIndex] * worldPosition;
+    output.Layer = cascadeIndex;
     
-    output.position = projPos;
     return output;
 }
 

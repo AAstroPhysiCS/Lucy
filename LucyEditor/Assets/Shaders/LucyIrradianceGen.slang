@@ -4,10 +4,6 @@
 #include "LucyComputeUtilities.slang"
 #include "LucyResource.slang"
 
-struct VertexInput {
-    [[vk::location(0)]] float3 a_Pos : POSITION;
-};
-
 struct VertexOutput {
     float4 a_Pos : SV_Position;
     [[vk::location(0)]] float3 a_PosOut : POSITION0;
@@ -22,13 +18,15 @@ struct LocalPushConstant {
 PushConstantGlobal<LocalPushConstant> PushConstants;
 
 [shader("vertex")]
-VertexOutput main(VertexInput input, uint32_t viewIndex : SV_ViewID) {
-    VertexOutput output;
-    output.a_PosOut = input.a_Pos;
+VertexOutput main(uint vertexIndex: SV_VulkanVertexID, uint32_t viewIndex: SV_ViewID) {
+    GPUVertex input = PushConstants.Root->Addresses.Vertices[vertexIndex];
     
     float4x4 viewMatrix = Inverse(CaptureViews[viewIndex]);
     float4x4 viewProjMatrix = mul(PushConstants.Data.u_ProjMatrix, viewMatrix);
-    output.a_Pos = mul(viewProjMatrix, float4(input.a_Pos, 1.0));
+
+    VertexOutput output;
+    output.a_PosOut = input.Position;
+    output.a_Pos = mul(viewProjMatrix, float4(input.Position, 1.0));
     
     return output;
 }

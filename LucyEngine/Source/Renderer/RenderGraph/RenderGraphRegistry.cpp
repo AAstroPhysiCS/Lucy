@@ -8,18 +8,33 @@ namespace Lucy {
 	
 	void RenderGraphRegistry::Flush() {
 		for (auto& [rgResource, entry] : m_Resources) {
-			if (!Renderer::IsValidRenderResource(entry.ResourceHandle) || !entry.IsExternalTransient())
+			if (!entry.IsExternalTransient())
 				continue;
-			Renderer::EnqueueResourceDestroy(entry.ResourceHandle);
+
+			for (auto& handle : entry.ResourceHandles) {
+				if (!Renderer::IsValidRenderResource(handle))
+					continue;
+				Renderer::EnqueueResourceDestroy(handle);
+			}
 		}
 	}
 
-	void RenderGraphRegistry::ImportExternalResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle) {
+	void RenderGraphRegistry::ImportExternalResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle, RGResourceData data) {
 		m_Resources.insert_or_assign(rgResource,
 			RGResourceEntry{
-				.ResourceHandle = handle,
+				.ResourceHandles = { handle },
 				.Type = RGResourceType::External,
-				.Data = {},
+				.Data = data,
+			}
+		);
+	}
+
+	void RenderGraphRegistry::ImportExternalResource(const RenderGraphResource& rgResource, const std::vector<RenderDeviceResourceHandle>& handles, RGResourceData data) {
+		m_Resources.insert_or_assign(rgResource,
+			RGResourceEntry{
+				.ResourceHandles = handles,
+				.Type = RGResourceType::External,
+				.Data = data,
 			}
 		);
 	}
@@ -27,7 +42,7 @@ namespace Lucy {
 	void RenderGraphRegistry::ImportExternalTransientResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle) {
 		m_Resources.insert_or_assign(rgResource, 
 			RGResourceEntry {
-				.ResourceHandle = handle,
+				.ResourceHandles = { handle },
 				.Type = RGResourceType::ExternalTransient,
 				.Data = {},
 			}
@@ -45,7 +60,7 @@ namespace Lucy {
 		m_Resources.insert_or_assign(
 			rgResource,
 			RGResourceEntry {
-				.ResourceHandle = handle,
+				.ResourceHandles = { handle },
 				.Type = RGResourceType::Internal,
 				.Data = imageData
 			}
@@ -59,7 +74,22 @@ namespace Lucy {
 		m_Resources.insert_or_assign(
 			rgResource,
 			RGResourceEntry {
-				.ResourceHandle = handle,
+				.ResourceHandles = { handle },
+				.Type = RGResourceType::Internal,
+				.Data = bufferData
+			}
+		);
+	}
+
+	void RenderGraphRegistry::DeclareBuffer(const RenderGraphResource& rgResource, const std::vector<RenderDeviceResourceHandle>& handles, const RGBufferData& bufferData) {
+		LUCY_ASSERT(rgResource != UndefinedRenderGraphResource);
+		for (const auto& handle : handles)
+			LUCY_ASSERT(Renderer::IsValidRenderResource(handle));
+
+		m_Resources.insert_or_assign(
+			rgResource,
+			RGResourceEntry{
+				.ResourceHandles = handles,
 				.Type = RGResourceType::Internal,
 				.Data = bufferData
 			}
@@ -67,18 +97,24 @@ namespace Lucy {
 	}
 
 	Ref<Image> RenderGraphRegistry::GetImage(const RenderGraphResource& rgResource) {
-		return Renderer::AccessResource<Image>(m_Resources.at(rgResource).ResourceHandle);
+		return Renderer::AccessResource<Image>(m_Resources.at(rgResource).ResourceHandles[0]);
 	}
 	
 	Ref<Image> RenderGraphRegistry::GetImage(const RenderGraphResource& rgResource) const {
-		return Renderer::AccessResource<Image>(m_Resources.at(rgResource).ResourceHandle);
+		return Renderer::AccessResource<Image>(m_Resources.at(rgResource).ResourceHandles[0]);
 	}
 
-	Ref<RenderDeviceResource> RenderGraphRegistry::GetBuffer(const RenderGraphResource& rgResource) {
-		return Renderer::AccessResource<RenderDeviceResource>(m_Resources.at(rgResource).ResourceHandle);
+	Ref<RenderDeviceBuffer> RenderGraphRegistry::GetBuffer(const RenderGraphResource& rgResource) {
+		const auto& data = m_Resources.at(rgResource).GetBufferData();
+		if (!data.InFlightMode)
+			return Renderer::AccessResource<RenderDeviceBuffer>(m_Resources.at(rgResource).ResourceHandles[0]);
+		return Renderer::AccessResource<RenderDeviceBuffer>(m_Resources.at(rgResource).ResourceHandles[Renderer::GetCurrentFrameIndex()]);
 	}
 
-	Ref<RenderDeviceResource> RenderGraphRegistry::GetBuffer(const RenderGraphResource& rgResource) const {
-		return Renderer::AccessResource<RenderDeviceResource>(m_Resources.at(rgResource).ResourceHandle);
+	Ref<RenderDeviceBuffer> RenderGraphRegistry::GetBuffer(const RenderGraphResource& rgResource) const {
+		const auto& data = m_Resources.at(rgResource).GetBufferData();
+		if (!data.InFlightMode)
+			return Renderer::AccessResource<RenderDeviceBuffer>(m_Resources.at(rgResource).ResourceHandles[0]);
+		return Renderer::AccessResource<RenderDeviceBuffer>(m_Resources.at(rgResource).ResourceHandles[Renderer::GetCurrentFrameIndex()]);
 	}
 }

@@ -31,7 +31,7 @@ namespace Lucy {
 
 		std::unordered_map<std::string, GraphicsPipelineStatistics> GetAllGraphicsPipelineStatistics() const;
 
-		void RTRecreateAllPipelinesDependentOnShader(const std::string_view& shaderName);
+		void RTRecreateAllPipelinesDependentOnShader(const std::vector<Ref<Shader>>& shadersThatAreReloaded);
 
 		void DestroyPipeline(const std::string& name);
 		void DestroyAll();
@@ -39,8 +39,8 @@ namespace Lucy {
 		void SaveToFileAsPSO();
 		void ReadFromFileAsPSO();
 	private:
-		RenderDeviceResourceHandle CreateGraphicsPipeline(const std::string& name, const GraphicsPipelineCreateInfo& createInfo);
-		RenderDeviceResourceHandle CreateComputePipeline(const std::string& name, const ComputePipelineCreateInfo& createInfo);
+		RenderDeviceResourceHandle CreateGraphicsPipeline(const std::string& name, const Ref<Shader>& shader, const GraphicsPipelineCreateInfo& createInfo);
+		RenderDeviceResourceHandle CreateComputePipeline(const std::string& name, const Ref<Shader>& shader, const ComputePipelineCreateInfo& createInfo);
 
 		std::unordered_map<std::string, RenderDeviceResourceHandle> m_GraphicsPipelines;
 		std::unordered_map<std::string, RenderDeviceResourceHandle> m_ComputePipelines;

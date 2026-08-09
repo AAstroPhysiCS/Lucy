@@ -10,12 +10,12 @@
 namespace Lucy {
 
 	VulkanRenderPass::VulkanRenderPass(const RenderPassCreateInfo& createInfo, const Ref<VulkanRenderDevice>& vulkanDevice)
-		: RenderPass(createInfo), m_VulkanDevice(vulkanDevice) {
+		: RenderPass(createInfo) {
 		m_DepthBuffered = m_CreateInfo.Layout.DepthAttachment.IsValid();
-		RTCreate();
+		RTCreate(vulkanDevice);
 	}
 
-	void VulkanRenderPass::RTCreate() {
+	void VulkanRenderPass::RTCreate(const Ref<VulkanRenderDevice>& vulkanDevice) {
 		const std::vector<RenderPassLayout::Attachment>& colorAttachments = m_CreateInfo.Layout.ColorAttachments;
 		const RenderPassLayout::Attachment& depthAttachment = m_CreateInfo.Layout.DepthAttachment;
 
@@ -82,7 +82,7 @@ namespace Lucy {
 		if (m_CreateInfo.Multiview.IsValid())
 			createInfo.pNext = &renderPassMultiview;
 
-		VkDevice logicalDevice = m_VulkanDevice->GetLogicalDevice();
+		VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
 		LUCY_VK_ASSERT(vkCreateRenderPass(logicalDevice, &createInfo, nullptr, &m_RenderPass));
 
 #ifdef LUCY_DEBUG
@@ -136,13 +136,13 @@ namespace Lucy {
 		vkCmdEndRenderPass(m_BoundedCommandBuffer);
 	}
 
-	void VulkanRenderPass::RTRecreate() {
-		RTDestroyResource();
-		RTCreate();
+	void VulkanRenderPass::RTRecreate(const Ref<RenderDevice>& device) {
+		Renderer::EnqueueResourceDestroy(GetMyHandle());
+		RTCreate(device->As<VulkanRenderDevice>());
 	}
 
-	void VulkanRenderPass::RTDestroyResource() {
-		vkDestroyRenderPass(m_VulkanDevice->GetLogicalDevice(), m_RenderPass, nullptr);
+	void VulkanRenderPass::RTDestroyResource(RenderDevice* device) {
+		vkDestroyRenderPass(reinterpret_cast<VulkanRenderDevice*>(device)->GetLogicalDevice(), m_RenderPass, nullptr);
 		m_RenderPass = VK_NULL_HANDLE;
 	}
 }

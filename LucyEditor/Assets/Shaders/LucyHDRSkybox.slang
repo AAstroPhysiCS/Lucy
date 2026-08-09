@@ -1,7 +1,4 @@
 #include "LucyResource.slang"
-struct VertexInput {
-    [[vk::location(0)]] float3 a_Pos : POSITION;
-};
 
 struct VertexOutput {
     float4 a_Pos : SV_Position;
@@ -16,14 +13,12 @@ struct LocalPushConstant {
 PushConstantGlobal<LocalPushConstant> PushConstants;
 
 [shader("vertex")]
-VertexOutput main(VertexInput input) {
+VertexOutput main(uint vertexIndex: SV_VulkanVertexID) {
+    GPUVertex input = PushConstants.Root->Addresses.Vertices[vertexIndex];
+
     SceneCamera camera = PushConstants.Root->Camera;
 
-    VertexOutput output;
-    output.a_PosOut = input.a_Pos;
-    output.a_PosOut.xy *= -1.0f;
-
-    float4 posWorld = float4(input.a_Pos, 1.0);
+    float4 posWorld = float4(input.Position, 1.0);
 
     float4x4 viewMatrix = float4x4(
         float4(camera.u_ViewMatrix[0].xyz, 0.0f),
@@ -35,6 +30,9 @@ VertexOutput main(VertexInput input) {
     float4 posView = mul(viewMatrix, posWorld);
     float4 posClip = mul(camera.u_ProjMatrix, posView);
 
+    VertexOutput output;
+    output.a_PosOut = input.Position;
+    output.a_PosOut.xy *= -1.0f;
     // Use .xyww for skybox rendering (depth = 1.0)
     output.a_Pos = posClip.xyww;
     

@@ -22,7 +22,9 @@ namespace Lucy {
 		inline const Ref<Shader>& GetShader() const { return m_Shader; }
 		PipelineConstant& GetPipelineConstants(const std::string& name);
 	protected:
-		virtual void RTDestroyResource() override;
+		virtual void RTDestroyResource(RenderDevice* device) override;
+
+		void SetShader(Ref<Shader> shader) { m_Shader = shader; }
 
 		inline const std::vector<PipelineConstant>& GetPipelineConstants() const { return m_PushConstants; }
 

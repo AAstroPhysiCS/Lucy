@@ -22,6 +22,215 @@
 
 namespace Lucy {
 
+#pragma region GPUDrivenRendererPasses
+
+	GPUDrivenRendererPass::GPUDrivenRendererPass(Ref<RenderDevice> device) {
+		const auto& scene = device->GetScene();
+
+		Renderer::ImportExternalRenderGraphResource(RGResource(GPUVerticesBuffer), scene->GetGlobalVertexBufferHandle(), RGBufferData{ .InFlightMode = false });
+		Renderer::ImportExternalRenderGraphResource(RGResource(GPUIndicesBuffer), scene->GetGlobalIndexBufferHandle(), RGBufferData{ .InFlightMode = false });
+		Renderer::ImportExternalRenderGraphResource(RGResource(GPUSceneBuffer), scene->GetCurrentFrameBufferHandles("GPUScene"), RGBufferData { .InFlightMode = false });
+		Renderer::ImportExternalRenderGraphResource(RGResource(GPUObjectsBuffer), scene->GetCurrentFrameBufferHandles("GPUObjects"), RGBufferData{ .InFlightMode = false });
+		Renderer::ImportExternalRenderGraphResource(RGResource(GPUMeshesBuffer), scene->GetCurrentFrameBufferHandles("GPUMeshes"), RGBufferData{ .InFlightMode = false });
+		Renderer::ImportExternalRenderGraphResource(RGResource(GPUMeshLODsBuffer), scene->GetCurrentFrameBufferHandles("GPUMeshLODs"), RGBufferData{ .InFlightMode = false });
+		Renderer::ImportExternalRenderGraphResource(RGResource(GPUSubmeshesBuffer), scene->GetCurrentFrameBufferHandles("GPUSubmeshes"), RGBufferData{ .InFlightMode = false });
+		Renderer::ImportExternalRenderGraphResource(RGResource(GPUMeshletsBuffer), scene->GetCurrentFrameBufferHandles("GPUMeshlets"), RGBufferData{ .InFlightMode = false });
+		Renderer::ImportExternalRenderGraphResource(RGResource(GPUCullViewsBuffer), scene->GetCurrentFrameBufferHandles("GPUCullViews"), RGBufferData{ .InFlightMode = false });
+	}
+
+	void GPUDrivenRendererPass::AddPass(const Ref<RenderGraph>& renderGraph) {
+		AddObjectCullPass(renderGraph);
+		AddDrawCommandsBuildPass(renderGraph);
+		AddMeshletCullPass(renderGraph);
+		AddHiZPass(renderGraph);
+	}
+
+	GlobalPushConstant<RenderDeviceGPUCullData> GPUDrivenRendererPass::CreateGPUCullPushConstant(RenderGraphRegistry& registry, uint32_t viewIndex) {
+		GlobalPushConstant<RenderDeviceGPUCullData> pushConstantData{
+			.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+			.Data = {
+				.VisibleObjects = registry.GetBuffer(RGResource(VisibleObjects))->GetDeviceAddress(),
+				.VisibleObjectCount = registry.GetBuffer(RGResource(VisibleObjectsCount))->GetDeviceAddress(),
+				.MeshletDispatchIndirect = registry.GetBuffer(RGResource(MeshletDispatch))->GetDeviceAddress(),
+				.VisibleDraws = registry.GetBuffer(RGResource(VisibleDraws))->GetDeviceAddress(),
+				.IndirectCommands = registry.GetBuffer(RGResource(IndirectCommands))->GetDeviceAddress(),
+				.DrawCounts = registry.GetBuffer(RGResource(DrawCounts))->GetDeviceAddress(),
+				.ObjectCapacity = static_cast<uint32_t>(RenderDeviceScene::GetObjectCapacity()),
+				.CommandCapacityPerBin = static_cast<uint32_t>(RenderDeviceScene::GetMeshletCapacity()),
+				.ViewIndex = viewIndex,
+				.RenderBinCount = RenderBin::Count
+			}
+		};
+
+		return pushConstantData;
+	}
+
+	// Idea from: https://medium.com/@mil_kru/two-pass-occlusion-culling-4100edcad501
+	void GPUDrivenRendererPass::AddHiZPass(const Ref<RenderGraph>& renderGraph) {
+		/*renderGraph->AddPass(TargetQueueFamily::Compute, "HiZPass", [=](RenderGraphBuilder& build) {
+			build.DeclareImage(RGResource(HiZImage), {
+				.Width = 2048,
+				.Height = 2048,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
+				.Format = ImageFormat::R32_SFLOAT,
+				.GenerateSampler = true,
+				.ImGuiUsage = true,
+			}, RenderPassLoadStoreAttachments::ClearStore);
+
+			build.WriteImage(RGResource(HiZImage), RenderGraphResourceAccess::StorageWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+
+			};
+		});*/
+	}
+
+	void GPUDrivenRendererPass::AddDrawCommandsBuildPass(const Ref<RenderGraph>& renderGraph) {
+		renderGraph->AddPass(TargetQueueFamily::Compute, "DrawCommandsBuildPass", [=](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.DeclareBuffer(RGResource(MeshletDispatch), {
+				.DebugName = "MeshletDispatch",
+				.Size = sizeof(VkDispatchIndirectCommand),
+				.Usage = BufferUsage::Storage | BufferUsage::Indirect
+			});
+
+			build.ReadBuffer(RGResource(VisibleObjectsCount), RenderGraphResourceAccess::StorageRead);
+			build.WriteBuffer(RGResource(MeshletDispatch), RenderGraphResourceAccess::StorageWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUBuildMeshletDispatchPipeline");
+
+				RenderCommand& command = cmdList.BeginRenderCommand("DrawCommandsBuildPass");
+				command.BindPipeline(pipeline);
+
+				auto pushConstantData = CreateGPUCullPushConstant(registry, 0);
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				command.BindPushConstant(pushConstant);
+				command.DispatchCompute(1, 1, 1);
+				cmdList.EndRenderCommand();
+			};
+		});
+	}
+
+	void GPUDrivenRendererPass::AddObjectCullPass(const Ref<RenderGraph>& renderGraph) {
+		renderGraph->AddPass(TargetQueueFamily::Compute, "ResetPass", [=](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.DeclareBuffer(RGResource(VisibleObjectsCount), {
+				.DebugName = "VisibleObjectsCount",
+				.Size = sizeof(uint32_t),
+				.Usage = BufferUsage::Storage | BufferUsage::TransferDestination,
+			});
+
+			build.DeclareBuffer(RGResource(DrawCounts), {
+				.DebugName = "DrawCounts",
+				.Size = RenderBin::Count * sizeof(uint32_t),
+				.Usage = BufferUsage::Storage | BufferUsage::TransferDestination | BufferUsage::Indirect
+			});
+
+			build.WriteBuffer(RGResource(VisibleObjectsCount), RenderGraphResourceAccess::TransferWrite);
+			build.WriteBuffer(RGResource(DrawCounts), RenderGraphResourceAccess::TransferWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+				RenderCommand& command = cmdList.BeginRenderCommand("BufferResetPass");
+				command.FillBuffer(registry.GetBuffer(RGResource(VisibleObjectsCount)), 0, sizeof(uint32_t), 0);
+				command.FillBuffer(registry.GetBuffer(RGResource(DrawCounts)), 0, RenderBin::Count * sizeof(uint32_t), 0);
+				cmdList.EndRenderCommand();
+			};
+		});
+
+		renderGraph->AddPass(TargetQueueFamily::Compute, "ObjectCullPass", [=](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.DeclareBuffer(RGResource(VisibleObjects), {
+				.DebugName = "VisibleObjects",
+				.Size = RenderDeviceScene::GetObjectCapacity() * sizeof(RenderDeviceVisibleObjectData),
+				.Usage = BufferUsage::Storage
+			});
+
+			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUObjectsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUMeshesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUMeshLODsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUCullViewsBuffer), RenderGraphResourceAccess::StorageRead);
+
+			build.ReadBuffer(RGResource(VisibleObjectsCount), RenderGraphResourceAccess::StorageRead);
+
+			build.WriteBuffer(RGResource(VisibleObjects), RenderGraphResourceAccess::StorageWrite);
+			build.WriteBuffer(RGResource(VisibleObjectsCount), RenderGraphResourceAccess::StorageReadWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUCullObjectsPipeline");
+
+				RenderCommand& command = cmdList.BeginRenderCommand("ObjectCullPass");
+				command.BindPipeline(pipeline);
+
+				auto pushConstantData = CreateGPUCullPushConstant(registry, 0);
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				command.BindPushConstant(pushConstant);
+				command.DispatchCompute((RenderDeviceScene::GetObjectCapacity() + 63) / 64, 1, 1);
+
+				cmdList.EndRenderCommand();
+			};
+		});
+	}
+
+	void GPUDrivenRendererPass::AddMeshletCullPass(const Ref<RenderGraph>& renderGraph) {
+		renderGraph->AddPass(TargetQueueFamily::Compute, "MeshletCullPass", [=](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+			
+			build.DeclareBuffer(RGResource(VisibleDraws), {
+				.DebugName = "VisibleDraws",
+				.Size = RenderBin::Count * RenderDeviceScene::GetMeshletCapacity() * sizeof(RenderDeviceVisibleDrawData),
+				.Usage = BufferUsage::Storage | BufferUsage::TransferDestination
+			});
+
+			build.DeclareBuffer(RGResource(IndirectCommands), {
+				.DebugName = "IndirectCommands",
+				.Size = RenderBin::Count * RenderDeviceScene::GetMeshletCapacity() * sizeof(VkDrawIndexedIndirectCommand),
+				.Usage = BufferUsage::Storage | BufferUsage::TransferDestination | BufferUsage::Indirect
+			});
+
+			build.ReadExternalBuffer(RGResource(GPUObjectsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUSubmeshesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUMeshletsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUCullViewsBuffer), RenderGraphResourceAccess::StorageRead);
+
+			build.ReadBuffer(RGResource(VisibleObjects), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(VisibleObjectsCount), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(MeshletDispatch), RenderGraphResourceAccess::IndirectRead);
+
+			build.WriteBuffer(RGResource(VisibleDraws), RenderGraphResourceAccess::StorageWrite);
+			build.WriteBuffer(RGResource(IndirectCommands), RenderGraphResourceAccess::StorageWrite);
+			build.WriteBuffer(RGResource(DrawCounts), RenderGraphResourceAccess::StorageReadWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUCullMeshletsPipeline");
+
+				RenderCommand& command = cmdList.BeginRenderCommand("MeshletCullPass");
+				command.BindPipeline(pipeline);
+
+				auto pushConstantData = CreateGPUCullPushConstant(registry, 0);
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				command.BindAllDescriptorSets();
+				command.BindPushConstant(pushConstant);
+				command.DispatchComputeIndirect(registry.GetBuffer(RGResource(MeshletDispatch)), 0);
+
+				cmdList.EndRenderCommand();
+			};
+		});
+	}
+
+#pragma endregion GPUDrivenRendererPasses
+
 #pragma region ForwardPBRPass
 
 	ForwardPBRPass::ForwardPBRPass(Ref<Scene> scene, uint32_t width, uint32_t height)
@@ -55,6 +264,16 @@ namespace Lucy {
 
 			build.ReadImage(RGResource(ShadowImages), RenderGraphResourceAccess::ShaderSampledRead);
 			build.ReadExternalImage(RGResource(BRDFLutImage), RenderGraphResourceAccess::ShaderSampledRead);
+
+			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUObjectsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUSubmeshesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUVerticesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUIndicesBuffer), RenderGraphResourceAccess::IndexRead);
+
+			build.ReadBuffer(RGResource(VisibleDraws), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(IndirectCommands), RenderGraphResourceAccess::IndirectRead);
+			build.ReadBuffer(RGResource(DrawCounts), RenderGraphResourceAccess::IndirectRead);
 
 			build.BindRenderTarget(RGResource(GeometryImage), RGResource(GeometryDepthImage));
 
@@ -93,31 +312,39 @@ namespace Lucy {
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
 
-				RenderDeviceTextureResource env[4] = {
-					{ .TextureIndex = shadowImagesIndex, .SamplerIndex = 0 },
-					{ .TextureIndex = prefilterIndex, .SamplerIndex = 0 },
-					{ .TextureIndex = brdfImageIndex, .SamplerIndex = 0 },
-					{ .TextureIndex = irradianceIndex, .SamplerIndex = 0 },
-				};
-
 				struct LocalPushConstant {
-					glm::mat4 ModelMatrix;
-					glm::mat4 ModelMatrixInversedTransposed;
-					uint32_t MaterialID;
+					RenderDeviceBufferReference VisibleDraws = 0;
 					RenderDeviceTextureResource PBRTextureResources[4];
-					uint32_t Padding[3]{};
 				};
 
-				m_Scene->ViewRForEach<MeshComponent, TransformComponent>([&](MeshComponent& meshComponent, TransformComponent& transformComponent) {
-					draw.DrawIndexedMeshWithPushConstant<LocalPushConstant>(meshComponent.GetMesh(), transformComponent.GetMatrix(),
-						[env](LocalPushConstant& data, const Submesh& submesh, const glm::mat4& finalTransform) {
-						data.ModelMatrix = finalTransform;
-						data.ModelMatrixInversedTransposed = glm::transpose(glm::inverse(finalTransform));
-						data.MaterialID = submesh.MaterialID.Index;
+				GlobalPushConstant<LocalPushConstant> pushConstantData{
+					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+					.Data = {
+						.VisibleDraws = registry.GetBuffer(RGResource(VisibleDraws))->GetDeviceAddress(),
+						.PBRTextureResources = {
+							{ .TextureIndex = shadowImagesIndex, .SamplerIndex = 0 },
+							{ .TextureIndex = prefilterIndex, .SamplerIndex = 0 },
+							{ .TextureIndex = brdfImageIndex, .SamplerIndex = 0 },
+							{ .TextureIndex = irradianceIndex, .SamplerIndex = 0 },
+						}
+					}
+				};
 
-						memcpy(data.PBRTextureResources, env, sizeof(env));
-					});
-				});
+				const uint32_t commandCapacityPerBin = RenderDeviceScene::GetMeshletCapacity();
+
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				draw.BindPushConstant(pushConstant);
+				draw.BindBuffers(registry.GetBuffer(RGResource(GPUIndicesBuffer)));
+
+				for (uint32_t renderBin = 0; renderBin < RenderBin::Count; renderBin++) {
+					uint64_t commandOffset = static_cast<uint64_t>(renderBin) * commandCapacityPerBin * sizeof(VkDrawIndexedIndirectCommand);
+					uint64_t countOffset = static_cast<uint64_t>(renderBin) * sizeof(uint32_t);
+
+					draw.DrawIndexedIndirectCount(registry.GetBuffer(RGResource(IndirectCommands)), commandOffset, 
+						registry.GetBuffer(RGResource(DrawCounts)), countOffset, commandCapacityPerBin, sizeof(VkDrawIndexedIndirectCommand));
+				}
 
 				cmdList.EndRenderCommand();
 			};
@@ -144,6 +371,16 @@ namespace Lucy {
 				.GenerateSampler = true,
 			}, RenderPassLoadStoreAttachments::ClearStore);
 
+			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUObjectsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUSubmeshesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUVerticesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUIndicesBuffer), RenderGraphResourceAccess::IndexRead);
+
+			build.ReadBuffer(RGResource(VisibleDraws), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(IndirectCommands), RenderGraphResourceAccess::IndirectRead);
+			build.ReadBuffer(RGResource(DrawCounts), RenderGraphResourceAccess::IndirectRead);
+
 			build.BindRenderTarget(RGResource(IDPassImage), RGResource(IDPassDepthImage));
 
 			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
@@ -155,15 +392,31 @@ namespace Lucy {
 				draw.BindAllDescriptorSets();
 
 				struct LocalPushConstant {
-					glm::mat4 ModelMatrix;
+					RenderDeviceBufferReference VisibleDraws;
 				};
 
-				m_Scene->ViewRForEach<MeshComponent, TransformComponent>([&](MeshComponent& meshComponent, TransformComponent& transformComponent) {
-					draw.DrawIndexedMeshWithPushConstant<LocalPushConstant>(meshComponent.GetMesh(), transformComponent.GetMatrix(),
-						[](LocalPushConstant& data, const Submesh& submesh, const glm::mat4& finalTransform) {
-						data.ModelMatrix = finalTransform;
-					});
-				});
+				GlobalPushConstant<LocalPushConstant> pushConstantData{
+					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+					.Data = {
+						.VisibleDraws = registry.GetBuffer(RGResource(VisibleDraws))->GetDeviceAddress()
+					}
+				};
+
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				draw.BindPushConstant(pushConstant);
+				draw.BindBuffers(registry.GetBuffer(RGResource(GPUIndicesBuffer)));
+
+				const uint32_t commandCapacityPerBin = RenderDeviceScene::GetMeshletCapacity();
+
+				for (uint32_t renderBin = 0; renderBin < RenderBin::Count; renderBin++) {
+					const uint64_t commandOffset = static_cast<uint64_t>(renderBin) * commandCapacityPerBin * sizeof(VkDrawIndexedIndirectCommand);
+					const uint64_t countOffset = static_cast<uint64_t>(renderBin) * sizeof(uint32_t);
+
+					draw.DrawIndexedIndirectCount(registry.GetBuffer(RGResource(IndirectCommands)), commandOffset,
+						registry.GetBuffer(RGResource(DrawCounts)), countOffset, commandCapacityPerBin, sizeof(VkDrawIndexedIndirectCommand));
+				}
 
 				cmdList.EndRenderCommand();
 			};
@@ -174,14 +427,219 @@ namespace Lucy {
 
 #pragma region ShadowPass
 
-	ShadowPass::ShadowPass(Ref<Scene> scene, uint32_t size)
-		: m_Scene(scene), m_ShadowMapSize(size) {
+	ShadowPass::ShadowPass(Ref<RenderDevice> device, Ref<Scene> scene, uint32_t size)
+		: m_Device(device), m_Scene(scene), m_ShadowMapSize(size) {
+		ShadowCamera::ResetSplit();
+		InitializeShadowCameras(m_ShadowMapSize, m_Scene->GetEditorCamera());
+		for (ShadowCamera& shadowCamera : s_ShadowCameras)
+			shadowCamera.CreateCullView(m_Device);
+	}
+
+	GlobalPushConstant<RenderDeviceGPUShadowCullData> ShadowPass::CreateGPUCullPushConstant(RenderGraphRegistry& registry) const {
+		return {
+			.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+			.Data = {
+				.VisibleObjects = registry.GetBuffer(RGResource(ShadowVisibleObjects))->GetDeviceAddress(),
+				.VisibleObjectCounts = registry.GetBuffer(RGResource(ShadowVisibleObjectCount))->GetDeviceAddress(),
+				.MeshletDispatches = registry.GetBuffer(RGResource(ShadowMeshletDispatches))->GetDeviceAddress(),
+				.ViewIndices = {
+					s_ShadowCameras[0].GetCullViewHandle().Index,
+					s_ShadowCameras[1].GetCullViewHandle().Index,
+					s_ShadowCameras[2].GetCullViewHandle().Index,
+					s_ShadowCameras[3].GetCullViewHandle().Index
+				},
+				.Data = {
+					static_cast<uint32_t>(RenderDeviceScene::GetObjectCapacity()),
+					static_cast<uint32_t>(RenderDeviceScene::GetMeshletCapacity()),
+					NUM_CASCADES,
+					0
+				}
+			}
+		};
+	}
+
+	GlobalPushConstant<RenderDeviceGPUCullData> ShadowPass::CreateGPUMeshletCullPushConstant(RenderGraphRegistry& registry, uint32_t cascadeIndex) const {
+		uint64_t objectCapacity = RenderDeviceScene::GetObjectCapacity();
+		uint64_t commandCapacity = RenderDeviceScene::GetMeshletCapacity();
+
+		uint64_t visibleObjectsOffset = cascadeIndex * objectCapacity * sizeof(RenderDeviceVisibleObjectData);
+		uint64_t visibleObjectCountOffset = cascadeIndex * sizeof(uint32_t);
+		uint64_t meshletDispatchOffset = cascadeIndex * sizeof(VkDispatchIndirectCommand);
+		uint64_t visibleDrawsOffset = cascadeIndex * commandCapacity * sizeof(RenderDeviceVisibleDrawData);
+		uint64_t indirectCommandsOffset = cascadeIndex * commandCapacity * sizeof(VkDrawIndexedIndirectCommand);
+		uint64_t drawCountOffset = cascadeIndex * sizeof(uint32_t);
+
+		return {
+			.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+			.Data = {
+				.VisibleObjects = registry.GetBuffer(RGResource(ShadowVisibleObjects))->GetDeviceAddress() + visibleObjectsOffset,
+				.VisibleObjectCount = registry.GetBuffer(RGResource(ShadowVisibleObjectCount))->GetDeviceAddress() + visibleObjectCountOffset,
+				.MeshletDispatchIndirect = registry.GetBuffer(RGResource(ShadowMeshletDispatches))->GetDeviceAddress() + meshletDispatchOffset,
+				.VisibleDraws = registry.GetBuffer(RGResource(ShadowVisibleDraws))->GetDeviceAddress() + visibleDrawsOffset,
+				.IndirectCommands = registry.GetBuffer(RGResource(ShadowIndirectCommands))->GetDeviceAddress() + indirectCommandsOffset,
+				.DrawCounts = registry.GetBuffer(RGResource(ShadowDrawCounts))->GetDeviceAddress() + drawCountOffset,
+				.ObjectCapacity = static_cast<uint32_t>(objectCapacity),
+				.CommandCapacityPerBin = static_cast<uint32_t>(commandCapacity),
+				.ViewIndex = static_cast<uint32_t>(s_ShadowCameras[cascadeIndex].GetCullViewHandle().Index),
+				.RenderBinCount = 1
+			}
+		};
 	}
 
 	void ShadowPass::AddPass(const Ref<RenderGraph>& renderGraph) {
+		const uint32_t objectCapacity = RenderDeviceScene::GetObjectCapacity();
+		const uint32_t commandCapacity = RenderDeviceScene::GetMeshletCapacity();
 
-		renderGraph->AddPass(TargetQueueFamily::Graphics, "VSMPass", [=, *this](RenderGraphBuilder& build) {
+		renderGraph->AddPass(TargetQueueFamily::Compute, "ShadowResetPass", [=](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.DeclareBuffer(RGResource(ShadowVisibleObjects), {
+				.DebugName = "ShadowVisibleObjects",
+				.Size = NUM_CASCADES * objectCapacity * sizeof(RenderDeviceVisibleObjectData),
+				.Usage = BufferUsage::Storage
+			});
+
+			build.DeclareBuffer(RGResource(ShadowVisibleObjectCount), {
+				.DebugName = "ShadowVisibleObjectCount",
+				.Size = NUM_CASCADES * sizeof(uint32_t),
+				.Usage = BufferUsage::Storage | BufferUsage::TransferDestination
+			});
+
+			build.DeclareBuffer(RGResource(ShadowMeshletDispatches), {
+				.DebugName = "ShadowMeshletDispatches",
+				.Size = NUM_CASCADES * sizeof(VkDispatchIndirectCommand),
+				.Usage = BufferUsage::Storage | BufferUsage::Indirect
+			});
+
+			build.DeclareBuffer(RGResource(ShadowVisibleDraws), {
+				.DebugName = "ShadowVisibleDraws",
+				.Size = NUM_CASCADES * commandCapacity * sizeof(RenderDeviceVisibleDrawData),
+				.Usage = BufferUsage::Storage
+			});
+
+			build.DeclareBuffer(RGResource(ShadowIndirectCommands), {
+				.DebugName = "ShadowIndirectCommands",
+				.Size = NUM_CASCADES * commandCapacity * sizeof(VkDrawIndexedIndirectCommand),
+				.Usage = BufferUsage::Storage | BufferUsage::Indirect
+			});
+
+			build.DeclareBuffer(RGResource(ShadowDrawCounts), {
+				.DebugName = "ShadowDrawCounts",
+				.Size = NUM_CASCADES * sizeof(uint32_t),
+				.Usage = BufferUsage::Storage | BufferUsage::TransferDestination | BufferUsage::Indirect
+			});
+
+			build.WriteBuffer(RGResource(ShadowVisibleObjectCount), RenderGraphResourceAccess::TransferWrite);
+			build.WriteBuffer(RGResource(ShadowDrawCounts), RenderGraphResourceAccess::TransferWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+				RenderCommand& command = cmdList.BeginRenderCommand("ShadowResetPass");
+				command.FillBuffer(registry.GetBuffer(RGResource(ShadowVisibleObjectCount)), 0, NUM_CASCADES * sizeof(uint32_t), 0);
+				command.FillBuffer(registry.GetBuffer(RGResource(ShadowDrawCounts)), 0, NUM_CASCADES * sizeof(uint32_t), 0);
+				cmdList.EndRenderCommand();
+			};
+		});
+
+		renderGraph->AddPass(TargetQueueFamily::Compute, "ShadowObjectCullPass", [=, *this](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUObjectsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUMeshesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUCullViewsBuffer), RenderGraphResourceAccess::StorageRead);
+
+			build.ReadBuffer(RGResource(ShadowVisibleObjectCount), RenderGraphResourceAccess::StorageReadWrite);
+
+			build.WriteBuffer(RGResource(ShadowVisibleObjects), RenderGraphResourceAccess::StorageWrite);
+			build.WriteBuffer(RGResource(ShadowVisibleObjectCount), RenderGraphResourceAccess::StorageReadWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUCullShadowObjectsPipeline" );
+
+				RenderCommand& command = cmdList.BeginRenderCommand("ShadowObjectCullPass");
+				command.BindPipeline(pipeline);
+
+				auto pushConstantData = CreateGPUCullPushConstant(registry);
+				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				command.BindPushConstant(pushConstant);
+				command.DispatchCompute((objectCapacity + 63) / 64, NUM_CASCADES, 1);
+
+				cmdList.EndRenderCommand();
+			};
+		});
+
+		renderGraph->AddPass(TargetQueueFamily::Compute, "ShadowDispatchBuildPass", [=, *this](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(ShadowVisibleObjectCount), RenderGraphResourceAccess::StorageRead);
+
+			build.WriteBuffer(RGResource(ShadowMeshletDispatches), RenderGraphResourceAccess::StorageWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUBuildShadowMeshletDispatchesPipeline");
+
+				RenderCommand& command = cmdList.BeginRenderCommand("ShadowDispatchBuildPass");
+				command.BindPipeline(pipeline);
+
+				auto pushConstantData = CreateGPUCullPushConstant(registry);
+				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				command.BindPushConstant(pushConstant);
+				command.DispatchCompute(1, 1, 1);
+
+				cmdList.EndRenderCommand();
+			};
+		});
+
+		renderGraph->AddPass(TargetQueueFamily::Compute, "ShadowMeshletCullPass", [=, *this](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUObjectsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUMeshesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUMeshLODsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUSubmeshesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUMeshletsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUCullViewsBuffer), RenderGraphResourceAccess::StorageRead);
+
+			build.ReadBuffer(RGResource(ShadowVisibleObjects), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(ShadowVisibleObjectCount), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(ShadowMeshletDispatches), RenderGraphResourceAccess::IndirectRead);
+
+			build.WriteBuffer(RGResource(ShadowVisibleDraws), RenderGraphResourceAccess::StorageWrite);
+			build.WriteBuffer(RGResource(ShadowIndirectCommands), RenderGraphResourceAccess::StorageWrite);
+			build.WriteBuffer(RGResource(ShadowDrawCounts), RenderGraphResourceAccess::StorageReadWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUCullMeshletsShadowPipeline");
+
+				RenderCommand& command = cmdList.BeginRenderCommand("ShadowMeshletCullPass");
+
+				command.BindPipeline(pipeline);
+				command.BindAllDescriptorSets();
+
+				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+
+				for (uint32_t cascadeIndex = 0; cascadeIndex < NUM_CASCADES; cascadeIndex++) {
+					auto pushConstantData = CreateGPUMeshletCullPushConstant(registry, cascadeIndex);
+					pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+					command.BindPushConstant(pushConstant);
+					command.DispatchComputeIndirect(registry.GetBuffer(RGResource(ShadowMeshletDispatches)), static_cast<uint64_t>(cascadeIndex) * sizeof(VkDispatchIndirectCommand));
+				}
+
+				cmdList.EndRenderCommand();
+			};
+		});
+
+		renderGraph->AddPass(TargetQueueFamily::Graphics, "ShadowDrawPass", [=](RenderGraphBuilder& build) {
 			build.SetViewportArea(m_ShadowMapSize, m_ShadowMapSize);
+
+			build.SetInFlightMode(true);
 			build.SetClearColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 
 			build.DeclareImage(RGResource(ShadowImages), {
@@ -189,43 +647,67 @@ namespace Lucy {
 				.Height = m_ShadowMapSize,
 				.ImageType = ImageType::Type2D,
 				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
-				.Layers = ShadowPass::NUM_CASCADES,
+				.Layers = NUM_CASCADES,
 				.Format = ImageFormat::R32G32_SFLOAT,
-				.GenerateSampler = true,
-			}, RenderPassLoadStoreAttachments::ClearStore,
+				.GenerateSampler = true
+				}, RenderPassLoadStoreAttachments::ClearStore,
 				RGResource(VSMDepth), {
-				.Width = m_ShadowMapSize,
-				.Height = m_ShadowMapSize,
-				.ImageType = ImageType::Type2D,
-				.ImageUsage = ImageUsage::AsDepthAttachment,
-				.Layers = ShadowPass::NUM_CASCADES,
-				.Format = ImageFormat::D32_SFLOAT,
-				.GenerateSampler = true,
-			}, RenderPassLoadStoreAttachments::ClearStore);
+					.Width = m_ShadowMapSize,
+					.Height = m_ShadowMapSize,
+					.ImageType = ImageType::Type2D,
+					.ImageUsage = ImageUsage::AsDepthAttachment,
+					.Layers = NUM_CASCADES,
+					.Format = ImageFormat::D32_SFLOAT
+				}, RenderPassLoadStoreAttachments::ClearStore
+			);
+
+			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUObjectsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUSubmeshesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUVerticesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUIndicesBuffer), RenderGraphResourceAccess::IndexRead);
+
+			build.ReadBuffer(RGResource(ShadowVisibleDraws), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(ShadowIndirectCommands), RenderGraphResourceAccess::IndirectRead);
+			build.ReadBuffer(RGResource(ShadowDrawCounts), RenderGraphResourceAccess::IndirectRead);
 
 			build.BindRenderTarget(RGResource(ShadowImages), RGResource(VSMDepth));
-
-			const auto& editorCamera = m_Scene->GetEditorCamera();
-			InitializeShadowCameras(m_ShadowMapSize, editorCamera);
 
 			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("VSMPipeline");
 
-				RenderCommand& draw = cmdList.BeginRenderCommand("VSM Draw");
+				RenderCommand& draw = cmdList.BeginRenderCommand("ShadowDrawPass");
+
 				draw.BindPipeline(pipeline);
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
+				draw.BindBuffers(registry.GetBuffer(RGResource(GPUIndicesBuffer)));
 
 				struct LocalPushConstant {
-					glm::mat4 ModelMatrix;
+					RenderDeviceBufferReference VisibleDraws;
+					glm::uvec4 Data;
 				};
 
-				m_Scene->ViewRForEach<MeshComponent, TransformComponent>([&](MeshComponent& meshComponent, TransformComponent& transformComponent) {
-					draw.DrawIndexedMeshWithPushConstant<LocalPushConstant>(meshComponent.GetMesh(), transformComponent.GetMatrix(), 
-						[](LocalPushConstant& data, const Submesh& submesh, const glm::mat4& finalTransform) {
-						data.ModelMatrix = finalTransform;
-					});
-				});
+				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+
+				uint64_t visibleDrawStride = static_cast<uint64_t>(commandCapacity) * sizeof(RenderDeviceVisibleDrawData);
+				uint64_t indirectCommandStride = static_cast<uint64_t>(commandCapacity) * sizeof(VkDrawIndexedIndirectCommand);
+
+				for (uint32_t cascadeIndex = 0; cascadeIndex < 1; cascadeIndex++) {
+					GlobalPushConstant<LocalPushConstant> pushConstantData{
+						.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+						.Data = {
+							.VisibleDraws = registry.GetBuffer(RGResource(ShadowVisibleDraws))->GetDeviceAddress() + cascadeIndex * visibleDrawStride,
+							.Data = { cascadeIndex, 0, 0, 0 }
+						}
+					};
+
+					pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+					draw.BindPushConstant(pushConstant);
+
+					draw.DrawIndexedIndirectCount(registry.GetBuffer(RGResource(ShadowIndirectCommands)), static_cast<uint64_t>(cascadeIndex) * indirectCommandStride,
+						registry.GetBuffer(RGResource(ShadowDrawCounts)), static_cast<uint64_t>(cascadeIndex) * sizeof(uint32_t), commandCapacity, sizeof(VkDrawIndexedIndirectCommand));
+				}
 
 				cmdList.EndRenderCommand();
 			};
@@ -425,7 +907,8 @@ namespace Lucy {
 
 		const auto& lightDir = GetRotation();
 
-		float radiusDistWS = std::ceil(glm::length(frustumCornersWS[0] - frustumCornersWS[6]) * 16.0f) / 2.0f;
+		//float radiusDistWS = std::ceil(glm::length(frustumCornersWS[0] - frustumCornersWS[6]) * 16.0f) / 32.0f;
+		float radiusDistWS = std::ceil((frustumCornersWS[0] - frustumCornersWS[6]).length() * 16.0f) / 2.0f;
 
 		float texelsPerUnitWS = m_ShadowMapSize / (radiusDistWS * 2.0f);
 
@@ -455,6 +938,15 @@ namespace Lucy {
 		UpdateProjection();
 
 		s_LastSplitDist = m_CascadeSplit;
+	}
+
+	void ShadowCamera::CreateCullView(const Ref<RenderDevice>& device) {
+		m_CullViewHandle = device->GetScene()->RegisterCullView({
+			.Data = {
+				INVALID_INDEX, INVALID_INDEX, 0,
+				static_cast<uint32_t>(GPUCullViewFlags::EnableFrustumCulling) | static_cast<uint32_t>(GPUCullViewFlags::Orthographic)
+			}
+		});
 	}
 
 	void ShadowCamera::ResetSplit() {
@@ -508,8 +1000,7 @@ namespace Lucy {
 				};
 
 				GlobalPushConstant<LocalPushConstant> pushConstantData {
-					draw.GetGlobalBufferAddress(),
-					0,
+					registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
 					{ .Data = { index, 0, settings.EnvironmentLOD } }
 				};
 
@@ -564,7 +1055,7 @@ namespace Lucy {
 				draw.BindBuffers(cubeMesh);
 
 				GlobalPushConstant<LocalPushConstant> localPushConstant{
-					.Root = draw.GetGlobalBufferAddress(),
+					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
 					.Data = {
 						.CaptureProjection = captureProjection, 
 						.Data = { originalHDRImageIndex, 0 } 
@@ -628,7 +1119,7 @@ namespace Lucy {
 				};
 
 				GlobalPushConstant<LocalPushConstant> pushConstantData{
-					.Root = draw.GetGlobalBufferAddress(),
+					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
 					.Data = {
 						.ProjMatrix = captureProjection,
 						.Data = { m_Size, 0, layeredImageIndex, irradianceImageIndex, }
@@ -741,7 +1232,7 @@ namespace Lucy {
 					const uint32_t mipSize = std::max(1u, m_CubemapSize >> mip);
 
 					GlobalPushConstant<LocalPushConstant> params{
-						.Root = cmd.GetGlobalBufferAddress(),
+						.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
 						.Data = {
 							.PrefilterParams = glm::vec4(mipSize, mipSize, mip / float(MAX_MIP_LEVELS - 1), mip),
 							.TextureData = { layeredImageIndex, prefilterImageIndices[mip], 0}
@@ -821,4 +1312,5 @@ namespace Lucy {
 		});
 	}
 #pragma endregion BRDFLutPass
+	
 }

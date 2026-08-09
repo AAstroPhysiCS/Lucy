@@ -24,7 +24,7 @@ namespace Lucy {
 		DescriptorSet(DescriptorSet&&) = delete;
 		DescriptorSet& operator=(DescriptorSet&&) = delete;
 		
-		virtual void RTUpdate() = 0;
+		virtual void RTUpdate(RenderDevice* device) = 0;
 
 		void AddUniformBuffer(const std::string& name, RenderDeviceResourceHandle bufferHandle);
 		void AddSharedStorageBuffer(const std::string& name, RenderDeviceResourceHandle bufferHandle);
@@ -34,8 +34,6 @@ namespace Lucy {
 		inline const auto& GetAllUniformBufferHandles() const { return m_UniformBufferHandles; }
 		inline const auto& GetAllSharedStorageBufferHandles() const { return m_SharedStorageBufferHandles; }
 	protected:
-		virtual void RTDestroyResource() = 0;
-
 		DescriptorSetCreateInfo m_CreateInfo;
 	private:
 		std::unordered_map<std::string, RenderDeviceResourceHandle> m_UniformBufferHandles;

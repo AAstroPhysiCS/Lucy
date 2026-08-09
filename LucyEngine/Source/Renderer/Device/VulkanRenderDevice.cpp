@@ -17,6 +17,7 @@
 #include "Renderer/Memory/Buffer/Vulkan/VulkanVertexBuffer.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanIndexBuffer.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
+#include "Renderer/Memory/Buffer/Vulkan/VulkanDeviceAddressBuffer.h"
 #include "Renderer/Memory/VulkanAllocator.h"
 
 #include "Renderer/Descriptors/DescriptorSetManager.h"
@@ -174,7 +175,11 @@ namespace Lucy {
 		vulkan12Features.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
 		vulkan12Features.descriptorBindingStorageImageUpdateAfterBind = VK_TRUE;
 		vulkan12Features.descriptorBindingVariableDescriptorCount = VK_TRUE;
+		vulkan12Features.drawIndirectCount = VK_TRUE;
 		vulkan12Features.bufferDeviceAddress = VK_TRUE;
+		vulkan12Features.vulkanMemoryModel = VK_TRUE;
+		vulkan12Features.vulkanMemoryModelDeviceScope = VK_TRUE;
+		vulkan12Features.scalarBlockLayout = VK_TRUE;
 		vulkan12Features.descriptorIndexing = VK_TRUE;
 		vulkan12Features.runtimeDescriptorArray = VK_TRUE;
 		vulkan12Features.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
@@ -488,17 +493,23 @@ namespace Lucy {
 		cmdPool->SetState(frameIndex, CommandBufferSlotState::Recorded);
 	}
 
+	void VulkanRenderDevice::FillBuffer(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset, size_t size, uint32_t value) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::FillBuffer");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		vkCmdFillBuffer((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex), buffer->As<VulkanDeviceAddressBuffer>()->GetVulkanBufferHandle(), offset, size, value);
+	}
+
 	void VulkanRenderDevice::BindBuffers(Ref<CommandPool> cmdPool, Ref<Mesh> mesh) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindBuffers");
 		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 
 		VulkanVertexBindInfo vertexInfo;
 		vertexInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
-		AccessResource<VulkanVertexBuffer>(mesh->GetVertexBufferHandle())->RTBind(vertexInfo);
+		//AccessResource<VulkanVertexBuffer>(mesh->GetVertexBufferHandle())->RTBind(vertexInfo);
 
 		VulkanIndexBindInfo indexInfo;
 		indexInfo.CommandBuffer = vertexInfo.CommandBuffer;
-		AccessResource<VulkanIndexBuffer>(mesh->GetIndexBufferHandle())->RTBind(indexInfo);
+		//AccessResource<VulkanIndexBuffer>(mesh->GetIndexBufferHandle())->RTBind(indexInfo);
 	}
 
 	void VulkanRenderDevice::BindBuffers(Ref<CommandPool> cmdPool, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) {
@@ -512,6 +523,15 @@ namespace Lucy {
 		VulkanIndexBindInfo indexInfo;
 		indexInfo.CommandBuffer = vertexInfo.CommandBuffer;
 		indexBuffer->As<VulkanIndexBuffer>()->RTBind(indexInfo);
+	}
+	
+	void VulkanRenderDevice::BindBuffers(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> indexBuffer) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindBuffers");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(cmdPool->GetCommandBuffer(frameIndex));
+
+		auto vulkanIndexBuffer = indexBuffer->As<VulkanDeviceAddressBuffer>();
+		vkCmdBindIndexBuffer(commandBuffer, vulkanIndexBuffer->GetVulkanBufferHandle(), 0, VK_INDEX_TYPE_UINT32);
 	}
 
 	//TODO: Clean this up
@@ -596,7 +616,7 @@ namespace Lucy {
 
 		for (auto handle : descriptorSetHandles) {
 			Ref<VulkanDescriptorSet> vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
-			vulkanSet->RTUpdate();
+			vulkanSet->RTUpdate(this);
 		}
 	}
 	
@@ -607,7 +627,7 @@ namespace Lucy {
 
 		for (auto handle : descriptorSetHandles) {
 			Ref<VulkanDescriptorSet> vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
-			vulkanSet->RTUpdate();	
+			vulkanSet->RTUpdate(this);
 		}
 	}
 
@@ -685,6 +705,13 @@ namespace Lucy {
 		}
 	}
 
+	void VulkanRenderDevice::DrawIndexedIndirectCount(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset, Ref<RenderDeviceBuffer> countBuffer, size_t countBufferOffset, uint32_t maxDrawCount, uint32_t stride) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::DrawIndexedIndirectCount");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		vkCmdDrawIndexedIndirectCount((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex), buffer->As<VulkanDeviceAddressBuffer>()->GetVulkanBufferHandle(), offset, 
+			countBuffer->As<VulkanDeviceAddressBuffer>()->GetVulkanBufferHandle(), countBufferOffset, maxDrawCount, stride);
+	}
+
 	void VulkanRenderDevice::DrawIndexed(Ref<CommandPool> cmdPool, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::DrawIndexed");
 		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
@@ -695,6 +722,12 @@ namespace Lucy {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::DispatchCompute");
 		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 		computePipeline->As<VulkanComputePipeline>()->RTDispatch(cmdPool->GetCommandBuffer(frameIndex), groupCountX, groupCountY, groupCountZ);
+	}
+
+	void VulkanRenderDevice::DispatchComputeIndirect(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::DispatchComputeIndirect");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		vkCmdDispatchIndirect((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex), buffer->As<VulkanDeviceAddressBuffer>()->GetVulkanBufferHandle(), offset);
 	}
 
 	void VulkanRenderDevice::BeginRenderPass(Ref<RenderPass> renderPass, Ref<FrameBuffer> frameBuffer, Ref<CommandPool> cmdPool) {

@@ -16,7 +16,6 @@ namespace Lucy {
 		BlendConfiguration BlendConfiguration;
 
 		RenderDeviceResourceHandle RenderPassHandle;
-		Ref<Shader> Shader;
 	};
 
 	class GraphicsPipelineStatistics {
@@ -44,7 +43,7 @@ namespace Lucy {
 
 	class GraphicsPipeline : public Pipeline {
 	public:
-		GraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo);
+		GraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo, Ref<Shader> shader);
 		virtual ~GraphicsPipeline() = default;
 
 		GraphicsPipeline(const GraphicsPipeline&) = delete;
@@ -59,7 +58,7 @@ namespace Lucy {
 		inline RenderDeviceResourceHandle GetRenderPassHandle() const { return m_CreateInfo.RenderPassHandle; }
 
 		virtual void RTBind(void* commandBufferHandle) = 0;
-		virtual void RTRecreate() = 0;
+		virtual void RTRecreate(Ref<Shader> newShader) = 0;
 		void Unbind(GraphicsPipelineStatistics&& statistics);
 	protected:
 		GraphicsPipelineCreateInfo m_CreateInfo;

@@ -14,10 +14,10 @@ namespace Lucy {
 		RenderGraphResource& operator=(const RenderGraphResource& other) = default;
 		RenderGraphResource& operator=(RenderGraphResource&& other) noexcept = default;
 
-		inline const std::string& GetName() const { return m_Name; }
+		const std::string& GetName() const { return m_Name; }
 
-		inline bool operator==(const RenderGraphResource& other) const { return m_Hash == other.m_Hash; }
-		inline auto operator<=>(const RenderGraphResource& other) const = default;
+		bool operator==(const RenderGraphResource& other) const { return m_Hash == other.m_Hash; }
+		auto operator<=>(const RenderGraphResource& other) const = default;
 	private:
 		std::string m_Name;
 		size_t m_Hash;

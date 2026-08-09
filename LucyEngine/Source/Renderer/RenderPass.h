@@ -6,6 +6,8 @@
 
 namespace Lucy {
 
+	class RenderDevice;
+
 	enum class ImageFormat;
 
 	struct ClearColor {
@@ -97,7 +99,7 @@ namespace Lucy {
 		RenderPass& operator=(const RenderPass& other) = delete;
 		RenderPass& operator=(RenderPass&& other) noexcept = delete;
 
-		virtual void RTRecreate() = 0;
+		virtual void RTRecreate(const Ref<RenderDevice>& device) = 0;
 
 		inline bool IsDepthBuffered() const { return m_DepthBuffered; }
 		inline const RenderPassLayout& GetLayout() const { return m_CreateInfo.Layout; }

@@ -36,33 +36,34 @@ namespace Lucy {
 	};
 
 #pragma region VulkanRenderGraphCompiler
-	inline constexpr static VkPipelineStageFlags2 ToStageMask(RenderGraphResourceAccess access, TargetQueueFamily queueFamily) {
+	[[nodiscard]] inline constexpr static VkPipelineStageFlags2 ToStageMask(RenderGraphResourceAccess access, TargetQueueFamily queueFamily) {
 		switch (access) {
+			case RenderGraphResourceAccess::ColorAttachmentRead:
 			case RenderGraphResourceAccess::ColorAttachmentWrite:
 				return VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+			case RenderGraphResourceAccess::DepthAttachmentRead:
 			case RenderGraphResourceAccess::DepthAttachmentWrite:
-				return VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
-					VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+				return VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
 			case RenderGraphResourceAccess::ShaderSampledRead:
 				switch (queueFamily) {
 					case TargetQueueFamily::Graphics:
-						return VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT |
-							VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+						return VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
 					case TargetQueueFamily::Compute:
 						return VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
 					default:
-						LUCY_ASSERT(false, "Sampled read not valid on this queue");
+						LUCY_ASSERT(false, "Sampled read is not valid on this queue.");
 						return VK_PIPELINE_STAGE_2_NONE;
 				}
 			case RenderGraphResourceAccess::StorageRead:
 			case RenderGraphResourceAccess::StorageWrite:
+			case RenderGraphResourceAccess::StorageReadWrite:
 				switch (queueFamily) {
 					case TargetQueueFamily::Graphics:
-						return VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+						return VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
 					case TargetQueueFamily::Compute:
 						return VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
 					default:
-						LUCY_ASSERT(false, "Storage access not valid on this queue");
+						LUCY_ASSERT(false, "Storage access is not valid on this queue.");
 						return VK_PIPELINE_STAGE_2_NONE;
 				}
 			case RenderGraphResourceAccess::TransferRead:
@@ -74,41 +75,71 @@ namespace Lucy {
 				return VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT;
 			case RenderGraphResourceAccess::IndirectRead:
 				return VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
-			case RenderGraphResourceAccess::Present:
-				return VK_PIPELINE_STAGE_2_NONE;
+			case RenderGraphResourceAccess::None:
 			default:
 				return VK_PIPELINE_STAGE_2_NONE;
 		}
 	}
 
-	inline constexpr static VkAccessFlags2 ToAccessMask(RenderGraphResourceAccess access) {
+	[[nodiscard]] inline constexpr static VkAccessFlags2 ToAccessMask(RenderGraphResourceAccess access) {
 		switch (access) {
-			case RenderGraphResourceAccess::ColorAttachmentWrite: return VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-			case RenderGraphResourceAccess::DepthAttachmentWrite: return VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-			case RenderGraphResourceAccess::ShaderSampledRead: return VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
-			case RenderGraphResourceAccess::StorageRead: return VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
-			case RenderGraphResourceAccess::StorageWrite: return VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
-			case RenderGraphResourceAccess::TransferRead: return VK_ACCESS_2_TRANSFER_READ_BIT;
-			case RenderGraphResourceAccess::TransferWrite: return VK_ACCESS_2_TRANSFER_WRITE_BIT;
-			case RenderGraphResourceAccess::VertexRead: return VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
-			case RenderGraphResourceAccess::IndexRead: return VK_ACCESS_2_INDEX_READ_BIT;
-			case RenderGraphResourceAccess::IndirectRead: return VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT;
-			default: return VK_ACCESS_2_NONE;
+			case RenderGraphResourceAccess::ColorAttachmentRead:
+				return VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT;
+			case RenderGraphResourceAccess::ColorAttachmentWrite:
+				return VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+			case RenderGraphResourceAccess::DepthAttachmentRead:
+				return VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+			case RenderGraphResourceAccess::DepthAttachmentWrite:
+				return VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			case RenderGraphResourceAccess::ShaderSampledRead:
+				return VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+			case RenderGraphResourceAccess::StorageRead:
+				return VK_ACCESS_2_SHADER_STORAGE_READ_BIT;
+			case RenderGraphResourceAccess::StorageWrite:
+				return VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+			case RenderGraphResourceAccess::StorageReadWrite:
+				return VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+			case RenderGraphResourceAccess::TransferRead:
+				return VK_ACCESS_2_TRANSFER_READ_BIT;
+			case RenderGraphResourceAccess::TransferWrite:
+				return VK_ACCESS_2_TRANSFER_WRITE_BIT;
+			case RenderGraphResourceAccess::VertexRead:
+				return VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
+			case RenderGraphResourceAccess::IndexRead:
+				return VK_ACCESS_2_INDEX_READ_BIT;
+			case RenderGraphResourceAccess::IndirectRead:
+				return VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT;
+			case RenderGraphResourceAccess::None:
+			default:
+				return VK_ACCESS_2_NONE;
 		}
 	}
 
-	inline constexpr static VkImageLayout ToImageLayout(RenderGraphResourceAccess access, bool isDepth) {
+	[[nodiscard]] inline constexpr static VkImageLayout ToImageLayout(RenderGraphResourceAccess access, bool isDepth) {
 		switch (access) {
-			case RenderGraphResourceAccess::ColorAttachmentWrite: return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			case RenderGraphResourceAccess::DepthAttachmentWrite: return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-			case RenderGraphResourceAccess::ShaderSampledRead: return isDepth ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			case RenderGraphResourceAccess::ColorAttachmentRead:
+			case RenderGraphResourceAccess::ColorAttachmentWrite:
+				return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			case RenderGraphResourceAccess::DepthAttachmentRead:
+				return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+			case RenderGraphResourceAccess::DepthAttachmentWrite:
+				return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			case RenderGraphResourceAccess::ShaderSampledRead:
+				return isDepth ?
+					VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL :
+					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			case RenderGraphResourceAccess::StorageRead:
-			case RenderGraphResourceAccess::StorageWrite: return VK_IMAGE_LAYOUT_GENERAL;
-			case RenderGraphResourceAccess::TransferRead: return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-			case RenderGraphResourceAccess::TransferWrite: return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-			case RenderGraphResourceAccess::Present: return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-			case RenderGraphResourceAccess::None: return VK_IMAGE_LAYOUT_UNDEFINED;
-			default: return VK_IMAGE_LAYOUT_GENERAL;
+			case RenderGraphResourceAccess::StorageWrite:
+			case RenderGraphResourceAccess::StorageReadWrite:
+				return VK_IMAGE_LAYOUT_GENERAL;
+			case RenderGraphResourceAccess::TransferRead:
+				return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+			case RenderGraphResourceAccess::TransferWrite:
+				return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			case RenderGraphResourceAccess::None:
+				return VK_IMAGE_LAYOUT_UNDEFINED;
+			default:
+				return VK_IMAGE_LAYOUT_GENERAL;
 		}
 	}
 

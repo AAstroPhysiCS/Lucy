@@ -35,6 +35,7 @@ namespace Lucy {
 	class RenderDeviceScene;
 	class RenderPass;
 
+	class Shader;
 	class Mesh;
 
 	struct ExecutionBatch;
@@ -73,14 +74,14 @@ namespace Lucy {
 
 		[[nodiscard]] const Unique<RenderDeviceScene>& GetScene() { return m_DeviceScene; }
 #pragma region ResourceManager
-		[[nodiscard]] RenderDeviceResourceHandle CreateGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo);
-		[[nodiscard]] RenderDeviceResourceHandle CreateComputePipeline(const ComputePipelineCreateInfo& createInfo);
+		[[nodiscard]] RenderDeviceResourceHandle CreateGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo, const Ref<Shader>& shader);
+		[[nodiscard]] RenderDeviceResourceHandle CreateComputePipeline(const ComputePipelineCreateInfo& createInfo, const Ref<Shader>& shader);
 		[[nodiscard]] RenderDeviceResourceHandle CreateRenderPass(const RenderPassCreateInfo& createInfo);
 
 		[[nodiscard]] RenderDeviceResourceHandle CreateFrameBuffer(const FrameBufferCreateInfo& createInfo);
 		[[nodiscard]] RenderDeviceResourceHandle CreateVertexBuffer(size_t size);
 		[[nodiscard]] RenderDeviceResourceHandle CreateIndexBuffer(size_t size);
-		[[nodiscard]] RenderDeviceResourceHandle CreateDeviceAddressBuffer(size_t size);
+		[[nodiscard]] RenderDeviceResourceHandle CreateDeviceAddressBuffer(const RenderDeviceBufferCreateInfo& createInfo);
 
 		[[nodiscard]] RenderDeviceResourceHandle CreateDescriptorSet(const DescriptorSetCreateInfo& createInfo);
 		[[nodiscard]] RenderDeviceResourceHandle CreateSampler(const ImageSamplerCreateInfo& createInfo);
@@ -122,7 +123,10 @@ namespace Lucy {
 		virtual void BeginCommandBuffer(Ref<CommandPool> cmdPool) = 0;
 		virtual void EndCommandBuffer(Ref<CommandPool> cmdPool) = 0;
 
+		virtual void FillBuffer(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset, size_t size, uint32_t value) = 0;
+
 		virtual void BindBuffers(Ref<CommandPool> cmdPool, Ref<Mesh> mesh) = 0;
+		virtual void BindBuffers(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> indexBuffer) = 0;
 		virtual void BindBuffers(Ref<CommandPool> cmdPool, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) = 0;
 
 		virtual void BindPushConstant(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline, const PipelineConstant& pushConstant) = 0;
@@ -140,9 +144,13 @@ namespace Lucy {
 		virtual void BindAllDescriptorSets(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline) = 0;
 		virtual void BindDescriptorSet(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline, uint32_t setIndex) = 0;
 
-		virtual void DrawIndexed(Ref<CommandPool> cmdPool, uint32_t indexCount, uint32_t instanceCount,
-								 uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) = 0;
+		virtual void DrawIndexedIndirectCount(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset,
+			Ref<RenderDeviceBuffer> countBuffer, size_t countBufferOffset, uint32_t maxDrawCount, uint32_t stride) = 0;
+		virtual void DrawIndexed(Ref<CommandPool> cmdPool, uint32_t indexCount, uint32_t instanceCount, 
+			uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) = 0;
+
 		virtual void DispatchCompute(Ref<CommandPool> cmdPool, Ref<ComputePipeline> computePipeline, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) = 0;
+		virtual void DispatchComputeIndirect(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset) = 0;
 
 		virtual void BeginRenderPass(Ref<RenderPass> renderPass, Ref<FrameBuffer> frameBuffer, Ref<CommandPool> cmdPool) = 0;
 		virtual void EndRenderPass(Ref<RenderPass> renderPass) = 0;
@@ -152,7 +160,7 @@ namespace Lucy {
 
 		virtual void Destroy() = 0;
 	private:
-		RenderDeviceResourceManager m_ResourceManager;
+		RenderDeviceResourceManager m_ResourceManager{ this };
 	protected:
 		Unique<RenderDeviceScene> m_DeviceScene = nullptr;
 

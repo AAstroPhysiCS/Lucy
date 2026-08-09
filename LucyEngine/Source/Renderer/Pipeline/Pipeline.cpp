@@ -19,10 +19,8 @@ namespace Lucy {
 		LUCY_ASSERT(false, "Could not find a suitable Push Constant for the given name: {0}", name);
 	}
 
-	void Pipeline::RTDestroyResource() {
-		Renderer::EnqueueToRenderCommandQueue([=](const auto& device) {
-			m_PushConstants.clear();
-		});
+	void Pipeline::RTDestroyResource(RenderDevice* device) {
+		m_PushConstants.clear();
 	}
 
 	void Pipeline::AddPushConstant(const ShaderVariable& pc) {

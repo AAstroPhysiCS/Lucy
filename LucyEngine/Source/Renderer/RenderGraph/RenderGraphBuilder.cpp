@@ -38,6 +38,10 @@ namespace Lucy {
 		m_RenderGraph->DeclareImage(rgResource, createInfo, loadStoreAccessOp, rgResourceDepth, createDepthInfo, loadStoreDepthAccessOp);
 	}
 
+	void RenderGraphBuilder::DeclareBuffer(const RenderGraphResource& rgResource, const RenderDeviceBufferCreateInfo& createInfo) {
+		m_RenderGraph->DeclareBuffer(rgResource, createInfo, m_RenderGraphPass->IsInFlightMode());
+	}
+
 	void RenderGraphBuilder::ReadExternalImage(const RenderGraphResource& rgResource, RenderGraphResourceAccess access) {
 		m_RenderGraph->ReadExternalImage(m_RenderGraphPass, rgResource);
 		m_RenderGraphPass->AddResourceRead({
@@ -118,6 +122,30 @@ namespace Lucy {
 			.Access = access,
 			.QueueFamily = m_RenderGraphPass->GetTargetQueueFamily(),
 			.IsExternal = false,
+			.IsTransient = false
+		});
+	}
+
+	void RenderGraphBuilder::ReadExternalBuffer(const RenderGraphResource& rgResource, RenderGraphResourceAccess access) {
+		m_RenderGraph->ReadExternalBuffer(m_RenderGraphPass, rgResource);
+		m_RenderGraphPass->AddResourceRead({
+			.Resource = rgResource,
+			.Type = RenderGraphResourceType::Buffer,
+			.Access = access,
+			.QueueFamily = m_RenderGraphPass->GetTargetQueueFamily(),
+			.IsExternal = true,
+			.IsTransient = false
+		});
+	}
+
+	void RenderGraphBuilder::WriteExternalBuffer(const RenderGraphResource& rgResource, RenderGraphResourceAccess access) {
+		m_RenderGraph->WriteExternalBuffer(m_RenderGraphPass, rgResource);
+		m_RenderGraphPass->AddResourceWrite({
+			.Resource = rgResource,
+			.Type = RenderGraphResourceType::Buffer,
+			.Access = access,
+			.QueueFamily = m_RenderGraphPass->GetTargetQueueFamily(),
+			.IsExternal = true,
 			.IsTransient = false
 		});
 	}

@@ -8,7 +8,9 @@
 
 #include "Renderer/Device/VulkanRenderDevice.h"
 #include "Renderer/Image/VulkanImage.h"
+
 #include "Renderer/Memory/Buffer/Vulkan/VulkanSharedStorageBuffer.h"
+#include "Renderer/Memory/Buffer/Vulkan/VulkanDeviceAddressBuffer.h"
 
 namespace Lucy {
 
@@ -95,10 +97,15 @@ namespace Lucy {
 			};
 		};
 
-		const auto CreateSameQueueBufferBarrier = [](TargetQueueFamily queueFamily, const Ref<VulkanSharedStorageBuffer>& buffer, RenderGraphResourceAccess srcAccess, RenderGraphResourceAccess dstAccess) {
+		const auto CreateSameQueueBufferBarrier = [&]<typename T>(TargetQueueFamily queueFamily, const Ref<T>& buffer, RenderGraphResourceAccess srcAccess, RenderGraphResourceAccess dstAccess) {
+			VkBuffer vkBuffer;
+			if constexpr (std::same_as<T, VulkanSharedStorageBuffer>)
+				vkBuffer = buffer->GetVulkanBufferHandle(Renderer::GetCurrentFrameIndex());
+			else
+				vkBuffer = buffer->GetVulkanBufferHandle();
 			return VkBufferMemoryBarrier2{
 				VulkanAPI::VulkanPipelineBarrier(
-					buffer->GetVulkanBufferHandle(Renderer::GetCurrentFrameIndex()),
+					vkBuffer,
 					ToStageMask(srcAccess, queueFamily),
 					ToStageMask(dstAccess, queueFamily),
 					ToAccessMask(srcAccess),
@@ -111,10 +118,15 @@ namespace Lucy {
 			};
 		};
 
-		const auto CreateReleaseBufferBarrier = [&](TargetQueueFamily srcQueue, TargetQueueFamily dstQueue, const Ref<VulkanSharedStorageBuffer>& buffer, RenderGraphResourceAccess srcAccess) {
+		const auto CreateReleaseBufferBarrier = [&]<typename T>(TargetQueueFamily srcQueue, TargetQueueFamily dstQueue, const Ref<T>& buffer, RenderGraphResourceAccess srcAccess) {
+			VkBuffer vkBuffer;
+			if constexpr (std::same_as<T, VulkanSharedStorageBuffer>)
+				vkBuffer = buffer->GetVulkanBufferHandle(Renderer::GetCurrentFrameIndex());
+			else
+				vkBuffer = buffer->GetVulkanBufferHandle();
 			return VkBufferMemoryBarrier2{
 				VulkanAPI::VulkanPipelineBarrier(
-					buffer->GetVulkanBufferHandle(Renderer::GetCurrentFrameIndex()),
+					vkBuffer,
 					ToStageMask(srcAccess, srcQueue),
 					VK_PIPELINE_STAGE_2_NONE,
 					ToAccessMask(srcAccess),
@@ -127,10 +139,15 @@ namespace Lucy {
 			};
 		};
 
-		const auto CreateAcquireBufferBarrier = [&](TargetQueueFamily srcQueue, TargetQueueFamily dstQueue, const Ref<VulkanSharedStorageBuffer>& buffer, RenderGraphResourceAccess dstAccess) {
+		const auto CreateAcquireBufferBarrier = [&]<typename T>(TargetQueueFamily srcQueue, TargetQueueFamily dstQueue, const Ref<T>& buffer, RenderGraphResourceAccess dstAccess) {
+			VkBuffer vkBuffer;
+			if constexpr (std::same_as<T, VulkanSharedStorageBuffer>)
+				vkBuffer = buffer->GetVulkanBufferHandle(Renderer::GetCurrentFrameIndex());
+			else
+				vkBuffer = buffer->GetVulkanBufferHandle();
 			return VkBufferMemoryBarrier2{
 				VulkanAPI::VulkanPipelineBarrier(
-					buffer->GetVulkanBufferHandle(Renderer::GetCurrentFrameIndex()),
+					vkBuffer,
 					VK_PIPELINE_STAGE_2_NONE,
 					ToStageMask(dstAccess, dstQueue),
 					VK_ACCESS_2_NONE,
@@ -148,26 +165,6 @@ namespace Lucy {
 
 		auto& idProvider = GetExecutionBatchIDProvider();
 
-		const auto LogImageBarrier =
-			[](std::string_view batchName,
-			const VkImageMemoryBarrier2& barrier) {
-			LUCY_INFO(
-				"Batch '{}': image={}, oldLayout={}, newLayout={}, "
-				"srcStage={}, dstStage={}, srcAccess={}, dstAccess={}, "
-				"srcFamily={}, dstFamily={}",
-				batchName,
-				static_cast<const void*>(barrier.image),
-				static_cast<int>(barrier.oldLayout),
-				static_cast<int>(barrier.newLayout),
-				barrier.srcStageMask,
-				barrier.dstStageMask,
-				barrier.srcAccessMask,
-				barrier.dstAccessMask,
-				barrier.srcQueueFamilyIndex,
-				barrier.dstQueueFamilyIndex
-			);
-		};
-
 		for (const auto& rgBatch : batches) {
 			TargetQueueFamily family = rgBatch.Passes[0]->GetTargetQueueFamily();
 
@@ -183,14 +180,20 @@ namespace Lucy {
 			for (const auto& br : rgBatch.IntraQueueTransition) {
 				if (br.ResourceType == RenderGraphResourceType::Image) {
 					auto image = renderGraph.GetImageByRGResource(br.Resource)->As<VulkanImage>();
+					LUCY_ASSERT(image->GetVulkanHandle(), "Image handle is null");
 					vkBatch.PreBatchBarrier.ImageBarriers.push_back(
 						VulkanImageMemoryBarrier{ image, CreateSameQueueImageBarrier(family, image, br.SrcAccess, br.DstAccess) }
 					);
 				} else {
-					auto buffer = renderGraph.GetBufferByRGResource(br.Resource)->As<VulkanSharedStorageBuffer>();
-					vkBatch.PreBatchBarrier.BufferBarriers.push_back(
-						CreateSameQueueBufferBarrier(family, buffer, br.SrcAccess, br.DstAccess)
-					);
+					if (auto buffer = renderGraph.GetBufferByRGResource(br.Resource)->As<VulkanSharedStorageBuffer>()) {
+						vkBatch.PreBatchBarrier.BufferBarriers.push_back(
+							CreateSameQueueBufferBarrier(family, buffer, br.SrcAccess, br.DstAccess)
+						);
+					} else if (auto buffer = renderGraph.GetBufferByRGResource(br.Resource)->As<VulkanDeviceAddressBuffer>()) {
+						vkBatch.PreBatchBarrier.BufferBarriers.push_back(
+							CreateSameQueueBufferBarrier(family, buffer, br.SrcAccess, br.DstAccess)
+						);
+					}
 				}
 			}
 
@@ -198,14 +201,20 @@ namespace Lucy {
 			for (const auto& tr : rgBatch.IncomingInterQueueTransitions) {
 				if (tr.ResourceType == RenderGraphResourceType::Image) {
 					auto image = renderGraph.GetImageByRGResource(tr.Resource)->As<VulkanImage>();
+					LUCY_ASSERT(image->GetVulkanHandle(), "Image handle is null");
 					vkBatch.PreBatchBarrier.ImageBarriers.push_back(
 						VulkanImageMemoryBarrier{ image, CreateAcquireImageBarrier(tr.SrcQueue, tr.DstQueue, image, tr.SrcAccess, tr.DstAccess) }
 					);
 				} else {
-					auto buffer = renderGraph.GetBufferByRGResource(tr.Resource)->As<VulkanSharedStorageBuffer>();
-					vkBatch.PreBatchBarrier.BufferBarriers.push_back(
-						CreateAcquireBufferBarrier(tr.SrcQueue, tr.DstQueue, buffer, tr.DstAccess)
-					);
+					if (auto buffer = renderGraph.GetBufferByRGResource(tr.Resource)->As<VulkanSharedStorageBuffer>()) {
+						vkBatch.PreBatchBarrier.BufferBarriers.push_back(
+							CreateAcquireBufferBarrier(tr.SrcQueue, tr.DstQueue, buffer, tr.DstAccess)
+						);
+					} else if (auto buffer = renderGraph.GetBufferByRGResource(tr.Resource)->As<VulkanDeviceAddressBuffer>()) {
+						vkBatch.PreBatchBarrier.BufferBarriers.push_back(
+							CreateAcquireBufferBarrier(tr.SrcQueue, tr.DstQueue, buffer, tr.DstAccess)
+						);
+					}
 				}
 			}
 
@@ -213,14 +222,20 @@ namespace Lucy {
 			for (const auto& tr : rgBatch.OutgoingInterQueueTransitions) {
 				if (tr.ResourceType == RenderGraphResourceType::Image) {
 					auto image = renderGraph.GetImageByRGResource(tr.Resource)->As<VulkanImage>();
+					LUCY_ASSERT(image->GetVulkanHandle(), "Image handle is null");
 					vkBatch.PostBatchBarrier.ImageBarriers.push_back(
 						VulkanImageMemoryBarrier{ image, CreateReleaseImageBarrier(tr.SrcQueue, tr.DstQueue, image, tr.SrcAccess, tr.DstAccess) }
 					);
 				} else {
-					auto buffer = renderGraph.GetBufferByRGResource(tr.Resource)->As<VulkanSharedStorageBuffer>();
-					vkBatch.PostBatchBarrier.BufferBarriers.push_back(
-						CreateReleaseBufferBarrier(tr.SrcQueue, tr.DstQueue, buffer, tr.SrcAccess)
-					);
+					if (auto buffer = renderGraph.GetBufferByRGResource(tr.Resource)->As<VulkanSharedStorageBuffer>()) {
+						vkBatch.PostBatchBarrier.BufferBarriers.push_back(
+							CreateReleaseBufferBarrier(tr.SrcQueue, tr.DstQueue, buffer, tr.SrcAccess)
+						);
+					} else if (auto buffer = renderGraph.GetBufferByRGResource(tr.Resource)->As<VulkanDeviceAddressBuffer>()) {
+						vkBatch.PostBatchBarrier.BufferBarriers.push_back(
+							CreateReleaseBufferBarrier(tr.SrcQueue, tr.DstQueue, buffer, tr.SrcAccess)
+						);
+					}
 				}
 			}
 

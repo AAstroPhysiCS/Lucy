@@ -16,7 +16,7 @@ namespace Lucy {
 		IndexBuffer(IndexBuffer&&) = delete;
 		IndexBuffer& operator=(IndexBuffer&&) = delete;
 
-		virtual void RTLoadToDevice() = 0;
+		virtual void RTLoadToDevice(RenderDevice* device) = 0;
 	protected:
 		IndexBuffer(size_t size) 
 			: RenderDeviceResource("Index Buffer") {

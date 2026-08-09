@@ -9,11 +9,6 @@
 
 namespace Lucy {
 
-	struct VulkanDescriptorSetCreateInfo {
-		VkDescriptorSetLayout Layout = VK_NULL_HANDLE;
-		Ref<VulkanDescriptorPool> Pool = nullptr;
-	};
-
 	struct VulkanDescriptorSetBindInfo {
 		VkCommandBuffer CommandBuffer;
 		VkPipelineBindPoint PipelineBindPoint;
@@ -31,26 +26,24 @@ namespace Lucy {
 		VulkanDescriptorSet& operator=(VulkanDescriptorSet&&) = delete;
 
 		void RTBind(const VulkanDescriptorSetBindInfo& bindInfo);
-		void RTBake(const Ref<VulkanDescriptorPool>& descriptorPool);
-		void RTUpdate() final override;
+		void RTBake(const Ref<VulkanDescriptorPool>& descriptorPool, RenderDevice* device);
+		void RTUpdate(RenderDevice* device) final override;
 		
 		VulkanImageSamplerBindingInfo* GetVulkanImageSampler(const std::string& imageBufferName);
 
 		inline VkDescriptorSetLayout GetDescriptorSetLayout() const { return m_DescriptorSetLayout; }
 	private:
-		void RTInitializeBufferDescriptors();
-		void RTWriteBufferDescriptors(uint32_t frameIndex);
-		void RTUpdateImageSamplerDescriptors();
+		void RTInitializeBufferDescriptors(RenderDevice* device);
+		void RTWriteBufferDescriptors(uint32_t frameIndex, RenderDevice* device);
+		void RTUpdateImageSamplerDescriptors(RenderDevice* device);
 
-		void RTCreate();
-		void RTDestroyResource() final override;
+		void RTCreate(const Ref<VulkanRenderDevice>& vulkanDevice);
+		void RTDestroyResource(RenderDevice* device) final override;
 
 		std::unordered_map<std::string, VulkanImageSamplerBindingInfo> m_ImageSamplerBindingInfos;
 
 		std::vector<VkDescriptorSet> m_DescriptorSets;
 		VkDescriptorSetLayout m_DescriptorSetLayout;
-
-		Ref<VulkanRenderDevice> m_VulkanDevice = nullptr;
 	};
 }
 

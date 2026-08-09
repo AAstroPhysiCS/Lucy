@@ -6,7 +6,7 @@ namespace Lucy {
 
 	class VulkanComputeShader final : public ComputeShader {
 	public:
-		VulkanComputeShader(const std::string& name, const std::filesystem::path& path, Ref<RenderDevice> device, const std::span<const uint32_t>& dataCompute);
+		VulkanComputeShader(const std::string& name, const std::filesystem::path& path, const std::string& entryPointName, Ref<RenderDevice> device, const std::span<const uint32_t>& dataCompute);
 		virtual ~VulkanComputeShader() = default;
 		
 		inline VkPipelineShaderStageCreateInfo GetShaderInfo() const { return m_ShaderStageInfo; }

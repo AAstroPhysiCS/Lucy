@@ -6,7 +6,7 @@ namespace Lucy {
 
 	class GraphicsShader : public Shader {
 	public:
-		GraphicsShader(const std::string& name, const std::filesystem::path& path);
+		GraphicsShader(const std::string& name, const std::filesystem::path& path, const std::string& shaderEntryPointName);
 		virtual ~GraphicsShader() = default;
 
 		void RTLoad(const Ref<RenderDevice>& device, const std::vector<std::span<const uint32_t>>& datas) final override;

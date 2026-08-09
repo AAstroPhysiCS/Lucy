@@ -13,13 +13,13 @@
 namespace Lucy {
 
 	VulkanDescriptorSet::VulkanDescriptorSet(const DescriptorSetCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device)
-		: DescriptorSet(createInfo), m_VulkanDevice(device) {
-		RTCreate();
+		: DescriptorSet(createInfo) {
+		RTCreate(device);
 	}
 
-	void VulkanDescriptorSet::RTCreate() {
+	void VulkanDescriptorSet::RTCreate(const Ref<VulkanRenderDevice>& vulkanDevice) {
 		LUCY_ASSERT(Renderer::IsOnRenderThread());
-		const auto& scene = m_VulkanDevice->GetScene();
+		const auto& scene = vulkanDevice->GetScene();
 
 		for (const auto& variable : m_CreateInfo.ShaderVariables) {
 			switch (variable.Type.Shape) {
@@ -34,7 +34,7 @@ namespace Lucy {
 					createInfo.ShaderChildrenVariables = variable.Layout.Children;
 					createInfo.ShaderMemberVariables = variable.Layout.Members;
 
-					AddSharedStorageBuffer(createInfo.Name, m_VulkanDevice->CreateSharedStorageBuffer(createInfo));
+					AddSharedStorageBuffer(createInfo.Name, vulkanDevice->CreateSharedStorageBuffer(createInfo));
 					break;
 				}
 				case DescriptorBaseShape::ConstantBuffer: {
@@ -47,7 +47,7 @@ namespace Lucy {
 					createInfo.ShaderChildrenVariables = variable.Layout.Children;
 					createInfo.ShaderMemberVariables = variable.Layout.Members;
 
-					AddUniformBuffer(createInfo.Name, m_VulkanDevice->CreateUniformBuffer(createInfo));
+					AddUniformBuffer(createInfo.Name, vulkanDevice->CreateUniformBuffer(createInfo));
 					break;
 				}
 				case DescriptorBaseShape::RWTexture2D:
@@ -81,11 +81,12 @@ namespace Lucy {
 			vkCmdBindDescriptorSets(bindInfo.CommandBuffer, bindInfo.PipelineBindPoint, bindInfo.PipelineLayout, m_CreateInfo.SetIndex, 1, &m_DescriptorSets[0], 0, nullptr);
 	}
 
-	void VulkanDescriptorSet::RTBake(const Ref<VulkanDescriptorPool>& descriptorPool) {
+	void VulkanDescriptorSet::RTBake(const Ref<VulkanDescriptorPool>& descriptorPool, RenderDevice* device) {
 		LUCY_ASSERT(Renderer::IsOnRenderThread());
 		
 		const uint32_t maxFramesInFlight = m_CreateInfo.Count;
-		VkDevice device = m_VulkanDevice->GetLogicalDevice();
+		auto vulkanDevice = device->As<VulkanRenderDevice>();
+		VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
 
 		std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
 		std::vector<bool> isBindlessVector;
@@ -131,7 +132,7 @@ namespace Lucy {
 		if (isBindless)
 			descriptorLayoutInfo.pNext = &extendedLayoutInfo;
 
-		LUCY_VK_ASSERT(vkCreateDescriptorSetLayout(device, &descriptorLayoutInfo, nullptr, &m_DescriptorSetLayout));
+		LUCY_VK_ASSERT(vkCreateDescriptorSetLayout(logicalDevice, &descriptorLayoutInfo, nullptr, &m_DescriptorSetLayout));
 
 		/*
 		* if any of the bindings are bindless.
@@ -143,12 +144,12 @@ namespace Lucy {
 		VkDescriptorSetAllocateInfo allocInfo = VulkanAPI::DescriptorSetAllocateInfo(maxFramesInFlight, layouts.data(), descriptorPool->GetVulkanHandle());
 
 		m_DescriptorSets.resize(maxFramesInFlight);
-		LUCY_VK_ASSERT(vkAllocateDescriptorSets(device, &allocInfo, m_DescriptorSets.data()));
+		LUCY_VK_ASSERT(vkAllocateDescriptorSets(logicalDevice, &allocInfo, m_DescriptorSets.data()));
 
-		RTInitializeBufferDescriptors();
+		RTInitializeBufferDescriptors(device);
 	}
 
-	void VulkanDescriptorSet::RTInitializeBufferDescriptors() {
+	void VulkanDescriptorSet::RTInitializeBufferDescriptors(RenderDevice* device) {
 		LUCY_PROFILE_NEW_EVENT("VulkanDescriptorSet::RTInitializeBufferDescriptors");
 		
 		LUCY_ASSERT(Renderer::IsOnRenderThread());
@@ -157,19 +158,20 @@ namespace Lucy {
 		const uint32_t maxFramesInFlight = m_CreateInfo.Count;
 
 		for (uint32_t frameIndex = 0; frameIndex < maxFramesInFlight; frameIndex++)
-			RTWriteBufferDescriptors(frameIndex);
+			RTWriteBufferDescriptors(frameIndex, device);
 	}
 
-	void VulkanDescriptorSet::RTWriteBufferDescriptors(uint32_t frameIndex) {
+	void VulkanDescriptorSet::RTWriteBufferDescriptors(uint32_t frameIndex, RenderDevice* device) {
 		LUCY_PROFILE_NEW_EVENT("VulkanDescriptorSet::RTWriteBufferDescriptors");
 
 		LUCY_ASSERT(Renderer::IsOnRenderThread());
 		LUCY_ASSERT(!m_DescriptorSets.empty());
 
-		VkDevice device = m_VulkanDevice->GetLogicalDevice();
+		auto vulkanDevice = reinterpret_cast<VulkanRenderDevice*>(device);
+		VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
 
 		for (RenderDeviceResourceHandle bufferHandle : GetAllUniformBufferHandles() | std::views::values) {
-			const auto& uniformBuffer = m_VulkanDevice->AccessResource<VulkanUniformBuffer>(bufferHandle);
+			const auto& uniformBuffer = vulkanDevice->AccessResource<VulkanUniformBuffer>(bufferHandle);
 			if (!uniformBuffer)
 				continue;
 
@@ -179,18 +181,18 @@ namespace Lucy {
 			if (descriptorType.Shape != DescriptorBaseShape::ConstantBuffer)
 				continue;
 
-			uniformBuffer->RTLoadToDevice();
+			uniformBuffer->RTLoadToDevice(vulkanDevice);
 
 			VkDescriptorBufferInfo bufferInfo = VulkanAPI::DescriptorBufferInfo(uniformBuffer->GetVulkanBufferHandle(frameIndex), 0, VK_WHOLE_SIZE);
 			VkWriteDescriptorSet setWrite = VulkanAPI::WriteDescriptorSet(m_DescriptorSets[frameIndex], 0, uniformBuffer->GetBinding(), arraySize == 0 ? 1 : arraySize,
 				(VkDescriptorType)ConvertDescriptorType(descriptorType), &bufferInfo);
 
-			vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr);
+			vkUpdateDescriptorSets(logicalDevice, 1, &setWrite, 0, nullptr);
 			uniformBuffer->Clear();
 		}
 
 		for (RenderDeviceResourceHandle bufferHandle : GetAllSharedStorageBufferHandles() | std::views::values) {
-			const auto& ssbo = m_VulkanDevice->AccessResource<VulkanSharedStorageBuffer>(bufferHandle);
+			const auto& ssbo = vulkanDevice->AccessResource<VulkanSharedStorageBuffer>(bufferHandle);
 			if (!ssbo)
 				continue;
 
@@ -200,45 +202,47 @@ namespace Lucy {
 			if (descriptorType.Shape != DescriptorBaseShape::SharedStorageBuffer && descriptorType.Shape != DescriptorBaseShape::RWSharedStorageBuffer)
 				continue;
 
-			ssbo->RTLoadToDevice();
+			ssbo->RTLoadToDevice(vulkanDevice);
 
 			VkDescriptorBufferInfo bufferInfo = VulkanAPI::DescriptorBufferInfo(ssbo->GetVulkanBufferHandle(frameIndex), 0, VK_WHOLE_SIZE);
 			VkWriteDescriptorSet setWrite = VulkanAPI::WriteDescriptorSet(m_DescriptorSets[frameIndex], 0, ssbo->GetBinding(), arraySize == 0 ? 1 : arraySize,
 				(VkDescriptorType)ConvertDescriptorType(descriptorType), &bufferInfo);
 
-			vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr);
+			vkUpdateDescriptorSets(logicalDevice, 1, &setWrite, 0, nullptr);
 			ssbo->Clear();
 		}
 	}
 
-	void VulkanDescriptorSet::RTUpdate() {
+	void VulkanDescriptorSet::RTUpdate(RenderDevice* device) {
 		LUCY_PROFILE_NEW_EVENT("VulkanDescriptorSet::RTUpdate");
+
+		auto vulkanRenderDevice = reinterpret_cast<VulkanRenderDevice*>(device);
 
 		LUCY_ASSERT(Renderer::IsOnRenderThread());
 		LUCY_ASSERT(!m_DescriptorSets.empty());
 
 		for (RenderDeviceResourceHandle bufferHandle : GetAllUniformBufferHandles() | std::views::values) {
-			const auto& uniformBuffer = m_VulkanDevice->AccessResource<VulkanUniformBuffer>(bufferHandle);
+			const auto& uniformBuffer = vulkanRenderDevice->AccessResource<VulkanUniformBuffer>(bufferHandle);
 			if (!uniformBuffer)
 				continue;
 
-			uniformBuffer->RTLoadToDevice();
+			uniformBuffer->RTLoadToDevice(device);
 			uniformBuffer->Clear();
 		}
 
 		for (RenderDeviceResourceHandle bufferHandle : GetAllSharedStorageBufferHandles() | std::views::values) {
-			const auto& storageBuffer = m_VulkanDevice->AccessResource<VulkanSharedStorageBuffer>(bufferHandle);
+			const auto& storageBuffer = vulkanRenderDevice->AccessResource<VulkanSharedStorageBuffer>(bufferHandle);
 			if (!storageBuffer)
 				continue;
 
-			storageBuffer->RTLoadToDevice();
+			storageBuffer->RTLoadToDevice(device);
 			storageBuffer->Clear();
 		}
 
-		RTUpdateImageSamplerDescriptors();
+		RTUpdateImageSamplerDescriptors(device);
 	}
 
-	void VulkanDescriptorSet::RTUpdateImageSamplerDescriptors() {
+	void VulkanDescriptorSet::RTUpdateImageSamplerDescriptors(RenderDevice* device) {
 		LUCY_PROFILE_NEW_EVENT("VulkanDescriptorSet::RTUpdateImageSamplerDescriptors");
 		
 		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
@@ -246,7 +250,7 @@ namespace Lucy {
 		if (m_ImageSamplerBindingInfos.empty())
 			return;
 
-		VkDevice device = m_VulkanDevice->GetLogicalDevice();
+		VkDevice logicalDevice = device->As<VulkanRenderDevice>()->GetLogicalDevice();
 
 		for (VulkanImageSamplerBindingInfo& bindingInfo : m_ImageSamplerBindingInfos | std::views::values) {
 			auto& imageInfos = bindingInfo.ImageInfos;
@@ -264,7 +268,7 @@ namespace Lucy {
 					static_cast<VkDescriptorType>(ConvertDescriptorType(bindingInfo.DescriptorType)), nullptr, imageInfos.data());
 			}
 
-			vkUpdateDescriptorSets(device, 1, &setWrite, 0, nullptr);
+			vkUpdateDescriptorSets(logicalDevice, 1, &setWrite, 0, nullptr);
 
 			imageInfos.clear();
 		}
@@ -276,14 +280,15 @@ namespace Lucy {
 		return &m_ImageSamplerBindingInfos.at(imageBufferName);
 	}
 
-	void VulkanDescriptorSet::RTDestroyResource() {
+	void VulkanDescriptorSet::RTDestroyResource(RenderDevice* device) {
 		LUCY_ASSERT(Renderer::IsOnRenderThread());
 
 		for (auto bufferHandle : GetAllUniformBufferHandles() | std::views::values)
-			m_VulkanDevice->RTDestroyResource(bufferHandle);
+			Renderer::EnqueueResourceDestroy(bufferHandle);
 		for (auto bufferHandle : GetAllSharedStorageBufferHandles() | std::views::values)
-			m_VulkanDevice->RTDestroyResource(bufferHandle);
+			Renderer::EnqueueResourceDestroy(bufferHandle);
 
-		vkDestroyDescriptorSetLayout(m_VulkanDevice->GetLogicalDevice(), m_DescriptorSetLayout, nullptr);
+		auto vulkanDevice = device->As<VulkanRenderDevice>();
+		vkDestroyDescriptorSetLayout(vulkanDevice->GetLogicalDevice(), m_DescriptorSetLayout, nullptr);
 	}
 }

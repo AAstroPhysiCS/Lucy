@@ -24,13 +24,13 @@ namespace Lucy {
     };
 
     struct RGBufferData {
-        // Alignment, size, usage flags, etc.
+        bool InFlightMode = false;
     };
 
     using RGResourceData = std::variant<RGImageData, RGBufferData>;
 
     struct RGResourceEntry {
-        RenderDeviceResourceHandle ResourceHandle;
+        std::vector<RenderDeviceResourceHandle> ResourceHandles; //why vector? bcs we might have multiple buffers aka buffers per frame in flight
         RGResourceType Type = RGResourceType::Internal;
         RGResourceData Data;
 
@@ -61,19 +61,21 @@ namespace Lucy {
 
         void Flush();
 
-        void ImportExternalResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle);
+        void ImportExternalResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle, RGResourceData data = {});
+        void ImportExternalResource(const RenderGraphResource& rgResource, const std::vector<RenderDeviceResourceHandle>& handles, RGResourceData data = {});
         void ImportExternalTransientResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle);
 
         void DeclareImage(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle, const RGImageData& imageData);
         void DeclareBuffer(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle, const RGBufferData& bufferData);
+        void DeclareBuffer(const RenderGraphResource& rgResource, const std::vector<RenderDeviceResourceHandle>& handles, const RGBufferData& bufferData);
 
         [[nodiscard]] bool Contains(const RenderGraphResource& rgResource) const;
 
         [[nodiscard]] Ref<Image> GetImage(const RenderGraphResource& rgResource);
         [[nodiscard]] Ref<Image> GetImage(const RenderGraphResource& rgResource) const;
 
-        [[nodiscard]] Ref<RenderDeviceResource> GetBuffer(const RenderGraphResource& rgResource);
-        [[nodiscard]] Ref<RenderDeviceResource> GetBuffer(const RenderGraphResource& rgResource) const;
+        [[nodiscard]] Ref<RenderDeviceBuffer> GetBuffer(const RenderGraphResource& rgResource);
+        [[nodiscard]] Ref<RenderDeviceBuffer> GetBuffer(const RenderGraphResource& rgResource) const;
     private:
         [[nodiscard]] RGResourceEntry& GetResourceEntry(const RenderGraphResource& rgResource) { return m_Resources.at(rgResource); }
         [[nodiscard]] const RGResourceEntry& GetResourceEntry(const RenderGraphResource& rgResource) const { return m_Resources.at(rgResource); }

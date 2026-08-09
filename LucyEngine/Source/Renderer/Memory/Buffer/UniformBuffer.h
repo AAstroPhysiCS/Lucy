@@ -28,7 +28,7 @@ namespace Lucy {
 		UniformBuffer(UniformBuffer&&) = delete;
 		UniformBuffer& operator=(UniformBuffer&&) = delete;
 
-		virtual void RTLoadToDevice() = 0;
+		virtual void RTLoadToDevice(RenderDevice* device) = 0;
 
 		inline const std::string& GetName() const { return m_CreateInfo.Name; }
 		inline uint32_t GetBinding() const { return m_CreateInfo.Binding; }

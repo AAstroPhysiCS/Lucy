@@ -21,7 +21,8 @@ namespace Lucy {
 
 	struct EntityPickedEvent;
 
-	using RenderDeletionFunc = std::function<void()>;
+	using RenderDeletionFunc = std::function<void(const Ref<RenderDevice>& device)>;
+	using RenderRecreateFunc = std::function<RenderDeletionFunc(const Ref<RenderDevice>&)>;
 
 	class RendererBackend : public MemoryTrackable {
 	protected:
@@ -39,7 +40,10 @@ namespace Lucy {
 		RendererBackend& operator=(RendererBackend&& other) noexcept = delete;
 		
 		void EnqueueToRenderCommandQueue(RenderCommandFunc&& func);
+
 		void EnqueueResourceDestroy(RenderDeviceResourceHandle handle);
+		void EnqueueResourceDestroy(RenderDeletionFunc&& func);
+		void EnqueueResourceRecreate(RenderRecreateFunc&& func);
 
 		virtual void SubmitBatchesToRender(std::vector<ExecutionBatch>& batches, const std::unordered_map<std::string, RenderFrameHandles>& renderFrameHandleMap) = 0;
 		virtual RenderContextResultCodes WaitAndPresent() = 0;

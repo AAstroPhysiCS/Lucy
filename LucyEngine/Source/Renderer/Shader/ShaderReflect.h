@@ -120,7 +120,7 @@ namespace Lucy {
 		inline const VertexShaderLayout& GetVertexShaderLayout() const { return m_VertexShaderLayout; }
 
 		void DestroyCachedData();
-		void Info(const std::filesystem::path& path, const Slang::ComPtr<IComponentType>& program, ShaderStageType stageFlag);
+		void Info(const std::filesystem::path& path, const Slang::ComPtr<IComponentType>& program, ShaderStageType stageFlag, std::string_view entryPointName);
 	private:
 		ShaderBlockLayoutElement ParseShaderVariableLayout(VariableLayoutReflection* variable, std::vector<ShaderDeviceAddressMember>& addressMembers);
 		bool CheckIfAlreadyPresent(const ShaderVariable& variable, std::vector<ShaderVariable>& buffer);

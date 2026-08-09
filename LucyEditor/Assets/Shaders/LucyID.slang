@@ -1,35 +1,31 @@
 #include "LucyResource.slang"
 
-struct VertexInput {
-    [[vk::location(0)]] float3 a_Pos : POSITION;
-    [[vk::location(1)]] float3 a_ID : ID;
-};
-
 struct VertexOutput {
     float4 a_Pos : SV_Position;
     [[vk::location(0)]] float3 a_IDOut : ID;
 };
 
 struct LocalPushConstant {
-    float4x4 u_ModelMatrix;
+    GPUVisibleDraw* VisibleDraws;
 };
 
 [vk::push_constant]
 PushConstantGlobal<LocalPushConstant> PushConstants;
 
 [shader("vertex")]
-VertexOutput main(VertexInput input) {
-    SceneCamera camera = PushConstants.Root->Camera;
+VertexOutput main(uint vertexIndex: SV_VulkanVertexID, uint drawIndex: SV_VulkanInstanceID) {
+    GPUVisibleDraw visibleDraw = PushConstants.Data.VisibleDraws[drawIndex];
+    GPUObject object = PushConstants.Root->Addresses.Objects[visibleDraw.ObjectIndex];
+    GPUSubmesh submesh = PushConstants.Root->Addresses.Submeshes[visibleDraw.SubmeshIndex];
+    GPUVertex vertex = PushConstants.Root->Addresses.Vertices[vertexIndex];
+
+    float4x4 modelMatrix = object.Transform * submesh.Transform;
+    float4 worldPosition = modelMatrix * float4(vertex.Position, 1.0f);
 
     VertexOutput output;
-    output.a_IDOut = input.a_ID;
-    
-    // Calculate position in clip space
-    float4 worldPos = mul(PushConstants.Data.u_ModelMatrix, float4(input.a_Pos, 1.0));
-    float4 viewPos = mul(camera.u_ViewMatrix, worldPos);
-    float4 clipPos = mul(camera.u_ProjMatrix, viewPos);
+    output.a_Pos = PushConstants.Root->Camera.u_ProjMatrix * PushConstants.Root->Camera.u_ViewMatrix * worldPosition;
+    output.a_IDOut = object.ObjectID.xyz;
 
-    output.a_Pos = clipPos;
     return output;
 }
 
@@ -44,10 +40,6 @@ struct PixelOutput {
 [shader("fragment")]
 PixelOutput main(PixelInput input) {
     PixelOutput output;
-    
-    const float3 scaledID = input.a_IDOut / 255.0;
-    const float3 roundedID = round(scaledID * 10000.0) / 10000.0;
-    
-    output.a_Color = float4(roundedID, 1.0);
+    output.a_Color = float4(input.a_IDOut, 1.0);
     return output;
 }

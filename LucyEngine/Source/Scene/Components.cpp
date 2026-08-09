@@ -1,7 +1,10 @@
 #include "lypch.h"
 #include "Components.h"
 
+#include "Entity.h"
+
 #include "Renderer/Renderer.h"
+#include "Renderer/Device/RenderDeviceScene.h"
 #include "Renderer/RenderGraph/RenderGraphResource.h"
 #include "Renderer/RendererPasses.h"
 
@@ -15,8 +18,13 @@ namespace Lucy {
 			* glm::scale(glm::mat4(1.0f), m_Scale);
 	}
 
-	void MeshComponent::LoadMesh(const std::string& path) {
+	void MeshComponent::LoadMesh(const Entity& e, const std::string& path) {
 		m_Mesh = std::move(Memory::CreateRef<Mesh>(path));
+
+		Renderer::EnqueueToRenderCommandQueue([this, e](const Ref<RenderDevice>& device) mutable {
+			const auto& transform = e.GetComponent<TransformComponent>().GetMatrix();
+			m_Handle = device->GetScene()->RegisterObject(m_Mesh->GetRenderDeviceMeshHandle(), transform, RenderDeviceObjectFlags::None);
+		});
 	}
 
 	void HDRCubemapComponent::LoadCubemap(const std::filesystem::path& path) {

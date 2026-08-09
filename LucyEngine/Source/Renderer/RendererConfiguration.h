@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 
+#include "Device/RenderDeviceSceneData.h"
+
 namespace Lucy {
 
 	enum class RenderArchitecture : uint8_t {
@@ -20,6 +22,9 @@ namespace Lucy {
 
 	struct RendererSettings {
 		float EnvironmentLOD = 0.0f;
+
+		uint32_t CullViewFlags = static_cast<uint32_t>(GPUCullViewFlags::EnableFrustumCulling) | static_cast<uint32_t>(GPUCullViewFlags::EnableConeCulling);
+		bool FreezeCullingView = false;
 	};
 
 	struct RendererConfiguration {

@@ -26,12 +26,16 @@ namespace Lucy {
         RenderDeviceScene(RenderDeviceScene&&) = delete;
         RenderDeviceScene& operator=(RenderDeviceScene&&) = delete;
         
-        RenderDeviceObjectHandle RegisterMesh(const RenderDeviceMeshData& data);
+        RenderDeviceObjectHandle RegisterMesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices, std::vector<Submesh>& submeshes);
         RenderDeviceObjectHandle RegisterPBRMaterial(const RenderDevicePBRMaterialData& data);
+        RenderDeviceObjectHandle RegisterObject(const RenderDeviceObjectHandle& meshHandle, const glm::mat4& transform, RenderDeviceObjectFlags flags);
+        RenderDeviceObjectHandle RegisterCullView(const RenderDeviceCullViewData& data);
 
         void UpdateCamera(const CameraViewProjection& camera);
         void UpdateLightValues(const RenderDeviceSceneGlobalData::LightValues& lightValues);
         void UpdateGlobals(const RenderDeviceSceneGlobalData& data);
+        void UpdateCullView(const RenderDeviceObjectHandle& handle, const RenderDeviceCullViewData& data);
+        void UpdateObjectTransform(const RenderDeviceObjectHandle& handle, const glm::mat4& transform);
 
         void UpdatePBRMaterial(const RenderDeviceObjectHandle& handle, const RenderDevicePBRMaterialData& data);
 
@@ -42,51 +46,56 @@ namespace Lucy {
     private:
         enum class RenderDeviceSceneBufferType {
             Globals,
+            Objects,
             Materials,
             Meshes,
+            MeshLODs,
             Submeshes,
-            Meshlets
+            Meshlets,
+            CullViews
         };
 
         struct RenderDeviceScenePendingUpdate {
-            RenderDeviceSceneBufferType BufferType;
+            RenderDeviceSceneBufferType BufferType = RenderDeviceSceneBufferType::Globals;
             size_t Offset = 0;
             std::vector<std::byte> Data;
         };
 
         struct RenderDeviceSceneFrameData {
             RenderDeviceResourceHandle GlobalsBuffer;
+            RenderDeviceResourceHandle ObjectsBuffer;
             RenderDeviceResourceHandle MaterialBuffer;
             RenderDeviceResourceHandle MeshBuffer;
+            RenderDeviceResourceHandle MeshLODBuffer;
             RenderDeviceResourceHandle SubmeshBuffer;
             RenderDeviceResourceHandle MeshletBuffer;
+            RenderDeviceResourceHandle CullViewsBuffer;
 
             std::vector<RenderDeviceScenePendingUpdate> PendingUpdates;
 
             bool Initialized = false;
         };
     public:
-        constexpr RenderDeviceResourceHandle GetBufferHandleByName(std::string_view name) { 
-            if (name == "GPUScene")
-                return m_FrameData[Renderer::GetCurrentFrameIndex()].GlobalsBuffer;
-            if (name == "PBRMaterial")
-                return m_FrameData[Renderer::GetCurrentFrameIndex()].MaterialBuffer;
-            else if (name == "GPUMesh")
-                return m_FrameData[Renderer::GetCurrentFrameIndex()].MeshBuffer;
-            else if (name == "GPUSubmesh")
-                return m_FrameData[Renderer::GetCurrentFrameIndex()].SubmeshBuffer;
-            else if (name == "GPUMeshlet")
-                return m_FrameData[Renderer::GetCurrentFrameIndex()].MeshletBuffer;
-            return {};
-        }
+        [[nodiscard]] const RenderDeviceResourceHandle& GetGlobalVertexBufferHandle() const { return m_GlobalVertexBuffer; }
+        [[nodiscard]] const RenderDeviceResourceHandle& GetGlobalIndexBufferHandle() const { return m_GlobalIndexBuffer; }
+
+        constexpr RenderDeviceResourceHandle GetCurrentFrameBufferHandle(std::string_view name) { return GetCurrentFrameBufferHandle(name, Renderer::GetCurrentFrameIndex()); }
+        std::vector<RenderDeviceResourceHandle> GetCurrentFrameBufferHandles(std::string_view name);
+
+        static uint64_t GetObjectCapacity() { return s_ObjectCapacity; }
+        static uint64_t GetMeshletCapacity() { return s_MeshletCapacity; }
     private:
         RenderDeviceObjectHandle RTCreateSceneGlobals(const RenderDeviceSceneGlobalData& data);
-        void RTRegisterMesh(const RenderDeviceObjectHandle& handle, const RenderDeviceMeshData& data);
+        void RTRegisterMesh(const RenderDeviceObjectHandle& handle, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const std::vector<Submesh>& submeshes);
         void RTRegisterPBRMaterial(const RenderDeviceObjectHandle& handle, const RenderDevicePBRMaterialData& data);
+        void RTRegisterObject(const RenderDeviceObjectHandle& handle);
+        void RTRegisterCullView(const RenderDeviceObjectHandle& handle);
 
         void RTUpdateCamera(const CameraViewProjection& camera);
         void RTUpdateLightValues(const RenderDeviceSceneGlobalData::LightValues& lightValues);
         void RTUpdateGlobals(const RenderDeviceSceneGlobalData& data);
+        void RTUpdateCullView(const RenderDeviceObjectHandle& handle, const RenderDeviceCullViewData& data);
+        void RTUpdateObjectTransform(const RenderDeviceObjectHandle& handle, const glm::mat4& transform);
 
         void RTUpdatePBRMaterial(const RenderDeviceObjectHandle& handle, const RenderDevicePBRMaterialData& data);
 
@@ -150,11 +159,20 @@ namespace Lucy {
                     case RenderDeviceSceneBufferType::Meshes:
                         return frameData.MeshBuffer;
                         break;
+                    case RenderDeviceSceneBufferType::MeshLODs:
+                        return frameData.MeshLODBuffer;
+                        break;
                     case RenderDeviceSceneBufferType::Submeshes:
                         return frameData.SubmeshBuffer;
                         break;
                     case RenderDeviceSceneBufferType::Meshlets:
                         return frameData.MeshletBuffer;
+                        break;
+                    case RenderDeviceSceneBufferType::CullViews:
+                        return frameData.CullViewsBuffer;
+                        break;
+                    case RenderDeviceSceneBufferType::Objects:
+                        return frameData.ObjectsBuffer;
                         break;
                 }
             };
@@ -164,7 +182,7 @@ namespace Lucy {
                 LUCY_ASSERT(bufferHandle);
 
                 const auto& buffer = m_RenderDevice->AccessResource<RenderDeviceBuffer>(bufferHandle);
-                buffer->RTLoadToDevice(update.Data.data(), update.Data.size(), update.Offset);
+                buffer->RTLoadToDevice(m_RenderDevice, update.Data.data(), update.Data.size(), update.Offset);
             }
 
             frameData.PendingUpdates.clear();
@@ -198,9 +216,8 @@ namespace Lucy {
             using Handle = TPool::Handle;
 
             for (size_t index = 0; auto& slot : pool) {
-                if (!slot.Alive)
-                    continue;
-                std::invoke(function, Handle{ .Index = static_cast<IndexType>(index), .Generation = slot.Generation }, slot.Data);
+                if (slot.Alive)
+                    std::invoke(function, Handle{ .Index = static_cast<IndexType>(index), .Generation = slot.Generation }, slot.Data);
                 index++;
             }
         }
@@ -215,7 +232,7 @@ namespace Lucy {
             const auto& buffer = m_RenderDevice->AccessResource<RenderDeviceBuffer>(bufferHandle);
 
             ForEachAlive(pool, [&](typename TPool::Handle handle, const TData& data) {
-                buffer->RTLoadToDevice(std::addressof(data), sizeof(TData), sizeof(TData) * static_cast<size_t>(handle.Index));
+                buffer->RTLoadToDevice(m_RenderDevice, std::addressof(data), sizeof(TData), sizeof(TData) * static_cast<size_t>(handle.Index));
             });
         }
 
@@ -233,7 +250,9 @@ namespace Lucy {
 
             size_t newCapacity = buffer->GetSize() * 4;
 
-            RenderDeviceResourceHandle newBuffer = m_RenderDevice->CreateDeviceAddressBuffer(newCapacity * sizeof(TData));
+            auto newCreateInfo = buffer->GetCreateInfo();
+            newCreateInfo.Size = newCapacity * sizeof(TData);
+            RenderDeviceResourceHandle newBuffer = m_RenderDevice->CreateDeviceAddressBuffer(newCreateInfo);
 
             //COPY THE OLD DATA TODO:????
 
@@ -247,12 +266,37 @@ namespace Lucy {
 
         RenderDeviceObjectHandle RTRegisterSubmesh(const RenderDeviceSubmeshData& data);
         RenderDeviceObjectHandle RTRegisterMeshlet(const RenderDeviceMeshletData& data);
+        RenderDeviceObjectHandle RTRegisterMeshLOD(const RenderDeviceMeshLODData& data);
 
-        GenerationalPool<RenderDeviceObjectHandle, RenderDevicePBRMaterialData> m_PBRMaterials;
+        constexpr RenderDeviceResourceHandle GetCurrentFrameBufferHandle(std::string_view name, size_t frameIndex) {
+            if (name == "GPUScene")
+                return m_FrameData[frameIndex].GlobalsBuffer;
+            else if (name == "GPUObjects")
+                return m_FrameData[frameIndex].ObjectsBuffer;
+            else if (name == "GPUMeshLODs")
+                return m_FrameData[frameIndex].MeshLODBuffer;
+            else if (name == "GPUCullViews")
+                return m_FrameData[frameIndex].CullViewsBuffer;
+            else if (name == "PBRMaterial")
+                return m_FrameData[frameIndex].MaterialBuffer;
+            else if (name == "GPUMeshes")
+                return m_FrameData[frameIndex].MeshBuffer;
+            else if (name == "GPUSubmeshes")
+                return m_FrameData[frameIndex].SubmeshBuffer;
+            else if (name == "GPUMeshlets")
+                return m_FrameData[frameIndex].MeshletBuffer;
+            LUCY_ASSERT(false, "Returning empty frame data buffer handle");
+            return {};
+        }
+
         GenerationalPool<RenderDeviceObjectHandle, RenderDeviceSceneGlobalData> m_Globals;
+        GenerationalPool<RenderDeviceObjectHandle, RenderDeviceObjectData> m_Objects;
         GenerationalPool<RenderDeviceObjectHandle, RenderDeviceMeshData> m_Meshes;
+        GenerationalPool<RenderDeviceObjectHandle, RenderDeviceMeshLODData> m_MeshLODs;
+        GenerationalPool<RenderDeviceObjectHandle, RenderDeviceCullViewData> m_CullViews;
         GenerationalPool<RenderDeviceObjectHandle, RenderDeviceSubmeshData> m_Submeshes;
         GenerationalPool<RenderDeviceObjectHandle, RenderDeviceMeshletData> m_Meshlets;
+        GenerationalPool<RenderDeviceObjectHandle, RenderDevicePBRMaterialData> m_PBRMaterials;
 
         std::vector<RenderDeviceSceneFrameData> m_FrameData;
 
@@ -260,14 +304,19 @@ namespace Lucy {
 
         RenderDevice* m_RenderDevice = nullptr;
 
-        /* TODO: later
-        RenderDeviceResourceHandle m_VertexBuffer;
-        RenderDeviceResourceHandle m_IndexBuffer;
+        RenderDeviceResourceHandle m_GlobalVertexBuffer;
+        RenderDeviceResourceHandle m_GlobalIndexBuffer;
 
-        RenderDeviceResourceHandle m_DrawCandidateBuffer;
-        RenderDeviceResourceHandle m_VisibleDrawBuffer;
-        RenderDeviceResourceHandle m_IndirectCommandBuffer;
-        RenderDeviceResourceHandle m_DrawCountBuffer;
-        */  
+        uint64_t m_GlobalVertexCount = 0;
+        uint64_t m_GlobalIndexCount = 0;
+
+        static inline uint64_t s_ObjectCapacity = 16 * 1024;
+        static inline uint64_t s_MaterialCapacity = 16 * 1024;
+        static inline uint64_t s_MeshCapacity = 16 * 1024;
+        static inline uint64_t s_SubmeshCapacity = 64 * 1024;
+        static inline uint64_t s_MeshletCapacity = 1024 * 1024;
+
+        static inline uint64_t s_GlobalVertexCapacity = 1024 * 1024;
+        static inline uint64_t s_GlobalIndexCapacity = 3 * s_GlobalVertexCapacity;
     };
 }

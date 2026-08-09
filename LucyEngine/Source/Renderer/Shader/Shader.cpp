@@ -3,12 +3,12 @@
 
 namespace Lucy {
 	
-	Shader::Shader(const std::string& name, const std::filesystem::path& path)
-		: m_Path(path), m_Name(name) {
+	Shader::Shader(const std::string& name, const std::filesystem::path& path, const std::string& entryPointName)
+		: m_Path(path), m_Name(name), m_EntryPointName(entryPointName) {
 	}
 
-	void Shader::RunReflect(const Slang::ComPtr<slang::IComponentType>& program, ShaderStageType stageFlag) {
-		m_Reflect.Info(GetPath(), program, stageFlag);
+	void Shader::RunReflect(const Slang::ComPtr<IComponentType>& linkedProgram, ShaderStageType shaderStage, std::string_view entryPointName) {
+		m_Reflect.Info(m_Path, linkedProgram, shaderStage, entryPointName);
 	}
 
 	void Shader::RTDestroyResource(const Ref<RenderDevice>& device) {

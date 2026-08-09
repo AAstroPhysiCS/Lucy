@@ -9,13 +9,15 @@
 
 namespace Lucy {
 
+	class RenderDevice;
+
 	template <typename TResource>
 	concept IsRenderResource = std::is_base_of_v<MemoryTrackable, TResource> && std::is_base_of_v<RenderDeviceResource, TResource>;
 
 	using RenderDeviceResourcePool = GenerationalPool<RenderDeviceResourceHandle, Ref<RenderDeviceResource>>;
 
 	class RenderDeviceResourceManager final {
-		RenderDeviceResourceManager() = default;
+		RenderDeviceResourceManager(RenderDevice* device);
 		~RenderDeviceResourceManager() = default;
 
 		RenderDeviceResourceManager(const RenderDeviceResourceManager&) = delete;
@@ -26,8 +28,9 @@ namespace Lucy {
 		template<IsRenderResource TResource>
 		[[nodiscard]] RenderDeviceResourceHandle PushResource(Ref<TResource> resource) {
 			LUCY_ASSERT(resource, "Cannot push nullptr render device resource.");
-			resource->SetInitialized(true);
-			return m_Resources.Create(std::move(resource));
+			auto handle = m_Resources.Create(std::move(resource));
+			m_Resources.Back().Data->SetInitialized(handle);
+			return handle;
 		}
 
 		[[nodiscard]] bool ResourceExists(RenderDeviceResourceHandle handle) const {
@@ -42,17 +45,10 @@ namespace Lucy {
 			return m_Resources.Get(handle);
 		}
 		
-		void RTDestroyResource(RenderDeviceResourceHandle& handle) {
-			LUCY_ASSERT(m_Resources.IsValid(handle), "Invalid render device resource handle.");
-
-			Ref<RenderDeviceResource>& resource = m_Resources.Get(handle);
-			resource->RTDestroyResource();
-
-			m_Resources.Destroy(handle);
-			handle = {};
-		}
+		void RTDestroyResource(RenderDeviceResourceHandle& handle);
 	private:
 		RenderDeviceResourcePool m_Resources;
+		RenderDevice* m_RenderDevice = nullptr;
 
 		friend class RenderDevice;
 	};

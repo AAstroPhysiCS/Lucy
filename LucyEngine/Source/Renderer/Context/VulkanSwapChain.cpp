@@ -91,8 +91,12 @@ namespace Lucy {
 
 	void VulkanSwapChain::Recreate() {
 		m_OldSwapChain = m_SwapChain;
-		m_SwapChain = Create(m_OldSwapChain);
+		
+		//TODO: maybe with VK_KHR_swapchain_maintenance1
+		vkQueueWaitIdle(GetRenderDevice()->As<VulkanRenderDevice>()->GetPresentQueue());
 
+		m_SwapChain = Create(m_OldSwapChain);
+		
 		auto [width, height] = GetExtent();
 		m_SwapChainFrameBuffer->RTRecreate(width, height);
 	}
@@ -176,8 +180,8 @@ namespace Lucy {
 
 		for (uint32_t i = 0; i < m_SwapChainImageViews.size(); i++)
 			m_SwapChainImageViews[i].RTDestroyResource();
-		m_SwapChainFrameBuffer->RTDestroyResource();
-		m_SwapChainRenderPass->RTDestroyResource();
+		m_SwapChainFrameBuffer->RTDestroyResource(GetRenderDevice().get());
+		m_SwapChainRenderPass->RTDestroyResource(GetRenderDevice().get());
 
 		const auto& vulkanDevice = GetRenderDevice()->As<VulkanRenderDevice>();
 		vkDestroySwapchainKHR(vulkanDevice->GetLogicalDevice(), m_SwapChain, nullptr);

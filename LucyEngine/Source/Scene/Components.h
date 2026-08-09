@@ -4,9 +4,12 @@
 
 #include "Renderer/Mesh.h"
 #include "Renderer/Image/Image.h"
+
 #include "Renderer/Renderer.h"
 
 namespace Lucy {
+
+	class Entity;
 
 	struct TransformComponent {
 		TransformComponent() = default;
@@ -15,10 +18,15 @@ namespace Lucy {
 		}
 		TransformComponent(const TransformComponent& other) = default;
 
-		inline glm::mat4& GetMatrix() { return m_Mat; }
-		inline glm::vec3& GetPosition() { return m_Position; }
-		inline glm::vec3& GetRotation() { return m_Rotation; }
-		inline glm::vec3& GetScale() { return m_Scale; }
+		const glm::mat4& GetMatrix() const { return m_Mat; }
+		const glm::vec3& GetPosition() const { return m_Position; }
+		const glm::vec3& GetRotation() const { return m_Rotation; }
+		const glm::vec3& GetScale() const { return m_Scale; }
+		
+		glm::mat4& GetMatrix() { return m_Mat; }
+		glm::vec3& GetPosition() { return m_Position; }
+		glm::vec3& GetRotation() { return m_Rotation; }
+		glm::vec3& GetScale() { return m_Scale; }
 
 		void CalculateMatrix();
 
@@ -37,12 +45,18 @@ namespace Lucy {
 		}
 		MeshComponent(const MeshComponent& other) = default;
 
-		void LoadMesh(const std::string& path);
+		void LoadMesh(const Entity& e, const std::string& path);
 
 		inline Ref<Mesh> GetMesh() { return m_Mesh; }
-		inline bool IsValid() { return m_Mesh.get() != nullptr && !m_Mesh->GetSubmeshes().empty(); }
+
+		void SetObjectHandle(const RenderDeviceObjectHandle& handle) { m_Handle = handle; }
+		const RenderDeviceObjectHandle& GetRenderDeviceObjectHandle() const { return m_Handle; }
+
+		inline bool IsValid() { return m_Mesh.get() != nullptr; }
 	private:
 		Ref<Mesh> m_Mesh = nullptr;
+
+		RenderDeviceObjectHandle m_Handle;
 	};
 
 	struct UUIDComponent {
@@ -90,9 +104,7 @@ namespace Lucy {
 		inline bool IsValid() const { return true; }
 	private:
 		glm::vec3 m_Direction = glm::vec3(1.0f);
-		[[maybe_unused]] float _padding0 = 0.0f;
 		glm::vec3 m_Color = glm::vec3(1.0f);
-		[[maybe_unused]] float _padding1 = 0.0f;
 	};
 
 	struct HDRCubemapComponent {

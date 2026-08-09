@@ -3,8 +3,8 @@
 
 namespace Lucy {
 
-	GraphicsPipeline::GraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo)
-		: Pipeline("GraphicsPipeline", createInfo.Shader), m_CreateInfo(createInfo) {
+	GraphicsPipeline::GraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo, Ref<Shader> shader)
+		: Pipeline("GraphicsPipeline", shader), m_CreateInfo(createInfo) {
 	}
 
 	void GraphicsPipeline::Unbind(GraphicsPipelineStatistics&& statistics) {

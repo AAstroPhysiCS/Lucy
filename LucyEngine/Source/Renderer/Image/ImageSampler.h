@@ -29,8 +29,6 @@ namespace Lucy {
 		ImageSampler(ImageSampler&&) = delete;
 		ImageSampler& operator=(ImageSampler&&) = delete;
 
-		virtual void RTDestroyResource() = 0;
-
 		inline ImageParameter GetParameter() const { return m_CreateInfo.Parameter; }
 
 		inline float GetMipmapLevel() const { return m_CreateInfo.MipmapLevel; }

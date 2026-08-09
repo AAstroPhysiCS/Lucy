@@ -10,11 +10,11 @@
 namespace Lucy {
 
 	VulkanImage2D::VulkanImage2D(const std::filesystem::path& path, const ImageCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device, std::string_view debugName)
-		: VulkanImage(path, createInfo, debugName), m_VulkanDevice(device) {
+		: VulkanImage(path, createInfo, debugName) {
 		if (m_CreateInfo.ImageType != ImageType::Type2D)
 			LUCY_ASSERT(false);
 
-		RTCreateFromPath();
+		RTCreateFromPath(device);
 
 #if LUCY_DEBUG
 		AddLabel(m_Image, device);
@@ -22,14 +22,14 @@ namespace Lucy {
 	}
 
 	VulkanImage2D::VulkanImage2D(const ImageCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device, std::string_view debugName)
-		: VulkanImage(createInfo, debugName), m_VulkanDevice(device) {
+		: VulkanImage(createInfo, debugName) {
 		if (m_CreateInfo.ImageType != ImageType::Type2D)
 			LUCY_ASSERT(false);
 
 		if (m_CreateInfo.ImageUsage == ImageUsage::AsDepthAttachment)
-			RTCreateDepthImage();
+			RTCreateDepthImage(device);
 		else
-			RTCreateEmptyImage();
+			RTCreateEmptyImage(device);
 
 #if LUCY_DEBUG
 		AddLabel(m_Image, device);
@@ -37,7 +37,7 @@ namespace Lucy {
 	}
 
 	VulkanImage2D::VulkanImage2D(const Ref<VulkanImage2D>& other, const Ref<VulkanRenderDevice>& device)
-		: VulkanImage(other->m_CreateInfo, "Copied VulkanImage2D"), m_VulkanDevice(device) {
+		: VulkanImage(other->m_CreateInfo, "Copied VulkanImage2D") {
 		m_CreateInfo = other->m_CreateInfo;
 		m_Path = other->m_Path;
 		m_CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -47,18 +47,18 @@ namespace Lucy {
 			LUCY_ASSERT(false);
 
 		if (!m_Path.empty())
-			RTCreateFromPath();
+			RTCreateFromPath(device);
 		else if (m_CreateInfo.ImageUsage == ImageUsage::AsDepthAttachment)
-			RTCreateDepthImage();
+			RTCreateDepthImage(device);
 		else
-			RTCreateEmptyImage();
+			RTCreateEmptyImage(device);
 
 #if LUCY_DEBUG
 		AddLabel(m_Image, device);
 #endif
 	}
 
-	void VulkanImage2D::RTCreateFromPath() {
+	void VulkanImage2D::RTCreateFromPath(const Ref<VulkanRenderDevice>& vulkanDevice) {
 		std::string pathInString = m_Path.string();
 		uint8_t* data = nullptr;
 		bool isHDR = stbi_is_hdr(pathInString.c_str());
@@ -78,7 +78,7 @@ namespace Lucy {
 		VkBuffer imageStagingBuffer = VK_NULL_HANDLE;
 		VmaAllocation imageStagingBufferVma = VK_NULL_HANDLE;
 
-		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
+		VulkanAllocator& allocator = vulkanDevice->GetAllocator();
 		allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, false, imageStagingBuffer, imageStagingBufferVma);
 
 		void* pixelData = nullptr;
@@ -106,18 +106,18 @@ namespace Lucy {
 
 		allocator.DestroyBuffer(imageStagingBuffer, imageStagingBufferVma);
 
-		RTCreateSampler(m_VulkanDevice);
-		RTCreateVulkanImageViewHandle(m_VulkanDevice);
+		RTCreateSampler(vulkanDevice);
+		RTCreateVulkanImageViewHandle(vulkanDevice);
 	}
 
-	void VulkanImage2D::RTCreateEmptyImage() {
+	void VulkanImage2D::RTCreateEmptyImage(const Ref<VulkanRenderDevice>& vulkanDevice) {
 		LUCY_ASSERT(m_CreateInfo.Width > 0 && m_CreateInfo.Height > 0, "Width or height of the image is less than zero.");
 
 		CalculateMaxMipLevel();
 
 		VkImageUsageFlags flags = GetImageFlagsBasedOnUsage();
 
-		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
+		VulkanAllocator& allocator = vulkanDevice->GetAllocator();
 		allocator.CreateVulkanImageVma(m_CreateInfo.Width, m_CreateInfo.Height, m_MaxMipLevel, (VkFormat)GetAPIImageFormat(m_CreateInfo.Format), m_CurrentLayout,
 									   flags, VK_IMAGE_TYPE_2D, m_Image, m_ImageVma, 0, m_CreateInfo.Layers);
 
@@ -126,11 +126,11 @@ namespace Lucy {
 		else
 			SetLayoutImmediate(GetInitialImageLayout());
 
-		RTCreateSampler(m_VulkanDevice);
-		RTCreateVulkanImageViewHandle(m_VulkanDevice);
+		RTCreateSampler(vulkanDevice);
+		RTCreateVulkanImageViewHandle(vulkanDevice);
 	}
 
-	void VulkanImage2D::RTCreateDepthImage() {
+	void VulkanImage2D::RTCreateDepthImage(const Ref<VulkanRenderDevice>& vulkanDevice) {
 		LUCY_ASSERT(m_CreateInfo.Width > 0 && m_CreateInfo.Height > 0, "Width or height of the image is less than zero.");
 
 		CalculateMaxMipLevel();
@@ -138,7 +138,7 @@ namespace Lucy {
 		//do the flags
 		VkImageUsageFlags flags = GetImageFlagsBasedOnUsage();
 
-		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
+		VulkanAllocator& allocator = vulkanDevice->GetAllocator();
 		allocator.CreateVulkanImageVma(m_CreateInfo.Width, m_CreateInfo.Height, 1, (VkFormat)GetAPIImageFormat(m_CreateInfo.Format), m_CurrentLayout, 
 			flags, VK_IMAGE_TYPE_2D, m_Image, m_ImageVma, 0U, m_CreateInfo.Layers);
 
@@ -147,11 +147,11 @@ namespace Lucy {
 		else
 			SetLayoutImmediate(GetInitialImageLayout());
 
-		RTCreateSampler(m_VulkanDevice);
-		RTCreateVulkanImageViewHandle(m_VulkanDevice);
+		RTCreateSampler(vulkanDevice);
+		RTCreateVulkanImageViewHandle(vulkanDevice);
 	}
 
-	void VulkanImage2D::RTDestroyResource() {
+	void VulkanImage2D::RTDestroyResource(RenderDevice* device) {
 		if (!m_Image)
 			return;
 
@@ -159,9 +159,10 @@ namespace Lucy {
 			//ImGui_ImplVulkan_RemoveTexture((VkDescriptorSet)m_ImGuiID);
 
 		m_ImageView.RTDestroyResource();
-		m_VulkanDevice->RTDestroyResource(m_SamplerHandle);
+		device->RTDestroyResource(m_SamplerHandle);
+		auto vulkanDevice = reinterpret_cast<VulkanRenderDevice*>(device);
 
-		VulkanAllocator& allocator = m_VulkanDevice->GetAllocator();
+		VulkanAllocator& allocator = vulkanDevice->GetAllocator();
 		allocator.DestroyImage(m_Image, m_ImageVma);
 		m_Image = VK_NULL_HANDLE;
 	}
@@ -170,15 +171,36 @@ namespace Lucy {
 		m_CreateInfo.Width = width;
 		m_CreateInfo.Height = height;
 
-		m_CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		Renderer::EnqueueResourceRecreate([this](const Ref<RenderDevice>& device) -> RenderDeletionFunc {
+			auto vulkanDevice = device->As<VulkanRenderDevice>();
 
-		RTDestroyResource();
+			VkImage oldImage = std::exchange(m_Image, VK_NULL_HANDLE);
+			VmaAllocation oldImageVma = std::exchange(m_ImageVma, VK_NULL_HANDLE);
+			VkImageView oldImageView = std::exchange(m_ImageView.m_ImageView, VK_NULL_HANDLE);
 
-		if (!m_Path.empty())
-			RTCreateFromPath();
-		else if (m_CreateInfo.ImageUsage == ImageUsage::AsDepthAttachment)
-			RTCreateDepthImage();
-		else
-			RTCreateEmptyImage();
+			auto oldSamplerHandle = std::exchange(m_SamplerHandle, {});
+
+			m_CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+			if (!m_Path.empty())
+				RTCreateFromPath(vulkanDevice);
+			else if (m_CreateInfo.ImageUsage == ImageUsage::AsDepthAttachment)
+				RTCreateDepthImage(vulkanDevice);
+			else
+				RTCreateEmptyImage(vulkanDevice);
+
+			return [oldImage, oldImageVma, oldImageView, oldSamplerHandle](const Ref<RenderDevice>& device) mutable {
+				auto vulkanDevice = device->As<VulkanRenderDevice>();
+
+				if (oldImageView)
+					vkDestroyImageView(vulkanDevice->GetLogicalDevice(), oldImageView, nullptr);
+
+				if (oldSamplerHandle)
+					vulkanDevice->RTDestroyResource(oldSamplerHandle);
+
+				if (oldImage)
+					vulkanDevice->GetAllocator().DestroyImage(oldImage, oldImageVma);
+			};
+		});
 	}
 }

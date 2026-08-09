@@ -9,7 +9,7 @@ namespace Lucy {
 
 	class VulkanGraphicsPipeline : public GraphicsPipeline {
 	public:
-		VulkanGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo, const Ref<VulkanRenderDevice>& vulkanDevice);
+		VulkanGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo, const Ref<Shader>& shader, const Ref<VulkanRenderDevice>& vulkanDevice);
 		virtual ~VulkanGraphicsPipeline() = default;
 
 		VulkanGraphicsPipeline(const VulkanGraphicsPipeline&) = delete;
@@ -18,7 +18,7 @@ namespace Lucy {
 		VulkanGraphicsPipeline& operator=(VulkanGraphicsPipeline&&) = delete;
 
 		void RTBind(void* commandBufferHandle) final override;
-		void RTRecreate() final override;
+		void RTRecreate(Ref<Shader> newShader) final override;
 
 		VkPipeline GetVulkanHandle() { return m_PipelineHandle; }
 		VkPipelineLayout GetPipelineLayout() { return m_PipelineLayoutHandle; }
@@ -26,7 +26,7 @@ namespace Lucy {
 		const std::vector<RenderDeviceResourceHandle>& GetDescriptorSetHandles() const { return m_DescriptorSetHandles; }
 	private:
 		void Create(const Ref<VulkanRenderDevice>& vulkanDevice);
-		void RTDestroyResource() final override;
+		void RTDestroyResource(RenderDevice* device) final override;
 
 		VkVertexInputBindingDescription CreateBindingDescription() const;
 		std::vector<VkVertexInputAttributeDescription> CreateAttributeDescription(uint32_t binding);

@@ -32,21 +32,23 @@ namespace Lucy {
 	enum class RenderGraphResourceAccess : uint8_t {
 		None,
 
-		ColorAttachmentWrite,
-		DepthAttachmentWrite,
-		
-		ShaderSampledRead,
-		StorageRead,
-		StorageWrite,
-		
 		TransferRead,
 		TransferWrite,
-		
+
+		StorageRead,
+		StorageWrite,
+		StorageReadWrite,
+
 		VertexRead, //TODO: maybe we dont need this?
 		IndexRead, //TODO: maybe we dont need this?
+
 		IndirectRead,
 
-		Present,
+		ShaderSampledRead,
+		ColorAttachmentRead,
+		ColorAttachmentWrite,
+		DepthAttachmentRead,
+		DepthAttachmentWrite
 	};
 
 	enum class RenderGraphResourceType : uint8_t {
@@ -140,16 +142,16 @@ namespace Lucy {
 		void SetClearColor(ClearColor clearColor);
 		void SetExecutionPolicy(RenderGraphExecutionPolicy policy);
 
-		inline bool operator==(const RenderGraphPass& other) const { return m_CreateInfo.Name.compare(other.m_CreateInfo.Name) == 0; }
+		bool operator==(const RenderGraphPass& other) const { return m_CreateInfo.Name.compare(other.m_CreateInfo.Name) == 0; }
 
-		inline const RGRenderTargetElements& GetRenderTargets() const { return m_RenderTargets; }
+		const RGRenderTargetElements& GetRenderTargets() const { return m_RenderTargets; }
 
-		inline const RGUsedResourceElements& GetResourceReads() const { return m_ResourceReads; }
-		inline const RGUsedResourceElements& GetResourceWrites() const { return m_ResourceWrites; }
+		const RGUsedResourceElements& GetResourceReads() const { return m_ResourceReads; }
+		const RGUsedResourceElements& GetResourceWrites() const { return m_ResourceWrites; }
 
-		inline ClearColor GetClearColor() { return m_ClearColor; }
+		ClearColor GetClearColor() { return m_ClearColor; }
 
-		inline auto GetViewportArea() const {
+		auto GetViewportArea() const {
 			struct Area {
 				uint32_t width;
 				uint32_t height;
@@ -158,13 +160,13 @@ namespace Lucy {
 			};
 			return Area{ m_ViewportWidth, m_ViewportHeight };
 		}
-		inline bool IsInFlightMode() const { return m_PassIsInFlightMode; }
+		bool IsInFlightMode() const { return m_PassIsInFlightMode; }
 
-		inline TargetQueueFamily GetTargetQueueFamily() const { return m_CreateInfo.TargetQueueFamily; }
+		TargetQueueFamily GetTargetQueueFamily() const { return m_CreateInfo.TargetQueueFamily; }
 
-		inline RenderGraphExecutionPolicy GetExecutionPolicy() const { return m_ExecutionPolicy; }
-		inline RenderGraphPassState GetCurrentState() const { return m_State; }
-		inline const std::string& GetName() const { return m_CreateInfo.Name; }
+		RenderGraphExecutionPolicy GetExecutionPolicy() const { return m_ExecutionPolicy; }
+		RenderGraphPassState GetCurrentState() const { return m_State; }
+		const std::string& GetName() const { return m_CreateInfo.Name; }
 	private:
 		RenderGraphExecuteFunc m_ExecuteFunc;
 		RenderGraphPassCreateInfo m_CreateInfo;

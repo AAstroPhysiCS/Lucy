@@ -18,7 +18,7 @@ namespace Lucy {
 		VertexBuffer(VertexBuffer&&) = delete;
 		VertexBuffer& operator=(VertexBuffer&&) = delete;
 
-		virtual void RTLoadToDevice() = 0;
+		virtual void RTLoadToDevice(const Ref<RenderDevice>& device) = 0;
 	protected:
 		VertexBuffer(size_t size) 
 			: RenderDeviceResource("Vertex Buffer") {

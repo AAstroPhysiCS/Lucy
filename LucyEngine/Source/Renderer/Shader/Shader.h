@@ -86,22 +86,31 @@ namespace Lucy {
 
 	class Shader : public MemoryTrackable {
 	public:
-		inline std::filesystem::path GetPath() const { return m_Path; }
-		inline const std::string& GetName() const { return m_Name; }
+		Shader(const Shader&) = delete;
+		Shader& operator=(const Shader&) = delete;
+		Shader(Shader&&) = delete;
+		Shader& operator=(Shader&&) = delete;
 
-		inline const ShaderStageInfo& GetShaderInfo() const { return m_Reflect.GetShaderInfo(); }
-		inline std::vector<ShaderVariable>& GetShaderPushConstants() { return m_Reflect.GetShaderPushConstants(); }
-		inline std::unordered_multimap<uint32_t, std::vector<ShaderVariable>>& GetShaderUniformBlockMap() { return m_Reflect.GetShaderUniformBlockMap(); }
+		std::filesystem::path GetPath() const { return m_Path; }
+		const std::string& GetName() const { return m_Name; }
 
-		inline const VertexShaderLayout& GetVertexShaderLayout() const { return m_Reflect.GetVertexShaderLayout(); }
+		const ShaderStageInfo& GetShaderInfo() const { return m_Reflect.GetShaderInfo(); }
+		std::vector<ShaderVariable>& GetShaderPushConstants() { return m_Reflect.GetShaderPushConstants(); }
+		std::unordered_multimap<uint32_t, std::vector<ShaderVariable>>& GetShaderUniformBlockMap() { return m_Reflect.GetShaderUniformBlockMap(); }
+
+		[[nodiscard]] const std::string& GetEntryPointName() const { return m_EntryPointName; }
+
+		const VertexShaderLayout& GetVertexShaderLayout() const { return m_Reflect.GetVertexShaderLayout(); }
 
 		virtual void RTLoad(const Ref<RenderDevice>& device, const std::vector<std::span<const uint32_t>>& datas) = 0;
 		virtual void RTDestroyResource(const Ref<RenderDevice>& device);
 	protected:
-		Shader(const std::string& name, const std::filesystem::path& path);
+		Shader(const std::string& name, const std::filesystem::path& path, const std::string& entryPointName);
 		virtual ~Shader() = default;
+
+		std::string m_EntryPointName;
 	private:
-		void RunReflect(const Slang::ComPtr<slang::IComponentType>& program, ShaderStageType stageFlag);
+		void RunReflect(const Slang::ComPtr<IComponentType>& linkedProgram, ShaderStageType shaderStage, std::string_view entryPointName);
 		void PrintReflectInfo();
 
 		std::filesystem::path m_Path = "";

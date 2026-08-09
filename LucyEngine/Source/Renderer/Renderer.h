@@ -12,10 +12,10 @@
 #include "Device/RenderDevice.h"
 #include "Device/RenderDeviceHandles.h"
 
+#include "RenderGraph/RenderGraphRegistry.h"
+
 namespace Lucy {
 
-	class RenderGraph;
-	
 	class MaterialManager;
 
 	class RenderThread;
@@ -25,7 +25,6 @@ namespace Lucy {
 
 	class RenderGraphPass;
 	class RenderGraphResource;
-
 	class RenderGraph;
 
 	template <typename TRendererPass>
@@ -53,7 +52,9 @@ namespace Lucy {
 		static void CompileRenderGraph();
 		static void Flush();
 
-		static void ImportExternalRenderGraphResource(const RenderGraphResource& renderGraphResource, RenderDeviceResourceHandle renderResourceHandle);
+		static void ImportExternalRenderGraphResource(const RenderGraphResource& renderGraphResource, RenderDeviceResourceHandle renderResourceHandle, RGResourceData data = {});
+		static void ImportExternalRenderGraphResource(const RenderGraphResource& renderGraphResource, 
+			const std::vector<RenderDeviceResourceHandle>& renderResourceHandles, RGResourceData data = {});
 		static void ImportExternalRenderGraphTransientResource(const RenderGraphResource& renderGraphResource, RenderDeviceResourceHandle renderResourceHandle);
 	public:
 		template <typename TRendererPass, typename ... TArgs> requires IsRendererPass<TRendererPass>
@@ -79,6 +80,8 @@ namespace Lucy {
 
 		static void EnqueueToRenderCommandQueue(RenderCommandFunc&& func);
 		static void EnqueueResourceDestroy(RenderDeviceResourceHandle& handle);
+		static void EnqueueResourceDestroy(RenderDeletionFunc&& func);
+		static void EnqueueResourceRecreate(RenderRecreateFunc&& func);
 #pragma endregion RenderDevice
 		static void InitializeImGui();
 

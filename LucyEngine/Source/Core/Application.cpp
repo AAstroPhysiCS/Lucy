@@ -12,7 +12,7 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/RenderThread.h"
 
-#include "Core/ViewportRenderPipeline.h"
+#include "Core/GPUDrivenRenderPipeline.h"
 
 namespace Lucy {
 
@@ -62,9 +62,10 @@ namespace Lucy {
 		switch (m_CreateInfo.RendererConfiguration.RenderType) {
 			case RenderType::Rasterizer: {
 				RenderPipelineCreateInfo createInfo = {
-					.ViewMode = ViewMode::Lit
+					.ViewMode = ViewMode::Lit,
+					.RenderDevice = Renderer::GetRenderDevice()
 				};
-				m_RenderPipeline = Memory::CreateRef<ViewportRenderPipeline>(createInfo, m_Scene);
+				m_RenderPipeline = Memory::CreateRef<GPUDrivenRenderPipeline>(createInfo, m_Scene);
 				break;
 			}
 			default:

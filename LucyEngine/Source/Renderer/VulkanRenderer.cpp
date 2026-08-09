@@ -118,8 +118,10 @@ namespace Lucy {
 
 			std::vector<VkImageMemoryBarrier2> imageBarriers;
 			imageBarriers.reserve(barrier.ImageBarriers.size());
-			for (const auto& barrier : barrier.ImageBarriers) {
-				imageBarriers.emplace_back(barrier.Barrier);
+			for (const auto& imageBarrier : barrier.ImageBarriers) {
+				auto vkBarrier = imageBarrier.Barrier;
+				vkBarrier.image = imageBarrier.Image->GetVulkanHandle();
+				imageBarriers.emplace_back(vkBarrier);
 			}
 
 			VkDependencyInfo depInfo{};
@@ -183,19 +185,18 @@ namespace Lucy {
 	}
 
 	void VulkanRenderer::FlushDeletionQueue() {
-		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::FlushDeletionQueue");
-		auto& currentDeletionQueue = m_ResourceDeletionQueues[m_CurrentFrameIndex];
-		if (currentDeletionQueue.empty())
+		auto& deletionQueue = m_ResourceDeletionQueues[m_CurrentFrameIndex];
+
+		if (deletionQueue.empty())
 			return;
 
-		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
 		const uint64_t frameValue = m_FrameFenceValues[m_CurrentFrameIndex];
 		m_InFlightFences[m_CurrentFrameIndex].Wait(frameValue);
-		
-		size_t oldDeletionQueueSize = currentDeletionQueue.size();
-		for (const auto& deletionFunc : currentDeletionQueue)
-			deletionFunc();
-		currentDeletionQueue.erase(currentDeletionQueue.begin(), currentDeletionQueue.begin() + oldDeletionQueueSize);
+
+		for (auto it = deletionQueue.rbegin(); it != deletionQueue.rend(); ++it)
+			(*it)(m_RenderDevice);
+
+		deletionQueue.clear();
 	}
 
 	void VulkanRenderer::InternalImGuiPass(uint64_t signalValue, bool hasSceneWork) {
@@ -335,13 +336,14 @@ namespace Lucy {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::WaitAndPresent");
 		
 		BeginFrame();
+		FlushDeletionQueue();
 		FlushCommandQueue();
 
 		m_RenderDevice->GetScene()->SyncFrame(m_CurrentFrameIndex);
 
 		RenderFrame();
+
 		EndFrame();
-		FlushDeletionQueue();
 
 		m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % m_MaxFramesInFlight;
 
@@ -416,14 +418,12 @@ namespace Lucy {
 	void VulkanRenderer::OnWindowResize() {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::OnWindowResize");
 
-		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
-		renderDevice->WaitForDevice();
-
 		const auto& swapChain = GetSwapChain();
 		swapChain->Recreate();
 
-		RecreateCommandQueue();
+		//RecreateCommandQueue();
 
+		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
 		auto& allocator = renderDevice->GetAllocator();
 		allocator.DestroyBuffer(s_IDBuffer, s_IDBufferVma);
 
@@ -435,8 +435,6 @@ namespace Lucy {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::OnViewportResize");
 
 		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
-		renderDevice->WaitForDevice();
-
 		auto& allocator = renderDevice->GetAllocator();
 		allocator.DestroyBuffer(s_IDBuffer, s_IDBufferVma);
 

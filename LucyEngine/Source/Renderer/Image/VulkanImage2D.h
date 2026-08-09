@@ -20,13 +20,11 @@ namespace Lucy {
 
 		void RTRecreate(uint32_t width, uint32_t height) final override;
 	private:
-		void RTCreateFromPath();
-		void RTCreateEmptyImage();
-		void RTCreateDepthImage();
+		void RTCreateFromPath(const Ref<VulkanRenderDevice>& device);
+		void RTCreateEmptyImage(const Ref<VulkanRenderDevice>& device);
+		void RTCreateDepthImage(const Ref<VulkanRenderDevice>& device);
 
-		void RTDestroyResource() final override;
-
-		Ref<VulkanRenderDevice> m_VulkanDevice = nullptr;
+		void RTDestroyResource(RenderDevice* device) final override;
 	};
 }
 

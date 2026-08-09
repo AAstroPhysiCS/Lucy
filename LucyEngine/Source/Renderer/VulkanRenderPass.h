@@ -27,14 +27,14 @@ namespace Lucy {
 
 		void RTBegin(VulkanRenderPassBeginInfo& info);
 		void RTEnd();
-		void RTRecreate() final override;
+		void RTRecreate(const Ref<RenderDevice>& device) final override;
 
 		inline VkRenderPass GetVulkanHandle() { return m_RenderPass; }
 		inline uint32_t GetAttachmentCount() { return m_AttachmentCount; }
 		inline uint32_t GetColorAttachmentCount() { return m_ColorAttachmentCount; }
 	private:
-		void RTCreate();
-		void RTDestroyResource() final override;
+		void RTCreate(const Ref<VulkanRenderDevice>& vulkanDevice);
+		void RTDestroyResource(RenderDevice* device) final override;
 
 		VkRenderPass m_RenderPass = VK_NULL_HANDLE;
 		uint32_t m_AttachmentCount = 0;
@@ -42,7 +42,6 @@ namespace Lucy {
 
 		//just a helper member variable, to save the commandbuffer that was given in begininfo
 		VkCommandBuffer m_BoundedCommandBuffer = VK_NULL_HANDLE;
-		Ref<VulkanRenderDevice> m_VulkanDevice = nullptr;
 
 		friend class VulkanSwapChain; //Exception, for ImGui initialization.
 	};

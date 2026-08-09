@@ -46,9 +46,23 @@ namespace Lucy {
 	}
 
 	void RendererBackend::EnqueueResourceDestroy(RenderDeviceResourceHandle handle) {
-		m_ResourceDeletionQueues[GetCurrentFrameIndex()].emplace_back([&, handle]() mutable {
-			LUCY_INFO("Debug Name {0}, ", GetRenderDevice()->AccessResource<RenderDeviceResource>(handle)->GetDebugName());
-			GetRenderDevice()->RTDestroyResource(handle);
+		auto debugName = GetRenderDevice()->AccessResource<RenderDeviceResource>(handle)->GetDebugName();
+
+		m_ResourceDeletionQueues[GetCurrentFrameIndex()].emplace_back([=](const Ref<RenderDevice>& device) mutable {
+			LUCY_INFO("Deleted Resource Name {0}", debugName);
+			device->RTDestroyResource(handle);
+		});
+	}
+
+	void RendererBackend::EnqueueResourceDestroy(RenderDeletionFunc&& func) {
+		m_ResourceDeletionQueues[GetCurrentFrameIndex()].emplace_back(std::move(func));
+	}
+
+	void RendererBackend::EnqueueResourceRecreate(RenderRecreateFunc&& func) {
+		EnqueueToRenderCommandQueue([this, func = std::move(func)](const Ref<RenderDevice>& device) mutable {
+			auto deletionFunc = func(device);
+			if (deletionFunc)
+				EnqueueResourceDestroy(std::move(deletionFunc));
 		});
 	}
 
