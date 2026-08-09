@@ -48,6 +48,7 @@ namespace Lucy {
 		void InternalImGuiPass(uint64_t signalValue, bool hasSceneWork);
 
 		void LinkBatches(RenderSubmitQueue& submitQueue, uint64_t signalValue);
+		void ExecuteVulkanBatchBarrier(VkCommandBuffer cmdBuffer, const VulkanBatchBarrier& barrier);
 
 		/*
 		* imageAvailable[frame] -> from acquire, waited by first GPU submit of the frame

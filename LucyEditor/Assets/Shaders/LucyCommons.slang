@@ -22,10 +22,13 @@ float4 SRGBtoLINEAR(float4 srgbIn) {
 
 float2x2 operator*(float2x2 a, float2x2 b) { return mul(b, a); }
 float2 operator*(float2x2 a, float2 b) { return mul(b, a); }
+float2 operator*(float2 a, float2x2 b) { return mul(b, a); }
 float3x3 operator*(float3x3 a, float3x3 b) { return mul(b, a); }
 float3 operator*(float3x3 a, float3 b) { return mul(b, a); }
+float3 operator*(float3 a, float3x3 b) { return mul(b, a); }
 float4x4 operator*(float4x4 a, float4x4 b) { return mul(b, a); }
 float4 operator*(float4x4 a, float4 b) { return mul(b, a); }
+float4 operator*(float4 a, float4x4 b) { return mul(b, a); }
 
 float4x4 Inverse(float4x4 m) {
     float n11 = m[0][0], n12 = m[1][0], n13 = m[2][0], n14 = m[3][0];

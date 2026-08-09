@@ -176,23 +176,51 @@ namespace Lucy {
 
 			auto& vkBatch = batch.AsVulkanBatch();
 
-			// Same-queue barriers go into pre-batch
+			// Same-queue barriers execute immediately before their destination pass
 			for (const auto& br : rgBatch.IntraQueueTransition) {
+				auto it = std::ranges::find_if(vkBatch.PassBarriers, [&](const VulkanPassBarrier& barrier) {
+					return barrier.Pass == br.DstPass;
+				});
+
+				if (it == vkBatch.PassBarriers.end()) {
+					vkBatch.PassBarriers.push_back({
+						.Pass = br.DstPass
+					});
+
+					it = std::prev(vkBatch.PassBarriers.end());
+				}
+
 				if (br.ResourceType == RenderGraphResourceType::Image) {
 					auto image = renderGraph.GetImageByRGResource(br.Resource)->As<VulkanImage>();
 					LUCY_ASSERT(image->GetVulkanHandle(), "Image handle is null");
-					vkBatch.PreBatchBarrier.ImageBarriers.push_back(
-						VulkanImageMemoryBarrier{ image, CreateSameQueueImageBarrier(family, image, br.SrcAccess, br.DstAccess) }
+					it->Barrier.ImageBarriers.push_back(
+						VulkanImageMemoryBarrier{
+							image,
+							CreateSameQueueImageBarrier(
+								family,
+								image,
+								br.SrcAccess,
+								br.DstAccess
+							)
+						}
 					);
 				} else {
-					if (auto buffer = renderGraph.GetBufferByRGResource(br.Resource)->As<VulkanSharedStorageBuffer>()) {
-						vkBatch.PreBatchBarrier.BufferBarriers.push_back(
-							CreateSameQueueBufferBarrier(family, buffer, br.SrcAccess, br.DstAccess)
-						);
-					} else if (auto buffer = renderGraph.GetBufferByRGResource(br.Resource)->As<VulkanDeviceAddressBuffer>()) {
-						vkBatch.PreBatchBarrier.BufferBarriers.push_back(
-							CreateSameQueueBufferBarrier(family, buffer, br.SrcAccess, br.DstAccess)
-						);
+					if (auto buffer = renderGraph.GetBufferByRGResource(br.Resource)->As<VulkanDeviceAddressBuffer>()) {
+						it->Barrier.BufferBarriers.push_back(
+							CreateSameQueueBufferBarrier(
+							family,
+							buffer,
+							br.SrcAccess,
+							br.DstAccess
+						));
+					} else if (auto buffer = renderGraph.GetBufferByRGResource(br.Resource)->As<VulkanSharedStorageBuffer>()) {
+						it->Barrier.BufferBarriers.push_back(
+							CreateSameQueueBufferBarrier(
+							family,
+							buffer,
+							br.SrcAccess,
+							br.DstAccess
+						));
 					}
 				}
 			}

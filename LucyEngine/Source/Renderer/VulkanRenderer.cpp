@@ -113,30 +113,6 @@ namespace Lucy {
 
 		uint64_t signalValue = m_FrameFenceValues[m_CurrentFrameIndex] + 1;
 
-		const auto ExecuteVulkanBatchBarrier = [](VkCommandBuffer cmdBuffer, const VulkanBatchBarrier& barrier) {
-			LUCY_PROFILE_NEW_EVENT("VulkanRenderer::RenderFrame::SubmitQueue::ExecuteVulkanBatchBarrier");
-
-			std::vector<VkImageMemoryBarrier2> imageBarriers;
-			imageBarriers.reserve(barrier.ImageBarriers.size());
-			for (const auto& imageBarrier : barrier.ImageBarriers) {
-				auto vkBarrier = imageBarrier.Barrier;
-				vkBarrier.image = imageBarrier.Image->GetVulkanHandle();
-				imageBarriers.emplace_back(vkBarrier);
-			}
-
-			VkDependencyInfo depInfo{};
-			depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-			depInfo.imageMemoryBarrierCount = static_cast<uint32_t>(imageBarriers.size());
-			depInfo.pImageMemoryBarriers = imageBarriers.empty() ? nullptr : imageBarriers.data();
-			depInfo.bufferMemoryBarrierCount = static_cast<uint32_t>(barrier.BufferBarriers.size());
-			depInfo.pBufferMemoryBarriers = barrier.BufferBarriers.empty() ? nullptr : barrier.BufferBarriers.data();
-
-			vkCmdPipelineBarrier2(cmdBuffer, &depInfo);
-
-			for (const auto& [image, barrier] : barrier.ImageBarriers)
-				image->SetLayout(barrier.newLayout);
-		};
-
 		if (hasSceneWork) {
 			LUCY_PROFILE_NEW_EVENT("VulkanRenderer::RenderFrame::SubmitQueue");
 
@@ -156,8 +132,19 @@ namespace Lucy {
 					ExecuteVulkanBatchBarrier(cmdBuffer, vkBatch.PreBatchBarrier);
 				}
 
-				for (const auto& submitFunc : info.SubmitFuncs)
-					submitFunc(cmdList);
+				for (size_t i = 0; i < info.SubmitFuncs.size(); i++) {
+					RenderGraphPass* pass = vkBatch.Passes[i];
+					auto it = std::ranges::find_if(vkBatch.PassBarriers, [&](const VulkanPassBarrier& passBarrier) {
+						return passBarrier.Pass == pass;
+					});
+
+					if (it != vkBatch.PassBarriers.end()) {
+						VkCommandBuffer cmdBuffer = static_cast<VkCommandBuffer>(primaryCommandPool->GetCommandBuffer(m_CurrentFrameIndex));
+						ExecuteVulkanBatchBarrier(cmdBuffer, it->Barrier);
+					}
+
+					info.SubmitFuncs[i](cmdList);
+				}
 
 				if (!vkBatch.PostBatchBarrier.ImageBarriers.empty() || !vkBatch.PostBatchBarrier.BufferBarriers.empty()) {
 					VkCommandBuffer cmdBuffer = static_cast<VkCommandBuffer>(primaryCommandPool->GetCommandBuffer(m_CurrentFrameIndex));
@@ -280,6 +267,30 @@ namespace Lucy {
 		const VkPipelineStageFlags2 lastSignalStages = GetDefaultSignalStage(lastBatch.QueueFamily);
 
 		lastBatch.Signals.emplace_back(lastSignalStages, 0, sceneFinishedSemaphore);
+	}
+
+	void VulkanRenderer::ExecuteVulkanBatchBarrier(VkCommandBuffer cmdBuffer, const VulkanBatchBarrier& barrier) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::RenderFrame::SubmitQueue::ExecuteVulkanBatchBarrier");
+
+		std::vector<VkImageMemoryBarrier2> imageBarriers;
+		imageBarriers.reserve(barrier.ImageBarriers.size());
+		for (const auto& imageBarrier : barrier.ImageBarriers) {
+			auto vkBarrier = imageBarrier.Barrier;
+			vkBarrier.image = imageBarrier.Image->GetVulkanHandle();
+			imageBarriers.emplace_back(vkBarrier);
+		}
+
+		VkDependencyInfo depInfo{};
+		depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+		depInfo.imageMemoryBarrierCount = static_cast<uint32_t>(imageBarriers.size());
+		depInfo.pImageMemoryBarriers = imageBarriers.empty() ? nullptr : imageBarriers.data();
+		depInfo.bufferMemoryBarrierCount = static_cast<uint32_t>(barrier.BufferBarriers.size());
+		depInfo.pBufferMemoryBarriers = barrier.BufferBarriers.empty() ? nullptr : barrier.BufferBarriers.data();
+
+		vkCmdPipelineBarrier2(cmdBuffer, &depInfo);
+
+		for (const auto& [image, barrier] : barrier.ImageBarriers)
+			image->SetLayout(barrier.newLayout);
 	}
 	
 	void VulkanRenderer::SubmitBatchesToRender(std::vector<ExecutionBatch>& batches, const std::unordered_map<std::string, RenderFrameHandles>& renderFrameHandleMap) {

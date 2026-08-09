@@ -29,10 +29,16 @@ namespace Lucy {
 		std::vector<VkBufferMemoryBarrier2> BufferBarriers;
 	};
 
+	struct VulkanPassBarrier {
+		RenderGraphPass* Pass = nullptr;
+		VulkanBatchBarrier Barrier;
+	};
+
 	struct VulkanExecutionBatch {
 		TargetQueueFamily QueueFamily;
 		std::vector<RenderGraphPass*> Passes;
 		VulkanBatchBarrier PreBatchBarrier; //release
+		std::vector<VulkanPassBarrier> PassBarriers; //barriers inside of a single batch
 		VulkanBatchBarrier PostBatchBarrier; //acquire
 		std::vector<VulkanQueueSubmitInfo> Waits;
 		std::vector<VulkanQueueSubmitInfo> Signals;

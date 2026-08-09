@@ -187,12 +187,25 @@ namespace Lucy {
 	}
 
 	void VulkanGraphicsPipeline::RTRecreate(Ref<Shader> newShader) {
-		Renderer::EnqueueResourceDestroy(GetMyHandle());
-
-		Renderer::EnqueueToRenderCommandQueue([=](const auto& device) {
+		Renderer::EnqueueResourceRecreate([this, newShader](const Ref<RenderDevice>& device) -> RenderDeletionFunc {
 			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+
+			VkPipeline oldPipelineHandle = std::exchange(m_PipelineHandle, VK_NULL_HANDLE);
+			VkPipelineLayout oldPipelineLayoutHandle = std::exchange(m_PipelineLayoutHandle, VK_NULL_HANDLE);
+
 			SetShader(newShader);
 			Create(vulkanDevice);
+
+			return [this, oldPipelineHandle, oldPipelineLayoutHandle](const Ref<RenderDevice>& device) {
+				const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+				VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
+
+				if (oldPipelineHandle)
+					vkDestroyPipeline(logicalDevice, oldPipelineHandle, nullptr);
+
+				if (oldPipelineLayoutHandle)
+					vkDestroyPipelineLayout(logicalDevice, oldPipelineLayoutHandle, nullptr);
+			};
 		});
 	}
 }

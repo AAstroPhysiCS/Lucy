@@ -357,7 +357,7 @@ namespace Lucy {
 					.PassName = "ShadowDrawPass",
 					.PipelineName = "VSMPipeline",
 					.RasterizationConfig = {.DisableBackCulling = true, .CullingMode = CullingMode::None},
-					.DepthConfig = {.DepthClipEnable = VK_TRUE, .DepthCompareOp = DepthCompareOp::LessOrEqual},
+					.DepthConfig = {.DepthClipEnable = VK_FALSE, .DepthCompareOp = DepthCompareOp::LessOrEqual},
 					.BlendConfig = {.BlendEnable = VK_FALSE}
 				},
 #if !USE_COMPUTE_FOR_CUBEMAP_GEN
