@@ -15,8 +15,7 @@ namespace Lucy {
 		
 		RenderDeviceResourceHandle RenderPassHandle{};
 		std::vector<RenderDeviceResourceHandle> ImageBufferHandles;
-
-		RenderDeviceResourceHandle DepthImageHandle{};
+		std::vector<RenderDeviceResourceHandle> DepthImageHandles;
 	};
 
 	class FrameBuffer : public RenderDeviceResource {

@@ -52,33 +52,43 @@ namespace Lucy {
 		m_Registry.ImportExternalTransientResource(rgResource, handle);
 	}
 
-	void RenderGraph::DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp) {
-		DeclareImage(rgResource, createInfo, loadStoreAccessOp, UndefinedRenderGraphResource, {}, RenderPassLoadStoreAttachments::NoneNone);
+	void RenderGraph::DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp, bool isInFlightMode) {
+		DeclareImage(rgResource, createInfo, loadStoreAccessOp, UndefinedRenderGraphResource, {}, RenderPassLoadStoreAttachments::NoneNone, isInFlightMode);
 	}
 
-	void RenderGraph::DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp, const RenderGraphResource& rgResourceDepth, const ImageCreateInfo& createDepthInfo, RenderPassLoadStoreAttachments loadStoreDepthAccessOp) {
-		const auto& imageHandle = m_RenderDevice->CreateImage(createInfo, "Image " + rgResource.GetName());
-		LUCY_ASSERT(Renderer::IsValidRenderResource(imageHandle));
+	void RenderGraph::DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp, const RenderGraphResource& rgResourceDepth, const ImageCreateInfo& createDepthInfo, RenderPassLoadStoreAttachments loadStoreDepthAccessOp, bool isInFlightMode) {
+		const uint32_t imageCount = isInFlightMode ? Renderer::GetMaxFramesInFlight() : 1;
 
-		m_Registry.DeclareImage(rgResource,
-			imageHandle,
-			RGImageData{ 
-				.LoadStoreAttachment = loadStoreAccessOp, 
-				.IsDepth = false 
+		std::vector<RenderDeviceResourceHandle> imageHandles;
+		imageHandles.reserve(imageCount);
+		for (uint32_t i = 0; i < imageCount; i++)
+			imageHandles.emplace_back(m_RenderDevice->CreateImage(createInfo, "Image " + rgResource.GetName()));
+
+		m_Registry.DeclareImage(
+			rgResource,
+			imageHandles,
+			RGImageData{
+				.LoadStoreAttachment = loadStoreAccessOp,
+				.IsDepth = false,
+				.InFlightMode = isInFlightMode
 			}
 		);
 
 		if (rgResourceDepth == UndefinedRenderGraphResource)
 			return;
 
-		const auto& imageDepthHandle = m_RenderDevice->CreateImage(createDepthInfo, "Depth " + rgResource.GetName());
-		LUCY_ASSERT(Renderer::IsValidRenderResource(imageDepthHandle));
+		std::vector<RenderDeviceResourceHandle> depthImageHandles;
+		depthImageHandles.reserve(imageCount);
+		for (uint32_t i = 0; i < imageCount; i++)
+			depthImageHandles.emplace_back(m_RenderDevice->CreateImage(createDepthInfo, "Depth " + rgResourceDepth.GetName()));
 
-		m_Registry.DeclareImage(rgResourceDepth,
-			imageDepthHandle,
+		m_Registry.DeclareImage(
+			rgResourceDepth,
+			depthImageHandles,
 			RGImageData{
 				.LoadStoreAttachment = loadStoreDepthAccessOp,
-				.IsDepth = true
+				.IsDepth = true,
+				.InFlightMode = isInFlightMode
 			}
 		);
 	}

@@ -21,6 +21,7 @@ namespace Lucy {
     struct RGImageData {
         RenderPassLoadStoreAttachments LoadStoreAttachment{};
         bool IsDepth = false;
+        bool InFlightMode = false;
     };
 
     struct RGBufferData {
@@ -66,6 +67,7 @@ namespace Lucy {
         void ImportExternalTransientResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle);
 
         void DeclareImage(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle, const RGImageData& imageData);
+        void DeclareImage(const RenderGraphResource& rgResource, const std::vector<RenderDeviceResourceHandle>& handles, const RGImageData& imageData);
         void DeclareBuffer(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle, const RGBufferData& bufferData);
         void DeclareBuffer(const RenderGraphResource& rgResource, const std::vector<RenderDeviceResourceHandle>& handles, const RGBufferData& bufferData);
 

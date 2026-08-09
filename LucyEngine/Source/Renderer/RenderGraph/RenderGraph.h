@@ -34,8 +34,7 @@ namespace Lucy {
 		void RemovePass(const std::string& passName);
 
 		void ImportExternalResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle, RGResourceData data = {});
-		void ImportExternalResource(const RenderGraphResource& rgResource, 
-			const std::vector<RenderDeviceResourceHandle>& handles, RGResourceData data = {});
+		void ImportExternalResource(const RenderGraphResource& rgResource, const std::vector<RenderDeviceResourceHandle>& handles, RGResourceData data = {});
 		void ImportExternalTransientResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle);
 
 		inline DirectedAcyclicGraph<RenderGraphPass, RenderGraphResource>& GetAcyclicGraph() { return m_AcyclicGraph; }
@@ -62,10 +61,10 @@ namespace Lucy {
 			}
 		}
 #pragma region Builder
-		void DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp);
+		void DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp, bool isInFlightMode);
 		void DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp,
-			const RenderGraphResource& rgResourceDepth, const ImageCreateInfo& createDepthInfo, RenderPassLoadStoreAttachments loadStoreDepthAccessOp);
-		void DeclareBuffer(const RenderGraphResource& rgResource, const RenderDeviceBufferCreateInfo& createInfo, bool isInFlightMode = false);
+			const RenderGraphResource& rgResourceDepth, const ImageCreateInfo& createDepthInfo, RenderPassLoadStoreAttachments loadStoreDepthAccessOp, bool isInFlightMode);
+		void DeclareBuffer(const RenderGraphResource& rgResource, const RenderDeviceBufferCreateInfo& createInfo, bool isInFlightMode);
 
 		void ReadExternalImage(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToRead);
 		void ReadExternalTransientImage(RenderGraphPass* currentPass, const RenderGraphResource& rgResourceToRead);
@@ -91,6 +90,7 @@ namespace Lucy {
 		RenderPassLoadStoreAttachments GetLoadStoreAttachmentsByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetResourceEntry(rgResource).GetImageData().LoadStoreAttachment; }
 
 		RenderDeviceResourceHandle GetHandleByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetResourceEntry(rgResource).ResourceHandles[0]; }
+		std::vector<RenderDeviceResourceHandle> GetHandlesByRGResource(const RenderGraphResource& rgResource) { return m_Registry.GetResourceEntry(rgResource).ResourceHandles; }
 		const std::vector<RenderDeviceResourceHandle>& GetHandlesByRGResource(const RenderGraphResource& rgResource) const { return m_Registry.GetResourceEntry(rgResource).ResourceHandles; }
 
 		RenderGraphBatches CreateBatchesForRendering() const;

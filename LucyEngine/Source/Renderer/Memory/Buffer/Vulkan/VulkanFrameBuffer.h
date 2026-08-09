@@ -32,14 +32,12 @@ namespace Lucy {
 
 		//Helper functions
 		Ref<VulkanImage> GetImage(uint32_t index);
-		Ref<VulkanImage> GetDepthImage();
+		Ref<VulkanImage> GetDepthImage(uint32_t index);
 		Ref<VulkanRenderPass> GetRenderPass();
 
 		std::vector<VkFramebuffer> m_FrameBufferHandles;
 		std::vector<RenderDeviceResourceHandle> m_ImageHandles;
-		RenderDeviceResourceHandle m_DepthImageHandle{};
-
-		bool m_CreatedInFlightFrameBufferImages = false;
+		std::vector<RenderDeviceResourceHandle> m_DepthImageHandles;
 	};
 
 	class VulkanSwapChainFrameBuffer : private FrameBuffer {

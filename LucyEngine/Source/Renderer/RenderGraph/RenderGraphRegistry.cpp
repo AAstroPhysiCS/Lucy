@@ -67,6 +67,21 @@ namespace Lucy {
 		);
 	}
 
+	void RenderGraphRegistry::DeclareImage(const RenderGraphResource& rgResource, const std::vector<RenderDeviceResourceHandle>& handles, const RGImageData& imageData) {
+		LUCY_ASSERT(rgResource != UndefinedRenderGraphResource);
+		for (const auto& handle : handles)
+			LUCY_ASSERT(Renderer::IsValidRenderResource(handle));
+
+		m_Resources.insert_or_assign(
+			rgResource,
+			RGResourceEntry{
+				.ResourceHandles = handles,
+				.Type = RGResourceType::Internal,
+				.Data = imageData
+			}
+		);
+	}
+
 	void RenderGraphRegistry::DeclareBuffer(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle, const RGBufferData& bufferData) {
 		LUCY_ASSERT(rgResource != UndefinedRenderGraphResource);
 		LUCY_ASSERT(Renderer::IsValidRenderResource(handle));

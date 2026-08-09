@@ -31,7 +31,6 @@ void CullShadowObjects(uint3 dispatchID: SV_DispatchThreadID) {
     bool visible = (objectFlags & OBJECT_FLAG_ALIVE) != 0;
     visible = visible && meshIndex != INVALID_BINDLESS_INDEX;
 
-    /*
     if (visible) {
         GPUMesh mesh = PushConstants.Root->Addresses.Meshes[object.Data.x];
         GPUCullView view = PushConstants.Root->Addresses.CullViews[PushConstants.Data.ViewIndices[cascadeIndex]];
@@ -40,7 +39,7 @@ void CullShadowObjects(uint3 dispatchID: SV_DispatchThreadID) {
         float worldRadius = mesh.BoundingSphere.w * GetMaximumScale(object.Transform);
 
         visible = IsSphereInsideFrustumShadow(worldCenter, worldRadius, view);
-    }*/
+    }
 
     const uint waveVisibleCount = WaveActiveCountBits(visible);
     uint waveBaseIndex = 0;

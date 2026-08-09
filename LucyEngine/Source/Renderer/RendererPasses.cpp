@@ -486,7 +486,7 @@ namespace Lucy {
 		const uint32_t commandCapacity = RenderDeviceScene::GetMeshletCapacity();
 
 		renderGraph->AddPass(TargetQueueFamily::Compute, "ShadowResetPass", [=](RenderGraphBuilder& build) {
-			//build.SetInFlightMode(true);
+			build.SetInFlightMode(true);
 
 			build.DeclareBuffer(RGResource(ShadowVisibleObjects), {
 				.DebugName = "ShadowVisibleObjects",
@@ -536,7 +536,7 @@ namespace Lucy {
 		});
 
 		renderGraph->AddPass(TargetQueueFamily::Compute, "ShadowObjectCullPass", [=, *this](RenderGraphBuilder& build) {
-			//build.SetInFlightMode(true);
+			build.SetInFlightMode(true);
 
 			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
 			build.ReadExternalBuffer(RGResource(GPUObjectsBuffer), RenderGraphResourceAccess::StorageRead);
@@ -566,7 +566,7 @@ namespace Lucy {
 		});
 
 		renderGraph->AddPass(TargetQueueFamily::Compute, "ShadowDispatchBuildPass", [=, *this](RenderGraphBuilder& build) {
-			//build.SetInFlightMode(true);
+			build.SetInFlightMode(true);
 
 			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
 			build.ReadBuffer(RGResource(ShadowVisibleObjectCount), RenderGraphResourceAccess::StorageRead);
@@ -591,7 +591,7 @@ namespace Lucy {
 		});
 
 		renderGraph->AddPass(TargetQueueFamily::Compute, "ShadowMeshletCullPass", [=, *this](RenderGraphBuilder& build) {
-			//build.SetInFlightMode(true);
+			build.SetInFlightMode(true);
 
 			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
 			build.ReadExternalBuffer(RGResource(GPUObjectsBuffer), RenderGraphResourceAccess::StorageRead);
@@ -632,7 +632,7 @@ namespace Lucy {
 		renderGraph->AddPass(TargetQueueFamily::Graphics, "ShadowDrawPass", [=](RenderGraphBuilder& build) {
 			build.SetViewportArea(m_ShadowMapSize, m_ShadowMapSize);
 
-			//build.SetInFlightMode(true);
+			build.SetInFlightMode(true);
 			build.SetClearColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 
 			build.DeclareImage(RGResource(ShadowImages), {
@@ -759,6 +759,8 @@ namespace Lucy {
 		};
 
 		renderGraph->AddPass(TargetQueueFamily::Compute, "VSMHorizontalBlurCompute", [=, *this](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
 			build.DeclareImage(RGResource(ShadowImagesBlurred), {
 				.Width = m_ShadowMapSize,
 				.Height = m_ShadowMapSize,
@@ -769,7 +771,7 @@ namespace Lucy {
 				.GenerateSampler = true,
 			}, RenderPassLoadStoreAttachments::ClearDontCare);
 
-			build.ReadImage(RGResource(ShadowImages), RenderGraphResourceAccess::StorageRead);
+			build.ReadImage(RGResource(ShadowImages), RenderGraphResourceAccess::ShaderSampledRead);
 			build.WriteImage(RGResource(ShadowImagesBlurred), RenderGraphResourceAccess::StorageWrite);
 
 			return std::bind(
@@ -781,7 +783,9 @@ namespace Lucy {
 		});
 
 		renderGraph->AddPass(TargetQueueFamily::Compute, "VSMVerticalBlurCompute", [=, *this](RenderGraphBuilder& build) {
-			build.ReadImage(RGResource(ShadowImagesBlurred), RenderGraphResourceAccess::StorageRead);
+			build.SetInFlightMode(true);
+			
+			build.ReadImage(RGResource(ShadowImagesBlurred), RenderGraphResourceAccess::ShaderSampledRead);
 			build.WriteImage(RGResource(ShadowImages), RenderGraphResourceAccess::StorageWrite);
 
 			return std::bind(

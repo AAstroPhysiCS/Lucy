@@ -215,12 +215,13 @@ namespace Lucy {
 
 		const auto CreateFrameBuffer = [&](RenderGraphPass* currentPass, const RGRenderTargetElements& rgRenderTargetElements, auto renderPassHandle,
 												uint32_t frameBufferWidth, uint32_t frameBufferHeight, bool isInFlight) {
-			std::vector<RenderDeviceResourceHandle> imageBufferHandles;
-			RenderDeviceResourceHandle depthImageHandle{};
+			size_t framesCount = isInFlight ? Renderer::GetMaxFramesInFlight() : 1;
+			std::vector<RenderDeviceResourceHandle> imageBufferHandles(framesCount);
+			std::vector<RenderDeviceResourceHandle> depthImageHandles(framesCount);
 
 			for (const auto& rgRenderTarget : rgRenderTargetElements) {
 				const auto& image = s_RenderGraph->GetImageByRGResource(rgRenderTarget);
-				auto handle = s_RenderGraph->GetHandleByRGResource(rgRenderTarget);
+				auto handles = s_RenderGraph->GetHandlesByRGResource(rgRenderTarget);
 				bool isDepth = image->GetFormat() == ImageFormat::D32_SFLOAT;
 
 				RenderGraphPass* renderTargetPass = acyclicGraph.FindOutputPassGivenResource(rgRenderTarget);
@@ -234,11 +235,13 @@ namespace Lucy {
 					return frameBufferHandle;
 				}
 
-				if (isDepth) {
-					depthImageHandle = handle;
-					continue;
+				for (uint32_t frameIndex = 0; frameIndex < framesCount; frameIndex++) {
+					const auto handle = handles[frameIndex];
+					if (isDepth)
+						depthImageHandles[frameIndex] = handle;
+					else
+						imageBufferHandles[frameIndex] = handle;
 				}
-				imageBufferHandles.push_back(handle);
 			}
 
 			FrameBufferCreateInfo frameBufferCreateInfo{
@@ -247,7 +250,7 @@ namespace Lucy {
 				.IsInFlight = isInFlight,
 				.RenderPassHandle = renderPassHandle,
 				.ImageBufferHandles = imageBufferHandles,
-				.DepthImageHandle = depthImageHandle
+				.DepthImageHandles = depthImageHandles
 			};
 
 			return device->CreateFrameBuffer(frameBufferCreateInfo);

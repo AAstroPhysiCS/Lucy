@@ -10,51 +10,38 @@
 namespace Lucy {
 
 	VulkanFrameBuffer::VulkanFrameBuffer(const FrameBufferCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device)
-		: FrameBuffer(createInfo), m_ImageHandles(m_CreateInfo.ImageBufferHandles), m_DepthImageHandle(createInfo.DepthImageHandle) {
-		LUCY_ASSERT(!m_ImageHandles.empty() || m_DepthImageHandle, "Imagebuffer and depth is empty!");
+		: FrameBuffer(createInfo), m_ImageHandles(m_CreateInfo.ImageBufferHandles), m_DepthImageHandles(m_CreateInfo.DepthImageHandles) {
+		LUCY_ASSERT(!m_ImageHandles.empty() || !m_DepthImageHandles.empty(), "Imagebuffer and depth is empty!");
 		
 		RTCreate(device);
 	}
 
 	void VulkanFrameBuffer::RTCreate(const Ref<VulkanRenderDevice>& vulkanDevice) {
 		const auto& renderPass = GetRenderPass();
+		const uint32_t frameBufferCount = m_CreateInfo.IsInFlight ? Renderer::GetMaxFramesInFlight() : 1;
 
-		if (m_CreateInfo.IsInFlight)
-			m_FrameBufferHandles.resize(Renderer::GetMaxFramesInFlight(), VK_NULL_HANDLE);
-		else
-			m_FrameBufferHandles.resize(1, VK_NULL_HANDLE);
+		m_FrameBufferHandles.resize(frameBufferCount, VK_NULL_HANDLE);
 
-		//because we dont want to recreate additional in flight frames everytime when we resize
-		if (!m_CreatedInFlightFrameBufferImages && m_CreateInfo.IsInFlight) {
-			//imageCount is here, so that we dont loop over and over endlessly
-			size_t imageCount = m_ImageHandles.size();
-			for (uint32_t i = 0; i < imageCount; i++) {
-				for (uint32_t j = 0; j < m_FrameBufferHandles.size() - 1; j++) {
-					m_ImageHandles.push_back(vulkanDevice->CreateImage(Renderer::AccessResource<VulkanImage2D>(m_ImageHandles[i])));
-				}
-			}
-			m_CreatedInFlightFrameBufferImages = true;
-		}
-
-		for (uint32_t i = 0; i < m_FrameBufferHandles.size(); i++) {
+		for (uint32_t frameIndex = 0; frameIndex < frameBufferCount; frameIndex++) {
 			std::vector<VkImageView> imageViewHandles;
-			imageViewHandles.reserve(renderPass->GetColorAttachmentCount());
+			imageViewHandles.reserve(renderPass->GetColorAttachmentCount() + (renderPass->IsDepthBuffered() ? 1 : 0));
 
 			if (m_CreateInfo.IsInFlight) {
-				for (uint32_t j = 0; j < imageViewHandles.capacity(); j++)
-					imageViewHandles.push_back(GetImage(i + j)->GetImageView().GetVulkanHandle());
+				imageViewHandles.push_back(GetImage(frameIndex)->GetImageView().GetVulkanHandle());
 			} else {
-				for (uint32_t j = 0; j < m_ImageHandles.size(); j++) {
-					auto& view = GetImage(j)->GetImageView();
-					imageViewHandles.push_back(view.GetVulkanHandle());
-				}
+				for (uint32_t i = 0; i < m_ImageHandles.size(); i++)
+					imageViewHandles.push_back(GetImage(i)->GetImageView().GetVulkanHandle());
 			}
 
-			if (renderPass->IsDepthBuffered())
-				imageViewHandles.push_back(GetDepthImage()->GetImageView().GetVulkanHandle());
+			if (renderPass->IsDepthBuffered()) {
+				const uint32_t depthIndex = m_CreateInfo.IsInFlight ? frameIndex : 0;
+				imageViewHandles.push_back(GetDepthImage(depthIndex)->GetImageView().GetVulkanHandle());
+			}
 
-			VkFramebufferCreateInfo createInfo = VulkanAPI::FramebufferCreateInfo(renderPass->GetVulkanHandle(), (uint32_t)imageViewHandles.size(), imageViewHandles.data(), m_CreateInfo.Width, m_CreateInfo.Height, 1);
-			LUCY_VK_ASSERT(vkCreateFramebuffer(vulkanDevice->GetLogicalDevice(), &createInfo, nullptr, &m_FrameBufferHandles[i]));
+			VkFramebufferCreateInfo createInfo = VulkanAPI::FramebufferCreateInfo(renderPass->GetVulkanHandle(), (uint32_t)imageViewHandles.size(), 
+				imageViewHandles.data(), m_CreateInfo.Width, m_CreateInfo.Height, 1);
+
+			LUCY_VK_ASSERT(vkCreateFramebuffer(vulkanDevice->GetLogicalDevice(), &createInfo, nullptr, &m_FrameBufferHandles[frameIndex]));
 		}
 	}
 
@@ -62,8 +49,8 @@ namespace Lucy {
 		return Renderer::AccessResource<VulkanImage>(m_ImageHandles[index]);
 	}
 
-	Ref<VulkanImage> VulkanFrameBuffer::GetDepthImage() {
-		return Renderer::AccessResource<VulkanImage>(m_DepthImageHandle);
+	Ref<VulkanImage> VulkanFrameBuffer::GetDepthImage(uint32_t index) {
+		return Renderer::AccessResource<VulkanImage>(m_DepthImageHandles[index]);
 	}
 
 	Ref<VulkanRenderPass> VulkanFrameBuffer::GetRenderPass() {
@@ -76,9 +63,8 @@ namespace Lucy {
 
 		for (uint32_t i = 0; i < m_ImageHandles.size(); i++)
 			GetImage(i)->RTRecreate(width, height);
-
-		if (Renderer::IsValidRenderResource(m_DepthImageHandle))
-			GetDepthImage()->RTRecreate(width, height);
+		for (uint32_t i = 0; i < m_DepthImageHandles.size(); i++)
+			GetDepthImage(i)->RTRecreate(width, height);
 
 		Renderer::EnqueueResourceRecreate([this](const Ref<RenderDevice>& device) -> RenderDeletionFunc {
 			auto vulkanDevice = device->As<VulkanRenderDevice>();

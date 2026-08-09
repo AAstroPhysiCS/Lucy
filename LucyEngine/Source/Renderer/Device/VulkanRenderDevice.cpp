@@ -541,19 +541,16 @@ namespace Lucy {
 
 		if (auto imageSampler = descriptorSet->GetVulkanImageSampler(imageBufferName)) {
 			const auto& vulkanImage = image->As<VulkanImage>();
-			if (mip == static_cast<uint32_t>(-1)) {
-				imageSampler->ImageInfos.push_back(VulkanAPI::DescriptorImageInfo(vulkanImage->GetCurrentLayout(),
-					vulkanImage->GetImageView().GetVulkanHandle(),
-					Renderer::AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle())
-				);
-				return imageSampler->ImageInfos.size() - 1;
-			} else {
-				imageSampler->ImageInfos.push_back(VulkanAPI::DescriptorImageInfo(vulkanImage->GetCurrentLayout(),
-					vulkanImage->GetImageView().GetMipViewVulkanHandle(mip),
-					Renderer::AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle())
-				);
-				return imageSampler->ImageInfos.size() - 1;
+			VkImageView imageView = mip == static_cast<uint32_t>(-1) ? vulkanImage->GetImageView().GetVulkanHandle() : vulkanImage->GetImageView().GetMipViewVulkanHandle(mip);
+
+			for (uint32_t i = 0; i < imageSampler->ImageInfos.size(); i++) {
+				if (imageSampler->ImageInfos[i].imageView == imageView)
+					return i;
 			}
+
+			imageSampler->ImageInfos.push_back(VulkanAPI::DescriptorImageInfo(vulkanImage->GetCurrentLayout(), imageView,
+				Renderer::AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle()));
+			return imageSampler->ImageInfos.size() - 1;
 		}
 
 		LUCY_ASSERT(false, "BindGlobalImageHandleTo did not work for name: {0}", imageBufferName);
@@ -567,19 +564,16 @@ namespace Lucy {
 
 		if (auto imageSampler = descriptorSet->GetVulkanImageSampler(imageBufferName)) {
 			const auto& vulkanImage = image->As<VulkanImage>();
-			if (mip == static_cast<uint32_t>(-1)) {
-				imageSampler->ImageInfos.push_back(VulkanAPI::DescriptorImageInfo(vulkanImage->GetCurrentLayout(),
-					vulkanImage->GetImageView().GetVulkanHandle(),
-					Renderer::AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle())
-				);
-				return imageSampler->ImageInfos.size() - 1;
-			} else {
-				imageSampler->ImageInfos.push_back(VulkanAPI::DescriptorImageInfo(vulkanImage->GetCurrentLayout(),
-					vulkanImage->GetImageView().GetMipViewVulkanHandle(mip),
-					Renderer::AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle())
-				);
-				return imageSampler->ImageInfos.size() - 1;
+			VkImageView imageView = mip == static_cast<uint32_t>(-1) ? vulkanImage->GetImageView().GetVulkanHandle() : vulkanImage->GetImageView().GetMipViewVulkanHandle(mip);
+			
+			for (uint32_t i = 0; i < imageSampler->ImageInfos.size(); i++) {
+				if (imageSampler->ImageInfos[i].imageView == imageView)
+					return i;
 			}
+
+			imageSampler->ImageInfos.push_back(VulkanAPI::DescriptorImageInfo(vulkanImage->GetCurrentLayout(), imageView,
+				Renderer::AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle()));
+			return imageSampler->ImageInfos.size() - 1;
 		}
 
 		return -1;

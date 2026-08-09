@@ -16,7 +16,7 @@ namespace Lucy {
 	public:
 		//avoiding to parse the global set... because the render device already parses it ONCE.
 		static inline constexpr uint32_t TEXTURE_BINDLESS_TABLE_SET_INDEX = 0;
-		static inline constexpr uint32_t GLOBAL_PER_FRAME_SET_INDEX = 1;
+		static inline constexpr uint32_t GLOBAL_PER_FRAME_SET_INDEX = 1; //TODO: maybe...
 	public:
 		VulkanDescriptorSetManager(VulkanRenderDevice* device);
 		~VulkanDescriptorSetManager() = default;

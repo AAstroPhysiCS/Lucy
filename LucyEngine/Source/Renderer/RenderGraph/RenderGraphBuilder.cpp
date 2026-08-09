@@ -30,12 +30,12 @@ namespace Lucy {
 	}
 
 	void RenderGraphBuilder::DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp) {
-		m_RenderGraph->DeclareImage(rgResource, createInfo, loadStoreAccessOp);
+		m_RenderGraph->DeclareImage(rgResource, createInfo, loadStoreAccessOp, m_RenderGraphPass->IsInFlightMode());
 	}
 
 	void RenderGraphBuilder::DeclareImage(const RenderGraphResource& rgResource, const ImageCreateInfo& createInfo, RenderPassLoadStoreAttachments loadStoreAccessOp,
 													const RenderGraphResource& rgResourceDepth, const ImageCreateInfo& createDepthInfo, RenderPassLoadStoreAttachments loadStoreDepthAccessOp) {
-		m_RenderGraph->DeclareImage(rgResource, createInfo, loadStoreAccessOp, rgResourceDepth, createDepthInfo, loadStoreDepthAccessOp);
+		m_RenderGraph->DeclareImage(rgResource, createInfo, loadStoreAccessOp, rgResourceDepth, createDepthInfo, loadStoreDepthAccessOp, m_RenderGraphPass->IsInFlightMode());
 	}
 
 	void RenderGraphBuilder::DeclareBuffer(const RenderGraphResource& rgResource, const RenderDeviceBufferCreateInfo& createInfo) {

@@ -270,7 +270,7 @@ namespace Lucy {
 
 			vkUpdateDescriptorSets(logicalDevice, 1, &setWrite, 0, nullptr);
 
-			imageInfos.clear();
+			//imageInfos.clear();
 		}
 	}
 
