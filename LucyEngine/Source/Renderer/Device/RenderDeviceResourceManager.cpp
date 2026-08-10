@@ -13,7 +13,7 @@ namespace Lucy {
 		Ref<RenderDeviceResource>& resource = m_Resources.Get(handle);
 		resource->RTDestroyResource(m_RenderDevice);
 
-		//m_Resources.Destroy(handle);
-		//handle = {};
+		m_Resources.Destroy(handle);
+		handle = {};
 	}
 }

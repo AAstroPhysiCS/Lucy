@@ -71,11 +71,6 @@ namespace Lucy {
 		m_RenderDevice->FillBuffer(m_PrimaryCommandPool, buffer, offset, size, value);
 	}
 
-	void RenderCommand::BindBuffers(Ref<Mesh> mesh) {
-		LUCY_ASSERT(m_BoundedGraphicsPipeline, "BindBuffers failed, bounded pipeline is nullptr.");
-		m_RenderDevice->BindBuffers(m_PrimaryCommandPool, mesh);
-	}
-
 	void RenderCommand::BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) {
 		LUCY_ASSERT(m_BoundedGraphicsPipeline, "BindBuffers failed, bounded pipeline is nullptr.");
 		m_RenderDevice->BindBuffers(m_PrimaryCommandPool, vertexBuffer, indexBuffer);
@@ -143,10 +138,7 @@ namespace Lucy {
 		auto globalIndexBuffer = m_RenderDevice->AccessResource<RenderDeviceBuffer>(gpuScene->GetGlobalIndexBufferHandle());
 		BindBuffers(globalIndexBuffer);
 
-		const auto& submeshes = mesh->GetSubmeshes();
-		for (const Submesh& submesh : submeshes) {
-			//DrawIndexed(submesh.IndexCount, 1, submesh.GlobalFirstIndex, submesh.GlobalVertexOffset, 0);
-		}
+		m_RenderDevice->DrawIndexed(m_PrimaryCommandPool, mesh->GetIndicesSize(), 1, 0, 0, 0);
 	}
 
 	void RenderCommand::DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {

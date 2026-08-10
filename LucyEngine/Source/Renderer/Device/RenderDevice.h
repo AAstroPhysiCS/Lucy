@@ -125,7 +125,6 @@ namespace Lucy {
 
 		virtual void FillBuffer(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset, size_t size, uint32_t value) = 0;
 
-		virtual void BindBuffers(Ref<CommandPool> cmdPool, Ref<Mesh> mesh) = 0;
 		virtual void BindBuffers(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> indexBuffer) = 0;
 		virtual void BindBuffers(Ref<CommandPool> cmdPool, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) = 0;
 

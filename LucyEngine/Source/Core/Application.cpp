@@ -85,6 +85,8 @@ namespace Lucy {
 		
 		Renderer::InitializeImGui();
 
+		double lastFrameTime = glfwGetTime();
+
 		while (!glfwWindowShouldClose(m_Window->Raw())) {
 			LUCY_PROFILE_NEW_FRAME("Lucy");
 
@@ -96,7 +98,12 @@ namespace Lucy {
 			
 			m_Window->WaitEventsIfMinimized();
 
-			m_Scene->Update();
+			const double currentFrameTime = glfwGetTime();
+
+			float deltaTime = static_cast<float>(currentFrameTime - lastFrameTime);
+			lastFrameTime = currentFrameTime;
+
+			m_Scene->Update(deltaTime);
 
 			m_RenderPipeline->BeginFrame(Renderer::GetRenderDevice(), m_Scene);
 			m_RenderPipeline->RenderFrame();
@@ -124,7 +131,7 @@ namespace Lucy {
 			Renderer::Flush();
 
 			LUCY_PROFILE_NEW_EVENT("Metrics::Update");
-			s_Metrics.Update();
+			s_Metrics.Update(deltaTime);
 		}
 	}
 

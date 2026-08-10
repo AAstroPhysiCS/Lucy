@@ -56,7 +56,6 @@ namespace Lucy {
 
 		void FillBuffer(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset, size_t size, uint32_t value);
 
-		void BindBuffers(Ref<CommandPool> cmdPool, Ref<Mesh> mesh) final override;
 		void BindBuffers(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> indexBuffer) final override;
 		void BindBuffers(Ref<CommandPool> cmdPool, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) final override;
 

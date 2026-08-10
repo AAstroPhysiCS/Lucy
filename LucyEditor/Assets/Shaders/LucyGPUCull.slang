@@ -21,19 +21,18 @@ PushConstantGlobal<CullData> PushConstants;
 
 // how much a object appears on screen... we are dealing here with perspective projection, so we can obtain
 // the approximate projected radius by getting the Pyy and multiply that by Viewport.y pixels / 2
-float GetProjectedRadiusPixels(float3 center, float radius, GPUCullView view) {
-    const float projectionScale = abs(view.Projection[1][1]) * view.Viewport.y * 0.5f;
 
-    if ((view.Data.w & VIEW_FLAG_ORTHOGRAPHIC) != 0)
-        return radius * projectionScale;
-
-    const float distanceToCamera = max(length(view.CameraPosition.xyz - center), 0.0001f);
-    return radius * projectionScale / distanceToCamera;
+float GetPixelWorldSize(float3 center, float radius, GPUCullView view) {
+    float distanceToSurface = max(0.0f, length(view.CameraPosition.xyz - center) - radius);
+    return distanceToSurface * 2.0f / (abs(view.Projection[1][1]) * view.Viewport.y);
 }
 
-uint SelectLOD(GPUSubmesh submesh, float projectedRadiusPixels, uint objectFlags) {
+uint SelectLOD(GPUSubmesh submesh, float3 worldCenter, float worldScale, GPUCullView view, uint objectFlags) {
     const uint firstLOD = submesh.LODs.x;
     const uint lodCount = submesh.LODs.y;
+
+    if (lodCount == 0)
+        return INVALID_BINDLESS_INDEX;
 
     if ((objectFlags & OBJECT_FLAG_FORCE_HIGHEST_LOD) != 0)
         return firstLOD;
@@ -41,19 +40,21 @@ uint SelectLOD(GPUSubmesh submesh, float projectedRadiusPixels, uint objectFlags
     if ((objectFlags & OBJECT_FLAG_FORCE_LOWEST_LOD) != 0)
         return firstLOD + lodCount - 1;
 
-    uint selectedLOD = firstLOD + lodCount - 1;
+    const float pixelWorldSize = GetPixelWorldSize(worldCenter, submesh.BoundingSphere.w * worldScale, view);
+    const float maxPixelError = 4.0f;
 
-    for (uint lodOffset = 0; lodOffset < lodCount; lodOffset++) {
-        const uint lodIndex = firstLOD + lodOffset;
+    // Try the cheapest LOD first.
+    for (int lodOffset = int(lodCount) - 1; lodOffset >= 0; lodOffset--) {
+        const uint lodIndex = firstLOD + uint(lodOffset);
         const GPUMeshLOD lod = PushConstants.Root->Addresses.MeshLODs[lodIndex];
 
-        if (projectedRadiusPixels >= lod.LODData.x) {
-            selectedLOD = lodIndex;
-            return selectedLOD;
-        }
+        const float worldError = lod.LODData.x * worldScale;
+
+        if (pixelWorldSize * maxPixelError >= worldError)
+            return lodIndex;
     }
 
-    return selectedLOD;
+    return firstLOD;
 }
 
 bool IsConeBackFacing(GPUMeshlet meshlet, float4x4 modelMatrix, float4x4 normalMatrix, float3 worldCenter, float worldRadius, float3 cameraPosition) {
@@ -184,99 +185,6 @@ void BuildMeshletDispatch() {
 
     PushConstants.Data.MeshletDispatchIndirect[0] = command;
 }
-[shader("compute")]
-[numthreads(64, 1, 1)]
-void CullMeshletsShadow(
-	uint3 groupID: SV_GroupID,
-	uint3 groupThreadID: SV_GroupThreadID
-) {
-    const uint visibleObjectIndex = groupID.x;
-    const uint visibleObjectCount = PushConstants.Data.VisibleObjectCount[0];
-
-    if (visibleObjectIndex >= visibleObjectCount)
-        return;
-
-    GPUVisibleObject visibleObject =
-		PushConstants.Data.VisibleObjects[visibleObjectIndex];
-
-    if (visibleObject.ObjectIndex >= PushConstants.Data.ObjectCapacity)
-        return;
-
-    GPUObject object =
-		PushConstants.Root->Addresses.Objects[
-			visibleObject.ObjectIndex
-		];
-
-    if ((object.Data.y & OBJECT_FLAG_ALIVE) == 0)
-        return;
-
-    const uint meshIndex = object.Data.x;
-
-    if (meshIndex == INVALID_BINDLESS_INDEX)
-        return;
-
-    GPUMesh mesh =
-		PushConstants.Root->Addresses.Meshes[meshIndex];
-
-    for (
-		uint submeshOffset = 0;
-		submeshOffset < mesh.Data.w;
-		submeshOffset++
-	) {
-        const uint submeshIndex =
-			mesh.Data.z + submeshOffset;
-
-        GPUSubmesh submesh =
-			PushConstants.Root->Addresses.Submeshes[submeshIndex];
-
-        // force highest / first LOD for this test
-        const uint lodIndex = submesh.LODs.x;
-
-        GPUMeshLOD lod =
-			PushConstants.Root->Addresses.MeshLODs[lodIndex];
-
-        for (
-			uint localMeshletIndex = groupThreadID.x;
-			localMeshletIndex < lod.Meshlets.y;
-			localMeshletIndex += 64
-		) {
-            const uint meshletIndex =
-				lod.Meshlets.x + localMeshletIndex;
-
-            GPUMeshlet meshlet =
-				PushConstants.Root->Addresses.Meshlets[meshletIndex];
-
-            uint outputIndex = 0;
-
-            InterlockedAdd(
-				PushConstants.Data.DrawCounts[0],
-				1,
-				outputIndex
-			);
-
-            if (outputIndex >= PushConstants.Data.CommandCapacityPerBin)
-                continue;
-
-            GPUVisibleDraw visibleDraw;
-            visibleDraw.ObjectIndex = visibleObject.ObjectIndex;
-            visibleDraw.SubmeshIndex = meshlet.Draw.w;
-            visibleDraw.MeshletIndex = meshletIndex;
-
-            PushConstants.Data.VisibleDraws[outputIndex] =
-				visibleDraw;
-
-            GPUIndexedIndirectCommand command;
-            command.IndexCount = meshlet.Draw.y;
-            command.InstanceCount = 1;
-            command.FirstIndex = meshlet.Draw.x;
-            command.VertexOffset = asint(meshlet.Draw.z);
-            command.FirstInstance = outputIndex;
-
-            PushConstants.Data.IndirectCommands[outputIndex] =
-				command;
-        }
-    }
-}
 
 [shader("compute")]
 [numthreads(64, 1, 1)]
@@ -305,8 +213,8 @@ void CullMeshlets(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_GroupThread
         if ((view.Data.w & VIEW_FLAG_FRUSTUM) != 0 && !IsSphereInsideFrustum(submeshWorldCenter, submeshWorldRadius, view))
             continue;
 
-        float projectedRadius = GetProjectedRadiusPixels(submeshWorldCenter, submeshWorldRadius, view);
-        uint lodIndex = SelectLOD(submesh, projectedRadius, object.Data.y);
+        float worldScale = GetMaximumScale(modelMatrix);
+        uint lodIndex = SelectLOD(submesh, submeshWorldCenter, worldScale, view, object.Data.y);
         GPUMeshLOD lod = PushConstants.Root->Addresses.MeshLODs[lodIndex];
 
         for (uint localMeshletIndex = groupThreadID.x; localMeshletIndex < lod.Meshlets.y; localMeshletIndex += 64) {

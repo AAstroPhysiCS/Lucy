@@ -63,23 +63,18 @@ namespace Lucy {
 		return {};
 	}
 
-	void Scene::Update() {
+	void Scene::Update(float deltaTime) {
 		LUCY_PROFILE_NEW_EVENT("Scene::Update");
-		m_Camera.Update();
+		m_Camera.Update(deltaTime);
 	}
 
 	void Scene::UpdateCamera(int32_t viewportWidth, int32_t viewportHeight) {
 		m_Camera.SetAspectRatio((float)viewportWidth / viewportHeight);
-		m_Camera.Update();
 	}
 
 	void Scene::OnEvent(Event& e) {
 		EventHandler::AddListener<ViewportAreaResizeEvent>(e, [this](const ViewportAreaResizeEvent& evt) {
 			UpdateCamera(evt.GetWidth(), evt.GetHeight());
-		});
-
-		EventHandler::AddListener<CursorPosEvent>(e, [this](const CursorPosEvent& evt) {
-			m_Camera.Update();
 		});
 	}
 

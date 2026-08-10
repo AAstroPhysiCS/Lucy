@@ -29,7 +29,7 @@ namespace Lucy {
 		[[nodiscard]] RenderDeviceResourceHandle PushResource(Ref<TResource> resource) {
 			LUCY_ASSERT(resource, "Cannot push nullptr render device resource.");
 			auto handle = m_Resources.Create(std::move(resource));
-			m_Resources.Back().Data->SetInitialized(handle);
+			m_Resources.Get(handle)->SetInitialized(handle);
 			return handle;
 		}
 

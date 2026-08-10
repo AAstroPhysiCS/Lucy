@@ -49,14 +49,9 @@ namespace Lucy {
 		std::pair<int32_t, int32_t> GetViewportArea() const {
 			return std::pair{ m_ViewportWidth, m_ViewportHeight };
 		}
-
-		std::pair<float, float> GetViewportMousePos() const {
-			return std::pair{ m_ViewportMouseX, m_ViewportMouseY };
-		}
 	private:
 		RenderPipelineCreateInfo m_CreateInfo;
 
 		int32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
-		float m_ViewportMouseX = 0, m_ViewportMouseY = 0;
 	};
 }

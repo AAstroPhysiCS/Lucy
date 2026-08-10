@@ -278,7 +278,7 @@ namespace Lucy {
                 RenderDeviceMeshLODData renderDeviceMeshLOD{};
                 renderDeviceMeshLOD.Meshlets.x = firstLODMeshletIndex;
                 renderDeviceMeshLOD.Meshlets.y = registeredLODMeshletCount;
-                renderDeviceMeshLOD.LODData.x = submeshLOD.MinimumProjectedRadius;
+                renderDeviceMeshLOD.LODData.x = submeshLOD.Error;
 
                 const RenderDeviceObjectHandle meshLODHandle = RTRegisterMeshLOD(renderDeviceMeshLOD);
 

@@ -98,7 +98,6 @@ namespace Lucy {
 		uint32_t FirstMeshletIndex = 0;
 		uint32_t MeshletIndexCount = 0;
 
-		float MinimumProjectedRadius = 0.0f;
 		float Error = 0.0f;
 	};
 
@@ -147,8 +146,8 @@ namespace Lucy {
 
 	class Mesh : public MemoryTrackable {
 	public:
-		template <size_t N>
-		Mesh(const std::array<float, N>& vertices, const std::array<uint32_t, N>& indices)
+		template <size_t NVert, size_t NInd>
+		Mesh(const std::array<float, NVert>& vertices, const std::array<uint32_t, NInd>& indices)
 			: Mesh(ConvertVerticesFromFloatToVertex(vertices), std::vector<uint32_t>(indices.begin(), indices.end())) {
 		}
 		Mesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
@@ -168,6 +167,7 @@ namespace Lucy {
 		std::string& GetPath() { return m_Path; }
 
 		MetadataInfo GetMetadataInfo() const { return m_MetadataInfo; }
+		uint32_t GetIndicesSize() const { return m_MetadataInfo.TotalIndicesSize; }
 
 		const RenderDeviceObjectHandle& GetRenderDeviceMeshHandle() const { return m_RenderDeviceMeshHandle; }
 
@@ -199,23 +199,12 @@ namespace Lucy {
 		constexpr static inline float MESHOPT_OVERDRAW_THRESHOLD = 1.05f;
 
 		constexpr static inline uint32_t MESH_LOD_COUNT = 4;
-		/*
-		* LOD 0: radius >= 256 pixels
-		* LOD 1: radius >= 128 pixels
-		* LOD 2: radius >= 64 pixels
-		* LOD 3: everything smaller
-		*/
+
 		constexpr static inline std::array<float, MESH_LOD_COUNT> MESH_LOD_RATIOS = {
-			1.0f,
-			0.50f,
-			0.20f,
-			0.05f
-		};
-		constexpr static inline std::array<float, MESH_LOD_COUNT> MESH_LOD_MIN_PROJECTED_RADIUS = {
-			2000.0f,
-			1000.0f,
-			500.0f,
-			0.0f
+			1.00f,
+			0.40f,
+			0.15f,
+			0.03f
 		};
 
 		constexpr static inline float MESH_LOD_TARGET_ERROR = 0.02f;

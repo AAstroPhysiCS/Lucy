@@ -34,7 +34,7 @@ namespace Lucy {
 		inline EditorCamera& GetEditorCamera() { return m_Camera; }
 
 		void OnEvent(Event& e);
-		void Update();
+		void Update(float deltaTime);
 		void Destroy();
 
 		template <typename ... TComponents>

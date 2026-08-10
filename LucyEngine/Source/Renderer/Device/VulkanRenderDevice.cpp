@@ -499,19 +499,6 @@ namespace Lucy {
 		vkCmdFillBuffer((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex), buffer->As<VulkanDeviceAddressBuffer>()->GetVulkanBufferHandle(), offset, size, value);
 	}
 
-	void VulkanRenderDevice::BindBuffers(Ref<CommandPool> cmdPool, Ref<Mesh> mesh) {
-		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindBuffers");
-		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
-
-		VulkanVertexBindInfo vertexInfo;
-		vertexInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
-		//AccessResource<VulkanVertexBuffer>(mesh->GetVertexBufferHandle())->RTBind(vertexInfo);
-
-		VulkanIndexBindInfo indexInfo;
-		indexInfo.CommandBuffer = vertexInfo.CommandBuffer;
-		//AccessResource<VulkanIndexBuffer>(mesh->GetIndexBufferHandle())->RTBind(indexInfo);
-	}
-
 	void VulkanRenderDevice::BindBuffers(Ref<CommandPool> cmdPool, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindBuffers");
 		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();

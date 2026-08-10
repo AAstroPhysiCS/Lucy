@@ -60,12 +60,17 @@ namespace Lucy {
 			case aiShadingMode_Blinn: {
 				aiColor3D specularColor{ 1.0f };
 				aiMaterial->Get(AI_MATKEY_COLOR_DIFFUSE, diffuse);
-				aiMaterial->Get(AI_MATKEY_SPECULAR_FACTOR, specularColor);
-				aiMaterial->Get(AI_MATKEY_SHININESS, roughness);
-				// https://computergraphics.stackexchange.com/questions/1515/what-is-the-accepted-method-of-converting-shininess-to-roughness-and-vice-versa
-				roughness = sqrt(2 / (roughness + 2));
-				float specIntensity = std::max(specularColor.r, std::max(specularColor.g, specularColor.b));
-				metallic = glm::clamp((specIntensity - 0.04f) / (1.0f - 0.04f), 0.0f, 1.0f);
+
+				float shininess = 0.0f;
+				if (aiMaterial->Get(AI_MATKEY_SHININESS, shininess) == aiReturn_SUCCESS) {
+					// https://computergraphics.stackexchange.com/questions/1515/what-is-the-accepted-method-of-converting-shininess-to-roughness-and-vice-versa
+					roughness = sqrt(2.0f / (shininess + 2.0f));
+				} else {
+					roughness = 0.8f;
+				}
+
+				// Legacy Phong materials should default to dielectric.
+				metallic = 0.0f;
 				break;
 			}
 			case aiShadingMode_OrenNayar:

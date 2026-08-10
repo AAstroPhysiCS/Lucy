@@ -38,6 +38,11 @@ namespace Lucy {
 	void RenderGraphPass::Execute(RenderCommandList& cmdList) {
 		LUCY_PROFILE_NEW_EVENT("RenderGraphPass::Execute");
 		m_ExecuteFunc(m_CreateInfo.Registry, cmdList);
+		for (const auto& resource : m_ResourceReads) {
+			if (!resource.IsExternal || !resource.IsTransient)
+				continue;
+			m_CreateInfo.Registry.RetireExternalTransientResource(resource.Resource);
+		}
 		SetState(RenderGraphPassState::Executed);
 	}
 

@@ -49,12 +49,18 @@ namespace Lucy {
 	}
 
 	Mesh::Mesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices) {
+		m_MetadataInfo.TotalVerticesSize = static_cast<uint32_t>(vertices.size());
+		m_MetadataInfo.TotalIndicesSize = static_cast<uint32_t>(indices.size());
+
 		Renderer::EnqueueToRenderCommandQueue([this, vertices = std::move(vertices), indices = std::move(indices)](const Ref<RenderDevice>& device) mutable {
 			Load(device, vertices, indices);
 		});
 	}
 
 	Mesh::Mesh(std::vector<Vertex>&& vertices, std::vector<uint32_t>&& indices) {
+		m_MetadataInfo.TotalVerticesSize = static_cast<uint32_t>(vertices.size());
+		m_MetadataInfo.TotalIndicesSize = static_cast<uint32_t>(indices.size());
+
 		Renderer::EnqueueToRenderCommandQueue([this, vertices = std::move(vertices), indices = std::move(indices)](const Ref<RenderDevice>& device) mutable {
 			Load(device, vertices, indices);
 		});
@@ -291,6 +297,8 @@ namespace Lucy {
 			return;
 		}
 
+		float errorScale = meshopt_simplifyScale(&submesh.Vertices[0].Position.x, submesh.Vertices.size(), sizeof(Vertex));
+
 		const std::vector<uint32_t>& baseIndices = submesh.Indices;
 
 		for (uint32_t lodIndex = 0; lodIndex < MESH_LOD_COUNT; lodIndex++) {
@@ -320,7 +328,7 @@ namespace Lucy {
 				meshopt_optimizeVertexCache(lodIndices.data(), lodIndices.data(), lodIndices.size(), submesh.Vertices.size());
 			}
 
-			BuildMeshlets(submesh, lodIndices, lodError, lodIndex);
+			BuildMeshlets(submesh, lodIndices, lodError * errorScale, lodIndex);
 		}
 
 		submesh.MeshletCount = static_cast<uint32_t>(submesh.Meshlets.size());
@@ -331,7 +339,6 @@ namespace Lucy {
 		lod.FirstMeshlet = static_cast<uint32_t>(submesh.Meshlets.size());
 		lod.FirstMeshletIndex = static_cast<uint32_t>(submesh.MeshletIndices.size());
 		lod.Error = lodError;
-		lod.MinimumProjectedRadius = MESH_LOD_MIN_PROJECTED_RADIUS[lodIndex];
 
 		if (submesh.Vertices.empty() || indices.empty()) {
 			submesh.LODs.push_back(lod);

@@ -37,7 +37,6 @@ namespace Lucy {
 	void RenderGraph::Flush() {
 		LUCY_PROFILE_NEW_EVENT("RenderGraph::Flush");
 		Update();
-		m_Registry.Flush();
 	}
 
 	void RenderGraph::ImportExternalResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle, RGResourceData data) {

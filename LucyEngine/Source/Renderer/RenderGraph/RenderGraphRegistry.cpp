@@ -6,16 +6,15 @@
 
 namespace Lucy {
 	
-	void RenderGraphRegistry::Flush() {
-		for (auto& [rgResource, entry] : m_Resources) {
-			if (!entry.IsExternalTransient())
-				continue;
+	void RenderGraphRegistry::RetireExternalTransientResource(const RenderGraphResource& rgResource) {
+		auto& entry = m_Resources.at(rgResource);
+		LUCY_ASSERT(entry.IsExternalTransient());
 
-			for (auto& handle : entry.ResourceHandles) {
-				if (!Renderer::IsValidRenderResource(handle))
-					continue;
-				Renderer::EnqueueResourceDestroy(handle);
-			}
+		for (auto& handle : entry.ResourceHandles) {
+			if (!Renderer::IsValidRenderResource(handle))
+				continue;
+			Renderer::EnqueueResourceDestroy(handle);
+			handle = {};
 		}
 	}
 

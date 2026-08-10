@@ -19,11 +19,8 @@ namespace Lucy {
 		});
 
 		EventHandler::AddListener<CursorPosEvent>(e, [this](const CursorPosEvent& evt) {
-			m_ViewportMouseX = (float)evt.GetXPos();
-			m_ViewportMouseY = (float)evt.GetYPos();
-
-			Input::MouseX = m_ViewportMouseX;
-			Input::MouseY = m_ViewportMouseY;
+			Input::MouseX = static_cast<float>(evt.GetXPos());
+			Input::MouseY = static_cast<float>(evt.GetYPos());
 		});
 	}
 }

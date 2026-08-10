@@ -610,7 +610,7 @@ namespace Lucy {
 			build.WriteBuffer(RGResource(ShadowDrawCounts), RenderGraphResourceAccess::StorageReadWrite);
 
 			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
-				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUCullMeshletsShadowPipeline");
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUCullMeshletsPipeline");
 
 				RenderCommand& command = cmdList.BeginRenderCommand("ShadowMeshletCullPass");
 
@@ -1029,7 +1029,7 @@ namespace Lucy {
 
 				struct LocalPushConstant {
 					glm::mat4 CaptureProjection;
-					glm::vec2 Data;
+					glm::uvec2 Data;
 				};
 
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("HDRImageToLayeredImageConvertPipeline");
@@ -1044,7 +1044,7 @@ namespace Lucy {
 
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
-				draw.BindBuffers(cubeMesh);
+				draw.BindBuffers(registry.GetBuffer(RGResource(GPUIndicesBuffer)));
 
 				GlobalPushConstant<LocalPushConstant> localPushConstant{
 					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),

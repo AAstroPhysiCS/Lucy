@@ -55,7 +55,7 @@ namespace Lucy {
 
     struct RenderDevicePBRMaterialData {
         glm::vec4 BaseColor{};
-        glm::vec4 ORME{}; // x = Occlusion, y = Roughness, z = Metallic, w = Emissive
+        glm::vec4 ORME{ 1.0f, 0.0f, 0.0f, 0.0f }; // x = Occlusion, y = Roughness, z = Metallic, w = Emissive
 
         RenderDeviceTextureResource AlbedoMap;
         RenderDeviceTextureResource NormalMap;
@@ -91,7 +91,7 @@ namespace Lucy {
 
     struct RenderDeviceMeshLODData {
         glm::uvec4 Meshlets = glm::uvec4{ 0 }; // x = FirstMeshlet y = MeshletCount z = unused w = unused
-        glm::vec4 LODData = glm::vec4{ 0.0f }; // x = minimum projected radius in pixels yzw = unused
+        glm::vec4 LODData = glm::vec4{ 0.0f };
     };
 
     struct RenderDeviceSubmeshData {

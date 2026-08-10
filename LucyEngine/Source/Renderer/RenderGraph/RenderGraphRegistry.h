@@ -60,7 +60,7 @@ namespace Lucy {
         RenderGraphRegistry& operator=(const RenderGraphRegistry& other) = delete;
         RenderGraphRegistry& operator=(RenderGraphRegistry&& other) noexcept = delete;
 
-        void Flush();
+        void RetireExternalTransientResource(const RenderGraphResource& rgResource);
 
         void ImportExternalResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle, RGResourceData data = {});
         void ImportExternalResource(const RenderGraphResource& rgResource, const std::vector<RenderDeviceResourceHandle>& handles, RGResourceData data = {});

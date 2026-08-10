@@ -132,7 +132,7 @@ namespace Lucy {
 				-1.0f, 1.0f, 1.0f
 			};
 
-			std::array<uint32_t, vertices.size()> indices;
+			std::array<uint32_t, vertices.size() / 3> indices;
 			for (uint32_t i = 0; i < indices.size(); i++)
 				indices[i] = i;
 
@@ -373,7 +373,7 @@ namespace Lucy {
 			};
 
 #if USE_COMPUTE_FOR_CUBEMAP_GEN
-			constexpr size_t computePipelineCount = 11;
+			constexpr size_t computePipelineCount = 10;
 #else
 			constexpr size_t computePipelineCount = 4;
 #endif
@@ -424,12 +424,7 @@ namespace Lucy {
 					.ShaderName = "LucyGPUCullShadows",
 					.EntryPointName = "BuildShadowMeshletDispatches",
 					.PipelineName = "GPUBuildShadowMeshletDispatchesPipeline"
-				},
-				RenderGraphPipelineCreateInfo {
-					.ShaderName = "LucyGPUCull",
-					.EntryPointName = "CullMeshletsShadow",
-					.PipelineName = "GPUCullMeshletsShadowPipeline"
-				},
+				}
 			};
 
 			static std::mutex pipelineMutex;
@@ -484,10 +479,7 @@ namespace Lucy {
 	
 	Ref<Image> Renderer::GetBlankArrayImage() { return GetRenderDevice()->AccessResource<Image>(s_BlankArrayHandle); }
 
-	uint32_t Renderer::GetEnvCubeMeshIndexCount() { 
-		//return (uint32_t)GetRenderDevice()->AccessResource<IndexBuffer>(s_CubeMesh->GetIndexBufferHandle())->GetSize(); 
-		return 0;
-	}
+	uint32_t Renderer::GetEnvCubeMeshIndexCount() { return s_CubeMesh->GetIndicesSize(); }
 
 	RenderContextResultCodes Renderer::WaitAndPresent() {
 		LUCY_PROFILE_NEW_EVENT("Renderer::WaitAndPresent");

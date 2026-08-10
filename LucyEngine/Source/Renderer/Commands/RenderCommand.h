@@ -66,7 +66,6 @@ namespace Lucy {
 
 		void FillBuffer(Ref<RenderDeviceBuffer> buffer, size_t offset, size_t size, uint32_t value);
 
-		void BindBuffers(Ref<Mesh> mesh);
 		void BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer);
 		void BindBuffers(Ref<RenderDeviceBuffer> indexBuffer);
 		
@@ -110,7 +109,7 @@ namespace Lucy {
 				meshPushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
 
 				BindPushConstant(meshPushConstant);
-				//DrawIndexed(submesh.IndexCount, 1, submesh.GlobalFirstIndex, submesh.GlobalVertexOffset, 0);
+				DrawIndexed(submesh.IndexCount, 1, submesh.BaseIndexCount, submesh.BaseVertexCount, 0);
 			}
 		}
 

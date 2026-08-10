@@ -33,11 +33,7 @@ namespace Lucy {
 		glfwGetWindowSize(window->Raw(), &width, &height);
 		io.DisplaySize = { (float)width, (float)height };
 
-#if USE_INTEGRATED_GRAPHICS
-		static constexpr auto IMGUI_MAX_POOL_SIZES = 4u;
-#else
 		static constexpr auto IMGUI_MAX_POOL_SIZES = 1000u;
-#endif
 
 		VulkanDescriptorPoolCreateInfo PoolSpecs = { 
 			.PoolSizesVector = {

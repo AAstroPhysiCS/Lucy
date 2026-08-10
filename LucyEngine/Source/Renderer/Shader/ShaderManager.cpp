@@ -133,10 +133,12 @@ namespace Lucy {
 				{slang::CompilerOptionValueKind::Int, 0, 0, nullptr, nullptr}
 			},*/
 #ifdef LUCY_DEBUG
+#ifndef USE_INTEGRATED_GRAPHICS
 			{	// DOES NOT WORK WITH AMD INTEGRATED GPUS
 				slang::CompilerOptionName::DebugInformation,
 				{slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_STANDARD, 0, nullptr, nullptr}
 			},
+#endif
 			{
 				slang::CompilerOptionName::EnableWarning,
 				{slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}
@@ -150,10 +152,10 @@ namespace Lucy {
 				{slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}
 			},
 #endif
-			{
+			/*{
 				slang::CompilerOptionName::VulkanUseGLLayout,
 				{slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}
-			},
+			},*/
 			{
 				slang::CompilerOptionName::VulkanUseEntryPointName,
 				{slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}
