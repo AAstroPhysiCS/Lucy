@@ -38,7 +38,7 @@ void CullShadowObjects(uint3 dispatchID: SV_DispatchThreadID) {
         float3 worldCenter = (object.Transform * float4(mesh.BoundingSphere.xyz, 1.0f)).xyz;
         float worldRadius = mesh.BoundingSphere.w * GetMaximumScale(object.Transform);
 
-        visible = IsSphereInsideFrustumShadow(worldCenter, worldRadius, view);
+        visible = IsAABBInsideFrustum(worldCenter, worldRadius, view);
     }
 
     const uint waveVisibleCount = WaveActiveCountBits(visible);

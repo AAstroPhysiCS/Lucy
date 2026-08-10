@@ -148,7 +148,7 @@ void CullObjects(uint3 dispatchID : SV_DispatchThreadID) {
 
         GPUCullView view = PushConstants.Root->Addresses.CullViews[PushConstants.Data.ViewIndex];
         if ((view.Data.w & VIEW_FLAG_FRUSTUM) != 0) {
-            visible = IsSphereInsideFrustum(worldCenter, worldRadius, view);
+            visible = IsAABBInsideFrustum(worldCenter, worldRadius, view);
         }
     }
 
@@ -210,7 +210,7 @@ void CullMeshlets(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_GroupThread
         float3 submeshWorldCenter = (modelMatrix * float4(submesh.BoundingSphere.xyz, 1.0f)).xyz;
         float submeshWorldRadius = submesh.BoundingSphere.w * GetMaximumScale(modelMatrix);
 
-        if ((view.Data.w & VIEW_FLAG_FRUSTUM) != 0 && !IsSphereInsideFrustum(submeshWorldCenter, submeshWorldRadius, view))
+        if ((view.Data.w & VIEW_FLAG_FRUSTUM) != 0 && !IsAABBInsideFrustum(submeshWorldCenter, submeshWorldRadius, view))
             continue;
 
         float worldScale = GetMaximumScale(modelMatrix);
@@ -224,10 +224,14 @@ void CullMeshlets(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_GroupThread
             float3 worldCenter = (modelMatrix * float4(meshlet.BoundingSphere.xyz, 1.0f)).xyz;
             float worldRadius = meshlet.BoundingSphere.w * GetMaximumScale(modelMatrix);
 
+            float3 aabbCenter = (modelMatrix * float4(meshlet.AABBCenter.xyz, 1.0f)).xyz;
+            float3x3 linearTransform = float3x3(modelMatrix);
+            float3 aabbExtents = abs(linearTransform) * meshlet.AABBExtents.xyz;
+
             bool visible = true;
 
             if ((view.Data.w & VIEW_FLAG_FRUSTUM) != 0)
-                visible = IsSphereInsideFrustum(worldCenter, worldRadius, view);
+                visible = IsAABBInsideFrustum(aabbCenter, aabbExtents, view);
 
             if (visible && (view.Data.w & VIEW_FLAG_CONE) != 0)
                 visible = !IsConeBackFacing(meshlet, modelMatrix, normalMatrix, worldCenter, worldRadius, view.CameraPosition.xyz);

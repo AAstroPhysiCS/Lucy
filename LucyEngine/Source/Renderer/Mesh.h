@@ -79,8 +79,6 @@ namespace Lucy {
 	};
 
 	struct Meshlet {
-		uint32_t VertexOffset = 0;
-		uint32_t TriangleOffset = 0;
 		uint32_t VertexCount = 0;
 		uint32_t TriangleCount = 0;
 
@@ -89,6 +87,8 @@ namespace Lucy {
 
 		glm::vec4 BoundingSphere = glm::vec4{ 0.0f };
 		glm::vec4 NormalCone = glm::vec4{ 0.0f };
+		glm::vec3 AABBCenter{};
+		glm::vec3 AABBExtents{};
 	};
 
 	struct SubmeshLOD {
@@ -209,10 +209,10 @@ namespace Lucy {
 
 		constexpr static inline float MESH_LOD_TARGET_ERROR = 0.02f;
 
-		constexpr static inline size_t MESHLET_MIN_TRIANGLES = 20;
+		constexpr static inline size_t MESHLET_MIN_TRIANGLES = 4;
 		constexpr static inline size_t MESHLET_MAX_VERTICES = 64;
 		constexpr static inline size_t MESHLET_MAX_TRIANGLES = 64;
-		constexpr static inline float MESHLET_CONE_WEIGHT = 0.25f;
+		constexpr static inline float MESHLET_CONE_WEIGHT = 0.5f;
 	private:
 		void ReleaseCPUData();
 

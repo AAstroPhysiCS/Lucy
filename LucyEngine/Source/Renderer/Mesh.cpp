@@ -345,7 +345,7 @@ namespace Lucy {
 			return;
 		}
 
-		size_t maxMeshletCount = meshopt_buildMeshletsBound(indices.size(), MESHLET_MAX_VERTICES, MESHLET_MAX_TRIANGLES);
+		size_t maxMeshletCount = meshopt_buildMeshletsBound(indices.size(), MESHLET_MAX_VERTICES, MESHLET_MIN_TRIANGLES);
 
 		std::vector<meshopt_Meshlet> generatedMeshlets(maxMeshletCount);
 		submesh.MeshletVertices.resize(indices.size());
@@ -381,9 +381,6 @@ namespace Lucy {
 				submesh.Vertices.size(), sizeof(Vertex));
 
 			Meshlet meshlet{};
-			//Meshlet& meshlet = submesh.Meshlets[meshletIndex];
-			meshlet.VertexOffset = baseMeshletVertexOffset + generatedMeshlet.vertex_offset;
-			meshlet.TriangleOffset = baseMeshletTriangleOffset + generatedMeshlet.triangle_offset;
 			meshlet.VertexCount = generatedMeshlet.vertex_count;
 			meshlet.TriangleCount = generatedMeshlet.triangle_count;
 
@@ -396,6 +393,20 @@ namespace Lucy {
 
 				submesh.MeshletIndices.push_back(submeshVertexIndex);
 			}
+
+			glm::vec3 minimum{ std::numeric_limits<float>::max() };
+			glm::vec3 maximum{ std::numeric_limits<float>::lowest() };
+
+			for (uint32_t i = 0; i < generatedMeshlet.vertex_count; i++) {
+				const uint32_t submeshVertexIndex = submesh.MeshletVertices[generatedMeshlet.vertex_offset + i];
+				const glm::vec3& position = submesh.Vertices[submeshVertexIndex].Position;
+
+				minimum = glm::min(minimum, position);
+				maximum = glm::max(maximum, position);
+			}
+
+			meshlet.AABBCenter = (minimum + maximum) * 0.5f;
+			meshlet.AABBExtents = (maximum - minimum) * 0.5f;
 
 			meshlet.BoundingSphere = { bounds.center[0], bounds.center[1], bounds.center[2], bounds.radius };
 			meshlet.NormalCone = { bounds.cone_axis[0], bounds.cone_axis[1], bounds.cone_axis[2], bounds.cone_cutoff };

@@ -260,6 +260,8 @@ namespace Lucy {
                     RenderDeviceMeshletData renderDeviceMeshlet{};
                     renderDeviceMeshlet.BoundingSphere = meshlet.BoundingSphere;
                     renderDeviceMeshlet.NormalCone = meshlet.NormalCone;
+                    renderDeviceMeshlet.AABBCenter = meshlet.AABBCenter;
+                    renderDeviceMeshlet.AABBExtents = meshlet.AABBExtents;
                     renderDeviceMeshlet.Draw.x = m_GlobalIndexCount + submesh.BaseMeshletIndexCount + meshlet.FirstIndex;
                     renderDeviceMeshlet.Draw.y = meshlet.IndexCount;
                     renderDeviceMeshlet.Draw.z = static_cast<int32_t>(m_GlobalVertexCount + submesh.BaseVertexCount);

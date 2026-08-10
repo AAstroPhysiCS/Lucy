@@ -107,6 +107,10 @@ namespace Lucy {
     struct RenderDeviceMeshletData {
         glm::vec4 BoundingSphere = glm::vec4{ 0.0f };
         glm::vec4 NormalCone = glm::vec4{ 0.0f };
+
+        glm::vec3 AABBCenter;
+        glm::vec3 AABBExtents;
+
         glm::uvec4 Draw = glm::uvec4{ 0 }; // x = FirstIndex y = IndexCount z = int32 VertexOffset bit-cast to uint32 w = SubmeshIndex
     };
 

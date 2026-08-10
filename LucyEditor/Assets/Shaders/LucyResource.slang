@@ -198,6 +198,10 @@ struct GPUSubmesh {
 struct GPUMeshlet {
     float4 BoundingSphere;
     float4 NormalCone;
+    
+    float3 AABBCenter;
+    float3 AABBExtents;
+
     uint4 Draw; // x = FirstIndex y = IndexCount z = int32 VertexOffset bit-cast to uint32 w = SubmeshIndex
 };
 
@@ -333,6 +337,19 @@ bool IsSphereInsideFrustum(float3 center, float radius, GPUCullView view) {
         if (distance < -radius)
             return false;
     }
+    return true;
+}
+
+bool IsAABBInsideFrustum(float3 center, float3 extents, GPUCullView view) {
+    for (uint i = 0; i < 6; i++) {
+        float4 plane = view.FrustumPlanes[i];
+        float projectedRadius = dot(abs(plane.xyz), extents);
+        float distance = dot(plane.xyz, center) + plane.w;
+
+        if (distance + projectedRadius < 0.0f)
+            return false;
+    }
+
     return true;
 }
 
