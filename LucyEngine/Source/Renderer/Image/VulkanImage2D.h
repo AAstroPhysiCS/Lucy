@@ -23,6 +23,7 @@ namespace Lucy {
 		void RTCreateFromPath(const Ref<VulkanRenderDevice>& device);
 		void RTCreateEmptyImage(const Ref<VulkanRenderDevice>& device);
 		void RTCreateDepthImage(const Ref<VulkanRenderDevice>& device);
+		void RTCreateFromDDS(const Ref<VulkanRenderDevice>& device);
 
 		void RTDestroyResource(RenderDevice* device) final override;
 	};

@@ -2,6 +2,7 @@
 #include "PBRMaterial.h"
 
 #include "Renderer/Renderer.h"
+#include "Renderer/Image/Image.h"
 
 namespace Lucy {
 

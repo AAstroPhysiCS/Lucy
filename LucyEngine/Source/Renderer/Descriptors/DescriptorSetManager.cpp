@@ -15,9 +15,9 @@ namespace Lucy {
 		const uint32_t frames = Renderer::GetMaxFramesInFlight();
 		
 		{
-			constexpr uint32_t maxBindlessSampledImages = 6144;
-			constexpr uint32_t maxBindlessStorageImages = 3072;
-			constexpr uint32_t maxBindlessSamplers = 256;
+			constexpr uint32_t maxBindlessSampledImages = 24576;
+			constexpr uint32_t maxBindlessStorageImages = 24576 / 2;
+			constexpr uint32_t maxBindlessSamplers = 4096;
 
 			constexpr uint32_t sampledImageBindlessBindings = 6;
 			constexpr uint32_t storageImageBindlessBindings = 4;

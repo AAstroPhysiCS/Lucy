@@ -34,8 +34,6 @@ namespace Lucy {
 		aiProcess_SplitLargeMeshes |
 		aiProcess_OptimizeMeshes;
 
-	constexpr static float MESHOPT_OVERDRAW_THRESHOLD = 1.05f;
-
 	[[nodiscard]] glm::vec3 AllocateMeshID() {
 		const uint32_t id = Mesh::s_NextMeshID.fetch_add(1, std::memory_order_relaxed);
 
@@ -200,8 +198,6 @@ namespace Lucy {
 		uint32_t runningIndexOffset = 0;
 		uint32_t runningMeshletOffset = 0;
 		uint32_t runningMeshletIndexOffset = 0;
-		uint32_t runningMeshletVertexOffset = 0;
-		uint32_t runningMeshletTriangleOffset = 0;
 
 		for (uint32_t i = 0; i < meshCount; i++) {
 			Submesh& submesh = m_Submeshes[i];
@@ -210,23 +206,31 @@ namespace Lucy {
 			submesh.BaseIndexCount = runningIndexOffset;
 			submesh.BaseMeshletCount = runningMeshletOffset;
 			submesh.BaseMeshletIndexCount = runningMeshletIndexOffset;
-			submesh.BaseMeshletVertexCount = runningMeshletVertexOffset;
-			submesh.BaseMeshletTriangleCount = runningMeshletTriangleOffset;
 
 			runningVertexOffset += submesh.VertexCount;
 			runningIndexOffset += submesh.IndexCount;
 			runningMeshletOffset += static_cast<uint32_t>(submesh.Meshlets.size());
 			runningMeshletIndexOffset += static_cast<uint32_t>(submesh.MeshletIndices.size());
-			runningMeshletVertexOffset += static_cast<uint32_t>(submesh.MeshletVertices.size());
-			runningMeshletTriangleOffset += static_cast<uint32_t>(submesh.MeshletTriangles.size());
 		}
 
 		m_MetadataInfo.TotalVerticesSize = runningVertexOffset;
 		m_MetadataInfo.TotalIndicesSize = runningIndexOffset;
 		m_MetadataInfo.TotalMeshletsSize = runningMeshletOffset;
 		m_MetadataInfo.TotalMeshletIndicesSize = runningMeshletIndexOffset;
-		m_MetadataInfo.TotalMeshletVerticesSize = runningMeshletVertexOffset;
-		m_MetadataInfo.TotalMeshletTrianglesSize = runningMeshletTriangleOffset;
+
+		uint64_t totalVertices = 0;
+		uint64_t totalBaseIndices = 0;
+		uint64_t totalMeshletIndices = 0;
+
+		for (const Submesh& submesh : m_Submeshes) {
+			totalVertices += submesh.Vertices.size();
+			totalBaseIndices += submesh.Indices.size();
+			totalMeshletIndices += submesh.MeshletIndices.size();
+		}
+
+		LUCY_INFO("TOTAL VERTICES: {}", totalVertices);
+		LUCY_INFO("TOTAL BASE INDICES: {}", totalBaseIndices);
+		LUCY_INFO("TOTAL MESHLET INDICES: {}", totalMeshletIndices);
 
 		const auto& materialManager = Renderer::GetMaterialManager();
 		for (uint32_t i = 0; i < meshCount; i++) {
@@ -348,22 +352,17 @@ namespace Lucy {
 		size_t maxMeshletCount = meshopt_buildMeshletsBound(indices.size(), MESHLET_MAX_VERTICES, MESHLET_MIN_TRIANGLES);
 
 		std::vector<meshopt_Meshlet> generatedMeshlets(maxMeshletCount);
-		submesh.MeshletVertices.resize(indices.size());
-		submesh.MeshletTriangles.resize(indices.size());
+		std::vector<uint32_t> meshletVertices(indices.size());
+		std::vector<uint8_t> meshletTriangles(indices.size());
 
-		size_t meshletCount = meshopt_buildMeshletsFlex(generatedMeshlets.data(), submesh.MeshletVertices.data(), submesh.MeshletTriangles.data(),
+		size_t meshletCount = meshopt_buildMeshletsSpatial(generatedMeshlets.data(), meshletVertices.data(), meshletTriangles.data(),
 			indices.data(), indices.size(), &submesh.Vertices[0].Position.x, submesh.Vertices.size(), sizeof(Vertex), 
-			MESHLET_MAX_VERTICES, MESHLET_MIN_TRIANGLES, MESHLET_MAX_TRIANGLES, MESHLET_CONE_WEIGHT, 2.0f);
-
-		size_t baseMeshletVertexOffset = submesh.MeshletVertices.size();
-		size_t baseMeshletTriangleOffset = submesh.MeshletTriangles.size();
+			MESHLET_MAX_VERTICES, MESHLET_MIN_TRIANGLES, MESHLET_MAX_TRIANGLES, MESHLET_CONE_WEIGHT);
 
 		generatedMeshlets.resize(meshletCount);
 		submesh.Meshlets.reserve(meshletCount);
 
 		if (generatedMeshlets.empty()) {
-			submesh.MeshletVertices.clear();
-			submesh.MeshletTriangles.clear();
 			submesh.MeshletCount = 0;
 
 			submesh.LODs.push_back(lod);
@@ -373,11 +372,11 @@ namespace Lucy {
 		for (size_t meshletIndex = 0; meshletIndex < generatedMeshlets.size(); meshletIndex++) {
 			const meshopt_Meshlet& generatedMeshlet = generatedMeshlets[meshletIndex];
 
-			meshopt_optimizeMeshlet(submesh.MeshletVertices.data() + generatedMeshlet.vertex_offset, submesh.MeshletTriangles.data() + generatedMeshlet.triangle_offset,
+			meshopt_optimizeMeshlet(meshletVertices.data() + generatedMeshlet.vertex_offset, meshletTriangles.data() + generatedMeshlet.triangle_offset,
 				generatedMeshlet.triangle_count, generatedMeshlet.vertex_count);
 
-			meshopt_Bounds bounds = meshopt_computeMeshletBounds(submesh.MeshletVertices.data() + generatedMeshlet.vertex_offset, 
-				submesh.MeshletTriangles.data() + generatedMeshlet.triangle_offset, generatedMeshlet.triangle_count, &submesh.Vertices[0].Position.x,
+			meshopt_Bounds bounds = meshopt_computeMeshletBounds(meshletVertices.data() + generatedMeshlet.vertex_offset, 
+				meshletTriangles.data() + generatedMeshlet.triangle_offset, generatedMeshlet.triangle_count, &submesh.Vertices[0].Position.x,
 				submesh.Vertices.size(), sizeof(Vertex));
 
 			Meshlet meshlet{};
@@ -388,8 +387,8 @@ namespace Lucy {
 			meshlet.IndexCount = generatedMeshlet.triangle_count * 3;
 
 			for (uint32_t index = 0; index < meshlet.IndexCount; index++) {
-				uint8_t meshletVertexIndex = submesh.MeshletTriangles[generatedMeshlet.triangle_offset + index];
-				uint32_t submeshVertexIndex = submesh.MeshletVertices[generatedMeshlet.vertex_offset + meshletVertexIndex];
+				uint8_t meshletVertexIndex = meshletTriangles[generatedMeshlet.triangle_offset + index];
+				uint32_t submeshVertexIndex = meshletVertices[generatedMeshlet.vertex_offset + meshletVertexIndex];
 
 				submesh.MeshletIndices.push_back(submeshVertexIndex);
 			}
@@ -398,7 +397,7 @@ namespace Lucy {
 			glm::vec3 maximum{ std::numeric_limits<float>::lowest() };
 
 			for (uint32_t i = 0; i < generatedMeshlet.vertex_count; i++) {
-				const uint32_t submeshVertexIndex = submesh.MeshletVertices[generatedMeshlet.vertex_offset + i];
+				const uint32_t submeshVertexIndex = meshletVertices[generatedMeshlet.vertex_offset + i];
 				const glm::vec3& position = submesh.Vertices[submeshVertexIndex].Position;
 
 				minimum = glm::min(minimum, position);
@@ -414,14 +413,6 @@ namespace Lucy {
 			submesh.Meshlets.push_back(meshlet);
 		}
 
-		const meshopt_Meshlet& lastMeshlet = generatedMeshlets.back();
-
-		size_t usedMeshletVertexCount = static_cast<size_t>(lastMeshlet.vertex_offset) + static_cast<size_t>(lastMeshlet.vertex_count);
-		size_t lastTriangleByteCount = (static_cast<size_t>(lastMeshlet.triangle_count) * 3 + 3) & ~size_t(3);
-		size_t usedMeshletTriangleCount = static_cast<size_t>(lastMeshlet.triangle_offset) + lastTriangleByteCount;
-
-		submesh.MeshletVertices.resize(usedMeshletVertexCount);
-		submesh.MeshletTriangles.resize(usedMeshletTriangleCount);
 		submesh.MeshletCount = static_cast<uint32_t>(meshletCount);
 
 		lod.MeshletCount = static_cast<uint32_t>(meshletCount);
@@ -435,15 +426,11 @@ namespace Lucy {
 			submesh.Vertices.clear();
 			submesh.Indices.clear();
 			submesh.Meshlets.clear();
-			submesh.MeshletVertices.clear();
-			submesh.MeshletTriangles.clear();
 			submesh.MeshletIndices.clear();
 
 			submesh.Vertices.shrink_to_fit();
 			submesh.Indices.shrink_to_fit();
 			submesh.Meshlets.shrink_to_fit();
-			submesh.MeshletVertices.shrink_to_fit();
-			submesh.MeshletTriangles.shrink_to_fit();
 			submesh.MeshletIndices.shrink_to_fit();
 		}
 	}

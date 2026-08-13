@@ -109,12 +109,6 @@ namespace Lucy {
 
 		std::vector<SubmeshLOD> LODs;
 
-		//Contains indices into the submesh vertex array.
-		std::vector<uint32_t> MeshletVertices;
-
-		//Contains three meshlet-local 8-bit vertex indices per triangle.
-		std::vector<uint8_t> MeshletTriangles;
-
 		//Flattened uint32_t index stream used by ordinary indexed rendering.
 		std::vector<uint32_t> MeshletIndices;
 
@@ -131,8 +125,6 @@ namespace Lucy {
 
 		uint32_t BaseMeshletCount = 0;
 		uint32_t BaseMeshletIndexCount = 0;
-		uint32_t BaseMeshletVertexCount = 0;
-		uint32_t BaseMeshletTriangleCount = 0;
 	};
 
 	struct MetadataInfo {
@@ -197,7 +189,6 @@ namespace Lucy {
 		void TraverseHierarchy(const aiNode* node, const glm::mat4& parentTransform);
 	private:
 		constexpr static inline float MESHOPT_OVERDRAW_THRESHOLD = 1.05f;
-
 		constexpr static inline uint32_t MESH_LOD_COUNT = 4;
 
 		constexpr static inline std::array<float, MESH_LOD_COUNT> MESH_LOD_RATIOS = {

@@ -133,7 +133,7 @@ namespace Lucy {
 				{slang::CompilerOptionValueKind::Int, 0, 0, nullptr, nullptr}
 			},*/
 #ifdef LUCY_DEBUG
-#ifndef USE_INTEGRATED_GRAPHICS
+#if USE_INTEGRATED_GRAPHICS == 0
 			{	// DOES NOT WORK WITH AMD INTEGRATED GPUS
 				slang::CompilerOptionName::DebugInformation,
 				{slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_STANDARD, 0, nullptr, nullptr}

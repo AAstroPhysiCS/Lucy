@@ -6,6 +6,7 @@
 
 #include "Renderer/Pipeline/GraphicsPipeline.h"
 #include "Renderer/Image/Image.h"
+#include "Renderer/Image/DDSHelper.h"
 
 #include "Core/FileSystem.h"
 #include "assimp/material.h"
@@ -123,9 +124,14 @@ namespace Lucy {
 				ImageCreateInfo createInfo{};
 				createInfo.Format = format;
 				createInfo.ImageType = ImageType::Type2D;
-				createInfo.ImageUsage = ImageUsage::AsColorAttachment;
+				if (DDS::IsDDS(properTexturePath)) {
+					createInfo.ImageUsage = ImageUsage::AsTexture;
+					createInfo.GenerateMipmap = MipmapCreateInfo::NoMipmap();
+				} else {
+					createInfo.ImageUsage = ImageUsage::AsColorAttachment;
+					createInfo.GenerateMipmap = MipmapCreateInfo::FromWidthAndHeight();
+				}
 				createInfo.GenerateSampler = true;
-				createInfo.GenerateMipmap = MipmapCreateInfo::FromWidthAndHeight();
 				createInfo.ImGuiUsage = true;
 
 				RenderDeviceResourceHandle textureHandle = device->CreateImage(properTexturePath, createInfo, "PBR Image: " + std::string(path.C_Str()));

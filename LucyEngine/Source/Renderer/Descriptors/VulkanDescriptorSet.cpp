@@ -96,7 +96,7 @@ namespace Lucy {
 			isBindlessVector.push_back(buffer.DynamicallyAllocated); //the set is bindless if true
 
 			if (buffer.DynamicallyAllocated) {
-				buffer.ArraySize = 256;
+				buffer.ArraySize = 4096;
 				binding.descriptorCount = buffer.ArraySize;
 			}
 
@@ -269,8 +269,6 @@ namespace Lucy {
 			}
 
 			vkUpdateDescriptorSets(logicalDevice, 1, &setWrite, 0, nullptr);
-
-			//imageInfos.clear();
 		}
 	}
 

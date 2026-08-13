@@ -48,11 +48,33 @@ namespace Lucy {
 		R32G32_SFLOAT,
 
 		R32_SFLOAT,
-		R32_UINT
+		R32_UINT,
+
+		BC1_UNORM,
+		BC1_SRGB,
+
+		BC2_UNORM,
+		BC2_SRGB,
+
+		BC3_UNORM,
+		BC3_SRGB,
+
+		BC4_UNORM,
+		BC4_SNORM,
+
+		BC5_UNORM,
+		BC5_SNORM,
+
+		BC6H_UFLOAT,
+		BC6H_SFLOAT,
+
+		BC7_UNORM,
+		BC7_SRGB
 	};
 
 	enum class ImageUsage : uint8_t {
-		Unknown = 1 << 1,
+		Unknown = 1 << 0,
+		AsTexture = 1 << 1,
 		AsColorAttachment = 1 << 2,
 		AsColorTransferAttachment = 1 << 3,
 		AsColorStorageTransferAttachment = 1 << 4,

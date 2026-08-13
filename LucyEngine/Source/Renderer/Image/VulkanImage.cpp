@@ -405,6 +405,9 @@ namespace Lucy {
 		VkImageUsageFlags flags = 0;
 
 		switch (m_CreateInfo.ImageUsage) {
+			case ImageUsage::AsTexture:
+				flags |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+				break;
 			case ImageUsage::AsColorAttachment:
 				flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 				break;
@@ -435,6 +438,7 @@ namespace Lucy {
 		VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 		switch (m_CreateInfo.ImageUsage) {
+			case ImageUsage::AsTexture:
 			case ImageUsage::AsColorAttachment:
 			case ImageUsage::AsColorTransientAttachment:
 			case ImageUsage::AsColorTransferAttachment:
@@ -493,6 +497,34 @@ namespace Lucy {
 				return VK_FORMAT_R32_SFLOAT;
 			case ImageFormat::R32_UINT:
 				return VK_FORMAT_R32_UINT;
+			case ImageFormat::BC1_UNORM:
+				return VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+			case ImageFormat::BC1_SRGB:
+				return VK_FORMAT_BC1_RGBA_SRGB_BLOCK;
+			case ImageFormat::BC2_UNORM:
+				return VK_FORMAT_BC2_UNORM_BLOCK;
+			case ImageFormat::BC2_SRGB:
+				return VK_FORMAT_BC2_SRGB_BLOCK;
+			case ImageFormat::BC3_UNORM:
+				return VK_FORMAT_BC3_UNORM_BLOCK;
+			case ImageFormat::BC3_SRGB:
+				return VK_FORMAT_BC3_SRGB_BLOCK;
+			case ImageFormat::BC4_UNORM:
+				return VK_FORMAT_BC4_UNORM_BLOCK;
+			case ImageFormat::BC4_SNORM:
+				return VK_FORMAT_BC4_SNORM_BLOCK;
+			case ImageFormat::BC5_UNORM:
+				return VK_FORMAT_BC5_UNORM_BLOCK;
+			case ImageFormat::BC5_SNORM:
+				return VK_FORMAT_BC5_SNORM_BLOCK;
+			case ImageFormat::BC6H_UFLOAT:
+				return VK_FORMAT_BC6H_UFLOAT_BLOCK;
+			case ImageFormat::BC6H_SFLOAT:
+				return VK_FORMAT_BC6H_SFLOAT_BLOCK;
+			case ImageFormat::BC7_UNORM:
+				return VK_FORMAT_BC7_UNORM_BLOCK;
+			case ImageFormat::BC7_SRGB:
+				return VK_FORMAT_BC7_SRGB_BLOCK;
 			default:
 				return VK_FORMAT_MAX_ENUM;
 		}
