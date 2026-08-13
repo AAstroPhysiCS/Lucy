@@ -321,11 +321,11 @@ namespace BindlessTable {
 }
 
 float GetMaximumScale(float4x4 transform) {
-    float scaleX = length(transform[0].xyz);
-    float scaleY = length(transform[1].xyz);
-    float scaleZ = length(transform[2].xyz);
+    const float3 column0 = float3(transform[0][0], transform[1][0], transform[2][0]);
+    const float3 column1 = float3(transform[0][1], transform[1][1], transform[2][1]);
+    const float3 column2 = float3(transform[0][2], transform[1][2], transform[2][2]);
 
-    return max(scaleX, max(scaleY, scaleZ));
+    return max(length(column0),max(length(column1), length(column2)));
 }
 
 bool IsSphereInsideFrustum(float3 center, float radius, GPUCullView view) {
@@ -341,6 +341,7 @@ bool IsSphereInsideFrustum(float3 center, float radius, GPUCullView view) {
 }
 
 bool IsAABBInsideFrustum(float3 center, float3 extents, GPUCullView view) {
+    [unroll]
     for (uint i = 0; i < 6; i++) {
         float4 plane = view.FrustumPlanes[i];
         float projectedRadius = dot(abs(plane.xyz), extents);

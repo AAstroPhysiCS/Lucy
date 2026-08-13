@@ -35,10 +35,10 @@ void CullShadowObjects(uint3 dispatchID: SV_DispatchThreadID) {
         GPUMesh mesh = PushConstants.Root->Addresses.Meshes[object.Data.x];
         GPUCullView view = PushConstants.Root->Addresses.CullViews[PushConstants.Data.ViewIndices[cascadeIndex]];
 
-        float3 worldCenter = (object.Transform * float4(mesh.BoundingSphere.xyz, 1.0f)).xyz;
+        float3 worldCenter = mul(object.Transform, float4(mesh.BoundingSphere.xyz, 1.0f)).xyz;
         float worldRadius = mesh.BoundingSphere.w * GetMaximumScale(object.Transform);
 
-        visible = IsAABBInsideFrustum(worldCenter, worldRadius, view);
+        visible = IsSphereInsideFrustum(worldCenter, worldRadius, view);
     }
 
     const uint waveVisibleCount = WaveActiveCountBits(visible);

@@ -310,13 +310,13 @@ namespace Lucy {
         uint64_t m_GlobalVertexCount = 0;
         uint64_t m_GlobalIndexCount = 0;
 
-        static inline uint64_t s_ObjectCapacity = 16 * 1024;
-        static inline uint64_t s_MaterialCapacity = 16 * 1024;
-        static inline uint64_t s_MeshCapacity = 16 * 1024;
+        static inline uint64_t s_ObjectCapacity = 1024;
+        static inline uint64_t s_MaterialCapacity = 1024;
+        static inline uint64_t s_MeshCapacity = 1024;
         static inline uint64_t s_SubmeshCapacity = 64 * 1024;
         static inline uint64_t s_MeshletCapacity = 1024 * 1024;
 
-        static inline uint64_t s_GlobalVertexCapacity = 1024 * 1024 * 16;
+        static inline uint64_t s_GlobalVertexCapacity = 1024 * 1024 * 4;
         static inline uint64_t s_GlobalIndexCapacity = 3 * s_GlobalVertexCapacity;
     };
 }
