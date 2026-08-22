@@ -73,11 +73,11 @@ namespace Lucy {
 
         [[nodiscard]] bool Contains(const RenderGraphResource& rgResource) const;
 
-        [[nodiscard]] Ref<Image> GetImage(const RenderGraphResource& rgResource);
         [[nodiscard]] Ref<Image> GetImage(const RenderGraphResource& rgResource) const;
+        [[nodiscard]] Ref<Image> GetImage(const RenderGraphResource& rgResource, uint32_t frameIndex) const;
 
-        [[nodiscard]] Ref<RenderDeviceBuffer> GetBuffer(const RenderGraphResource& rgResource);
         [[nodiscard]] Ref<RenderDeviceBuffer> GetBuffer(const RenderGraphResource& rgResource) const;
+        [[nodiscard]] Ref<RenderDeviceBuffer> GetBuffer(const RenderGraphResource& rgResource, uint32_t frameIndex) const;
     private:
         [[nodiscard]] RGResourceEntry& GetResourceEntry(const RenderGraphResource& rgResource) { return m_Resources.at(rgResource); }
         [[nodiscard]] const RGResourceEntry& GetResourceEntry(const RenderGraphResource& rgResource) const { return m_Resources.at(rgResource); }

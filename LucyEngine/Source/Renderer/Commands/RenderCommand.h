@@ -62,7 +62,7 @@ namespace Lucy {
 		void CopyImageToBuffer(Ref<Image> srcImage, Ref<ByteBuffer> destBuffer);
 #pragma endregion Image
 
-		[[nodiscard]] uint32_t BindImageHandleTo(const std::string& imageBufferName, const Ref<Image>& image, uint32_t mip = -1);
+		[[nodiscard]] RenderDeviceTextureHandle BindImageHandleTo(const std::string& imageBufferName, const Ref<Image>& image, uint32_t mip = -1);
 
 		void FillBuffer(Ref<RenderDeviceBuffer> buffer, size_t offset, size_t size, uint32_t value);
 

@@ -32,10 +32,10 @@ namespace Lucy {
 		IndexType Index = INVALID_INDEX;
 		uint32_t Generation = 0;
 
-		[[nodiscard]] explicit operator TIndex() const { return Index; }
+		[[nodiscard]] operator TIndex() const { return Index; }
 		[[nodiscard]] operator bool() const { return Index != INVALID_INDEX; }
 
-		[[nodiscard]] bool operator==(const GenerationalHandle&) const = default;
+		auto operator<=>(const GenerationalHandle&) const = default;
 	};
 
 	template<IsGenerationalHandle THandle, typename TData>
@@ -121,6 +121,8 @@ namespace Lucy {
 		}
 
 		[[nodiscard]] const Slot& Back() { return m_Slots.back(); }
+
+		[[nodiscard]] const bool IsEmpty() const { return m_Slots.empty(); }
 		
 		[[nodiscard]] TData& Get(const THandle& handle) {
 			LUCY_ASSERT(IsValid(handle), "Invalid or stale handle.");

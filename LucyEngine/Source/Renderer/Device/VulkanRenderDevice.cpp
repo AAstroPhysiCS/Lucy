@@ -544,48 +544,97 @@ namespace Lucy {
 	}
 
 	//TODO: Clean this up
-	uint32_t VulkanRenderDevice::BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<GraphicsPipeline>& pipeline, const Ref<Image>& image, uint32_t mip) {
+	RenderDeviceTextureHandle VulkanRenderDevice::BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<GraphicsPipeline>& pipeline, const Ref<Image>& image, uint32_t mip) {
 		const auto& descriptorSetHandle = pipeline->As<VulkanGraphicsPipeline>()->GetDescriptorSetHandles()[VulkanDescriptorSetManager::TEXTURE_BINDLESS_TABLE_SET_INDEX];
 		const auto& descriptorSet = AccessResource<VulkanDescriptorSet>(descriptorSetHandle);
 
 		if (auto imageSampler = descriptorSet->GetVulkanImageSampler(imageBufferName)) {
 			const auto& vulkanImage = image->As<VulkanImage>();
+			const auto& imageHandle = image->GetMyHandle();
 			VkImageView imageView = mip == static_cast<uint32_t>(-1) ? vulkanImage->GetImageView().GetVulkanHandle() : vulkanImage->GetImageView().GetMipViewVulkanHandle(mip);
 
-			for (uint32_t i = 0; i < imageSampler->ImageInfos.size(); i++) {
-				if (imageSampler->ImageInfos[i].imageView == imageView)
-					return i;
+			for (uint32_t index = 0; const auto& slot : imageSampler->Images) {
+				if (!slot.Alive) {
+					index++;
+					continue;
+				}
+
+				if (slot.Data.ImageHandle == imageHandle && slot.Data.Mip == mip) {
+					return RenderDeviceTextureHandle{
+						.Index = index,
+						.Generation = slot.Generation
+					};
+				}
+
+				index++;
 			}
 
-			imageSampler->ImageInfos.push_back(VulkanAPI::DescriptorImageInfo(vulkanImage->GetCurrentLayout(), imageView,
-				Renderer::AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle()));
-			return imageSampler->ImageInfos.size() - 1;
+			RenderDeviceTextureHandle handle = imageSampler->Images.Create(
+				VulkanImageDescriptor{
+					.ImageHandle = imageHandle,
+					.Mip = mip,
+					.ImageInfo = VulkanAPI::DescriptorImageInfo(
+						vulkanImage->GetCurrentLayout(), 
+						imageView, 
+						Renderer::AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle()
+					)
+				}
+			);
+
+			descriptorSet->RTUpdateImageSamplerDescriptors(this, imageBufferName, handle);
+
+			return handle;
 		}
 
-		LUCY_ASSERT(false, "BindGlobalImageHandleTo did not work for name: {0}", imageBufferName);
-		return INVALID_INDEX;
+		LUCY_ASSERT(false, "Graphics::BindGlobalImageHandleTo did not work for name: {0}", imageBufferName);
+		return {};
 	}
 	
 	//TODO: Clean this up
-	uint32_t VulkanRenderDevice::BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<ComputePipeline>& pipeline, const Ref<Image>& image, uint32_t mip) {
+	RenderDeviceTextureHandle VulkanRenderDevice::BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<ComputePipeline>& pipeline, const Ref<Image>& image, uint32_t mip) {
 		const auto& descriptorSetHandle = pipeline->As<VulkanComputePipeline>()->GetDescriptorSetHandles()[VulkanDescriptorSetManager::TEXTURE_BINDLESS_TABLE_SET_INDEX];
 		const auto& descriptorSet = AccessResource<VulkanDescriptorSet>(descriptorSetHandle);
 
 		if (auto imageSampler = descriptorSet->GetVulkanImageSampler(imageBufferName)) {
 			const auto& vulkanImage = image->As<VulkanImage>();
+			const auto& imageHandle = image->GetMyHandle();
 			VkImageView imageView = mip == static_cast<uint32_t>(-1) ? vulkanImage->GetImageView().GetVulkanHandle() : vulkanImage->GetImageView().GetMipViewVulkanHandle(mip);
-			
-			for (uint32_t i = 0; i < imageSampler->ImageInfos.size(); i++) {
-				if (imageSampler->ImageInfos[i].imageView == imageView)
-					return i;
+
+			for (uint32_t index = 0; const auto& slot : imageSampler->Images) {
+				if (!slot.Alive) {
+					index++;
+					continue;
+				}
+
+				if (slot.Data.ImageHandle == imageHandle && slot.Data.Mip == mip) {
+					return RenderDeviceTextureHandle{
+						.Index = index,
+						.Generation = slot.Generation
+					};
+				}
+
+				index++;
 			}
 
-			imageSampler->ImageInfos.push_back(VulkanAPI::DescriptorImageInfo(vulkanImage->GetCurrentLayout(), imageView,
-				Renderer::AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle()));
-			return imageSampler->ImageInfos.size() - 1;
+			RenderDeviceTextureHandle handle = imageSampler->Images.Create(
+				VulkanImageDescriptor{
+					.ImageHandle = imageHandle,
+					.Mip = mip,
+					.ImageInfo = VulkanAPI::DescriptorImageInfo(
+						vulkanImage->GetCurrentLayout(),
+						imageView,
+						Renderer::AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle()
+					)
+				}
+			);
+
+			descriptorSet->RTUpdateImageSamplerDescriptors(this, imageBufferName, handle);
+
+			return handle;
 		}
 
-		return -1;
+		LUCY_ASSERT(false, "Compute::BindGlobalImageHandleTo did not work for name: {0}", imageBufferName);
+		return {};
 	}
 	
 	void VulkanRenderDevice::BindPushConstant(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline, const PipelineConstant& pushConstant) {
@@ -670,7 +719,7 @@ namespace Lucy {
 			}
 		}
 	}
-	
+
 	void VulkanRenderDevice::BindAllDescriptorSets(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindAllDescriptorSets | Compute");
 		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();

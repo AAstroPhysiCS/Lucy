@@ -56,9 +56,9 @@ namespace Lucy {
 		static void AddObjectCullPass(const Ref<RenderGraph>& renderGraph);
 		static void AddMeshletCullPass(const Ref<RenderGraph>& renderGraph);
 
-		static GlobalPushConstant<RenderDeviceGPUCullData> CreateGPUCullPushConstant(const RenderGraphRegistry& registry, uint32_t viewIndex);
+		static GlobalPushConstant<RenderDeviceGPUCullData> CreateGPUCullPushConstant(const RenderGraphRegistry& registry, uint32_t viewIndex, uint32_t frameIndex);
 
-		static inline GlobalPushConstant<RenderDeviceGPUCullData> s_GPUCullPushConstant;
+		static inline std::vector<GlobalPushConstant<RenderDeviceGPUCullData>> s_GPUCullPushConstants;
 	};
 
 #pragma endregion GPUDrivenRendererPasses
@@ -137,12 +137,12 @@ namespace Lucy {
 
 		static inline std::vector<ShadowCamera>& GetShadowCameras() { return s_ShadowCameras; }
 	private:
-		static GlobalPushConstant<RenderDeviceGPUShadowCullData> CreateGPUCullPushConstant(const RenderGraphRegistry& registry);
+		static GlobalPushConstant<RenderDeviceGPUShadowCullData> CreateGPUCullPushConstant(const RenderGraphRegistry& registry, uint32_t frameIndex);
 		
 		void InitializeShadowCameras(uint32_t size, const EditorCamera& editorCamera) const;
 
 		static inline std::vector<ShadowCamera> s_ShadowCameras;
-		static inline GlobalPushConstant<RenderDeviceGPUShadowCullData> s_ShadowCullPushConstant;
+		static inline std::vector<GlobalPushConstant<RenderDeviceGPUShadowCullData>> s_ShadowCullPushConstants;
 
 		Ref<RenderDevice> m_Device;
 		Ref<Scene> m_Scene;

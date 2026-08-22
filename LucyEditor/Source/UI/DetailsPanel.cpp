@@ -207,7 +207,7 @@ namespace Lucy {
 							ImGui::ImageButton("", (ImTextureID)textureID, {64.0f, 64.0f}, {0.0f, 0.0f}, {1.0f, 1.0f});
 						ImGui::SameLine();
 
-						if (ImGui::BeginCombo("##hideLabel combo", std::to_string(materialID).c_str())) {
+						if (ImGui::BeginCombo("##hideLabel combo", std::to_string(materialID.Index).c_str())) {
 							for (uint32_t j = 0; j < mesh->GetSubmeshes().size(); j++) {
 								Submesh& submeshInner = mesh->GetSubmeshes()[i];
 

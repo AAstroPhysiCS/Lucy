@@ -239,37 +239,24 @@ namespace Lucy {
 			storageBuffer->Clear();
 		}
 
-		RTUpdateImageSamplerDescriptors(device);
+		//not updating everything every frame
+		//RTUpdateImageSamplerDescriptors(device);
 	}
 
-	void VulkanDescriptorSet::RTUpdateImageSamplerDescriptors(RenderDevice* device) {
-		LUCY_PROFILE_NEW_EVENT("VulkanDescriptorSet::RTUpdateImageSamplerDescriptors");
-		
+	void VulkanDescriptorSet::RTUpdateImageSamplerDescriptors(RenderDevice* device, const std::string& imageBufferName, const RenderDeviceTextureHandle& handle) {
+		LUCY_PROFILE_NEW_EVENT("VulkanDescriptorSet::RTUpdateImageSamplerDescriptor");
 		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 
-		if (m_ImageSamplerBindingInfos.empty())
-			return;
+		auto* bindingInfo = GetVulkanImageSampler(imageBufferName);
+		auto& imageInfo = bindingInfo->Images.Get(handle).ImageInfo;
+		VkDescriptorSet descriptorSet = m_CreateInfo.Count == Renderer::GetMaxFramesInFlight() ? m_DescriptorSets[frameIndex] : m_DescriptorSets[0];
+
+		//we are here only updating the index of the image sampler, not the entire descriptor set -> perf improv
+		VkWriteDescriptorSet setWrite = VulkanAPI::WriteDescriptorSet(descriptorSet, handle.Index, bindingInfo->Binding, 1, 
+			static_cast<VkDescriptorType>(ConvertDescriptorType(bindingInfo->DescriptorType)), nullptr, &imageInfo);
 
 		VkDevice logicalDevice = device->As<VulkanRenderDevice>()->GetLogicalDevice();
-
-		for (VulkanImageSamplerBindingInfo& bindingInfo : m_ImageSamplerBindingInfos | std::views::values) {
-			auto& imageInfos = bindingInfo.ImageInfos;
-
-			if (imageInfos.empty())
-				continue;
-
-			VkWriteDescriptorSet setWrite{};
-			//if the descriptor set needs to be updated per frame (aka if the descriptor set is non-global)
-			if (m_CreateInfo.Count == Renderer::GetMaxFramesInFlight()) {
-				setWrite = VulkanAPI::WriteDescriptorSet(m_DescriptorSets[frameIndex], 0, bindingInfo.Binding, static_cast<uint32_t>(imageInfos.size()),
-					static_cast<VkDescriptorType>(ConvertDescriptorType(bindingInfo.DescriptorType)), nullptr, imageInfos.data());
-			} else {
-				setWrite = VulkanAPI::WriteDescriptorSet(m_DescriptorSets[0], 0, bindingInfo.Binding, static_cast<uint32_t>(imageInfos.size()),
-					static_cast<VkDescriptorType>(ConvertDescriptorType(bindingInfo.DescriptorType)), nullptr, imageInfos.data());
-			}
-
-			vkUpdateDescriptorSets(logicalDevice, 1, &setWrite, 0, nullptr);
-		}
+		vkUpdateDescriptorSets(logicalDevice, 1, &setWrite, 0, nullptr);
 	}
 
 	VulkanImageSamplerBindingInfo* VulkanDescriptorSet::GetVulkanImageSampler(const std::string& imageBufferName) {

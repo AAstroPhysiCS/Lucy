@@ -69,8 +69,8 @@ namespace Lucy {
 		RenderDevice(RenderDevice&&) = delete;
 		RenderDevice& operator=(RenderDevice&&) = delete;
 	public:
-		[[nodiscard]] virtual uint32_t BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<GraphicsPipeline>& pipeline, const Ref<Image>& image, uint32_t mip) = 0;
-		[[nodiscard]] virtual uint32_t BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<ComputePipeline>& pipeline, const Ref<Image>& image, uint32_t mip) = 0;
+		[[nodiscard]] virtual RenderDeviceTextureHandle BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<GraphicsPipeline>& pipeline, const Ref<Image>& image, uint32_t mip) = 0;
+		[[nodiscard]] virtual RenderDeviceTextureHandle BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<ComputePipeline>& pipeline, const Ref<Image>& image, uint32_t mip) = 0;
 
 		[[nodiscard]] const Unique<RenderDeviceScene>& GetScene() { return m_DeviceScene; }
 #pragma region ResourceManager

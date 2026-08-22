@@ -10,6 +10,9 @@ namespace Lucy {
     struct RenderDeviceObjectTag;
     using RenderDeviceObjectHandle = GenerationalHandle<RenderDeviceObjectTag, uint64_t>;
 
+    struct RenderDeviceTextureTag;
+    using RenderDeviceTextureHandle = GenerationalHandle<RenderDeviceTextureTag>;
+
     //struct RenderDeviceMaterialTag;
     //using RenderDeviceMaterialHandle = GenerationalHandle<RenderDeviceMaterialTag, uint64_t>;
 }

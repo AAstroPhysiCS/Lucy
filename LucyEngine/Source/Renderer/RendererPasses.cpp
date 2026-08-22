@@ -46,22 +46,25 @@ namespace Lucy {
 		AddMeshletCullPass(renderGraph);
 		AddHiZPass(renderGraph);
 
-		s_GPUCullPushConstant = CreateGPUCullPushConstant(renderGraph->GetRegistry(), 0);
+		s_GPUCullPushConstants.resize(Renderer::GetMaxFramesInFlight());
+		for (uint32_t frameIndex = 0; frameIndex < Renderer::GetMaxFramesInFlight(); frameIndex++) {
+			s_GPUCullPushConstants[frameIndex] = CreateGPUCullPushConstant(renderGraph->GetRegistry(), 0, frameIndex);
+		}
 	}
 
-	GlobalPushConstant<RenderDeviceGPUCullData> GPUDrivenRendererPass::CreateGPUCullPushConstant(const RenderGraphRegistry& registry, uint32_t viewIndex) {
+	GlobalPushConstant<RenderDeviceGPUCullData> GPUDrivenRendererPass::CreateGPUCullPushConstant(const RenderGraphRegistry& registry, uint32_t viewIndex, uint32_t frameIndex) {
 		GlobalPushConstant<RenderDeviceGPUCullData> pushConstantData{
 			.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
 			.Data = {
-				.VisibleObjects = registry.GetBuffer(RGResource(VisibleObjects))->GetDeviceAddress(),
-				.VisibleObjectCount = registry.GetBuffer(RGResource(VisibleObjectsCount))->GetDeviceAddress(),
-				.VisibleSubmeshes = registry.GetBuffer(RGResource(VisibleSubmeshes))->GetDeviceAddress(),
-				.VisibleSubmeshCount = registry.GetBuffer(RGResource(VisibleSubmeshesCount))->GetDeviceAddress(),
-				.SubmeshDispatchIndirect = registry.GetBuffer(RGResource(SubmeshDispatch))->GetDeviceAddress(),
-				.MeshletDispatchIndirect = registry.GetBuffer(RGResource(MeshletDispatch))->GetDeviceAddress(),
-				.VisibleDraws = registry.GetBuffer(RGResource(VisibleDraws))->GetDeviceAddress(),
-				.IndirectCommands = registry.GetBuffer(RGResource(IndirectCommands))->GetDeviceAddress(),
-				.DrawCounts = registry.GetBuffer(RGResource(DrawCounts))->GetDeviceAddress(),
+				.VisibleObjects = registry.GetBuffer(RGResource(VisibleObjects), frameIndex)->GetDeviceAddress(),
+				.VisibleObjectCount = registry.GetBuffer(RGResource(VisibleObjectsCount), frameIndex)->GetDeviceAddress(),
+				.VisibleSubmeshes = registry.GetBuffer(RGResource(VisibleSubmeshes), frameIndex)->GetDeviceAddress(),
+				.VisibleSubmeshCount = registry.GetBuffer(RGResource(VisibleSubmeshesCount), frameIndex)->GetDeviceAddress(),
+				.SubmeshDispatchIndirect = registry.GetBuffer(RGResource(SubmeshDispatch), frameIndex)->GetDeviceAddress(),
+				.MeshletDispatchIndirect = registry.GetBuffer(RGResource(MeshletDispatch), frameIndex)->GetDeviceAddress(),
+				.VisibleDraws = registry.GetBuffer(RGResource(VisibleDraws), frameIndex)->GetDeviceAddress(),
+				.IndirectCommands = registry.GetBuffer(RGResource(IndirectCommands), frameIndex)->GetDeviceAddress(),
+				.DrawCounts = registry.GetBuffer(RGResource(DrawCounts), frameIndex)->GetDeviceAddress(),
 				.ObjectCapacity = static_cast<uint32_t>(RenderDeviceScene::GetObjectCapacity()),
 				.SubmeshCapacity = static_cast<uint32_t>(RenderDeviceScene::GetSubmeshCapacity()),
 				.CommandCapacityPerBin = static_cast<uint32_t>(RenderDeviceScene::GetMeshletCapacity()),
@@ -115,7 +118,8 @@ namespace Lucy {
 				command.BindPipeline(pipeline);	
 
 				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
-				pushConstant.SetData(reinterpret_cast<uint8_t*>(&s_GPUCullPushConstant), sizeof(s_GPUCullPushConstant));
+				auto& pushConstantData = s_GPUCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
 
 				command.BindPushConstant(pushConstant);
 				command.DispatchCompute(1, 1, 1);
@@ -156,7 +160,8 @@ namespace Lucy {
 				command.BindPipeline(pipeline);
 
 				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
-				pushConstant.SetData(reinterpret_cast<uint8_t*>(&s_GPUCullPushConstant), sizeof(s_GPUCullPushConstant));
+				auto& pushConstantData = s_GPUCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
 
 				command.BindPushConstant(pushConstant);
 				command.DispatchComputeIndirect(registry.GetBuffer(RGResource(SubmeshDispatch)), 0);
@@ -187,7 +192,8 @@ namespace Lucy {
 				command.BindPipeline(pipeline);
 
 				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
-				pushConstant.SetData(reinterpret_cast<uint8_t*>(&s_GPUCullPushConstant), sizeof(s_GPUCullPushConstant));
+				auto& pushConstantData = s_GPUCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
 
 				command.BindPushConstant(pushConstant);
 				command.DispatchCompute(1, 1, 1);
@@ -260,7 +266,8 @@ namespace Lucy {
 				command.BindPipeline(pipeline);
 
 				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
-				pushConstant.SetData(reinterpret_cast<uint8_t*>(&s_GPUCullPushConstant), sizeof(s_GPUCullPushConstant));
+				auto& pushConstantData = s_GPUCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
 
 				command.BindPushConstant(pushConstant);
 				command.DispatchCompute((RenderDeviceScene::GetObjectCapacity() + 63) / 64, 1, 1);
@@ -308,7 +315,8 @@ namespace Lucy {
 				command.BindPipeline(pipeline);
 
 				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
-				pushConstant.SetData(reinterpret_cast<uint8_t*>(&s_GPUCullPushConstant), sizeof(s_GPUCullPushConstant));
+				auto& pushConstantData = s_GPUCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
 
 				command.BindAllDescriptorSets();
 				command.BindPushConstant(pushConstant);
@@ -522,19 +530,19 @@ namespace Lucy {
 			shadowCamera.CreateCullView(m_Device);
 	}
 
-	GlobalPushConstant<RenderDeviceGPUShadowCullData> ShadowPass::CreateGPUCullPushConstant(const RenderGraphRegistry& registry) {
+	GlobalPushConstant<RenderDeviceGPUShadowCullData> ShadowPass::CreateGPUCullPushConstant(const RenderGraphRegistry& registry, uint32_t frameIndex) {
 		return {
 			.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
 			.Data = {
-				.VisibleObjects = registry.GetBuffer(RGResource(ShadowVisibleObjects))->GetDeviceAddress(),
-				.VisibleObjectCount = registry.GetBuffer(RGResource(ShadowVisibleObjectCount))->GetDeviceAddress(),
-				.VisibleSubmeshes = registry.GetBuffer(RGResource(ShadowVisibleSubmeshes))->GetDeviceAddress(),
-				.VisibleSubmeshCount = registry.GetBuffer(RGResource(ShadowVisibleSubmeshCount))->GetDeviceAddress(),
-				.SubmeshDispatchIndirect = registry.GetBuffer(RGResource(ShadowSubmeshDispatches))->GetDeviceAddress(),
-				.MeshletDispatchIndirect = registry.GetBuffer(RGResource(ShadowMeshletDispatches))->GetDeviceAddress(),
-				.VisibleDraws = registry.GetBuffer(RGResource(ShadowVisibleDraws))->GetDeviceAddress(),
-				.IndirectCommands = registry.GetBuffer(RGResource(ShadowIndirectCommands))->GetDeviceAddress(),
-				.DrawCount = registry.GetBuffer(RGResource(ShadowDrawCounts))->GetDeviceAddress(),
+				.VisibleObjects = registry.GetBuffer(RGResource(ShadowVisibleObjects), frameIndex)->GetDeviceAddress(),
+				.VisibleObjectCount = registry.GetBuffer(RGResource(ShadowVisibleObjectCount), frameIndex)->GetDeviceAddress(),
+				.VisibleSubmeshes = registry.GetBuffer(RGResource(ShadowVisibleSubmeshes), frameIndex)->GetDeviceAddress(),
+				.VisibleSubmeshCount = registry.GetBuffer(RGResource(ShadowVisibleSubmeshCount), frameIndex)->GetDeviceAddress(),
+				.SubmeshDispatchIndirect = registry.GetBuffer(RGResource(ShadowSubmeshDispatches), frameIndex)->GetDeviceAddress(),
+				.MeshletDispatchIndirect = registry.GetBuffer(RGResource(ShadowMeshletDispatches), frameIndex)->GetDeviceAddress(),
+				.VisibleDraws = registry.GetBuffer(RGResource(ShadowVisibleDraws), frameIndex)->GetDeviceAddress(),
+				.IndirectCommands = registry.GetBuffer(RGResource(ShadowIndirectCommands), frameIndex)->GetDeviceAddress(),
+				.DrawCount = registry.GetBuffer(RGResource(ShadowDrawCounts), frameIndex)->GetDeviceAddress(),
 				.ViewIndices = {
 					s_ShadowCameras[0].GetCullViewHandle().Index,
 					s_ShadowCameras[1].GetCullViewHandle().Index,
@@ -624,8 +632,10 @@ namespace Lucy {
 				command.FillBuffer(registry.GetBuffer(RGResource(ShadowVisibleSubmeshCount)), 0, sizeof(uint32_t), 0);
 				command.FillBuffer(registry.GetBuffer(RGResource(ShadowDrawCounts)), 0, sizeof(uint32_t), 0);
 
-				if (!s_ShadowCullPushConstant)
-					s_ShadowCullPushConstant = CreateGPUCullPushConstant(registry);
+				s_ShadowCullPushConstants.resize(Renderer::GetMaxFramesInFlight());
+				for (uint32_t frameIndex = 0; frameIndex < Renderer::GetMaxFramesInFlight(); frameIndex++) {
+					s_ShadowCullPushConstants[frameIndex] = CreateGPUCullPushConstant(renderGraph->GetRegistry(), frameIndex);
+				}
 
 				cmdList.EndRenderCommand();
 			};
@@ -652,7 +662,8 @@ namespace Lucy {
 				command.BindPipeline(pipeline);
 
 				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
-				pushConstant.SetData(reinterpret_cast<uint8_t*>(&s_ShadowCullPushConstant), sizeof(s_ShadowCullPushConstant));
+				auto& pushConstantData = s_ShadowCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
 
 				command.BindPushConstant(pushConstant);
 				command.DispatchCompute((objectCapacity + 63) / 64, 1, 1);
@@ -675,7 +686,8 @@ namespace Lucy {
 				command.BindPipeline(pipeline);
 
 				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
-				pushConstant.SetData(reinterpret_cast<uint8_t*>(&s_ShadowCullPushConstant), sizeof(s_ShadowCullPushConstant));
+				auto& pushConstantData = s_ShadowCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
 
 				command.BindPushConstant(pushConstant);
 				command.DispatchCompute(1, 1, 1);
@@ -711,7 +723,8 @@ namespace Lucy {
 				command.BindPipeline(pipeline);
 
 				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
-				pushConstant.SetData(reinterpret_cast<uint8_t*>(&s_ShadowCullPushConstant), sizeof(s_ShadowCullPushConstant));
+				auto& pushConstantData = s_ShadowCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
 
 				command.BindPushConstant(pushConstant);
 				command.DispatchComputeIndirect(registry.GetBuffer(RGResource(ShadowSubmeshDispatches)), 0);
@@ -735,7 +748,8 @@ namespace Lucy {
 				command.BindPipeline(pipeline);
 
 				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
-				pushConstant.SetData(reinterpret_cast<uint8_t*>(&s_ShadowCullPushConstant), sizeof(s_ShadowCullPushConstant));
+				auto& pushConstantData = s_ShadowCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
 
 				command.BindPushConstant(pushConstant);
 				command.DispatchCompute(1, 1, 1);
@@ -773,7 +787,8 @@ namespace Lucy {
 				command.BindAllDescriptorSets();
 
 				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
-				pushConstant.SetData(reinterpret_cast<uint8_t*>(&s_ShadowCullPushConstant), sizeof(s_ShadowCullPushConstant));
+				auto& pushConstantData = s_ShadowCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
 
 				command.BindPushConstant(pushConstant);
 				command.DispatchComputeIndirect(registry.GetBuffer(RGResource(ShadowMeshletDispatches)), 0);
@@ -1219,10 +1234,8 @@ namespace Lucy {
 				pushConstantData.SetData((uint8_t*)&localPushConstant, sizeof(localPushConstant));
 				pushConstant.SetData(pushConstantData);
 
-				for (uint32_t i = 0; i < 6; i++) {
-					draw.BindPushConstant(pushConstant);
-					draw.DrawIndexed(cubeMeshIndexCount, 1, 0, 0, 0);
-				}
+				draw.BindPushConstant(pushConstant);
+				draw.DrawIndexed(cubeMeshIndexCount, 1, 0, 0, 0);
 
 				cmdList.EndRenderCommand();
 			};

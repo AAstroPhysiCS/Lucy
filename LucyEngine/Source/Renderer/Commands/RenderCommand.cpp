@@ -66,7 +66,7 @@ namespace Lucy {
 		m_BoundedGraphicsPipeline->Unbind(m_RenderDevice->GetQueryResults(RenderDeviceQueryType::Pipeline, Renderer::GetCurrentFrameIndex()));
 	}
 
-	uint32_t RenderCommand::BindImageHandleTo(const std::string& imageBufferName, const Ref<Image>& image, uint32_t mip) {
+	RenderDeviceTextureHandle RenderCommand::BindImageHandleTo(const std::string& imageBufferName, const Ref<Image>& image, uint32_t mip) {
 		LUCY_PROFILE_NEW_EVENT("RenderCommand::BindImageHandleTo");
 		LUCY_ASSERT(m_BoundedGraphicsPipeline || m_BoundedComputePipeline, "BindGlobalImageHandleTo needs to be called after a BindPipeline call.");
 		if (m_BoundedGraphicsPipeline)

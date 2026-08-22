@@ -19,11 +19,11 @@ namespace Lucy {
 
 		inline bool IsInitialized() const { return m_Handle; }
 		inline const std::string& GetDebugName() const { return m_DebugName; }
+
+		RenderDeviceResourceHandle& GetMyHandle() { return m_Handle; }
 	protected:
 		RenderDeviceResource(std::string_view name)
 			: m_DebugName(name) {}
-
-		RenderDeviceResourceHandle& GetMyHandle() { return m_Handle; }
 	private:
 		inline void SetInitialized(RenderDeviceResourceHandle handle) { m_Handle = handle; }
 

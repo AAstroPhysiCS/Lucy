@@ -112,23 +112,20 @@ namespace Lucy {
 		);
 	}
 
-	Ref<Image> RenderGraphRegistry::GetImage(const RenderGraphResource& rgResource) {
-		LUCY_PROFILE_NEW_EVENT("RenderGraphRegistry::GetImage");
-		return Renderer::AccessResource<Image>(m_Resources.at(rgResource).ResourceHandles[0]);
-	}
-	
 	Ref<Image> RenderGraphRegistry::GetImage(const RenderGraphResource& rgResource) const {
 		LUCY_PROFILE_NEW_EVENT("RenderGraphRegistry::GetImage");
-		return Renderer::AccessResource<Image>(m_Resources.at(rgResource).ResourceHandles[0]);
+		const auto& data = m_Resources.at(rgResource).GetImageData();
+		if (!data.InFlightMode)
+			return Renderer::AccessResource<Image>(m_Resources.at(rgResource).ResourceHandles[0]);
+		return Renderer::AccessResource<Image>(m_Resources.at(rgResource).ResourceHandles[Renderer::GetCurrentFrameIndex()]);
 	}
 
-	Ref<RenderDeviceBuffer> RenderGraphRegistry::GetBuffer(const RenderGraphResource& rgResource) {
-		LUCY_PROFILE_NEW_EVENT("RenderGraphRegistry::GetBuffer");
-
-		const auto& data = m_Resources.at(rgResource).GetBufferData();
+	Ref<Image> RenderGraphRegistry::GetImage(const RenderGraphResource& rgResource, uint32_t frameIndex) const {
+		LUCY_PROFILE_NEW_EVENT("RenderGraphRegistry::GetImage");
+		const auto& data = m_Resources.at(rgResource).GetImageData();
 		if (!data.InFlightMode)
-			return Renderer::AccessResource<RenderDeviceBuffer>(m_Resources.at(rgResource).ResourceHandles[0]);
-		return Renderer::AccessResource<RenderDeviceBuffer>(m_Resources.at(rgResource).ResourceHandles[Renderer::GetCurrentFrameIndex()]);
+			return Renderer::AccessResource<Image>(m_Resources.at(rgResource).ResourceHandles[0]);
+		return Renderer::AccessResource<Image>(m_Resources.at(rgResource).ResourceHandles[frameIndex]);
 	}
 
 	Ref<RenderDeviceBuffer> RenderGraphRegistry::GetBuffer(const RenderGraphResource& rgResource) const {
@@ -138,5 +135,14 @@ namespace Lucy {
 		if (!data.InFlightMode)
 			return Renderer::AccessResource<RenderDeviceBuffer>(m_Resources.at(rgResource).ResourceHandles[0]);
 		return Renderer::AccessResource<RenderDeviceBuffer>(m_Resources.at(rgResource).ResourceHandles[Renderer::GetCurrentFrameIndex()]);
+	}
+
+	Ref<RenderDeviceBuffer> RenderGraphRegistry::GetBuffer(const RenderGraphResource& rgResource, uint32_t frameIndex) const {
+		LUCY_PROFILE_NEW_EVENT("RenderGraphRegistry::GetBuffer");
+
+		const auto& data = m_Resources.at(rgResource).GetBufferData();
+		if (!data.InFlightMode)
+			return Renderer::AccessResource<RenderDeviceBuffer>(m_Resources.at(rgResource).ResourceHandles[0]);
+		return Renderer::AccessResource<RenderDeviceBuffer>(m_Resources.at(rgResource).ResourceHandles[frameIndex]);
 	}
 }

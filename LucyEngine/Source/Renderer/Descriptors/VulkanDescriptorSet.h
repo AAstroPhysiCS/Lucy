@@ -28,14 +28,14 @@ namespace Lucy {
 		void RTBind(const VulkanDescriptorSetBindInfo& bindInfo);
 		void RTBake(const Ref<VulkanDescriptorPool>& descriptorPool, RenderDevice* device);
 		void RTUpdate(RenderDevice* device) final override;
-		
+		void RTUpdateImageSamplerDescriptors(RenderDevice* device, const std::string& imageBufferName, const RenderDeviceTextureHandle& handle);
+
 		VulkanImageSamplerBindingInfo* GetVulkanImageSampler(const std::string& imageBufferName);
 
 		inline VkDescriptorSetLayout GetDescriptorSetLayout() const { return m_DescriptorSetLayout; }
 	private:
 		void RTInitializeBufferDescriptors(RenderDevice* device);
 		void RTWriteBufferDescriptors(uint32_t frameIndex, RenderDevice* device);
-		void RTUpdateImageSamplerDescriptors(RenderDevice* device);
 
 		void RTCreate(const Ref<VulkanRenderDevice>& vulkanDevice);
 		void RTDestroyResource(RenderDevice* device) final override;
