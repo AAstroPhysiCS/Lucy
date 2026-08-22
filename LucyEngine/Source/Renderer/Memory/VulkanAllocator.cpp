@@ -86,7 +86,7 @@ namespace Lucy {
 		return 0;
 	}
 
-	VmaAllocationInfo VulkanAllocator::CreateVulkanBufferVma(VulkanBufferUsage lucyBufferUsage, VkDeviceSize size, VkBufferUsageFlags usage,
+	VmaAllocationInfo VulkanAllocator::CreateVulkanBufferVma(MemoryUsage lucyBufferUsage, VkDeviceSize size, VkBufferUsageFlags usage,
 												bool persistentlyMapped, VkBuffer& bufferHandle, VmaAllocation& vmaAllocation) {
 		VkBufferCreateInfo createInfo = VulkanAPI::BufferCreateInfo(size, usage, VK_SHARING_MODE_EXCLUSIVE);
 
@@ -94,23 +94,23 @@ namespace Lucy {
 		vmaCreateInfo.priority = 1.0f;
 
 		switch (lucyBufferUsage) {
-			case VulkanBufferUsage::Auto:
+			case MemoryUsage::Auto:
 				vmaCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
 				vmaCreateInfo.flags = 0;
 				break;
-			case VulkanBufferUsage::CPUOnly:
+			case MemoryUsage::CPUOnly:
 				vmaCreateInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
 				vmaCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 				break;
-			case VulkanBufferUsage::GPUOnly:
+			case MemoryUsage::GPUOnly:
 				vmaCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 				//vmaCreateInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
 				break;
-			case VulkanBufferUsage::CPUToGPU:
+			case MemoryUsage::CPUToGPU:
 				vmaCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
 				vmaCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 				break;
-			case VulkanBufferUsage::Readback:
+			case MemoryUsage::Readback:
 				vmaCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
 				vmaCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
 				break;

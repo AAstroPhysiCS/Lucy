@@ -1,6 +1,7 @@
 #include "lypch.h"
 #include "VulkanDeviceAddressBuffer.h"
 
+#include "Renderer/Renderer.h"
 #include "Renderer/Device/VulkanRenderDevice.h"
 #include "Renderer/Context/VulkanContext.h"
 
@@ -15,11 +16,17 @@ namespace Lucy {
         LUCY_ASSERT(GetSize() > 0, "Cannot create zero-sized VulkanDeviceAddressBuffer!");
         const auto& vulkanDevice = device->As<VulkanRenderDevice>();
 
-        const VkBufferUsageFlags vulkanUsage = ToVulkanBufferUsage(GetUsage());
+        VkBufferUsageFlags vulkanUsage = ToVulkanBufferUsage(GetUsage());
+        vulkanUsage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        auto memoryUsage = GetCreateInfo().MemoryUsage;
 
-        auto result = vulkanDevice->GetAllocator()
-            .CreateVulkanBufferVma(VulkanBufferUsage::CPUToGPU, GetSize(), vulkanUsage | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, true, m_Buffer, m_Allocation);
-		m_MappedData = result.pMappedData;
+        if (memoryUsage == MemoryUsage::GPUOnly) {
+            auto result = vulkanDevice->GetAllocator().CreateVulkanBufferVma(memoryUsage, GetSize(), vulkanUsage | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, false, m_Buffer, m_Allocation);
+            m_MappedData = result.pMappedData;
+        } else {
+            auto result = vulkanDevice->GetAllocator().CreateVulkanBufferVma(memoryUsage, GetSize(), vulkanUsage | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, true, m_Buffer, m_Allocation);
+            m_MappedData = result.pMappedData;
+        }
 
         QueryDeviceAddress(vulkanDevice);
 
@@ -38,16 +45,11 @@ namespace Lucy {
 	}
 
     void VulkanDeviceAddressBuffer::RTLoadToDevice(RenderDevice* device, const void* data, RenderDeviceSize size, RenderDeviceSize offset) {
-        LUCY_ASSERT(data != nullptr, "Cannot upload null data to VulkanDeviceAddressBuffer!");
-        LUCY_ASSERT(offset + size <= GetSize(), "VulkanDeviceAddressBuffer upload out of bounds!");
-        LUCY_ASSERT(m_MappedData != nullptr, "VulkanDeviceAddressBuffer is not mapped!");
-        
-        const auto& vulkanDevice = reinterpret_cast<VulkanRenderDevice*>(device);
+        LUCY_ASSERT(data);
+        LUCY_ASSERT(offset + size <= GetSize());
 
-		auto& allocator = vulkanDevice->GetAllocator();
-        memcpy(static_cast<uint8_t*>(m_MappedData) + offset, data, size);
-        // Safe for coherent and non-coherent memory.
-        allocator.Flush(m_Allocation, offset, size);
+        auto* vulkanDevice = reinterpret_cast<VulkanRenderDevice*>(device);
+        vulkanDevice->GetUploadManager()->EnqueueUploadBuffer(m_Buffer, offset, data, size);
 
         m_SizeAllocated = std::max(m_SizeAllocated, offset + size);
 	}

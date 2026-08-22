@@ -146,7 +146,10 @@ namespace Lucy {
 
 		switch (material->GetMaterialType()) {
 			case MaterialType::PBR: {
-				TryLoadTextureIntoSlot(aiTextureType_BASE_COLOR, PBRMaterial::ALBEDO_TYPE, ImageFormat::R8G8B8A8_SRGB);
+				bool loadedBase = TryLoadTextureIntoSlot(aiTextureType_BASE_COLOR, PBRMaterial::ALBEDO_TYPE, ImageFormat::R8G8B8A8_SRGB);
+				if (!loadedBase) {
+					TryLoadTextureIntoSlot(aiTextureType_DIFFUSE, PBRMaterial::ALBEDO_TYPE, ImageFormat::R8G8B8A8_SRGB);
+				}
 				bool loadedNormal = TryLoadTextureIntoSlot(aiTextureType_NORMALS, PBRMaterial::NORMALS_TYPE, ImageFormat::R8G8B8A8_UNORM);
 				if (!loadedNormal) {
 					TryLoadTextureIntoSlot(aiTextureType_NORMAL_CAMERA, PBRMaterial::NORMALS_TYPE, ImageFormat::R8G8B8A8_UNORM);
@@ -154,6 +157,7 @@ namespace Lucy {
 				TryLoadTextureIntoSlot(aiTextureType_AMBIENT_OCCLUSION, PBRMaterial::AO_TYPE, ImageFormat::R8G8B8A8_UNORM);
 				TryLoadTextureIntoSlot(aiTextureType_DIFFUSE_ROUGHNESS, PBRMaterial::ROUGHNESS_TYPE, ImageFormat::R8G8B8A8_UNORM);
 				TryLoadTextureIntoSlot(aiTextureType_METALNESS, PBRMaterial::METALLIC_TYPE, ImageFormat::R8G8B8A8_UNORM);
+				TryLoadTextureIntoSlot(aiTextureType_EMISSIVE, PBRMaterial::EMISSIVE_TYPE, ImageFormat::R8G8B8A8_SRGB);
 				//TODO:
 				//bool loadedGLTF = TryLoadTextureIntoSlot(aiTextureType_GLTF_METALLIC_ROUGHNESS, PBRMaterial::ORM_TYPE, ImageFormat::R8G8B8A8_UNORM);
 				break;

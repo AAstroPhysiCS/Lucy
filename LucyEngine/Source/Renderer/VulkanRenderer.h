@@ -28,7 +28,6 @@ namespace Lucy {
 
 		void Destroy() final override;
 
-		void RTDirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size);
 		void SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func);
 
 		void OnWindowResize() final override;
@@ -44,6 +43,8 @@ namespace Lucy {
 		void EndFrame() final override;
 
 		void FlushDeletionQueue() final override;
+
+		void ProcessQueryResults();
 
 		void InternalImGuiPass(uint64_t signalValue, bool hasSceneWork);
 

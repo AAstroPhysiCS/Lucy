@@ -36,6 +36,7 @@ namespace Lucy {
 		static inline const MaterialImageType AO_TYPE = { "AO", 2 };
 		static inline const MaterialImageType ROUGHNESS_TYPE = { "Roughness", 3 };
 		static inline const MaterialImageType METALLIC_TYPE = { "Metallic", 4 };
+		static inline const MaterialImageType EMISSIVE_TYPE = { "Emissive", 5 };
 	private:
 
 		RenderDevicePBRMaterialData m_MaterialData;

@@ -61,6 +61,14 @@ namespace Lucy {
 		m_RenderDeviceTimestampQuery->RTResetPoolByIndex(commandPool, Renderer::GetCurrentFrameIndex());
 	}
 
+	void RenderDevice::ResetTimestampQuery(uint32_t frameIndex) {
+		m_RenderDeviceTimestampQuery->ResetPoolByIndex(frameIndex);
+	}
+
+	void RenderDevice::ResetPipelineQuery(uint32_t frameIndex) {
+		m_RenderDevicePipelineQuery->ResetPoolByIndex(frameIndex);
+	}
+
 	uint32_t RenderDevice::RTBeginTimestamp(Ref<CommandPool> cmdPool) {
 		return m_RenderDeviceTimestampQuery->RTBegin(cmdPool);
 	}
@@ -77,12 +85,12 @@ namespace Lucy {
 		return m_RenderDevicePipelineQuery->RTEnd(cmdPool);
 	}
 
-	std::vector<uint64_t> RenderDevice::GetQueryResults(RenderDeviceQueryType type) {
+	std::vector<uint64_t> RenderDevice::GetQueryResults(RenderDeviceQueryType type, uint32_t frameIndex) {
 		switch (type) {
 			case RenderDeviceQueryType::Timestamp:
-				return m_RenderDeviceTimestampQuery->GetQueryResults();
+				return m_RenderDeviceTimestampQuery->GetQueryResults(frameIndex);
 			case RenderDeviceQueryType::Pipeline:
-				return m_RenderDevicePipelineQuery->GetQueryResults();
+				return m_RenderDevicePipelineQuery->GetQueryResults(frameIndex);
 			default:
 				LUCY_ASSERT(false, "Unimplemented device query type!");
 		};

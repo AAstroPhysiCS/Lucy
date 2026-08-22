@@ -2,9 +2,11 @@
 
 #include "vma/vk_mem_alloc.h"
 
+#include "VulkanRenderDeviceUploadManager.h"
+
 namespace Lucy {
 
-	enum class VulkanBufferUsage {
+	enum class MemoryUsage {
 		/*
 		* Auto, with no additional flag
 		*/
@@ -38,7 +40,7 @@ namespace Lucy {
 		VulkanAllocator(VulkanAllocator&&) = delete;
 		VulkanAllocator& operator=(VulkanAllocator&&) = delete;
 
-		VmaAllocationInfo CreateVulkanBufferVma(VulkanBufferUsage lucyBufferUsage, VkDeviceSize size, VkBufferUsageFlags usage,
+		VmaAllocationInfo CreateVulkanBufferVma(MemoryUsage lucyBufferUsage, VkDeviceSize size, VkBufferUsageFlags usage,
 			bool persistentlyMapped, VkBuffer& bufferHandle, VmaAllocation& vmaAllocation);
 
 		VmaAllocationInfo CreateVulkanImageVma(uint32_t width, uint32_t height, uint32_t mipLevel, VkFormat format, VkImageLayout currentLayout, VkImageUsageFlags usage,

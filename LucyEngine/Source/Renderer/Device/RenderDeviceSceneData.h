@@ -2,8 +2,9 @@
 
 #include <cstdint>
 
-#include "Renderer/RendererPasses.h"
 #include "Renderer/Memory/Buffer/RenderDeviceBuffer.h"
+
+#include "Scene/Camera.h"
 
 namespace Lucy {
 
@@ -42,6 +43,8 @@ namespace Lucy {
 
         // x = MeshIndex y = RenderDeviceObjectFlags z = unused w = float LOD bias encoded using floatBitsToUint
         glm::uvec4 Data = glm::uvec4{ INVALID_INDEX, static_cast<uint32_t>(RenderDeviceObjectFlags::None), 0, 0 }; 
+
+        auto operator<=>(const RenderDeviceObjectData&) const = default;
 
         static inline constexpr auto Members = MembersList<
             &RenderDeviceObjectData::Transform,
@@ -87,11 +90,15 @@ namespace Lucy {
     struct RenderDeviceMeshData {   
         glm::vec4 BoundingSphere = glm::vec4{ 0.0f };
         glm::uvec4 Data = glm::uvec4{ 0 }; // x = FirstLOD y = LODCount z = FirstSubmesh w = SubmeshCount
+
+        auto operator<=>(const RenderDeviceMeshData&) const = default;
     };
 
     struct RenderDeviceMeshLODData {
         glm::uvec4 Meshlets = glm::uvec4{ 0 }; // x = FirstMeshlet y = MeshletCount z = unused w = unused
         glm::vec4 LODData = glm::vec4{ 0.0f };
+
+        auto operator<=>(const RenderDeviceMeshLODData&) const = default;
     };
 
     struct RenderDeviceSubmeshData {
@@ -102,6 +109,8 @@ namespace Lucy {
         glm::uvec4 Draw = glm::uvec4{ 0 }; // x = FirstIndex y = IndexCount z = int32 VertexOffset bit-cast to uint32 w = MaterialIndex
         glm::uvec4 Meshlets = glm::uvec4{ 0 }; // x = FirstMeshlet y = MeshletCount z = RenderBin w = flags
         glm::uvec4 LODs = glm::uvec4{ INVALID_INDEX, 0, 0, 0 }; // x = FirstLOD, y = LODCount
+
+        auto operator<=>(const RenderDeviceSubmeshData&) const = default;
     };
 
     struct RenderDeviceMeshletData {
@@ -112,16 +121,30 @@ namespace Lucy {
         glm::vec3 AABBExtents;
 
         glm::uvec4 Draw = glm::uvec4{ 0 }; // x = FirstIndex y = IndexCount z = int32 VertexOffset bit-cast to uint32 w = SubmeshIndex
+
+        auto operator<=>(const RenderDeviceMeshletData&) const = default;
     };
 
     struct RenderDeviceVisibleObjectData {
         uint32_t ObjectIndex = INVALID_INDEX;
+
+        auto operator<=>(const RenderDeviceVisibleObjectData&) const = default;
+    };
+
+    struct RenderDeviceVisibleSubmeshData {
+        uint32_t ObjectIndex = INVALID_INDEX;
+        uint32_t SubmeshIndex = INVALID_INDEX;
+        uint32_t LODIndex = INVALID_INDEX;
+
+        auto operator<=>(const RenderDeviceVisibleSubmeshData&) const = default;
     };
 
     struct RenderDeviceVisibleDrawData {
         uint32_t ObjectIndex = INVALID_INDEX;
         uint32_t SubmeshIndex = INVALID_INDEX;
         uint32_t MeshletIndex = INVALID_INDEX;
+
+        auto operator<=>(const RenderDeviceVisibleDrawData&) const = default;
     };
 
     enum class GPUCullViewFlags : uint32_t {
@@ -145,6 +168,8 @@ namespace Lucy {
 
         //x = Hi-Z texture index, y = Hi-Z sampler index, z = Hi-Z mip count, w = GPUCullViewFlags
         glm::uvec4 Data = glm::uvec4{ INVALID_INDEX, INVALID_INDEX, 0, GPUCullViewFlags::None };
+
+        auto operator<=>(const RenderDeviceCullViewData&) const = default;
     };
 
     struct RenderDeviceIndexedIndirectCommand {
@@ -170,6 +195,8 @@ namespace Lucy {
     };
 
     struct RenderDeviceSceneGlobalData {
+        static inline constexpr const uint32_t NUM_CASCADES = 4;
+
         CameraViewProjection Camera{};
 
         RenderDeviceSceneAddresses Addresses{};
@@ -177,7 +204,7 @@ namespace Lucy {
         struct LightValues {
             glm::vec3 Direction;
             glm::vec3 Color;
-            glm::mat4 DirLightShadowMatrices[ShadowPass::NUM_CASCADES];
+            glm::mat4 DirLightShadowMatrices[NUM_CASCADES];
             glm::vec4 DirLightShadowCascadeSplits; // x = 0, y = 1, z = 2, w = 3 cascadeIndex
 
             auto operator<=>(const LightValues&) const = default;
@@ -196,5 +223,7 @@ namespace Lucy {
     struct GlobalPushConstant {
         RenderDeviceBufferReference Root = 0;
         T Data{};
+
+		explicit constexpr operator bool() const { return Root != 0; }
     };
 }

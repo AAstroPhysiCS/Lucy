@@ -22,7 +22,7 @@ namespace Lucy {
 		RenderGraphCompiler& operator=(const RenderGraphCompiler& other) = delete;
 		RenderGraphCompiler& operator=(RenderGraphCompiler&& other) noexcept = delete;
 
-		virtual std::vector<ExecutionBatch> Compile(const RenderGraphBatches& batches) = 0;
+		virtual std::vector<ExecutionBatch> Compile(RenderGraphBatches&& batches) = 0;
 	protected:
 		inline Ref<RenderDevice> GetRenderDevice() const { return m_RenderDevice; }
 		inline const RenderGraph& GetRenderGraph() const { return m_RenderGraph; }
@@ -148,7 +148,7 @@ namespace Lucy {
 		VulkanRenderGraphCompiler(const RenderGraph& renderGraph, const Ref<RenderDevice>& device);
 		virtual ~VulkanRenderGraphCompiler() = default;
 
-		std::vector<ExecutionBatch> Compile(const RenderGraphBatches& batches) final override;
+		std::vector<ExecutionBatch> Compile(RenderGraphBatches&& batches) final override;
 	};
 #pragma endregion VulkanRenderGraphCompiler
 }

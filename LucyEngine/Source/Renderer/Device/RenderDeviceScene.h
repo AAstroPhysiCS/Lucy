@@ -82,6 +82,7 @@ namespace Lucy {
         constexpr RenderDeviceResourceHandle GetCurrentFrameBufferHandle(std::string_view name) { return GetCurrentFrameBufferHandle(name, Renderer::GetCurrentFrameIndex()); }
         std::vector<RenderDeviceResourceHandle> GetCurrentFrameBufferHandles(std::string_view name);
 
+        static uint64_t GetSubmeshCapacity() { return s_SubmeshCapacity; }
         static uint64_t GetObjectCapacity() { return s_ObjectCapacity; }
         static uint64_t GetMeshletCapacity() { return s_MeshletCapacity; }
     private:
@@ -311,12 +312,12 @@ namespace Lucy {
         uint64_t m_GlobalIndexCount = 0;
 
         static inline uint64_t s_ObjectCapacity = 1024;
-        static inline uint64_t s_MaterialCapacity = 1024;
+        static inline uint64_t s_MaterialCapacity = 4096;
         static inline uint64_t s_MeshCapacity = 1024;
         static inline uint64_t s_SubmeshCapacity = 64 * 1024;
         static inline uint64_t s_MeshletCapacity = 1024 * 1024;
 
         static inline uint64_t s_GlobalVertexCapacity = 1024 * 1024 * 4;
-        static inline uint64_t s_GlobalIndexCapacity = 3 * s_GlobalVertexCapacity;
+        static inline uint64_t s_GlobalIndexCapacity = 3 * s_GlobalVertexCapacity * 10;
     };
 }

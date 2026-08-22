@@ -30,8 +30,7 @@ namespace Lucy {
 
 	std::vector<ExecutionBatch> RenderGraph::Execute() {
 		LUCY_PROFILE_NEW_EVENT("RenderGraph::Execute");
-		const auto& batches = CreateBatchesForRendering();
-		return m_Compiler->Compile(batches);
+		return m_Compiler->Compile(CreateBatchesForRendering());
 	}
 
 	void RenderGraph::Flush() {
@@ -230,50 +229,7 @@ namespace Lucy {
 	RenderGraphBatches RenderGraph::CreateBatchesForRendering() const {
 		LUCY_PROFILE_NEW_EVENT("RenderGraph::CreateBatchesForRendering");
 		RenderGraphBatches batches;
-
-		std::vector<RenderGraphPass*> orderedPasses;
-		orderedPasses.reserve(m_AcyclicGraph.Size());
-
-		for (const auto& node : m_AcyclicGraph) {
-			RenderGraphPass* pass = node.Pass;
-			if (pass->GetCurrentState() != RenderGraphPassState::Runnable)
-				continue;
-			orderedPasses.push_back(pass);
-		}
-
-		if (orderedPasses.empty())
-			return batches;
-
-		// 1) Build contiguous queue-family batches
-		{
-			RenderGraphBatch currentBatch{};
-			TargetQueueFamily currentBatchFamily = orderedPasses.front()->GetTargetQueueFamily();
-
-			for (RenderGraphPass* pass : orderedPasses) {
-				TargetQueueFamily family = pass->GetTargetQueueFamily();
-
-				if (currentBatchFamily == family) {
-					currentBatch.Passes.push_back(pass);
-				} else {
-					//old current batch
-					batches.push_back(std::move(currentBatch));
-
-					currentBatch = {};
-					currentBatchFamily = family;
-
-					currentBatch.Passes.push_back(pass);
-				}
-			}
-
-			if (!currentBatch.Passes.empty())
-				batches.push_back(std::move(currentBatch));
-		}
-
-		std::unordered_map<RenderGraphPass*, size_t> batchIndexOfPass;
-		for (size_t i = 0; i < batches.size(); ++i) {
-			for (RenderGraphPass* pass : batches[i].Passes)
-				batchIndexOfPass[pass] = i;
-		}
+		batches.reserve(m_AcyclicGraph.Size());
 
 		const auto IsReadOnlyAccess = [](RenderGraphResourceAccess access) {
 			switch (access) {
@@ -302,60 +258,63 @@ namespace Lucy {
 			TargetQueueFamily Queue = TargetQueueFamily::Graphics;
 			RenderGraphResourceAccess Access = RenderGraphResourceAccess::None;
 			RenderGraphResourceType Type = RenderGraphResourceType::Image;
+			size_t BatchIndex = 0;
 		};
 
 		std::unordered_map<RenderGraphResource, LastUseInfo> lastUse;
 
+		size_t currentBatchIndex = 0;
 		const auto HandleUse = [&](RenderGraphPass* pass, const RenderGraphResourceAddInfo& use) {
-			auto it = lastUse.find(use.Resource);
-			if (it != lastUse.end() && it->second.Pass) {
-				const LastUseInfo& prev = it->second;
+			auto [it, inserted] = lastUse.try_emplace(use.Resource);
 
+			LastUseInfo& prev = it->second;
+
+			if (!inserted && prev.Pass) {
 				if (prev.Queue != use.QueueFamily) {
-					RenderGraphInterQueueTransition tr{};
-					tr.Resource = use.Resource;
-					tr.ResourceType = use.Type;
-					tr.SrcQueue = prev.Queue;
-					tr.DstQueue = use.QueueFamily;
-					tr.SrcAccess = prev.Access;
-					tr.DstAccess = use.Access;
-					tr.SrcPass = prev.Pass;
-					tr.DstPass = pass;
+					size_t srcBatchIndex = prev.BatchIndex;
+					size_t dstBatchIndex = currentBatchIndex;
 
-					size_t srcBatchIndex = batchIndexOfPass.at(prev.Pass);
-					size_t dstBatchIndex = batchIndexOfPass.at(pass);
-
-					batches[srcBatchIndex].OutgoingInterQueueTransitions.push_back(tr);
-					batches[dstBatchIndex].IncomingInterQueueTransitions.push_back(tr);
+					batches[srcBatchIndex].OutgoingInterQueueTransitions.emplace_back(use.Resource, use.Type, prev.Queue, use.QueueFamily, prev.Access, use.Access, prev.Pass, pass);
+					batches[dstBatchIndex].IncomingInterQueueTransitions.emplace_back(use.Resource, use.Type, prev.Queue, use.QueueFamily, prev.Access, use.Access, prev.Pass, pass);
 				} else if (NeedsIntraQueueBarrier(prev.Access, use.Access)) {
-					RenderGraphIntraQueueTransition br{};
-					br.Resource = use.Resource;
-					br.ResourceType = use.Type;
-					br.QueueFamily = use.QueueFamily;
-					br.SrcAccess = prev.Access;
-					br.DstAccess = use.Access;
-					br.SrcPass = prev.Pass;
-					br.DstPass = pass;
-
-					size_t dstBatchIndex = batchIndexOfPass.at(pass);
-					batches[dstBatchIndex].IntraQueueTransition.push_back(br);
+					size_t dstBatchIndex = currentBatchIndex;
+					batches[dstBatchIndex].IntraQueueTransition.emplace_back(use.Resource, use.Type, use.QueueFamily, prev.Access, use.Access, prev.Pass, pass);
 				}
 				//everything else is deemed to be automatically synchronized by the vulkan driver
 			}
 
-			lastUse[use.Resource] = {
+			prev = {
 				.Pass = pass,
 				.Queue = use.QueueFamily,
 				.Access = use.Access,
-				.Type = use.Type
+				.Type = use.Type,
+				.BatchIndex = currentBatchIndex
 			};
 		};
 
-		// 3) Walk passes in execution order and build intra/inter queue dependencies
-		for (RenderGraphPass* pass : orderedPasses) {
+		// walk passes in execution order and build intra/inter queue dependencies
+		TargetQueueFamily currentBatchFamily = TargetQueueFamily::Graphics;
+		bool hasBatch = false;
+		for (const auto& node : m_AcyclicGraph) {
+			RenderGraphPass* pass = node.Pass;
+			if (pass->GetCurrentState() != RenderGraphPassState::Runnable)
+				continue;
+
+			TargetQueueFamily family = pass->GetTargetQueueFamily();
+
+			if (!hasBatch || currentBatchFamily != family) {
+				currentBatchFamily = family;
+				currentBatchIndex = batches.size();
+
+				batches.emplace_back();
+
+				hasBatch = true;
+			}
+
+			batches[currentBatchIndex].Passes.emplace_back(pass);
+
 			for (const RenderGraphResourceAddInfo& readUse : pass->GetResourceReads())
 				HandleUse(pass, readUse);
-
 			for (const RenderGraphResourceAddInfo& writeUse : pass->GetResourceWrites())
 				HandleUse(pass, writeUse);
 		}

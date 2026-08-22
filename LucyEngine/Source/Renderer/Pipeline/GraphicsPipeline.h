@@ -25,20 +25,18 @@ namespace Lucy {
 		GraphicsPipelineStatistics(std::vector<uint64_t>&& times = {});
 		~GraphicsPipelineStatistics() = default;
 
-		uint64_t GetInputAssemblyVertexCount() const { return GetStatisticsOrZero(0); }
-		uint64_t GetInputAssemblyPrimitivesCount() const { return GetStatisticsOrZero(1); }
-		uint64_t GetVertexShaderInvocations() const { return GetStatisticsOrZero(2); }
-		uint64_t GetClippingStagePrimitivesProcessed() const { return GetStatisticsOrZero(3); }
-		uint64_t GetClippingStagePrimitivesOutput() const { return GetStatisticsOrZero(4); }
-		uint64_t GetFragmentShaderInvocations() const { return GetStatisticsOrZero(5); }
-		uint64_t GetTesselationControlShaderPatches() const { return GetStatisticsOrZero(6); }
-		uint64_t GetTesselationEvaluationShaderInvocations() const { return GetStatisticsOrZero(7); }
+		uint64_t GetInputAssemblyVertexCount() const { return m_Times[0]; }
+		uint64_t GetInputAssemblyPrimitivesCount() const { return m_Times[1]; }
+		uint64_t GetVertexShaderInvocations() const { return m_Times[2]; }
+		uint64_t GetClippingStagePrimitivesProcessed() const { return m_Times[3]; }
+		uint64_t GetClippingStagePrimitivesOutput() const { return m_Times[4]; }
+		uint64_t GetFragmentShaderInvocations() const { return m_Times[5]; }
+		uint64_t GetTesselationControlShaderPatches() const { return m_Times[6]; }
+		uint64_t GetTesselationEvaluationShaderInvocations() const { return m_Times[7]; }
+
+		constexpr bool IsEmpty() const { return m_Times.empty(); }
 	private:
 		std::vector<uint64_t> m_Times;
-
-		uint64_t GetStatisticsOrZero(size_t index) const {
-			return (index < m_Times.size()) ? m_Times[index] : 0;
-		}
 	};
 
 	class GraphicsPipeline : public Pipeline {

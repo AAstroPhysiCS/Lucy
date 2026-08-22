@@ -27,10 +27,7 @@ namespace Lucy {
 		void RTDestroyResource(RenderDevice* device) final override;
 		void RTCreate(const Ref<VulkanRenderDevice>& device, size_t size);
 
-		VkBuffer m_StagingBufferHandle = VK_NULL_HANDLE;
 		VkBuffer m_BufferHandle = VK_NULL_HANDLE;
-
-		VmaAllocation m_StagingBufferVma = VK_NULL_HANDLE;
 		VmaAllocation m_BufferVma = VK_NULL_HANDLE;
 	};
 }

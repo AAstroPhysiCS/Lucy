@@ -86,7 +86,7 @@ namespace Lucy {
 		VmaAllocation imageStagingBufferVma = VK_NULL_HANDLE;
 
 		VulkanAllocator& allocator = vulkanDevice->GetAllocator();
-		allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, false, imageStagingBuffer, imageStagingBufferVma);
+		allocator.CreateVulkanBufferVma(MemoryUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, false, imageStagingBuffer, imageStagingBufferVma);
 
 		void* pixelData = nullptr;
 		allocator.MapMemory(imageStagingBufferVma, pixelData);
@@ -244,7 +244,7 @@ namespace Lucy {
 
 		VkBuffer imageStagingBuffer = VK_NULL_HANDLE;
 		VmaAllocation imageStagingBufferVma = VK_NULL_HANDLE;
-		allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, false, imageStagingBuffer, imageStagingBufferVma);
+		allocator.CreateVulkanBufferVma(MemoryUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, false, imageStagingBuffer, imageStagingBufferVma);
 
 		void* pixelData = nullptr;
 		allocator.MapMemory(imageStagingBufferVma, pixelData);

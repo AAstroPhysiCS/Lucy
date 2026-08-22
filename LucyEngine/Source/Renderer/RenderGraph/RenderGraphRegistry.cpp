@@ -7,6 +7,8 @@
 namespace Lucy {
 	
 	void RenderGraphRegistry::RetireExternalTransientResource(const RenderGraphResource& rgResource) {
+		LUCY_PROFILE_NEW_EVENT("RenderGraphRegistry::RetireExternalTransientResource");
+		
 		auto& entry = m_Resources.at(rgResource);
 		LUCY_ASSERT(entry.IsExternalTransient());
 
@@ -111,14 +113,18 @@ namespace Lucy {
 	}
 
 	Ref<Image> RenderGraphRegistry::GetImage(const RenderGraphResource& rgResource) {
+		LUCY_PROFILE_NEW_EVENT("RenderGraphRegistry::GetImage");
 		return Renderer::AccessResource<Image>(m_Resources.at(rgResource).ResourceHandles[0]);
 	}
 	
 	Ref<Image> RenderGraphRegistry::GetImage(const RenderGraphResource& rgResource) const {
+		LUCY_PROFILE_NEW_EVENT("RenderGraphRegistry::GetImage");
 		return Renderer::AccessResource<Image>(m_Resources.at(rgResource).ResourceHandles[0]);
 	}
 
 	Ref<RenderDeviceBuffer> RenderGraphRegistry::GetBuffer(const RenderGraphResource& rgResource) {
+		LUCY_PROFILE_NEW_EVENT("RenderGraphRegistry::GetBuffer");
+
 		const auto& data = m_Resources.at(rgResource).GetBufferData();
 		if (!data.InFlightMode)
 			return Renderer::AccessResource<RenderDeviceBuffer>(m_Resources.at(rgResource).ResourceHandles[0]);
@@ -126,6 +132,8 @@ namespace Lucy {
 	}
 
 	Ref<RenderDeviceBuffer> RenderGraphRegistry::GetBuffer(const RenderGraphResource& rgResource) const {
+		LUCY_PROFILE_NEW_EVENT("RenderGraphRegistry::GetBuffer");
+		
 		const auto& data = m_Resources.at(rgResource).GetBufferData();
 		if (!data.InFlightMode)
 			return Renderer::AccessResource<RenderDeviceBuffer>(m_Resources.at(rgResource).ResourceHandles[0]);

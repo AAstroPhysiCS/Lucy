@@ -15,6 +15,22 @@ namespace Lucy {
 		TargetQueueFamily TargetQueueFamily = TargetQueueFamily::Count;
 	};
 
+	struct TimestampQueryScope {
+		std::string PassName;
+		uint32_t BeginQueryIndex = 0;
+		uint32_t EndQueryIndex = 0;
+	};
+
+	struct PipelineQueryScope {
+		std::string PassName;
+		uint32_t QueryIndex = 0;
+	};
+
+	struct RenderCommandListQueryData {
+		std::vector<TimestampQueryScope> TimestampScopes;
+		std::vector<PipelineQueryScope> PipelineScopes;
+	};
+
 	class RenderCommandList final {
 	public:
 		RenderCommandList(const RenderCommandListCreateInfo& createInfo);
@@ -26,15 +42,16 @@ namespace Lucy {
 		RenderCommandList& operator=(RenderCommandList&&) noexcept = default;
 
 		RenderCommand& BeginRenderCommand(const std::string& nameOfDraw);
-		void EndRenderCommand() const;
+		void EndRenderCommand();
 
 		bool IsCurrentFrameSlotAvailable(uint32_t frameIndex) const;
 		bool IsCurrentFrameSlotRecorded(uint32_t frameIndex) const;
 
 		explicit operator bool() const { return !m_RenderCommands.empty(); }
 
-		inline TargetQueueFamily GetTargetQueueFamily() const { return m_CreateInfo.TargetQueueFamily; }
-		inline Ref<CommandPool> GetPrimaryCommandPool() const { return m_PrimaryCommandPool; }
+		TargetQueueFamily GetTargetQueueFamily() const { return m_CreateInfo.TargetQueueFamily; }
+		Ref<CommandPool> GetPrimaryCommandPool() const { return m_PrimaryCommandPool; }
+		const RenderCommandListQueryData& GetQueryData(uint32_t frameIndex) const { return m_QueryDatas[frameIndex]; }
 	private:
 		void Reset();
 		void ResetRenderCommand(uint32_t frameIndex);
@@ -46,6 +63,8 @@ namespace Lucy {
 		RenderCommandListCreateInfo m_CreateInfo;
 		Ref<CommandPool> m_PrimaryCommandPool = nullptr;
 		//Ref<CommandPool> m_SecondaryCommandPool = nullptr;
+
+		std::vector<RenderCommandListQueryData> m_QueryDatas;
 
 		friend class RenderCommandQueue; //for Destroy/Recreate
 		friend class VulkanRenderer; //for ResetRenderCommand

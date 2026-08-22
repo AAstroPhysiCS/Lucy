@@ -71,16 +71,16 @@ namespace Lucy {
 				Bit mask that specifies which view rendering is broadcast to
 				For example; 0011 = Broadcast to first and second view (layer)
 			*/
-			uint32_t ViewMask = 0x7FFFFFFFu;
+			uint32_t ViewMask = 0u;
 
 			/*
 				Bit mask that specifies correlation between views
 				An implementation may use this for optimizations (concurrent render)
 			*/
-			uint32_t CorrelationMask = 0x7FFFFFFFu;
+			uint32_t CorrelationMask = 0u;
 
 			inline bool IsValid() const {
-				return ViewMask != 0x7FFFFFFFu && CorrelationMask != 0x7FFFFFFFu;
+				return ViewMask != 0;
 			}
 		};
 

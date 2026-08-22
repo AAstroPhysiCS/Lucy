@@ -37,8 +37,9 @@ namespace Lucy {
 		void ImportExternalResource(const RenderGraphResource& rgResource, const std::vector<RenderDeviceResourceHandle>& handles, RGResourceData data = {});
 		void ImportExternalTransientResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle);
 
-		inline DirectedAcyclicGraph<RenderGraphPass, RenderGraphResource>& GetAcyclicGraph() { return m_AcyclicGraph; }
-		inline size_t GetPassCount() const { return m_Passes.size(); }
+		DirectedAcyclicGraph<RenderGraphPass, RenderGraphResource>& GetAcyclicGraph() { return m_AcyclicGraph; }
+		const RenderGraphRegistry& GetRegistry() const { return m_Registry; }
+		size_t GetPassCount() const { return m_Passes.size(); }
 	private:
 		template <typename TFunc>
 		inline void Traverse(TFunc&& func) {

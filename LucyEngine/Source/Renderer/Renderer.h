@@ -75,7 +75,6 @@ namespace Lucy {
 			return device->AccessResource<TResource>(handle);
 		}
 
-		static void RTDirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size);
 		static void SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func);
 
 		static void EnqueueToRenderCommandQueue(RenderCommandFunc&& func);

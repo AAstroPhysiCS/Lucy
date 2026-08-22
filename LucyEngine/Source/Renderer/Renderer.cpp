@@ -198,15 +198,17 @@ namespace Lucy {
 				.DepthAttachment = depthAttachment
 			};
 
-			uint32_t viewMask = maxLayerCount == 1 ? 0x7FFFFFFFu : (1u << maxLayerCount) - 1;
-			uint32_t correlationMask = maxLayerCount == 1 ? 0x7FFFFFFFu : (1u << 2) - 1;
+			//uint32_t viewMask = maxLayerCount == 1 ? 0x7FFFFFFFu : (1u << maxLayerCount) - 1;
+			//uint32_t correlationMask = maxLayerCount == 1 ? 0x7FFFFFFFu : (1u << 2) - 1;
+
+			uint32_t viewMask = maxLayerCount > 1 ? (1u << maxLayerCount) - 1 : 0;
 
 			RenderPassCreateInfo passCreateInfo {
 				.ClearColor = currentPass->GetClearColor(),
 				.Layout = passLayout,
 				.Multiview = {
 					.ViewMask = viewMask,
-					.CorrelationMask = correlationMask
+					.CorrelationMask = viewMask
 				},
 			};
 
@@ -372,11 +374,8 @@ namespace Lucy {
 #endif
 			};
 
-#if USE_COMPUTE_FOR_CUBEMAP_GEN
-			constexpr size_t computePipelineCount = 10;
-#else
-			constexpr size_t computePipelineCount = 4;
-#endif
+			constexpr size_t computePipelineCount = 15;
+
 			constexpr const std::array<RenderGraphPipelineCreateInfo, computePipelineCount> computePipelineCreateInfos = {
 #if USE_COMPUTE_FOR_CUBEMAP_GEN
 				RenderGraphPipelineCreateInfo {
@@ -416,14 +415,39 @@ namespace Lucy {
 					.PipelineName = "GPUCullMeshletsPipeline"
 				},
 				RenderGraphPipelineCreateInfo {
+					.ShaderName = "LucyGPUCull",
+					.EntryPointName = "BuildSubmeshDispatch",
+					.PipelineName = "GPUBuildSubmeshDispatchPipeline"
+				},
+				RenderGraphPipelineCreateInfo {
+					.ShaderName = "LucyGPUCull",
+					.EntryPointName = "CullSubmeshes",
+					.PipelineName = "GPUCullSubmeshesPipeline"
+				},
+				RenderGraphPipelineCreateInfo {
 					.ShaderName = "LucyGPUCullShadows",
 					.EntryPointName = "CullShadowObjects",
 					.PipelineName = "GPUCullShadowObjectsPipeline"
 				},
 				RenderGraphPipelineCreateInfo {
 					.ShaderName = "LucyGPUCullShadows",
-					.EntryPointName = "BuildShadowMeshletDispatches",
-					.PipelineName = "GPUBuildShadowMeshletDispatchesPipeline"
+					.EntryPointName = "BuildShadowSubmeshDispatch",
+					.PipelineName = "GPUBuildShadowSubmeshDispatchPipeline"
+				},
+				RenderGraphPipelineCreateInfo {
+					.ShaderName = "LucyGPUCullShadows",
+					.EntryPointName = "CullShadowSubmeshes",
+					.PipelineName = "GPUCullShadowSubmeshesPipeline"
+				},
+				RenderGraphPipelineCreateInfo {
+					.ShaderName = "LucyGPUCullShadows",
+					.EntryPointName = "BuildShadowMeshletDispatch",
+					.PipelineName = "GPUBuildShadowMeshletDispatchPipeline"
+				},
+				RenderGraphPipelineCreateInfo {
+					.ShaderName = "LucyGPUCullShadows",
+					.EntryPointName = "CullShadowMeshlets",
+					.PipelineName = "GPUCullShadowMeshletsPipeline"
 				}
 			};
 
@@ -445,7 +469,7 @@ namespace Lucy {
 			taskScheduler->WaitForAllTasks();
 		}
 
-		device->CreatePipelineDeviceQueries(s_PipelineManager->GetGraphicsPipelineCount());
+		device->CreatePipelineDeviceQueries(s_PipelineManager->GetGraphicsPipelineCount() * 6); //some of my passes include viewmasks... and it crashes if you do not include them.
 		device->CreateTimestampDeviceQueries(s_RenderGraph->GetPassCount());
 	}
 
@@ -554,11 +578,6 @@ namespace Lucy {
 			return device->AccessResource<Image>(frameBuffer->As<VulkanFrameBuffer>()->GetImageHandles()[GetCurrentFrameIndex()]);
 		LUCY_ASSERT(false);
 		return nullptr;
-	}
-
-	void Renderer::RTDirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size) {
-		LUCY_ASSERT(IsOnRenderThread(), "RTDirectCopyBuffer is being called from the main thread!");
-		s_Backend->As<VulkanRenderer>()->RTDirectCopyBuffer(stagingBuffer, buffer, size);
 	}
 
 	void Renderer::SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func) {

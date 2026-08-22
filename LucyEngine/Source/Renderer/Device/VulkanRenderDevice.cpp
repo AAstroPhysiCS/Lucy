@@ -19,6 +19,7 @@
 #include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanDeviceAddressBuffer.h"
 #include "Renderer/Memory/VulkanAllocator.h"
+#include "Renderer/Memory/VulkanRenderDeviceUploadManager.h"
 
 #include "Renderer/Descriptors/DescriptorSetManager.h"
 
@@ -55,10 +56,8 @@ namespace Lucy {
 		LUCY_VK_ASSERT(vkCreateFence(m_LogicalDevice, &fenceCreateInfo, nullptr, &m_ImmediateSubmitFence));
 
 		m_DescriptorSetManager = Memory::CreateUnique<VulkanDescriptorSetManager>(this);
+		m_UploadManager = Memory::CreateUnique<VulkanRenderDeviceUploadManager>(shared_from_this()->As<VulkanRenderDevice>());
 		m_DeviceScene = Memory::CreateUnique<RenderDeviceScene>(this);
-
-		//const auto& globalPerFrameHandle = m_DescriptorSetManager->GetGlobalDescriptorSet(0);
-		//const auto& globalTextureTableHandle = m_DescriptorSetManager->GetGlobalDescriptorSet(1);
 	}
 
 	void VulkanRenderDevice::PickDeviceByRanking(const std::vector<VkPhysicalDevice>& devices) {
@@ -467,6 +466,7 @@ namespace Lucy {
 		scene->RTDestroy();
 
 		m_DescriptorSetManager->RTDestroy();
+		m_UploadManager->Destroy(m_Allocator);
 		m_Allocator.Destroy();
 		vkDestroyFence(m_LogicalDevice, m_ImmediateSubmitFence, nullptr);
 		vkDestroyDevice(m_LogicalDevice, nullptr);
@@ -497,6 +497,28 @@ namespace Lucy {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::FillBuffer");
 		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 		vkCmdFillBuffer((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex), buffer->As<VulkanDeviceAddressBuffer>()->GetVulkanBufferHandle(), offset, size, value);
+	}
+
+	void VulkanRenderDevice::CopyBuffer(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> srcBuffer, Ref<RenderDeviceBuffer> dstBuffer, size_t srcOffset, size_t dstOffset, size_t size) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::CopyBuffer");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(cmdPool->GetCommandBuffer(frameIndex));
+
+		VkBufferCopy copyRegion{};
+		copyRegion.srcOffset = srcOffset;
+		copyRegion.dstOffset = dstOffset;
+		copyRegion.size = size;
+		vkCmdCopyBuffer(commandBuffer, srcBuffer->As<VulkanDeviceAddressBuffer>()->GetVulkanBufferHandle(), 
+			dstBuffer->As<VulkanDeviceAddressBuffer>()->GetVulkanBufferHandle(), 1, &copyRegion);
+	}
+
+	void VulkanRenderDevice::CopyBuffer(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> srcBuffer, Ref<RenderDeviceBuffer> dstBuffer, const std::vector<const void*>& regions) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::CopyBuffer");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(cmdPool->GetCommandBuffer(frameIndex));
+
+		vkCmdCopyBuffer(commandBuffer, srcBuffer->As<VulkanDeviceAddressBuffer>()->GetVulkanBufferHandle(), 
+			dstBuffer->As<VulkanDeviceAddressBuffer>()->GetVulkanBufferHandle(), regions.size(), reinterpret_cast<const VkBufferCopy*>(regions.data()));
 	}
 
 	void VulkanRenderDevice::BindBuffers(Ref<CommandPool> cmdPool, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) {
@@ -746,10 +768,25 @@ namespace Lucy {
 #endif
 	}
 
+	void VulkanRenderDevice::BeginDebugMarker(VkCommandBuffer commandBuffer, const char* labelName) {
+#if LUCY_DEBUG
+		VkDebugUtilsLabelEXT labelInfo{};
+		labelInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+		labelInfo.pLabelName = labelName;
+		VulkanExternalFuncLinkage::vkCmdBeginDebugUtilsLabelEXT(commandBuffer, &labelInfo);
+#endif
+	}
+
 	void VulkanRenderDevice::EndDebugMarker(Ref<CommandPool> cmdPool) {
 		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 #if LUCY_DEBUG
 		VulkanExternalFuncLinkage::vkCmdEndDebugUtilsLabelEXT((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex));
+#endif
+	}
+
+	void VulkanRenderDevice::EndDebugMarker(VkCommandBuffer commandBuffer) {
+#if LUCY_DEBUG
+		VulkanExternalFuncLinkage::vkCmdEndDebugUtilsLabelEXT(commandBuffer);
 #endif
 	}
 

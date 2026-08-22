@@ -46,7 +46,7 @@ namespace Lucy {
 		void operator+=(RenderSubmitInfo&& info);
 
 		std::vector<RenderCommandList>& GetCommandLists(TargetQueueFamily family);
-		inline const std::vector<RenderCommandList>& GetCommandLists(TargetQueueFamily family) const {
+		const std::vector<RenderCommandList>& GetCommandLists(TargetQueueFamily family) const {
 			return const_cast<std::vector<RenderCommandList>&>(std::as_const(*this).GetCommandLists(family));
 		}
 

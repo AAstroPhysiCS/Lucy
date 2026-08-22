@@ -51,20 +51,20 @@ namespace Lucy {
 		m_FrameFenceValues.resize(m_MaxFramesInFlight, 0);
 
 		for (size_t i = 0; i < m_MaxFramesInFlight; i++) {
-			m_InFlightFences.emplace_back(SemaphoreType::Timeline, m_RenderDevice);
-			m_ImageAvailableSemaphores.emplace_back(SemaphoreType::Binary, m_RenderDevice);
-			m_SceneFinishedSemaphores.emplace_back(SemaphoreType::Binary, m_RenderDevice);
+			m_InFlightFences.emplace_back(SemaphoreType::Timeline, vulkanDevice);
+			m_ImageAvailableSemaphores.emplace_back(SemaphoreType::Binary, vulkanDevice);
+			m_SceneFinishedSemaphores.emplace_back(SemaphoreType::Binary, vulkanDevice);
 		}
 
 		for (size_t i = 0; i < swapImageCount; i++) {
-			m_RenderFinishedSemaphores.emplace_back(SemaphoreType::Binary, m_RenderDevice);
+			m_RenderFinishedSemaphores.emplace_back(SemaphoreType::Binary, vulkanDevice);
 		}
 
-		m_TransientCommandPool = Memory::CreateRef<VulkanTransientCommandPool>(vulkanDevice);
+		m_TransientCommandPool = Memory::CreateUnique<VulkanTransientCommandPool>(vulkanDevice);
 
 		//for imgui
 		m_ImGuiRenderCommandList = Memory::CreateUnique<RenderCommandList>(RenderCommandListCreateInfo{
-			.RenderDevice = m_RenderDevice,
+			.RenderDevice = vulkanDevice,
 			.TargetQueueFamily = TargetQueueFamily::Graphics
 		});
 	}
@@ -81,6 +81,12 @@ namespace Lucy {
 
 			const uint64_t frameValue = m_FrameFenceValues[m_CurrentFrameIndex];
 			m_InFlightFences[m_CurrentFrameIndex].Wait(frameValue);
+
+			if (frameValue > 0)
+				ProcessQueryResults();
+
+			renderDevice->ResetPipelineQuery(m_CurrentFrameIndex);
+			renderDevice->ResetTimestampQuery(m_CurrentFrameIndex);
 			
 			m_RenderCommandQueue->ResetFrameSlotRecordersIfCompleted(m_CurrentFrameIndex, TargetQueueFamily::Graphics);
 			m_RenderCommandQueue->ResetFrameSlotRecordersIfCompleted(m_CurrentFrameIndex, TargetQueueFamily::Compute);
@@ -106,10 +112,9 @@ namespace Lucy {
 		if (m_LastSwapChainResult == ERROR_OUT_OF_DATE_KHR || m_LastSwapChainResult == SUBOPTIMAL_KHR || m_LastSwapChainResult == NOT_READY)
 			return;
 
+		const auto& vulkanDevice = m_RenderDevice->As<VulkanRenderDevice>();
 		auto& submitQueue = m_RenderCommandQueue->GetRenderSubmitQueue();
 		const bool hasSceneWork = !submitQueue.empty();
-
-		m_CommandQueueMetricsOutput.Time = 0.0;
 
 		uint64_t signalValue = m_FrameFenceValues[m_CurrentFrameIndex] + 1;
 
@@ -122,37 +127,43 @@ namespace Lucy {
 			for (auto& [id, info] : submitQueue) {
 				auto& vkBatch = info.Batch.AsVulkanBatch();
 
-				auto& cmdList = m_RenderCommandQueue->GetNextAvailableCommandList(m_CurrentFrameIndex, vkBatch.QueueFamily);
+				RenderCommandList& cmdList = m_RenderCommandQueue->GetNextAvailableCommandList(m_CurrentFrameIndex, vkBatch.QueueFamily);
 				const auto& primaryCommandPool = cmdList.GetPrimaryCommandPool();
-
-				m_RenderDevice->BeginCommandBuffer(primaryCommandPool);
+				
+				vulkanDevice->BeginCommandBuffer(primaryCommandPool);
 
 				if (!vkBatch.PreBatchBarrier.ImageBarriers.empty() || !vkBatch.PreBatchBarrier.BufferBarriers.empty()) {
 					VkCommandBuffer cmdBuffer = static_cast<VkCommandBuffer>(primaryCommandPool->GetCommandBuffer(m_CurrentFrameIndex));
+					vulkanDevice->BeginDebugMarker(cmdBuffer, "PreBatchVulkanBarrier");
 					ExecuteVulkanBatchBarrier(cmdBuffer, vkBatch.PreBatchBarrier);
+					vulkanDevice->EndDebugMarker(cmdBuffer);
 				}
 
 				for (size_t i = 0; i < info.SubmitFuncs.size(); i++) {
 					RenderGraphPass* pass = vkBatch.Passes[i];
-					auto it = std::ranges::find_if(vkBatch.PassBarriers, [&](const VulkanPassBarrier& passBarrier) {
+					/*auto it = std::ranges::find_if(vkBatch.PassBarriers, [&](const VulkanPassBarrier& passBarrier) {
 						return passBarrier.Pass == pass;
-					});
+					});*/
 
-					if (it != vkBatch.PassBarriers.end()) {
+					/*if (it != vkBatch.PassBarriers.end()) {
 						VkCommandBuffer cmdBuffer = static_cast<VkCommandBuffer>(primaryCommandPool->GetCommandBuffer(m_CurrentFrameIndex));
+						vulkanDevice->BeginDebugMarker(cmdBuffer, "PassVulkanBarrier");
 						ExecuteVulkanBatchBarrier(cmdBuffer, it->Barrier);
-					}
+						vulkanDevice->EndDebugMarker(cmdBuffer);
+					}*/
 
 					info.SubmitFuncs[i](cmdList);
 				}
 
 				if (!vkBatch.PostBatchBarrier.ImageBarriers.empty() || !vkBatch.PostBatchBarrier.BufferBarriers.empty()) {
 					VkCommandBuffer cmdBuffer = static_cast<VkCommandBuffer>(primaryCommandPool->GetCommandBuffer(m_CurrentFrameIndex));
+					vulkanDevice->BeginDebugMarker(cmdBuffer, "PostBatchVulkanBarrier");
 					ExecuteVulkanBatchBarrier(cmdBuffer, vkBatch.PostBatchBarrier);
+					vulkanDevice->EndDebugMarker(cmdBuffer);
 				}
 
-				m_RenderDevice->EndCommandBuffer(primaryCommandPool);
-				m_RenderDevice->SubmitWorkToGPUAsBatch(cmdList, info.Batch);
+				vulkanDevice->EndCommandBuffer(primaryCommandPool);
+				vulkanDevice->SubmitWorkToGPUAsBatch(cmdList, info.Batch);
 			}
 		}
 
@@ -184,6 +195,53 @@ namespace Lucy {
 			(*it)(m_RenderDevice);
 
 		deletionQueue.clear();
+	}
+
+	void VulkanRenderer::ProcessQueryResults() {
+		m_CommandQueueMetricsOutput.Time = 0;
+		m_CommandQueueMetricsOutput.TimeOfPasses.clear();
+
+		const auto& vulkanDevice = m_RenderDevice->As<VulkanRenderDevice>();
+		auto timestampResults = vulkanDevice->GetQueryResults(RenderDeviceQueryType::Timestamp, m_CurrentFrameIndex);
+		auto pipelineResults = vulkanDevice->GetQueryResults(RenderDeviceQueryType::Pipeline, m_CurrentFrameIndex);
+
+		const auto ProcessQuery = [](const RenderCommandListQueryData& queryData, const std::vector<uint64_t>& results, double timestampPeriod) -> RenderCommandQueueMetricsOutput {
+			RenderCommandQueueMetricsOutput metricsOutput{};
+			metricsOutput.Time = 0.0;
+			for (const auto& scope : queryData.TimestampScopes) {
+				uint64_t begin = results[scope.BeginQueryIndex];
+				uint64_t end = results[scope.EndQueryIndex];
+				float ms = static_cast<float>(end - begin) * timestampPeriod / 1000000.0f;
+				metricsOutput.TimeOfPasses[scope.PassName] = ms;
+				metricsOutput.Time += ms;
+			}
+			return metricsOutput;
+		};
+
+		const auto& cmdListsGraphics = m_RenderCommandQueue->GetCommandLists(TargetQueueFamily::Graphics);
+		const auto& cmdListsCompute = m_RenderCommandQueue->GetCommandLists(TargetQueueFamily::Compute);
+
+		for (const auto& cmdList : cmdListsGraphics) {
+			const auto& queryData = cmdList.GetQueryData(m_CurrentFrameIndex);
+			if (!queryData.TimestampScopes.empty()) {
+				auto metricsOutput = ProcessQuery(queryData, timestampResults, vulkanDevice->GetTimestampPeriod());
+				m_CommandQueueMetricsOutput.Time += metricsOutput.Time;
+				for (const auto& [passName, time] : metricsOutput.TimeOfPasses)
+					m_CommandQueueMetricsOutput.TimeOfPasses[passName] += time;
+			}
+		}
+
+		for (const auto& cmdList : cmdListsCompute) {
+			const auto& queryData = cmdList.GetQueryData(m_CurrentFrameIndex);
+			if (!queryData.TimestampScopes.empty()) {
+				auto metricsOutput = ProcessQuery(queryData, timestampResults, vulkanDevice->GetTimestampPeriod());
+				m_CommandQueueMetricsOutput.Time += metricsOutput.Time;
+				for (const auto& [passName, time] : metricsOutput.TimeOfPasses)
+					m_CommandQueueMetricsOutput.TimeOfPasses[passName] += time;
+			}
+		}
+
+
 	}
 
 	void VulkanRenderer::InternalImGuiPass(uint64_t signalValue, bool hasSceneWork) {
@@ -227,7 +285,9 @@ namespace Lucy {
 				case TargetQueueFamily::Graphics: return VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
 				case TargetQueueFamily::Compute:  return VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
 				case TargetQueueFamily::Transfer: return VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-				default:                          return VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+				default:                          
+					LUCY_ASSERT(false);
+					return VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 			}
 		};
 
@@ -236,7 +296,9 @@ namespace Lucy {
 				case TargetQueueFamily::Graphics: return VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
 				case TargetQueueFamily::Compute:  return VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
 				case TargetQueueFamily::Transfer: return VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-				default:                          return VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+				default:                          
+					LUCY_ASSERT(false);
+					return VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 			}
 		};
 
@@ -315,6 +377,13 @@ namespace Lucy {
 						break;
 					}
 					case TargetQueueFamily::Graphics: {
+						if (!renderFrameHandleMap.contains(pass->GetName())) {
+							passExecuteFuncs.push_back([=](RenderCommandList& cmdList) {
+								LUCY_PROFILE_NEW_EVENT("RendererBackend::SubmitToCompute");
+								pass->Execute(cmdList);
+							});
+							break;
+						}
 						const auto& [renderPassHandle, frameBufferHandle] = renderFrameHandleMap.at(pass->GetName());
 						passExecuteFuncs.push_back([=](RenderCommandList& cmdList) {
 							LUCY_PROFILE_NEW_EVENT("RendererBackend::SubmitToRender");
@@ -351,6 +420,7 @@ namespace Lucy {
 		FlushCommandQueue();
 
 		m_RenderDevice->GetScene()->SyncFrame(m_CurrentFrameIndex);
+		m_RenderDevice->As<VulkanRenderDevice>()->GetUploadManager()->SyncFrame(m_CurrentFrameIndex);
 
 		RenderFrame();
 
@@ -392,31 +462,6 @@ namespace Lucy {
 
 		FlushCommandQueue();
 		RendererBackend::Destroy();
-	}
-
-	// Should not be used in a loop 
-	void VulkanRenderer::RTDirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size) {
-		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::RTDirectCopyBuffer");
-		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
-		renderDevice->SubmitImmediateCommand([&](VkCommandBuffer commandBuffer) {
-			VkBufferCopy copyRegion = VulkanAPI::BufferCopy(0, 0, size);
-
-			VkMemoryBarrier2 barrier{};
-			barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
-			barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
-			barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-			barrier.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
-			barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-
-			VkDependencyInfo depInfo{};
-			depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-			depInfo.memoryBarrierCount = 1;
-			depInfo.pMemoryBarriers = &barrier;
-
-			vkCmdPipelineBarrier2(commandBuffer, &depInfo);
-			vkCmdCopyBuffer(commandBuffer, stagingBuffer, buffer, 1, &copyRegion);
-			vkCmdPipelineBarrier2(commandBuffer, &depInfo);
-		}, m_TransientCommandPool);
 	}
 
 	// Should not be used in a loop 
@@ -469,7 +514,7 @@ namespace Lucy {
 
 		auto& allocator = GetRenderDevice()->As<VulkanRenderDevice>()->GetAllocator();
 		if (!s_IDBuffer)
-			allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, false, s_IDBuffer, s_IDBufferVma);
+			allocator.CreateVulkanBufferVma(MemoryUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, false, s_IDBuffer, s_IDBufferVma);
 
 		image->SetLayoutImmediate(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 		image->CopyImageToBufferImmediate(s_IDBuffer);

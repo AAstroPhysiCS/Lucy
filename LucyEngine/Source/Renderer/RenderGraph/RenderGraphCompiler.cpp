@@ -22,7 +22,7 @@ namespace Lucy {
 		: RenderGraphCompiler(renderGraph, device) {
 	}
 
-	std::vector<ExecutionBatch> VulkanRenderGraphCompiler::Compile(const RenderGraphBatches& batches) {
+	std::vector<ExecutionBatch> VulkanRenderGraphCompiler::Compile(RenderGraphBatches&& batches) {
 		GetExecutionBatchIDProvider().Reset();
 
 		const auto& renderGraph = GetRenderGraph();
@@ -165,12 +165,12 @@ namespace Lucy {
 
 		auto& idProvider = GetExecutionBatchIDProvider();
 
-		for (const auto& rgBatch : batches) {
+		for (auto& rgBatch : batches) {
 			TargetQueueFamily family = rgBatch.Passes[0]->GetTargetQueueFamily();
 
 			ExecutionBatch batch = VulkanExecutionBatch{
 				.QueueFamily = family,
-				.Passes = rgBatch.Passes,
+				.Passes = std::move(rgBatch.Passes),
 			};
 			batch.ID = idProvider.RequestID();
 
@@ -193,34 +193,12 @@ namespace Lucy {
 				if (br.ResourceType == RenderGraphResourceType::Image) {
 					auto image = renderGraph.GetImageByRGResource(br.Resource)->As<VulkanImage>();
 					LUCY_ASSERT(image->GetVulkanHandle(), "Image handle is null");
-					it->Barrier.ImageBarriers.push_back(
-						VulkanImageMemoryBarrier{
-							image,
-							CreateSameQueueImageBarrier(
-								family,
-								image,
-								br.SrcAccess,
-								br.DstAccess
-							)
-						}
-					);
+					it->Barrier.ImageBarriers.emplace_back(image, CreateSameQueueImageBarrier(family, image, br.SrcAccess, br.DstAccess));
 				} else {
 					if (auto buffer = renderGraph.GetBufferByRGResource(br.Resource)->As<VulkanDeviceAddressBuffer>()) {
-						it->Barrier.BufferBarriers.push_back(
-							CreateSameQueueBufferBarrier(
-							family,
-							buffer,
-							br.SrcAccess,
-							br.DstAccess
-						));
+						it->Barrier.BufferBarriers.emplace_back(CreateSameQueueBufferBarrier(family, buffer, br.SrcAccess, br.DstAccess));
 					} else if (auto buffer = renderGraph.GetBufferByRGResource(br.Resource)->As<VulkanSharedStorageBuffer>()) {
-						it->Barrier.BufferBarriers.push_back(
-							CreateSameQueueBufferBarrier(
-							family,
-							buffer,
-							br.SrcAccess,
-							br.DstAccess
-						));
+						it->Barrier.BufferBarriers.emplace_back(CreateSameQueueBufferBarrier(family, buffer, br.SrcAccess, br.DstAccess));
 					}
 				}
 			}
@@ -230,18 +208,12 @@ namespace Lucy {
 				if (tr.ResourceType == RenderGraphResourceType::Image) {
 					auto image = renderGraph.GetImageByRGResource(tr.Resource)->As<VulkanImage>();
 					LUCY_ASSERT(image->GetVulkanHandle(), "Image handle is null");
-					vkBatch.PreBatchBarrier.ImageBarriers.push_back(
-						VulkanImageMemoryBarrier{ image, CreateAcquireImageBarrier(tr.SrcQueue, tr.DstQueue, image, tr.SrcAccess, tr.DstAccess) }
-					);
+					vkBatch.PreBatchBarrier.ImageBarriers.emplace_back(image, CreateAcquireImageBarrier(tr.SrcQueue, tr.DstQueue, image, tr.SrcAccess, tr.DstAccess));
 				} else {
 					if (auto buffer = renderGraph.GetBufferByRGResource(tr.Resource)->As<VulkanSharedStorageBuffer>()) {
-						vkBatch.PreBatchBarrier.BufferBarriers.push_back(
-							CreateAcquireBufferBarrier(tr.SrcQueue, tr.DstQueue, buffer, tr.DstAccess)
-						);
+						vkBatch.PreBatchBarrier.BufferBarriers.emplace_back(CreateAcquireBufferBarrier(tr.SrcQueue, tr.DstQueue, buffer, tr.DstAccess));
 					} else if (auto buffer = renderGraph.GetBufferByRGResource(tr.Resource)->As<VulkanDeviceAddressBuffer>()) {
-						vkBatch.PreBatchBarrier.BufferBarriers.push_back(
-							CreateAcquireBufferBarrier(tr.SrcQueue, tr.DstQueue, buffer, tr.DstAccess)
-						);
+						vkBatch.PreBatchBarrier.BufferBarriers.emplace_back(CreateAcquireBufferBarrier(tr.SrcQueue, tr.DstQueue, buffer, tr.DstAccess));
 					}
 				}
 			}
@@ -251,23 +223,17 @@ namespace Lucy {
 				if (tr.ResourceType == RenderGraphResourceType::Image) {
 					auto image = renderGraph.GetImageByRGResource(tr.Resource)->As<VulkanImage>();
 					LUCY_ASSERT(image->GetVulkanHandle(), "Image handle is null");
-					vkBatch.PostBatchBarrier.ImageBarriers.push_back(
-						VulkanImageMemoryBarrier{ image, CreateReleaseImageBarrier(tr.SrcQueue, tr.DstQueue, image, tr.SrcAccess, tr.DstAccess) }
-					);
+					vkBatch.PostBatchBarrier.ImageBarriers.emplace_back(image, CreateReleaseImageBarrier(tr.SrcQueue, tr.DstQueue, image, tr.SrcAccess, tr.DstAccess));
 				} else {
 					if (auto buffer = renderGraph.GetBufferByRGResource(tr.Resource)->As<VulkanSharedStorageBuffer>()) {
-						vkBatch.PostBatchBarrier.BufferBarriers.push_back(
-							CreateReleaseBufferBarrier(tr.SrcQueue, tr.DstQueue, buffer, tr.SrcAccess)
-						);
+						vkBatch.PostBatchBarrier.BufferBarriers.emplace_back(CreateReleaseBufferBarrier(tr.SrcQueue, tr.DstQueue, buffer, tr.SrcAccess));
 					} else if (auto buffer = renderGraph.GetBufferByRGResource(tr.Resource)->As<VulkanDeviceAddressBuffer>()) {
-						vkBatch.PostBatchBarrier.BufferBarriers.push_back(
-							CreateReleaseBufferBarrier(tr.SrcQueue, tr.DstQueue, buffer, tr.SrcAccess)
-						);
+						vkBatch.PostBatchBarrier.BufferBarriers.emplace_back(CreateReleaseBufferBarrier(tr.SrcQueue, tr.DstQueue, buffer, tr.SrcAccess));
 					}
 				}
 			}
 
-			result.push_back(std::move(batch));
+			result.emplace_back(std::move(batch));
 		}
 
 		return result;

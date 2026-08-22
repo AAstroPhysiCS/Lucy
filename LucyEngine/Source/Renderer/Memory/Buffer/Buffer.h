@@ -50,6 +50,7 @@ namespace Lucy {
 		}
 
 		void Resize(size_t size) {
+			LUCY_PROFILE_NEW_EVENT("Buffer::Resize");
 			m_Data.resize(size);
 		}
 
@@ -69,11 +70,13 @@ namespace Lucy {
 		}
 
 		void SetData(T* data, size_t size) {
+			LUCY_PROFILE_NEW_EVENT("Buffer::SetData");
 			Resize(size);
 			memcpy(m_Data.data(), data, size);
 		}
 
 		void SetData(const Buffer<T>& other) {
+			LUCY_PROFILE_NEW_EVENT("Buffer::SetData");
 			SetData(other.m_Data);
 		}
 

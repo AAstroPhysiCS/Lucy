@@ -27,9 +27,6 @@ namespace Lucy {
 
 		VkBuffer m_BufferHandle = VK_NULL_HANDLE;
 		VmaAllocation m_BufferVma = VK_NULL_HANDLE;
-
-		VkBuffer m_StagingBufferHandle = VK_NULL_HANDLE;
-		VmaAllocation m_StagingBufferVma = VK_NULL_HANDLE;
 	};
 }
 

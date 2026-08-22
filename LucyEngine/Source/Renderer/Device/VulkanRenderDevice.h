@@ -2,6 +2,7 @@
 
 #include "RenderDevice.h"
 #include "Renderer/Memory/VulkanAllocator.h"
+#include "Renderer/Memory/VulkanRenderDeviceUploadManager.h"
 
 #include "Renderer/Memory/Buffer/PushConstant.h"
 
@@ -54,7 +55,9 @@ namespace Lucy {
 		void BeginCommandBuffer(Ref<CommandPool> cmdPool);
 		void EndCommandBuffer(Ref<CommandPool> cmdPool);
 
-		void FillBuffer(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset, size_t size, uint32_t value);
+		void FillBuffer(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset, size_t size, uint32_t value) final override;
+		void CopyBuffer(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> srcBuffer, Ref<RenderDeviceBuffer> dstBuffer, size_t srcOffset, size_t dstOffset, size_t size) final override;
+		void CopyBuffer(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> srcBuffer, Ref<RenderDeviceBuffer> dstBuffer, const std::vector<const void*>& regions) final override;
 
 		void BindBuffers(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> indexBuffer) final override;
 		void BindBuffers(Ref<CommandPool> cmdPool, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) final override;
@@ -89,7 +92,9 @@ namespace Lucy {
 		void EndRenderPass(Ref<RenderPass> renderPass) final override;
 
 		void BeginDebugMarker(Ref<CommandPool> cmdPool, const char* labelName) final override;
+		void BeginDebugMarker(VkCommandBuffer commandBuffer, const char* labelName);
 		void EndDebugMarker(Ref<CommandPool> cmdPool) final override;
+		void EndDebugMarker(VkCommandBuffer commandBuffer);
 
 		void RegisterShaderBindings(const Ref<Shader>& shader) final override;
 
@@ -102,15 +107,15 @@ namespace Lucy {
 		void WaitForDevice() final override;
 		void WaitForQueue(TargetQueueFamily queueFamily) final override;
 
-		inline VulkanDeviceInfo& GetDeviceInformation() { return m_DeviceInfo; }
+		VulkanDeviceInfo& GetDeviceInformation() { return m_DeviceInfo; }
 
 		std::vector<RenderDeviceResourceHandle> GetResourceBindingHandles(const Ref<Shader>& shader) const final override;
 
-		inline VkPhysicalDevice GetPhysicalDevice() const { return m_PhysicalDevice; }
-		inline VkDevice GetLogicalDevice() const { return m_LogicalDevice; }
-		inline QueueFamilyIndices GetQueueFamilies() const { return m_QueueFamilyIndices; }
+		VkPhysicalDevice GetPhysicalDevice() const { return m_PhysicalDevice; }
+		VkDevice GetLogicalDevice() const { return m_LogicalDevice; }
+		QueueFamilyIndices GetQueueFamilies() const { return m_QueueFamilyIndices; }
 
-		inline auto GetQueue(TargetQueueFamily queueFamily) {
+		auto GetQueue(TargetQueueFamily queueFamily) {
 			struct Result {
 				uint32_t Family;
 				VkQueue Handle;
@@ -124,12 +129,14 @@ namespace Lucy {
 			}
 		}
 
-		inline VkQueue GetPresentQueue() const { return m_PresentQueue; }
+		const Unique<VulkanRenderDeviceUploadManager>& GetUploadManager() const { return m_UploadManager; }
 
-		inline VulkanAllocator& GetAllocator() { return m_Allocator; }
+		VkQueue GetPresentQueue() const { return m_PresentQueue; }
 
-		inline uint32_t GetMinUniformBufferOffsetAlignment() const { return m_DeviceInfo.MinUniformBufferAlignment; }
-		inline float GetTimestampPeriod() const { return m_DeviceInfo.TimestampPeriod; }
+		VulkanAllocator& GetAllocator() { return m_Allocator; }
+
+		uint32_t GetMinUniformBufferOffsetAlignment() const { return m_DeviceInfo.MinUniformBufferAlignment; }
+		float GetTimestampPeriod() const { return m_DeviceInfo.TimestampPeriod; }
 	private:
 		void SubmitWorkToGPUImmediate(VkQueue queueHandle, size_t commandBufferCount, void* commandBufferHandles) const;
 
@@ -175,5 +182,6 @@ namespace Lucy {
 		VkFence m_ImmediateSubmitFence = VK_NULL_HANDLE;
 
 		Unique<VulkanDescriptorSetManager> m_DescriptorSetManager = nullptr;
+		Unique<VulkanRenderDeviceUploadManager> m_UploadManager = nullptr;
 	};
 }

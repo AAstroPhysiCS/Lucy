@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Renderer/Device/RenderDeviceResource.h"
+#include "Renderer/Memory/VulkanAllocator.h" //TODO: Change this
 
 namespace Lucy {
 
@@ -37,6 +38,7 @@ namespace Lucy {
         std::string DebugName = "RenderDeviceBuffer";
         RenderDeviceSize Size = 0;
         BufferUsage Usage = BufferUsage::None;
+        MemoryUsage MemoryUsage = MemoryUsage::GPUOnly;
     };
 
     class RenderDeviceBuffer : public RenderDeviceResource {

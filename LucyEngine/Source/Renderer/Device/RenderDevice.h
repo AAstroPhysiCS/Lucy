@@ -104,13 +104,15 @@ namespace Lucy {
 
 		[[nodiscard]] uint32_t RTBeginTimestamp(Ref<CommandPool> cmdPool);
 		[[nodiscard]] uint32_t RTEndTimestamp(Ref<CommandPool> cmdPool);
+		void ResetTimestampQuery(uint32_t frameIndex);
 		void RTResetTimestampQuery(Ref<CommandPool> commandPool);
 
 		[[nodiscard]] uint32_t RTBeginPipelineQuery(Ref<CommandPool> cmdPool);
 		[[nodiscard]] uint32_t RTEndPipelineQuery(Ref<CommandPool> cmdPool);
+		void ResetPipelineQuery(uint32_t frameIndex);
 		void RTResetPipelineQuery(Ref<CommandPool> commandPool);
 
-		std::vector<uint64_t> GetQueryResults(RenderDeviceQueryType type);
+		std::vector<uint64_t> GetQueryResults(RenderDeviceQueryType type, uint32_t frameIndex);
 
 		virtual void RegisterShaderBindings(const Ref<Shader>& shader) = 0;
 		virtual std::vector<RenderDeviceResourceHandle> GetResourceBindingHandles(const Ref<Shader>& shader) const = 0;
@@ -124,6 +126,8 @@ namespace Lucy {
 		virtual void EndCommandBuffer(Ref<CommandPool> cmdPool) = 0;
 
 		virtual void FillBuffer(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset, size_t size, uint32_t value) = 0;
+		virtual void CopyBuffer(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> srcBuffer, Ref<RenderDeviceBuffer> dstBuffer, size_t srcOffset, size_t dstOffset, size_t size) = 0;
+		virtual void CopyBuffer(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> srcBuffer, Ref<RenderDeviceBuffer> dstBuffer, const std::vector<const void*>& regions) = 0;
 
 		virtual void BindBuffers(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> indexBuffer) = 0;
 		virtual void BindBuffers(Ref<CommandPool> cmdPool, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) = 0;

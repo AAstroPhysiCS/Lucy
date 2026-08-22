@@ -190,6 +190,7 @@ namespace Lucy {
 	private:
 		constexpr static inline float MESHOPT_OVERDRAW_THRESHOLD = 1.05f;
 		constexpr static inline uint32_t MESH_LOD_COUNT = 4;
+		constexpr static float MIN_LOD_REDUCTION = 0.90f;
 
 		constexpr static inline std::array<float, MESH_LOD_COUNT> MESH_LOD_RATIOS = {
 			1.00f,

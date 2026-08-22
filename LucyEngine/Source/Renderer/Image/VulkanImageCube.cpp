@@ -36,11 +36,11 @@ namespace Lucy {
 	void VulkanImageCube::RTCreateFromPath(const Ref<VulkanRenderDevice>& vulkanDevice) {
 		VkImageUsageFlags flags = GetImageFlagsBasedOnUsage();
 
+		CalculateMaxMipLevel();
+
 		VulkanAllocator& allocator = vulkanDevice->GetAllocator();
 		allocator.CreateVulkanImageVma(m_CreateInfo.Width, m_CreateInfo.Height, m_MaxMipLevel, (VkFormat)GetAPIImageFormat(m_CreateInfo.Format), m_CurrentLayout,
 									   flags, VK_IMAGE_TYPE_2D, m_Image, m_ImageVma, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT, m_CreateInfo.Layers);
-
-		CalculateMaxMipLevel();
 
 		if (m_CreateInfo.GenerateMipmap)
 			GenerateMipmapsImmediate();
@@ -68,16 +68,34 @@ namespace Lucy {
 		m_CreateInfo.Width = width;
 		m_CreateInfo.Height = height;
 
-		m_CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-		Renderer::EnqueueResourceDestroy(GetMyHandle());
-		Renderer::EnqueueToRenderCommandQueue([&](const Ref<RenderDevice>& device) {
+		Renderer::EnqueueResourceRecreate([this](const Ref<RenderDevice>& device) -> RenderDeletionFunc {
 			auto vulkanDevice = device->As<VulkanRenderDevice>();
-			if (!m_Path.empty()) {
+
+			VkImage oldImage = std::exchange(m_Image, VK_NULL_HANDLE);
+			VmaAllocation oldImageVma = std::exchange(m_ImageVma, VK_NULL_HANDLE);
+			VkImageView oldImageView = std::exchange(m_ImageView.m_ImageView, VK_NULL_HANDLE);
+
+			auto oldSamplerHandle = std::exchange(m_SamplerHandle, {});
+
+			m_CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+			if (!m_Path.empty())
 				RTCreateFromPath(vulkanDevice);
-			} else {
+			else
 				RTCreateEmptyImage(vulkanDevice);
-			}
+
+			return [oldImage, oldImageVma, oldImageView, oldSamplerHandle](const Ref<RenderDevice>& device) mutable {
+				auto vulkanDevice = device->As<VulkanRenderDevice>();
+
+				if (oldImageView)
+					vkDestroyImageView(vulkanDevice->GetLogicalDevice(), oldImageView, nullptr);
+
+				if (oldSamplerHandle)
+					vulkanDevice->RTDestroyResource(oldSamplerHandle);
+
+				if (oldImage)
+					vulkanDevice->GetAllocator().DestroyImage(oldImage, oldImageVma);
+			};
 		});
 	}
 

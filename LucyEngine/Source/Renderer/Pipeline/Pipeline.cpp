@@ -11,6 +11,7 @@ namespace Lucy {
 	}
 
 	PipelineConstant& Pipeline::GetPipelineConstants(const std::string& name) {
+		LUCY_PROFILE_NEW_EVENT("Pipeline::GetPipelineConstants");
 		for (PipelineConstant& pushConstant : m_PushConstants) {
 			if (name == pushConstant.GetName()) {
 				return pushConstant;

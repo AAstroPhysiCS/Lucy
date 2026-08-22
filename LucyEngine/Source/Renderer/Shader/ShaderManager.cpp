@@ -18,11 +18,11 @@
 namespace Lucy {
 
 #ifdef LUCY_DEBUG
-	static void WriteSpirvForNsight(const std::filesystem::path& directory, std::string_view moduleName, std::string_view entryPointName, const Slang::ComPtr<slang::IBlob>& blob) {
+	static void WriteSpirvForNsight(const std::filesystem::path& directory, std::string_view moduleName, std::string_view entryPointName, ShaderStageType type, const Slang::ComPtr<slang::IBlob>& blob) {
 		LUCY_ASSERT(blob, "Cannot write an empty SPIR-V blob!");
 
 		std::filesystem::create_directories(directory);
-		const std::filesystem::path outputPath = directory / std::format("{}__{}.spv", moduleName, entryPointName);
+		const std::filesystem::path outputPath = directory / std::format("{}__{}__{}.spv", moduleName, entryPointName, ShaderStageToShaderString(type));
 
 		std::ofstream output(outputPath, std::ios::binary | std::ios::trunc);
 
@@ -136,7 +136,7 @@ namespace Lucy {
 #if USE_INTEGRATED_GRAPHICS == 0
 			{	// DOES NOT WORK WITH AMD INTEGRATED GPUS
 				slang::CompilerOptionName::DebugInformation,
-				{slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_STANDARD, 0, nullptr, nullptr}
+				{slang::CompilerOptionValueKind::Int, SLANG_DEBUG_INFO_LEVEL_MAXIMAL, 0, nullptr, nullptr}
 			},
 #endif
 			{
@@ -174,11 +174,7 @@ namespace Lucy {
 			},
 			{
 				slang::CompilerOptionName::Optimization,
-#ifdef LUCY_DEBUG
-				{ slang::CompilerOptionValueKind::Int, 0, 0, nullptr, nullptr }
-#else
-				{ slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr }
-#endif
+				{ slang::CompilerOptionValueKind::Int, SLANG_OPTIMIZATION_LEVEL_HIGH, 0, nullptr, nullptr }
 			},
 			{
 				slang::CompilerOptionName::ValidateUniformity,
@@ -389,7 +385,7 @@ namespace Lucy {
 			shaderPrograms[i].LinkedProgram = linkedProgram;
 
 #ifdef LUCY_DEBUG
-			WriteSpirvForNsight(GetCacheFolder() / "Nsight", path.stem().string(), nameOfEntry, blob);
+			WriteSpirvForNsight(GetCacheFolder() / "Nsight", path.stem().string(), nameOfEntry, shaderStage, blob);
 #endif
 		}
 

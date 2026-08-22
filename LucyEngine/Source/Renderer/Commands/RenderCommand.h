@@ -149,6 +149,7 @@ namespace Lucy {
 		DepthConfiguration m_DynamicDepthConfig;
 
 		uint32_t m_BeginTimestampIndex = 0, m_EndTimestampIndex = 0;
+		uint32_t m_BeginPipelineQueryIndex = 0;
 
 		friend class RenderCommandList;
 	};

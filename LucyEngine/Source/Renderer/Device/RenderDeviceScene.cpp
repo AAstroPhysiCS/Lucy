@@ -1,6 +1,8 @@
 #include "lypch.h"
 #include "RenderDeviceScene.h"
 
+#include "Renderer/Memory/VulkanAllocator.h"
+
 namespace Lucy {
 
     RenderDeviceScene::RenderDeviceScene(RenderDevice* device)
@@ -13,33 +15,30 @@ namespace Lucy {
         */
 
         for (auto& frameData : m_FrameData) {
-            frameData.GlobalsBuffer = device->CreateDeviceAddressBuffer({ "Globalsbuffer", sizeof(RenderDeviceSceneGlobalData) });
-            frameData.ObjectsBuffer = device->CreateDeviceAddressBuffer({ "ObjectBuffer", s_ObjectCapacity * sizeof(RenderDeviceObjectData) });
-            frameData.MaterialBuffer = device->CreateDeviceAddressBuffer({ "Materialbuffer", s_MaterialCapacity * sizeof(RenderDevicePBRMaterialData) });
-            frameData.MeshBuffer = device->CreateDeviceAddressBuffer({ "Meshbuffer", s_MeshCapacity * sizeof(RenderDeviceMeshData) });
-            frameData.MeshLODBuffer = device->CreateDeviceAddressBuffer({ "MeshLODBuffer", 4 * s_SubmeshCapacity * sizeof(RenderDeviceMeshLODData) });
-            frameData.SubmeshBuffer = device->CreateDeviceAddressBuffer({ "Submeshbuffer", s_SubmeshCapacity * sizeof(RenderDeviceSubmeshData) });
-            frameData.MeshletBuffer = device->CreateDeviceAddressBuffer({ "Meshletbuffer", s_MeshletCapacity * sizeof(RenderDeviceMeshletData) });
-            frameData.CullViewsBuffer = device->CreateDeviceAddressBuffer({ "CullViewsBuffer", 10 * sizeof(RenderDeviceCullViewData) });
+            frameData.GlobalsBuffer = device->CreateDeviceAddressBuffer({ "Globalsbuffer", sizeof(RenderDeviceSceneGlobalData), BufferUsage::None, MemoryUsage::GPUOnly });
+            frameData.ObjectsBuffer = device->CreateDeviceAddressBuffer({ "ObjectBuffer", s_ObjectCapacity * sizeof(RenderDeviceObjectData), BufferUsage::None, MemoryUsage::GPUOnly });
+            frameData.MaterialBuffer = device->CreateDeviceAddressBuffer({ "Materialbuffer", s_MaterialCapacity * sizeof(RenderDevicePBRMaterialData), BufferUsage::None, MemoryUsage::GPUOnly });
+            frameData.MeshBuffer = device->CreateDeviceAddressBuffer({ "Meshbuffer", s_MeshCapacity * sizeof(RenderDeviceMeshData), BufferUsage::None, MemoryUsage::GPUOnly });
+            frameData.MeshLODBuffer = device->CreateDeviceAddressBuffer({ "MeshLODBuffer", 4 * s_SubmeshCapacity * sizeof(RenderDeviceMeshLODData), BufferUsage::None, MemoryUsage::GPUOnly });
+            frameData.SubmeshBuffer = device->CreateDeviceAddressBuffer({ "Submeshbuffer", s_SubmeshCapacity * sizeof(RenderDeviceSubmeshData), BufferUsage::None, MemoryUsage::GPUOnly });
+            frameData.MeshletBuffer = device->CreateDeviceAddressBuffer({ "Meshletbuffer", s_MeshletCapacity * sizeof(RenderDeviceMeshletData), BufferUsage::None, MemoryUsage::GPUOnly });
+            frameData.CullViewsBuffer = device->CreateDeviceAddressBuffer({ "CullViewsBuffer", 10 * sizeof(RenderDeviceCullViewData), BufferUsage::None, MemoryUsage::GPUOnly });
         }
 
+        std::vector<RenderDeviceObjectData> emptyObjects(s_ObjectCapacity);
+        for (auto& object : emptyObjects)
+            object.Data = { INVALID_INDEX, static_cast<uint32_t>(RenderDeviceObjectFlags::None), 0, 0 };
+        
         for (auto& frameData : m_FrameData) {
             const auto& buffer = m_RenderDevice->AccessResource<RenderDeviceBuffer>(frameData.ObjectsBuffer);
-            RenderDeviceObjectData emptyData{
-                .Data = {
-                    INVALID_INDEX, RenderDeviceObjectFlags::None, 0, 0
-                }
-            };
-            for (size_t i = 0; i < s_ObjectCapacity; i++) {
-				buffer->RTLoadToDevice(m_RenderDevice, reinterpret_cast<const void*>(&emptyData), sizeof(RenderDeviceObjectData), sizeof(RenderDeviceObjectData) * i);
-            }
+			buffer->RTLoadToDevice(m_RenderDevice, reinterpret_cast<const void*>(emptyObjects.data()), sizeof(RenderDeviceObjectData) * emptyObjects.size(), 0);
         }
 
         m_GlobalVertexBuffer = device->CreateDeviceAddressBuffer({ "GlobalVertexBuffer", s_GlobalVertexCapacity * sizeof(Vertex),
-            BufferUsage::Storage | BufferUsage::TransferDestination | BufferUsage::TransferSource });
+            BufferUsage::Storage | BufferUsage::TransferDestination | BufferUsage::TransferSource, MemoryUsage::GPUOnly });
 
         m_GlobalIndexBuffer = device->CreateDeviceAddressBuffer({ "GlobalIndexBuffer", s_GlobalIndexCapacity * sizeof(uint32_t),
-            BufferUsage::Storage | BufferUsage::Index | BufferUsage::TransferDestination | BufferUsage::TransferSource });
+            BufferUsage::Storage | BufferUsage::Index | BufferUsage::TransferDestination | BufferUsage::TransferSource, MemoryUsage::GPUOnly });
 
         m_GlobalsHandle = RTCreateSceneGlobals({});
     }
@@ -133,6 +132,8 @@ namespace Lucy {
         LUCY_ASSERT(m_CullViews.IsValid(handle));
 
         RenderDeviceCullViewData& currentData = m_CullViews.Get(handle);
+        if (currentData == data)
+            return;
         currentData = data;
 
         RTEnqueueUpdate(m_CullViews, RenderDeviceSceneBufferType::CullViews, handle);

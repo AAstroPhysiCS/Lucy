@@ -63,7 +63,7 @@ namespace Lucy {
 		Renderer::SubmitImmediateCommand([](VkCommandBuffer cmd) { 
 			ImGui_ImplVulkan_CreateFontsTexture(); 
 
-			VkMemoryBarrier2* barrier2 = new VkMemoryBarrier2();
+			/*VkMemoryBarrier2* barrier2 = new VkMemoryBarrier2();
 			barrier2->sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
 			barrier2->srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
 			barrier2->srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
@@ -75,7 +75,7 @@ namespace Lucy {
 			depInfo2->memoryBarrierCount = 1;
 			depInfo2->pMemoryBarriers = barrier2;
 
-			vkCmdPipelineBarrier2(cmd, depInfo2);
+			vkCmdPipelineBarrier2(cmd, depInfo2);*/
 		});
 	}
 

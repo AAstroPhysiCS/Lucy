@@ -209,6 +209,12 @@ struct GPUVisibleObject {
     uint ObjectIndex;
 };
 
+struct GPUVisibleSubmesh {
+    uint ObjectIndex;
+    uint SubmeshIndex;
+    uint LODIndex;
+};
+
 struct GPUVisibleDraw {
     uint ObjectIndex;
     uint SubmeshIndex;
@@ -328,6 +334,43 @@ float GetMaximumScale(float4x4 transform) {
     return max(length(column0),max(length(column1), length(column2)));
 }
 
+float GetPixelWorldSize(float3 center, float radius, GPUCullView view) {
+    if ((view.Data.w & VIEW_FLAG_ORTHOGRAPHIC) != 0)
+        return 2.0f / (abs(view.Projection[1][1]) * view.Viewport.y);
+    float distanceToSurface = max(0.0f, length(view.CameraPosition.xyz - center) - radius);
+    return distanceToSurface * 2.0f / (abs(view.Projection[1][1]) * view.Viewport.y);
+}
+
+uint SelectLOD(GPUSubmesh submesh, float3 worldCenter, float worldScale, GPUCullView view, uint objectFlags, GPUMeshLOD* meshLODs) {
+    uint firstLOD = submesh.LODs.x;
+    uint lodCount = submesh.LODs.y;
+
+    if (lodCount == 0)
+        return INVALID_BINDLESS_INDEX;
+
+    if ((objectFlags & OBJECT_FLAG_FORCE_HIGHEST_LOD) != 0)
+        return firstLOD;
+
+    if ((objectFlags & OBJECT_FLAG_FORCE_LOWEST_LOD) != 0)
+        return firstLOD + lodCount - 1;
+
+    float pixelWorldSize = GetPixelWorldSize(worldCenter, submesh.BoundingSphere.w * worldScale, view);
+    float maxPixelError = 4.0f;
+
+    // Try the cheapest LOD first.
+    for (int lodOffset = int(lodCount) - 1; lodOffset >= 0; lodOffset--) {
+        uint lodIndex = firstLOD + uint(lodOffset);
+        GPUMeshLOD lod = meshLODs[lodIndex];
+
+        float worldError = lod.LODData.x * worldScale;
+
+        if (pixelWorldSize * maxPixelError >= worldError)
+            return lodIndex;
+    }
+
+    return firstLOD;
+}
+
 bool IsSphereInsideFrustum(float3 center, float radius, GPUCullView view) {
     [unroll]
     for (uint planeIndex = 0; planeIndex < 6; planeIndex++) {
@@ -351,18 +394,6 @@ bool IsAABBInsideFrustum(float3 center, float3 extents, GPUCullView view) {
             return false;
     }
 
-    return true;
-}
-
-bool IsSphereInsideFrustumShadow(float3 center, float radius, GPUCullView view) {
-    [unroll]
-    for (uint planeIndex = 0; planeIndex < 4; planeIndex++) {
-        float4 plane = view.FrustumPlanes[planeIndex];
-        float distance = dot(plane.xyz, center) + plane.w;
-        // basic stuff... n*p+d < -r => sphere is outside of the plane, where p = center of sphere, n = (x,y,z)
-        if (distance < -radius)
-            return false;
-    }
     return true;
 }
 

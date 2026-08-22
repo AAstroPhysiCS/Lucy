@@ -20,6 +20,7 @@ namespace Lucy {
 
 		template <typename TPipeline>
 		inline Ref<TPipeline> GetAs(const std::string& name) const {
+			LUCY_PROFILE_NEW_EVENT("PipelineManager::GetAs");
 			if (m_GraphicsPipelines.contains(name))
 				return m_RenderDevice->AccessResource<TPipeline>(m_GraphicsPipelines.at(name));
 			return m_RenderDevice->AccessResource<TPipeline>(m_ComputePipelines.at(name));

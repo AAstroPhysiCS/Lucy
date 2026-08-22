@@ -4,6 +4,10 @@ struct CullData {
     GPUVisibleObject* VisibleObjects;
     uint* VisibleObjectCount;
 
+    GPUVisibleSubmesh* VisibleSubmeshes;
+    uint* VisibleSubmeshCount;
+
+    GPUDispatchIndirectCommand* SubmeshDispatchIndirect;
     GPUDispatchIndirectCommand* MeshletDispatchIndirect;
 
     GPUVisibleDraw* VisibleDraws;
@@ -11,6 +15,7 @@ struct CullData {
     uint* DrawCounts;
 
     uint ObjectCapacity;
+    uint SubmeshCapacity;
     uint CommandCapacityPerBin;
     uint ViewIndex;
     uint RenderBinCount;
@@ -21,41 +26,6 @@ PushConstantGlobal<CullData> PushConstants;
 
 // how much a object appears on screen... we are dealing here with perspective projection, so we can obtain
 // the approximate projected radius by getting the Pyy and multiply that by Viewport.y pixels / 2
-
-float GetPixelWorldSize(float3 center, float radius, GPUCullView view) {
-    float distanceToSurface = max(0.0f, length(view.CameraPosition.xyz - center) - radius);
-    return distanceToSurface * 2.0f / (abs(view.Projection[1][1]) * view.Viewport.y);
-}
-
-uint SelectLOD(GPUSubmesh submesh, float3 worldCenter, float worldScale, GPUCullView view, uint objectFlags) {
-    const uint firstLOD = submesh.LODs.x;
-    const uint lodCount = submesh.LODs.y;
-
-    if (lodCount == 0)
-        return INVALID_BINDLESS_INDEX;
-
-    if ((objectFlags & OBJECT_FLAG_FORCE_HIGHEST_LOD) != 0)
-        return firstLOD;
-
-    if ((objectFlags & OBJECT_FLAG_FORCE_LOWEST_LOD) != 0)
-        return firstLOD + lodCount - 1;
-
-    const float pixelWorldSize = GetPixelWorldSize(worldCenter, submesh.BoundingSphere.w * worldScale, view);
-    const float maxPixelError = 4.0f;
-
-    // Try the cheapest LOD first.
-    for (int lodOffset = int(lodCount) - 1; lodOffset >= 0; lodOffset--) {
-        const uint lodIndex = firstLOD + uint(lodOffset);
-        const GPUMeshLOD lod = PushConstants.Root->Addresses.MeshLODs[lodIndex];
-
-        const float worldError = lod.LODData.x * worldScale;
-
-        if (pixelWorldSize * maxPixelError >= worldError)
-            return lodIndex;
-    }
-
-    return firstLOD;
-}
 
 bool IsConeBackFacing(GPUMeshlet meshlet, float4x4 modelMatrix, float4x4 normalMatrix, float3 worldCenter, float worldRadius, float3 cameraPosition) {
     const float coneCutoff = meshlet.NormalCone.w;
@@ -127,9 +97,9 @@ void CullObjects(uint3 dispatchID : SV_DispatchThreadID) {
     if (objectIndex >= PushConstants.Data.ObjectCapacity)
         return;
 
-    const GPUObject object = PushConstants.Root->Addresses.Objects[objectIndex];
-    const uint objectFlags = object.Data.y;
-    const uint meshIndex = object.Data.x;
+    GPUObject object = PushConstants.Root->Addresses.Objects[objectIndex];
+    uint objectFlags = object.Data.y;
+    uint meshIndex = object.Data.x;
 
     bool visible = (objectFlags & OBJECT_FLAG_ALIVE) != 0;
     visible = visible && meshIndex != INVALID_BINDLESS_INDEX;
@@ -144,7 +114,7 @@ void CullObjects(uint3 dispatchID : SV_DispatchThreadID) {
         worldCenter = worldCenter = mul(object.Transform, float4(mesh.BoundingSphere.xyz, 1.0f)).xyz;
         worldRadius = mesh.BoundingSphere.w * GetMaximumScale(object.Transform);
         
-        printf("World Center: (%f, %f, %f), World Radius: %f\n", worldCenter.x, worldCenter.y, worldCenter.z, worldRadius);
+        //printf("World Center: (%f, %f, %f), World Radius: %f\n", worldCenter.x, worldCenter.y, worldCenter.z, worldRadius);
 
         GPUCullView view = PushConstants.Root->Addresses.CullViews[PushConstants.Data.ViewIndex];
         if ((view.Data.w & VIEW_FLAG_FRUSTUM) != 0) {
@@ -175,11 +145,86 @@ void CullObjects(uint3 dispatchID : SV_DispatchThreadID) {
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void BuildMeshletDispatch() {
+void BuildSubmeshDispatch() {
     const uint visibleObjectCount = PushConstants.Data.VisibleObjectCount[0];
 
     GPUDispatchIndirectCommand command;
     command.GroupCountX = visibleObjectCount;
+    command.GroupCountY = 1;
+    command.GroupCountZ = 1;
+
+    PushConstants.Data.SubmeshDispatchIndirect[0] = command;
+}
+
+[shader("compute")]
+[numthreads(64, 1, 1)]
+void CullSubmeshes(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_GroupThreadID) {
+    const uint visibleObjectIndex = groupID.x;
+    const uint visibleObjectCount = PushConstants.Data.VisibleObjectCount[0];
+
+    if (visibleObjectIndex >= visibleObjectCount)
+        return;
+
+    GPUVisibleObject visibleObject = PushConstants.Data.VisibleObjects[visibleObjectIndex];
+    GPUObject object = PushConstants.Root->Addresses.Objects[visibleObject.ObjectIndex];
+    GPUMesh mesh = PushConstants.Root->Addresses.Meshes[object.Data.x];
+    GPUCullView view = PushConstants.Root->Addresses.CullViews[PushConstants.Data.ViewIndex];
+
+    for (uint submeshOffset = groupThreadID.x; submeshOffset < mesh.Data.w; submeshOffset += 64) {
+        uint submeshIndex = mesh.Data.z + submeshOffset;
+
+        GPUSubmesh submesh = PushConstants.Root->Addresses.Submeshes[submeshIndex];
+        float4x4 modelMatrix = mul(object.Transform, submesh.Transform);
+
+        float worldScale = GetMaximumScale(modelMatrix);
+        float3 worldCenter = mul(modelMatrix, float4(submesh.BoundingSphere.xyz, 1.0f)).xyz;
+        float worldRadius = submesh.BoundingSphere.w * worldScale;
+
+        bool visible = true;
+
+        if ((view.Data.w & VIEW_FLAG_FRUSTUM) != 0)
+            visible = IsSphereInsideFrustum(worldCenter, worldRadius, view);
+
+        uint lodIndex = INVALID_BINDLESS_INDEX;
+
+        if (visible) {
+            lodIndex = SelectLOD(submesh, worldCenter, worldScale, view, object.Data.y, PushConstants.Root->Addresses.MeshLODs);
+            visible = lodIndex != INVALID_BINDLESS_INDEX;
+        }
+
+        uint waveVisibleCount = WaveActiveCountBits(visible);
+        uint waveOutputBase = 0;
+
+        if (WaveIsFirstLane() && waveVisibleCount > 0)
+            InterlockedAdd(PushConstants.Data.VisibleSubmeshCount[0], waveVisibleCount, waveOutputBase);
+
+        waveOutputBase = WaveReadLaneFirst(waveOutputBase);
+
+        if (!visible)
+            continue;
+
+        uint waveOffset = WavePrefixCountBits(visible);
+        uint outputIndex = waveOutputBase + waveOffset;
+
+        if (outputIndex >= PushConstants.Data.SubmeshCapacity)
+            continue;
+
+        GPUVisibleSubmesh output;
+        output.ObjectIndex = visibleObject.ObjectIndex;
+        output.SubmeshIndex = submeshIndex;
+        output.LODIndex = lodIndex;
+
+        PushConstants.Data.VisibleSubmeshes[outputIndex] = output;
+    }
+}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void BuildMeshletDispatch() {
+    const uint visibleSubmeshCount = PushConstants.Data.VisibleSubmeshCount[0];
+
+    GPUDispatchIndirectCommand command;
+    command.GroupCountX = visibleSubmeshCount;
     command.GroupCountY = 1;
     command.GroupCountZ = 1;
 
@@ -189,93 +234,81 @@ void BuildMeshletDispatch() {
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void CullMeshlets(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_GroupThreadID) {
-    const uint visibleObjectIndex = groupID.x;
-    const uint visibleObjectCount = PushConstants.Data.VisibleObjectCount[0];
+    const uint visibleSubmeshIndex = groupID.x;
+    const uint visibleSubmeshCount = PushConstants.Data.VisibleSubmeshCount[0];
 
-    if (visibleObjectIndex >= visibleObjectCount)
+    if (visibleSubmeshIndex >= visibleSubmeshCount)
         return;
 
-    GPUVisibleObject visibleObject = PushConstants.Data.VisibleObjects[visibleObjectIndex];
-    GPUObject object = PushConstants.Root->Addresses.Objects[visibleObject.ObjectIndex];
+    GPUVisibleSubmesh visibleSubmesh = PushConstants.Data.VisibleSubmeshes[visibleSubmeshIndex];
+    GPUObject object = PushConstants.Root->Addresses.Objects[visibleSubmesh.ObjectIndex];
+    GPUSubmesh submesh = PushConstants.Root->Addresses.Submeshes[visibleSubmesh.SubmeshIndex];
+    GPUMeshLOD lod = PushConstants.Root->Addresses.MeshLODs[visibleSubmesh.LODIndex];
     GPUCullView view = PushConstants.Root->Addresses.CullViews[PushConstants.Data.ViewIndex];
-    GPUMesh mesh = PushConstants.Root->Addresses.Meshes[object.Data.x];
 
-    for (uint submeshOffset = 0; submeshOffset < mesh.Data.w; submeshOffset++) {
-        const uint submeshIndex = mesh.Data.z + submeshOffset;
-        GPUSubmesh submesh = PushConstants.Root->Addresses.Submeshes[submeshIndex];
+    float4x4 modelMatrix = mul(object.Transform, submesh.Transform);
+    float4x4 normalMatrix = mul(object.TransformInversedTransposed, submesh.TransformInversedTransposed);
 
-        float4x4 modelMatrix = mul(object.Transform, submesh.Transform);
+    float worldScale = GetMaximumScale(modelMatrix);
+    uint renderBin = min(submesh.Meshlets.z, PushConstants.Data.RenderBinCount - 1);
 
-        float4x4 normalMatrix = mul(object.TransformInversedTransposed, submesh.TransformInversedTransposed);
+    for (uint localMeshletIndex = groupThreadID.x; localMeshletIndex < lod.Meshlets.y; localMeshletIndex += 64) {
+        uint meshletIndex = lod.Meshlets.x + localMeshletIndex;
+        GPUMeshlet meshlet = PushConstants.Root->Addresses.Meshlets[meshletIndex];
 
-        float3 submeshWorldCenter = mul(modelMatrix, float4(submesh.BoundingSphere.xyz, 1.0f)).xyz;
-        float submeshWorldRadius = submesh.BoundingSphere.w * GetMaximumScale(modelMatrix);
+        float3 worldCenter = mul(modelMatrix, float4(meshlet.BoundingSphere.xyz, 1.0f)).xyz;
+        float worldRadius = meshlet.BoundingSphere.w * worldScale;
 
-        if ((view.Data.w & VIEW_FLAG_FRUSTUM) != 0 && !IsSphereInsideFrustum(submeshWorldCenter, submeshWorldRadius, view))
+        float3 aabbCenter = mul(modelMatrix, float4(meshlet.AABBCenter.xyz, 1.0f)).xyz;
+        float3x3 linearTransform = float3x3(modelMatrix);
+        float3 aabbExtents = mul(abs(float3x3(modelMatrix)), meshlet.AABBExtents.xyz);
+
+        bool visible = true;
+
+        if ((view.Data.w & VIEW_FLAG_FRUSTUM) != 0)
+            visible = IsAABBInsideFrustum(aabbCenter, aabbExtents, view);
+
+        if (visible && (view.Data.w & VIEW_FLAG_CONE) != 0)
+            visible = !IsConeBackFacing(meshlet, modelMatrix, normalMatrix, worldCenter, worldRadius, view.CameraPosition.xyz);
+
+        if (visible && (view.Data.w & VIEW_FLAG_OCCLUSION) != 0)
+            visible = !IsHiZOccluded(worldCenter, worldRadius, view);
+
+        uint renderBin = min(submesh.Meshlets.z, PushConstants.Data.RenderBinCount - 1);
+        uint waveVisibleCount = WaveActiveCountBits(visible);
+
+        uint waveBinBase = 0;
+
+        if (WaveIsFirstLane() && waveVisibleCount > 0)
+            InterlockedAdd(PushConstants.Data.DrawCounts[renderBin], waveVisibleCount, waveBinBase);
+
+        waveBinBase = WaveReadLaneFirst(waveBinBase);
+
+        if (!visible)
             continue;
 
-        float worldScale = GetMaximumScale(modelMatrix);
-        uint lodIndex = SelectLOD(submesh, submeshWorldCenter, worldScale, view, object.Data.y);
-        GPUMeshLOD lod = PushConstants.Root->Addresses.MeshLODs[lodIndex];
+        uint waveOffset = WavePrefixCountBits(visible);
+        uint binLocalIndex = waveBinBase + waveOffset;
 
-        for (uint localMeshletIndex = groupThreadID.x; localMeshletIndex < lod.Meshlets.y; localMeshletIndex += 64) {
-            uint meshletIndex = lod.Meshlets.x + localMeshletIndex;
-            GPUMeshlet meshlet = PushConstants.Root->Addresses.Meshlets[meshletIndex];
+        if (binLocalIndex >= PushConstants.Data.CommandCapacityPerBin)
+            continue;
 
-            float3 worldCenter = mul(modelMatrix, float4(meshlet.BoundingSphere.xyz, 1.0f)).xyz;
-            float worldRadius = meshlet.BoundingSphere.w * GetMaximumScale(modelMatrix);
+        uint outputIndex = renderBin * PushConstants.Data.CommandCapacityPerBin + binLocalIndex;
 
-            float3 aabbCenter = mul(modelMatrix, float4(meshlet.AABBCenter.xyz, 1.0f)).xyz;
-            float3x3 linearTransform = float3x3(modelMatrix);
-            float3 aabbExtents = mul(abs(float3x3(modelMatrix)), meshlet.AABBExtents.xyz);
+        GPUVisibleDraw visibleDraw;
+        visibleDraw.ObjectIndex = visibleSubmesh.ObjectIndex;
+        visibleDraw.SubmeshIndex = visibleSubmesh.SubmeshIndex;
+        visibleDraw.MeshletIndex = meshletIndex;
 
-            bool visible = true;
+        PushConstants.Data.VisibleDraws[outputIndex] = visibleDraw;
 
-            if ((view.Data.w & VIEW_FLAG_FRUSTUM) != 0)
-                visible = IsAABBInsideFrustum(aabbCenter, aabbExtents, view);
+        GPUIndexedIndirectCommand command;
+        command.IndexCount = meshlet.Draw.y;
+        command.InstanceCount = 1;
+        command.FirstIndex = meshlet.Draw.x;
+        command.VertexOffset = asint(meshlet.Draw.z);
+        command.FirstInstance = outputIndex;
 
-            if (visible && (view.Data.w & VIEW_FLAG_CONE) != 0)
-                visible = !IsConeBackFacing(meshlet, modelMatrix, normalMatrix, worldCenter, worldRadius, view.CameraPosition.xyz);
-
-            if (visible && (view.Data.w & VIEW_FLAG_OCCLUSION) != 0)
-                visible = !IsHiZOccluded(worldCenter, worldRadius, view);
-
-            uint renderBin = min(submesh.Meshlets.z, PushConstants.Data.RenderBinCount - 1);
-            uint waveVisibleCount = WaveActiveCountBits(visible);
-
-            uint waveBinBase = 0;
-
-            if (WaveIsFirstLane() && waveVisibleCount > 0)
-                InterlockedAdd(PushConstants.Data.DrawCounts[renderBin], waveVisibleCount, waveBinBase);
-
-            waveBinBase = WaveReadLaneFirst(waveBinBase);
-
-            if (!visible)
-                continue;
-
-            uint waveOffset = WavePrefixCountBits(visible);
-            uint binLocalIndex = waveBinBase + waveOffset;
-
-            if (binLocalIndex >= PushConstants.Data.CommandCapacityPerBin)
-                continue;
-
-            uint outputIndex = renderBin * PushConstants.Data.CommandCapacityPerBin + binLocalIndex;
-
-            GPUVisibleDraw visibleDraw;
-            visibleDraw.ObjectIndex = visibleObject.ObjectIndex;
-            visibleDraw.SubmeshIndex = submeshIndex;
-            visibleDraw.MeshletIndex = meshletIndex;
-
-            PushConstants.Data.VisibleDraws[outputIndex] = visibleDraw;
-
-            GPUIndexedIndirectCommand command;
-            command.IndexCount = meshlet.Draw.y;
-            command.InstanceCount = 1;
-            command.FirstIndex = meshlet.Draw.x;
-            command.VertexOffset = asint(meshlet.Draw.z);
-            command.FirstInstance = outputIndex;
-
-            PushConstants.Data.IndirectCommands[outputIndex] = command;
-        }
+        PushConstants.Data.IndirectCommands[outputIndex] = command;
     }
 }

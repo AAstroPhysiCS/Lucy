@@ -305,6 +305,8 @@ namespace Lucy {
 
 		const std::vector<uint32_t>& baseIndices = submesh.Indices;
 
+		float previousLODIndexCount = 0.0f;
+
 		for (uint32_t lodIndex = 0; lodIndex < MESH_LOD_COUNT; lodIndex++) {
 			std::vector<uint32_t> lodIndices;
 			float lodError = 0.0f;
@@ -323,16 +325,36 @@ namespace Lucy {
 					MESH_LOD_TARGET_ERROR, 0, &lodError);
 
 				if (simplifiedIndexCount < 3) {
-					lodIndices = baseIndices;
-					lodError = 0.0f;
-				} else {
-					lodIndices.resize(simplifiedIndexCount);
+					submesh.LODs.push_back(submesh.LODs.back());
+					continue;
 				}
 
+				lodIndices.resize(simplifiedIndexCount);
+
 				meshopt_optimizeVertexCache(lodIndices.data(), lodIndices.data(), lodIndices.size(), submesh.Vertices.size());
+
+				/*
+				 * meshopt wasn't able to simplify this LOD any further.
+				 *
+				 * Keep the logical LOD entry, but point it at the previous
+				 * physical meshlet range instead of duplicating it.
+				*/
+
+				size_t maximumUsefulIndexCount = static_cast<size_t>(previousLODIndexCount * MIN_LOD_REDUCTION);
+				if (lodIndices.size() >= maximumUsefulIndexCount) {
+					submesh.LODs.push_back(submesh.LODs.back());
+					continue;
+				}
 			}
 
 			BuildMeshlets(submesh, lodIndices, lodError * errorScale, lodIndex);
+
+			previousLODIndexCount = static_cast<float>(lodIndices.size());
+#if LUCY_DEBUG
+			LUCY_INFO("LOD {}: base={} target={} actual={} ratio={:.3f}", lodIndex, baseIndices.size(), 
+				lodIndex == 0 ? baseIndices.size() : static_cast<size_t>(baseIndices.size() * MESH_LOD_RATIOS[lodIndex]), 
+				lodIndices.size(), static_cast<float>(lodIndices.size()) / static_cast<float>(baseIndices.size()));
+#endif
 		}
 
 		submesh.MeshletCount = static_cast<uint32_t>(submesh.Meshlets.size());

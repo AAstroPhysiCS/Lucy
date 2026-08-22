@@ -8,12 +8,13 @@ namespace Lucy {
 
 	VulkanVertexBuffer::VulkanVertexBuffer(size_t size, const Ref<VulkanRenderDevice>& device)
 		: VertexBuffer(size) {
-		RTCreate(device, size); //staging buffer allocation
+		RTCreate(device, size);
 	}
 
 	void VulkanVertexBuffer::RTCreate(const Ref<VulkanRenderDevice>& device, size_t size) {
 		VulkanAllocator& allocator = device->GetAllocator();
-		allocator.CreateVulkanBufferVma(VulkanBufferUsage::CPUOnly, size * sizeof(float), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, false, m_StagingBufferHandle, m_StagingBufferVma);
+		allocator.CreateVulkanBufferVma(MemoryUsage::GPUOnly, size * sizeof(float),
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, false, m_BufferHandle, m_BufferVma);
 	}
 
 	void VulkanVertexBuffer::RTBind(const VulkanVertexBindInfo& info) {
@@ -24,18 +25,7 @@ namespace Lucy {
 
 	void VulkanVertexBuffer::RTLoadToDevice(const Ref<RenderDevice>& device) {
 		auto vulkanDevice = device->As<VulkanRenderDevice>();
-		VulkanAllocator& allocator = vulkanDevice->GetAllocator();
-
-		void* data;
-		allocator.MapMemory(m_StagingBufferVma, data);
-		memcpy(data, m_Data.data(), m_Data.size() * sizeof(float));
-		allocator.UnmapMemory(m_StagingBufferVma);
-
-		allocator.CreateVulkanBufferVma(VulkanBufferUsage::GPUOnly, m_Data.size() * sizeof(float),
-										VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, false, m_BufferHandle, m_BufferVma);
-		Renderer::RTDirectCopyBuffer(m_StagingBufferHandle, m_BufferHandle, m_Data.size() * sizeof(float));
-
-		allocator.DestroyBuffer(m_StagingBufferHandle, m_StagingBufferVma);
+		vulkanDevice->GetUploadManager()->EnqueueUploadBuffer(m_BufferHandle, 0, m_Data.data(), m_Data.size() * sizeof(uint32_t));
 	}
 
 	void VulkanVertexBuffer::RTDestroyResource(RenderDevice* device) {
