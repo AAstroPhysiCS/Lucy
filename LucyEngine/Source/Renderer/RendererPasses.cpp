@@ -54,7 +54,7 @@ namespace Lucy {
 
 	GlobalPushConstant<RenderDeviceGPUCullData> GPUDrivenRendererPass::CreateGPUCullPushConstant(const RenderGraphRegistry& registry, uint32_t viewIndex, uint32_t frameIndex) {
 		GlobalPushConstant<RenderDeviceGPUCullData> pushConstantData{
-			.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+			.Root = registry.GetBuffer(RGResource(GPUSceneBuffer), frameIndex)->GetDeviceAddress(),
 			.Data = {
 				.VisibleObjects = registry.GetBuffer(RGResource(VisibleObjects), frameIndex)->GetDeviceAddress(),
 				.VisibleObjectCount = registry.GetBuffer(RGResource(VisibleObjectsCount), frameIndex)->GetDeviceAddress(),
@@ -532,7 +532,7 @@ namespace Lucy {
 
 	GlobalPushConstant<RenderDeviceGPUShadowCullData> ShadowPass::CreateGPUCullPushConstant(const RenderGraphRegistry& registry, uint32_t frameIndex) {
 		return {
-			.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+			.Root = registry.GetBuffer(RGResource(GPUSceneBuffer), frameIndex)->GetDeviceAddress(),
 			.Data = {
 				.VisibleObjects = registry.GetBuffer(RGResource(ShadowVisibleObjects), frameIndex)->GetDeviceAddress(),
 				.VisibleObjectCount = registry.GetBuffer(RGResource(ShadowVisibleObjectCount), frameIndex)->GetDeviceAddress(),

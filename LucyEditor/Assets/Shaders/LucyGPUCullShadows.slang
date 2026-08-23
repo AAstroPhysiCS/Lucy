@@ -42,15 +42,15 @@ void CullShadowObjects(uint3 dispatchID: SV_DispatchThreadID) {
     if (visible) {
         GPUMesh mesh = PushConstants.Root->Addresses.Meshes[meshIndex];
 
-        float3 worldCenter = mul(object.Transform, float4(mesh.BoundingSphere.xyz, 1.0f)).xyz;
-        float worldRadius = mesh.BoundingSphere.w * GetMaximumScale(object.Transform);
+        float3 aabbCenter = mul(object.Transform, float4(mesh.AABBCenter, 1.0f)).xyz;
+        float3 aabbExtents = mul(abs(float3x3(object.Transform)), mesh.AABBExtents);
 
         visible = false;
 
         for (uint cascadeIndex = 0; cascadeIndex < cascadeCount; cascadeIndex++) {
             GPUCullView view = PushConstants.Root->Addresses.CullViews[PushConstants.Data.ViewIndices[cascadeIndex]];
 
-            if (IsSphereInsideFrustum(worldCenter, worldRadius, view)) {
+            if (IsAABBInsideFrustum(aabbCenter, aabbExtents, view)) {
                 visible = true;
                 break;
             }
@@ -116,15 +116,17 @@ void CullShadowSubmeshes(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_Grou
         float4x4 modelMatrix = mul(object.Transform, submesh.Transform);
 
         float worldScale = GetMaximumScale(modelMatrix);
+        // float worldRadius = submesh.BoundingSphere.w * worldScale;
         float3 worldCenter = mul(modelMatrix, float4(submesh.BoundingSphere.xyz, 1.0f)).xyz;
-        float worldRadius = submesh.BoundingSphere.w * worldScale;
+        float3 aabbCenter = mul(modelMatrix, float4(submesh.AABBCenter, 1.0f)).xyz;
+        float3 aabbExtents = mul(abs(float3x3(modelMatrix)), submesh.AABBExtents);
 
         bool visible = false;
 
         for (uint cascadeIndex = 0; cascadeIndex < cascadeCount; cascadeIndex++) {
             GPUCullView view = PushConstants.Root->Addresses.CullViews[PushConstants.Data.ViewIndices[cascadeIndex]];
 
-            if (IsSphereInsideFrustum(worldCenter, worldRadius, view)) {
+            if (IsAABBInsideFrustum(aabbCenter, aabbExtents, view)) {
                 visible = true;
                 break;
             }

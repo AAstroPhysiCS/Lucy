@@ -129,7 +129,10 @@ namespace Lucy {
 		glm::vec3 right = glm::rotate(glm::inverse(m_Orientation), glm::vec3(1, 0, 0));
 		glm::vec3 up = glm::cross(forward, right);
 
-		const float speed = m_CameraSpeed * deltaTime;
+		float speed = m_CameraSpeed * deltaTime;
+
+		if (Input::IsKeyPressed(KeyCode::LeftControl))
+			speed *= 10.0f;
 
 		if (Input::IsKeyPressed(KeyCode::W))
 			m_Position -= forward * speed;

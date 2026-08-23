@@ -111,14 +111,14 @@ void CullObjects(uint3 dispatchID : SV_DispatchThreadID) {
     if (visible) {
         mesh = PushConstants.Root->Addresses.Meshes[meshIndex];
 
-        worldCenter = worldCenter = mul(object.Transform, float4(mesh.BoundingSphere.xyz, 1.0f)).xyz;
-        worldRadius = mesh.BoundingSphere.w * GetMaximumScale(object.Transform);
-        
+        float3 aabbCenter = mul(object.Transform, float4(mesh.AABBCenter, 1.0f)).xyz;
+        float3 aabbExtents = mul(abs(float3x3(object.Transform)), mesh.AABBExtents);
+
         //printf("World Center: (%f, %f, %f), World Radius: %f\n", worldCenter.x, worldCenter.y, worldCenter.z, worldRadius);
 
         GPUCullView view = PushConstants.Root->Addresses.CullViews[PushConstants.Data.ViewIndex];
         if ((view.Data.w & VIEW_FLAG_FRUSTUM) != 0) {
-            visible = IsSphereInsideFrustum(worldCenter, worldRadius, view);
+            visible = IsAABBInsideFrustum(aabbCenter, aabbExtents, view);
         }
     }
 
@@ -177,13 +177,15 @@ void CullSubmeshes(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_GroupThrea
         float4x4 modelMatrix = mul(object.Transform, submesh.Transform);
 
         float worldScale = GetMaximumScale(modelMatrix);
+        //float worldRadius = submesh.BoundingSphere.w * worldScale;
         float3 worldCenter = mul(modelMatrix, float4(submesh.BoundingSphere.xyz, 1.0f)).xyz;
-        float worldRadius = submesh.BoundingSphere.w * worldScale;
+        float3 aabbCenter = mul(modelMatrix, float4(submesh.AABBCenter, 1.0f)).xyz;
+        float3 aabbExtents = mul(abs(float3x3(modelMatrix)), submesh.AABBExtents);
+        float aabbRadius = length(aabbExtents);
 
         bool visible = true;
-
         if ((view.Data.w & VIEW_FLAG_FRUSTUM) != 0)
-            visible = IsSphereInsideFrustum(worldCenter, worldRadius, view);
+            visible = IsAABBInsideFrustum(aabbCenter, aabbExtents, view);
 
         uint lodIndex = INVALID_BINDLESS_INDEX;
 
@@ -260,7 +262,6 @@ void CullMeshlets(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_GroupThread
         float worldRadius = meshlet.BoundingSphere.w * worldScale;
 
         float3 aabbCenter = mul(modelMatrix, float4(meshlet.AABBCenter.xyz, 1.0f)).xyz;
-        float3x3 linearTransform = float3x3(modelMatrix);
         float3 aabbExtents = mul(abs(float3x3(modelMatrix)), meshlet.AABBExtents.xyz);
 
         bool visible = true;

@@ -143,9 +143,12 @@ public struct PBRMaterial {
             result.Metallic *= orm.b;
         }*/
 
-        result.NormalTS = NormalMap.Sample2DTexture(uv).xyz * 2.0f - 1.0f;
-        result.NormalTS.rg *= NormalStrength;
-        result.NormalTS = normalize(result.NormalTS);
+        float2 normalXY = NormalMap.Sample2DTexture(uv).xy * 2.0f - 1.0f;
+        normalXY *= NormalStrength;
+        //basically x^2 + y^2 + z^2 = 1 -> z = sqrt(1 - x^2 - y^2)
+        //we need this for BC5 normals (bistro etc...)
+        float normalZ = sqrt(saturate(1.0f - dot(normalXY, normalXY)));
+        result.NormalTS = normalize(float3(normalXY, normalZ));
 
         float3 emissive = EmissiveMap.Sample2DTexture(uv, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
         result.EmissiveColorAndStrength = float4(emissive, ORME.w);
@@ -176,7 +179,8 @@ struct GPUObject {
 };
 
 struct GPUMesh {
-    float4 BoundingSphere;
+    float3 AABBCenter;
+    float3 AABBExtents;
     uint4 Data; // x = unused y = unused z = FirstSubmesh w = SubmeshCount
 };
 
@@ -190,6 +194,10 @@ struct GPUSubmesh {
     float4x4 TransformInversedTransposed;
 
     float4 BoundingSphere;
+
+    float3 AABBCenter;
+    float3 AABBExtents;
+
     uint4 Draw; // x = FirstIndex y = IndexCount z = int32 VertexOffset bit-cast to uint32 w = MaterialIndex
     uint4 Meshlets; // x = FirstMeshlet y = MeshletCount z = RenderBin w = flags
     uint4 LODs; // x = FirstLOD, y = LODCount
@@ -389,6 +397,9 @@ bool IsAABBInsideFrustum(float3 center, float3 extents, GPUCullView view) {
         float4 plane = view.FrustumPlanes[i];
         float projectedRadius = dot(abs(plane.xyz), extents);
         float distance = dot(plane.xyz, center) + plane.w;
+
+        //sometimes, some objects still flicker... so give some margin (0.5% is good in bistro)
+        float epsilon = max(0.05f, projectedRadius * 0.05f);
 
         if (distance + projectedRadius < 0.0f)
             return false;

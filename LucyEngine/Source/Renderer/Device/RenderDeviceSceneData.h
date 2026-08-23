@@ -87,8 +87,9 @@ namespace Lucy {
         >{};
     };
 
-    struct RenderDeviceMeshData {   
-        glm::vec4 BoundingSphere = glm::vec4{ 0.0f };
+    struct RenderDeviceMeshData {
+        glm::vec3 AABBCenter{};
+        glm::vec3 AABBExtents{};
         glm::uvec4 Data = glm::uvec4{ 0 }; // x = FirstLOD y = LODCount z = FirstSubmesh w = SubmeshCount
 
         auto operator<=>(const RenderDeviceMeshData&) const = default;
@@ -106,6 +107,10 @@ namespace Lucy {
         glm::mat4 TransformInversedTransposed = glm::mat4{ 1.0f };
 
         glm::vec4 BoundingSphere = glm::vec4{ 0.0f };
+
+        glm::vec3 AABBCenter{};
+        glm::vec3 AABBExtents{};
+
         glm::uvec4 Draw = glm::uvec4{ 0 }; // x = FirstIndex y = IndexCount z = int32 VertexOffset bit-cast to uint32 w = MaterialIndex
         glm::uvec4 Meshlets = glm::uvec4{ 0 }; // x = FirstMeshlet y = MeshletCount z = RenderBin w = flags
         glm::uvec4 LODs = glm::uvec4{ INVALID_INDEX, 0, 0, 0 }; // x = FirstLOD, y = LODCount

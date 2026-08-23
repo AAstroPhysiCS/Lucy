@@ -193,31 +193,6 @@ namespace Lucy {
         Index firstSubmeshIndex = INVALID_INDEX;
         Index registeredSubmeshCount = 0;
 
-        const auto CalculateSubmeshBoundingSphere = [&](const Submesh& submesh) {
-            if (submesh.VertexCount == 0)
-                return glm::vec4(0.0f);
-
-            glm::vec3 minimum{ std::numeric_limits<float>::max() };
-            glm::vec3 maximum{ std::numeric_limits<float>::lowest() };
-
-            for (uint32_t vertexIndex = 0; vertexIndex < submesh.VertexCount; vertexIndex++) {
-                const glm::vec3 position = vertices[submesh.BaseVertexCount + vertexIndex].Position;
-
-                minimum = glm::min(minimum, position);
-                maximum = glm::max(maximum, position);
-            }
-
-            const glm::vec3 center = (minimum + maximum) * 0.5f;
-            float radius = 0.0f;
-
-            for (uint32_t vertexIndex = 0; vertexIndex < submesh.VertexCount; vertexIndex++) {
-                const glm::vec3 position = vertices[submesh.BaseVertexCount + vertexIndex].Position;
-                radius = glm::max(radius, glm::distance(center, position));
-            }
-
-            return glm::vec4(center, radius);
-        };
-
         for (const Submesh& submesh : submeshes) {
             LUCY_ASSERT(!submesh.LODs.empty(), "Submesh requires at least one LOD.");
 
@@ -226,7 +201,6 @@ namespace Lucy {
             RenderDeviceSubmeshData renderDeviceSubmesh{};
             renderDeviceSubmesh.Transform = submesh.Transform;
             renderDeviceSubmesh.TransformInversedTransposed = glm::transpose(glm::inverse(submesh.Transform));
-            renderDeviceSubmesh.BoundingSphere = CalculateSubmeshBoundingSphere(submesh);
             renderDeviceSubmesh.Draw.x = m_GlobalIndexCount + submesh.BaseMeshletIndexCount + baseLOD.FirstMeshletIndex;
             renderDeviceSubmesh.Draw.y = baseLOD.MeshletIndexCount;
             renderDeviceSubmesh.Draw.z = static_cast<int32_t>(m_GlobalVertexCount + submesh.BaseVertexCount);
@@ -304,14 +278,35 @@ namespace Lucy {
             registeredSubmesh.LODs.x = firstSubmeshLODIndex;
             registeredSubmesh.LODs.y = registeredSubmeshLODCount;
 
+            glm::vec3 minimum{ std::numeric_limits<float>::max() };
+            glm::vec3 maximum{ std::numeric_limits<float>::lowest() };
+
+            for (const Meshlet& meshlet : submesh.Meshlets) {
+                const glm::vec3 meshletMinimum = meshlet.AABBCenter - meshlet.AABBExtents;
+                const glm::vec3 meshletMaximum = meshlet.AABBCenter + meshlet.AABBExtents;
+
+                minimum = glm::min(minimum, meshletMinimum);
+                maximum = glm::max(maximum, meshletMaximum);
+            }
+
+            registeredSubmesh.AABBCenter = (minimum + maximum) * 0.5f;
+            registeredSubmesh.AABBExtents = (maximum - minimum) * 0.5f;
+
+            float radius = 0.0f;
+            for (uint32_t vertexIndex = 0; vertexIndex < submesh.VertexCount; vertexIndex++) {
+                const glm::vec3& position = vertices[submesh.BaseVertexCount + vertexIndex].Position;
+                radius = glm::max(radius, glm::distance(registeredSubmesh.AABBCenter, position));
+            }
+            registeredSubmesh.BoundingSphere = glm::vec4{ registeredSubmesh.AABBCenter, radius };
+
             RTEnqueueUpdate(m_Submeshes, RenderDeviceSceneBufferType::Submeshes, submeshHandle);
 
             registeredSubmeshCount++;
         }
 
-        const auto CalculateMeshBoundingSphere = [](const auto& vertices, const auto& submeshes) {
+        const auto CalculateMeshCenterAndExtents = [](const auto& vertices, const auto& submeshes) {
             if (vertices.empty())
-                return glm::vec4(0.0f);
+                return std::make_pair(glm::vec3{}, glm::vec3{});
 
             glm::vec3 minimum{ std::numeric_limits<float>::max() };
             glm::vec3 maximum{ std::numeric_limits<float>::lowest() };
@@ -319,7 +314,10 @@ namespace Lucy {
             for (const Submesh& submesh : submeshes) {
                 for (uint32_t vertexIndex = 0; vertexIndex < submesh.VertexCount; vertexIndex++) {
                     const Vertex& vertex = vertices[submesh.BaseVertexCount + vertexIndex];
-                    const glm::vec3 position = glm::vec3(submesh.Transform * glm::vec4(vertex.Position, 1.0f));
+
+                    const glm::vec3 position = glm::vec3(
+                        submesh.Transform * glm::vec4(vertex.Position, 1.0f)
+                    );
 
                     minimum = glm::min(minimum, position);
                     maximum = glm::max(maximum, position);
@@ -327,22 +325,16 @@ namespace Lucy {
             }
 
             const glm::vec3 center = (minimum + maximum) * 0.5f;
-            float radius = 0.0f;
+            const glm::vec3 extents = (maximum - minimum) * 0.5f;
 
-            for (const Submesh& submesh : submeshes) {
-                for (uint32_t vertexIndex = 0; vertexIndex < submesh.VertexCount; vertexIndex++) {
-                    const Vertex& vertex = vertices[submesh.BaseVertexCount + vertexIndex];
-                    const glm::vec3 position = glm::vec3(submesh.Transform * glm::vec4(vertex.Position, 1.0f));
-
-                    radius = glm::max(radius, glm::distance(center, position));
-                }
-            }
-
-            return glm::vec4{ center, radius };
+            return std::make_pair(center, extents);
         };
 
+        const auto [center, extents] = CalculateMeshCenterAndExtents(vertices, submeshes);
+
         RenderDeviceMeshData& renderDeviceMesh = m_Meshes.Get(handle);
-        renderDeviceMesh.BoundingSphere = CalculateMeshBoundingSphere(vertices, submeshes);
+        renderDeviceMesh.AABBCenter = center;
+        renderDeviceMesh.AABBExtents = extents;
         renderDeviceMesh.Data.x = INVALID_INDEX;
         renderDeviceMesh.Data.y = 0;
         renderDeviceMesh.Data.z = firstSubmeshIndex;

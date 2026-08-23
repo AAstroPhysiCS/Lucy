@@ -240,7 +240,7 @@ namespace Lucy {
 	}
 
 	void Mesh::TraverseHierarchy(const aiNode* node, const glm::mat4& parentTransform) {
-		glm::mat4 localTransform = *(glm::mat4*)&node->mTransformation;
+		glm::mat4 localTransform = glm::transpose(*(glm::mat4*)&node->mTransformation);
 		glm::mat4 transformed = parentTransform * localTransform;
 
 		for (uint32_t i = 0; i < node->mNumMeshes; i++) {
