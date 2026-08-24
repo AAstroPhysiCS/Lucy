@@ -71,6 +71,10 @@ namespace Lucy {
             RenderDeviceResourceHandle MeshletBuffer;
             RenderDeviceResourceHandle CullViewsBuffer;
 
+            RenderDeviceResourceHandle TopLevelAccelerationStructure;
+            bool TopLevelAccelerationStructureDirty = true;
+            bool TopLevelAccelerationStructureRebuild = true;
+
             std::vector<RenderDeviceScenePendingUpdate> PendingUpdates;
 
             bool Initialized = false;
@@ -81,6 +85,8 @@ namespace Lucy {
 
         constexpr RenderDeviceResourceHandle GetCurrentFrameBufferHandle(std::string_view name) { return GetCurrentFrameBufferHandle(name, Renderer::GetCurrentFrameIndex()); }
         std::vector<RenderDeviceResourceHandle> GetCurrentFrameBufferHandles(std::string_view name);
+
+		[[nodiscard]] const RenderDeviceResourceHandle& GetCurrentTopLevelAccelerationStructureHandle() const { return m_FrameData[Renderer::GetCurrentFrameIndex()].TopLevelAccelerationStructure; }
 
         static uint64_t GetSubmeshCapacity() { return s_SubmeshCapacity; }
         static uint64_t GetObjectCapacity() { return s_ObjectCapacity; }
@@ -99,6 +105,9 @@ namespace Lucy {
         void RTUpdateObjectTransform(const RenderDeviceObjectHandle& handle, const glm::mat4& transform);
 
         void RTUpdatePBRMaterial(const RenderDeviceObjectHandle& handle, const RenderDevicePBRMaterialData& data);
+
+        void RTCreateMeshBottomLevelAccelerationStructure(const RenderDeviceObjectHandle& meshHandle, const std::vector<Submesh>& submeshes);
+        void RTSyncTopLevelAccelerationStructure(uint32_t frameIndex);
 
         template <CanDetectChange TData, typename TFunc>
         void DetectChange(const TData& old, const TData& newData, TFunc&& func) {
@@ -304,6 +313,8 @@ namespace Lucy {
         RenderDeviceObjectHandle m_GlobalsHandle;
 
         RenderDevice* m_RenderDevice = nullptr;
+
+        std::vector<RenderDeviceResourceHandle> m_MeshBLAccelerationStructures;
 
         RenderDeviceResourceHandle m_GlobalVertexBuffer;
         RenderDeviceResourceHandle m_GlobalIndexBuffer;

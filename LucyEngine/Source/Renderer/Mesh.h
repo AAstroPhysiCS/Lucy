@@ -194,12 +194,12 @@ namespace Lucy {
 
 		constexpr static inline std::array<float, MESH_LOD_COUNT> MESH_LOD_RATIOS = {
 			1.00f,
-			0.65f,
-			0.25f,
-			0.05f
+			0.70f,
+			0.40f,
+			0.20f
 		};
 
-		constexpr static inline float MESH_LOD_TARGET_ERROR = 0.02f;
+		constexpr static inline float MESH_LOD_TARGET_ERROR = 0.01f;
 
 		constexpr static inline size_t MESHLET_MIN_TRIANGLES = 4;
 		constexpr static inline size_t MESHLET_MAX_VERTICES = 64;

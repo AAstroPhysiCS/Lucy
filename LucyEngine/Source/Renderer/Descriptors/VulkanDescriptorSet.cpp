@@ -6,6 +6,7 @@
 #include "Renderer/Memory/Buffer/Vulkan/VulkanDeviceAddressBuffer.h"
 
 #include "Renderer/Pipeline/VulkanImageSamplerBindingInfo.h"
+#include "Renderer/Pipeline/VulkanRayTracingPipeline.h"
 
 #include "Renderer/Renderer.h"
 #include "Renderer/Device/VulkanRenderDevice.h"
@@ -62,6 +63,10 @@ namespace Lucy {
 				case DescriptorBaseShape::SampledImageArray:
 				case DescriptorBaseShape::Sampler: {
 					m_ImageSamplerBindingInfos.try_emplace(variable.Name, VulkanImageSamplerBindingInfo{ variable.Binding, variable.Name, variable.Type });
+					break;
+				}
+				case DescriptorBaseShape::AccelerationStructure: {
+					m_AccelerationStructureBindings.try_emplace(variable.Name, variable.Binding);
 					break;
 				}
 				default: {
@@ -257,6 +262,37 @@ namespace Lucy {
 
 		VkDevice logicalDevice = device->As<VulkanRenderDevice>()->GetLogicalDevice();
 		vkUpdateDescriptorSets(logicalDevice, 1, &setWrite, 0, nullptr);
+	}
+
+	void VulkanDescriptorSet::RTUpdateAccelerationStructure(RenderDevice* device, const std::string& name, const Ref<AccelerationStructure>& accelerationStructure) {
+		LUCY_ASSERT(Renderer::IsOnRenderThread());
+
+		auto* vulkanDevice = reinterpret_cast<VulkanRenderDevice*>(device);
+
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		const uint32_t binding = m_AccelerationStructureBindings.at(name);
+
+		const auto& vulkanAccelerationStructure = accelerationStructure->As<VulkanAccelerationStructure>();
+
+		VkAccelerationStructureKHR accelerationStructureHandle = vulkanAccelerationStructure->GetVulkanHandle();
+
+		VkWriteDescriptorSetAccelerationStructureKHR accelerationStructureInfo{};
+		accelerationStructureInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+		accelerationStructureInfo.accelerationStructureCount = 1;
+		accelerationStructureInfo.pAccelerationStructures = &accelerationStructureHandle;
+
+		VkDescriptorSet descriptorSet = m_CreateInfo.Count == Renderer::GetMaxFramesInFlight() ? m_DescriptorSets[frameIndex] : m_DescriptorSets[0];
+
+		VkWriteDescriptorSet write{};
+		write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		write.dstSet = descriptorSet;
+		write.dstBinding = binding;
+		write.dstArrayElement = 0;
+		write.descriptorCount = 1;
+		write.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+		write.pNext = &accelerationStructureInfo;
+
+		vkUpdateDescriptorSets(vulkanDevice->GetLogicalDevice(), 1, &write, 0, nullptr);
 	}
 
 	VulkanImageSamplerBindingInfo* VulkanDescriptorSet::GetVulkanImageSampler(const std::string& imageBufferName) {

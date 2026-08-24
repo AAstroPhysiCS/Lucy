@@ -6,6 +6,7 @@
 
 #include "Renderer/Pipeline/VulkanGraphicsPipeline.h"
 #include "Renderer/Pipeline/VulkanComputePipeline.h"
+#include "Renderer/Pipeline/VulkanRayTracingPipeline.h"
 
 #include "Renderer/Descriptors/VulkanDescriptorSet.h"
 
@@ -58,6 +59,8 @@ namespace Lucy {
 		m_DescriptorSetManager = Memory::CreateUnique<VulkanDescriptorSetManager>(this);
 		m_UploadManager = Memory::CreateUnique<VulkanRenderDeviceUploadManager>(shared_from_this()->As<VulkanRenderDevice>());
 		m_DeviceScene = Memory::CreateUnique<RenderDeviceScene>(this);
+
+		m_TransientCommandPool = Memory::CreateUnique<VulkanTransientCommandPool>(shared_from_this()->As<VulkanRenderDevice>());
 	}
 
 	void VulkanRenderDevice::PickDeviceByRanking(const std::vector<VkPhysicalDevice>& devices) {
@@ -99,31 +102,20 @@ namespace Lucy {
 		}
 #else
 		for (const auto& device : devices) {
-			VkPhysicalDeviceProperties properties;
-			vkGetPhysicalDeviceProperties(device, &properties);
+			VulkanDeviceInfo deviceInfo = QueryDeviceInfo(device);
 
-			VkPhysicalDeviceFeatures features;
-			vkGetPhysicalDeviceFeatures(device, &features);
-
-			VulkanDeviceInfo deviceInfo = { properties.deviceName, properties.driverVersion, properties.apiVersion };
 			LUCY_INFO(std::format("Device Name: {0}", deviceInfo.Name));
 			LUCY_INFO(std::format("Device Driver Version: {0}", deviceInfo.DriverVersion));
 			LUCY_INFO(std::format("Device API Version: {0}", deviceInfo.ApiVersion));
 			LUCY_INFO("-------------------------------------");
-			deviceInfo.MinUniformBufferAlignment = (uint32_t)properties.limits.minUniformBufferOffsetAlignment;
-			deviceInfo.TimestampPeriod = properties.limits.timestampPeriod;
 
 			FindQueueFamilies(device);
 
 			bool isDeviceRequirementsCovered = CheckDeviceExtensionSupport(device) && CheckDeviceFormatSupport(device);
 
-			if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
-				&& features.multiViewport
-				&& features.geometryShader
-				&& features.samplerAnisotropy
-				&& features.tessellationShader
-				&& m_QueueFamilyIndices.IsComplete()
-				&& isDeviceRequirementsCovered) {
+			if (/*deviceInfo.DeviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && */deviceInfo.SamplerAnisotropy && deviceInfo.GeometryShader
+				&& deviceInfo.TessellationShader && deviceInfo.MultiViewport && deviceInfo.DynamicRendering && deviceInfo.Synchronization2 
+				&& m_QueueFamilyIndices.IsComplete() && isDeviceRequirementsCovered) {
 				m_DeviceInfo = deviceInfo;
 				m_PhysicalDevice = device;
 				return;
@@ -194,13 +186,35 @@ namespace Lucy {
 		vulkan13Features.synchronization2 = VK_TRUE;
 		vulkan13Features.pNext = &vulkan12Features;
 
+		//For raytracing DDGI
+		VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeatures{};
+		rayQueryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+		rayQueryFeatures.rayQuery = VK_TRUE;
+		rayQueryFeatures.pNext = &vulkan13Features;
+
+		VkPhysicalDeviceRayTracingInvocationReorderFeaturesEXT rayTracingInvocationReorderFeatures{};
+		rayTracingInvocationReorderFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_INVOCATION_REORDER_FEATURES_EXT;
+		rayTracingInvocationReorderFeatures.rayTracingInvocationReorder = VK_TRUE;
+		rayTracingInvocationReorderFeatures.pNext = &rayQueryFeatures;
+
+		VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingPipelineFeatures{};
+		rayTracingPipelineFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+		rayTracingPipelineFeatures.rayTracingPipeline = VK_TRUE;
+		rayTracingPipelineFeatures.rayTracingPipelineTraceRaysIndirect = VK_TRUE;
+		rayTracingPipelineFeatures.pNext = &rayTracingInvocationReorderFeatures;
+
+		VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures{};
+		accelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+		accelerationStructureFeatures.accelerationStructure = VK_TRUE;
+		accelerationStructureFeatures.pNext = &rayTracingPipelineFeatures;
+
 		VkPhysicalDeviceFeatures2 features{};
 		features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 		vkGetPhysicalDeviceFeatures2(m_PhysicalDevice, &features);
 		features.features.samplerAnisotropy = VK_TRUE;
 		features.features.geometryShader = VK_TRUE;
 		features.features.multiViewport = VK_TRUE;
-		features.pNext = &vulkan13Features;
+		features.pNext = &accelerationStructureFeatures;
 
 		VkDeviceCreateInfo deviceCreateInfo{};
 		deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -268,6 +282,113 @@ namespace Lucy {
 		}
 	}
 
+	VulkanDeviceInfo VulkanRenderDevice::QueryDeviceInfo(VkPhysicalDevice device) const {
+		VkPhysicalDeviceProperties properties{};
+		vkGetPhysicalDeviceProperties(device, &properties);
+
+		VkPhysicalDeviceFeatures features{};
+		vkGetPhysicalDeviceFeatures(device, &features);
+
+		VkPhysicalDeviceDynamicRenderingFeatures dynamicRendering{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES
+		};
+
+		VkPhysicalDeviceSynchronization2Features synchronization2{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES
+		};
+
+		VkPhysicalDeviceTimelineSemaphoreFeatures timelineSemaphore{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES
+		};
+
+		VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAddress{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES
+		};
+
+		VkPhysicalDeviceDescriptorIndexingFeatures descriptorIndexing{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES
+		};
+
+		VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructure{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR
+		};
+
+		VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingPipeline{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR
+		};
+
+		dynamicRendering.pNext = &synchronization2;
+		synchronization2.pNext = &timelineSemaphore;
+		timelineSemaphore.pNext = &bufferDeviceAddress;
+		bufferDeviceAddress.pNext = &descriptorIndexing;
+		descriptorIndexing.pNext = &accelerationStructure;
+		accelerationStructure.pNext = &rayTracingPipeline;
+
+		VkPhysicalDeviceFeatures2 features2 {
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+			.pNext = &dynamicRendering
+		};
+
+		vkGetPhysicalDeviceFeatures2(device, &features2);
+
+		VkPhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingProperties {
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR
+		};
+
+		VkPhysicalDeviceProperties2 properties2 {
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+			.pNext = &rayTracingProperties
+		};
+
+		vkGetPhysicalDeviceProperties2(device, &properties2);
+
+		return VulkanDeviceInfo{
+			.Name = properties.deviceName,
+			.VendorId = properties.vendorID,
+			.DeviceId = properties.deviceID,
+			.DeviceType = properties.deviceType,
+			.DriverVersion = properties.driverVersion,
+			.ApiVersion = properties.apiVersion,
+			.MinUniformBufferAlignment = static_cast<uint32_t>(properties.limits.minUniformBufferOffsetAlignment),
+			.MinStorageBufferAlignment = static_cast<uint32_t>(properties.limits.minStorageBufferOffsetAlignment),
+			.MinTexelBufferOffsetAlignment = static_cast<uint32_t>(properties.limits.minTexelBufferOffsetAlignment),
+			.MaxImageDimension2D = properties.limits.maxImageDimension2D,
+			.MaxBoundDescriptorSets = properties.limits.maxBoundDescriptorSets,
+			.MaxPushConstantsSize = properties.limits.maxPushConstantsSize,
+			.MaxComputeWorkGroupInvocations = properties.limits.maxComputeWorkGroupInvocations,
+			.MaxComputeWorkGroupSize = {
+				properties.limits.maxComputeWorkGroupSize[0],
+				properties.limits.maxComputeWorkGroupSize[1],
+				properties.limits.maxComputeWorkGroupSize[2]
+			},
+			.MaxComputeWorkGroupCount = {
+				properties.limits.maxComputeWorkGroupCount[0],
+				properties.limits.maxComputeWorkGroupCount[1],
+				properties.limits.maxComputeWorkGroupCount[2]
+			},
+			.MaxSamplerAnisotropy = properties.limits.maxSamplerAnisotropy,
+			.TimestampPeriod = properties.limits.timestampPeriod,
+			.FramebufferColorSampleCounts = properties.limits.framebufferColorSampleCounts,
+			.FramebufferDepthSampleCounts = properties.limits.framebufferDepthSampleCounts,
+			.SamplerAnisotropy = static_cast<bool>(features.samplerAnisotropy),
+			.GeometryShader = static_cast<bool>(features.geometryShader),
+			.TessellationShader = static_cast<bool>(features.tessellationShader),
+			.MultiViewport = static_cast<bool>(features.multiViewport),
+			.DynamicRendering = static_cast<bool>(dynamicRendering.dynamicRendering),
+			.Synchronization2 = static_cast<bool>(synchronization2.synchronization2),
+			.TimelineSemaphore = static_cast<bool>(timelineSemaphore.timelineSemaphore),
+			.BufferDeviceAddress = static_cast<bool>(bufferDeviceAddress.bufferDeviceAddress),
+			.DescriptorIndexing = static_cast<bool>(descriptorIndexing.descriptorBindingPartiallyBound && descriptorIndexing.runtimeDescriptorArray),
+			.RayTracingPipeline = static_cast<bool>(rayTracingPipeline.rayTracingPipeline),
+			.AccelerationStructure = static_cast<bool>(accelerationStructure.accelerationStructure),
+			.ShaderGroupHandleSize = rayTracingProperties.shaderGroupHandleSize,
+			.ShaderGroupHandleAlignment = rayTracingProperties.shaderGroupHandleAlignment,
+			.ShaderGroupBaseAlignment = rayTracingProperties.shaderGroupBaseAlignment,
+			.MaxShaderGroupStride = rayTracingProperties.maxShaderGroupStride,
+			.MaxRayRecursionDepth = rayTracingProperties.maxRayRecursionDepth,
+		};
+	}
+
 	bool VulkanRenderDevice::CheckDeviceExtensionSupport(VkPhysicalDevice device) {
 		uint32_t extensionCount = 0;
 		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
@@ -285,7 +406,7 @@ namespace Lucy {
 			LUCY_CRITICAL("Not available extensions");
 			uint32_t i = 0;
 			for (const auto& notAvailableExtensions : requiredExtensions) {
-				LUCY_CRITICAL(std::format("Index: {0}, Name: {1}", (i++), notAvailableExtensions));
+				LUCY_CRITICAL(std::format("Index: {0}, Name: {1}\n", (i++), notAvailableExtensions));
 			}
 			LUCY_ASSERT(false);
 		}
@@ -464,6 +585,8 @@ namespace Lucy {
 		LUCY_PROFILE_DESTROY();
 		auto& scene = GetScene();
 		scene->RTDestroy();
+
+		m_TransientCommandPool->Destroy();
 
 		m_DescriptorSetManager->RTDestroy();
 		m_UploadManager->Destroy(m_Allocator);
@@ -648,6 +771,12 @@ namespace Lucy {
 		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 		pushConstant.RTBind((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex), pipeline->As<VulkanComputePipeline>()->GetPipelineLayout());
 	}
+	
+	void VulkanRenderDevice::BindPushConstant(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline, const PipelineConstant& pushConstant) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindPushConstant | RayTracing");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		pushConstant.RTBind((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex), pipeline->As<VulkanRayTracingPipeline>()->GetPipelineLayout());
+	}
 
 	void VulkanRenderDevice::BindPipeline(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindPipeline | Graphics");
@@ -659,6 +788,18 @@ namespace Lucy {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindPipeline | Compute");
 		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 		pipeline->RTBind(cmdPool->GetCommandBuffer(frameIndex));
+	}
+	
+	void VulkanRenderDevice::BindPipeline(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindPipeline | RayTracing");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		pipeline->RTBind(cmdPool->GetCommandBuffer(frameIndex));
+	}
+
+	void VulkanRenderDevice::TraceRays(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline, uint32_t width, uint32_t height, uint32_t depth) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::TraceRays");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		pipeline->RTTrace(cmdPool->GetCommandBuffer(frameIndex), width, height, depth);
 	}
 
 	void VulkanRenderDevice::UpdateDescriptorSets(Ref<GraphicsPipeline> pipeline) {
@@ -680,6 +821,19 @@ namespace Lucy {
 		for (auto handle : descriptorSetHandles) {
 			Ref<VulkanDescriptorSet> vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
 			vulkanSet->RTUpdate(this);
+		}
+	}
+	
+	void VulkanRenderDevice::UpdateDescriptorSets(Ref<RayTracingPipeline> pipeline, const std::string& name, const Ref<AccelerationStructure>& accelerationStructure) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::UpdateDescriptorSets | RayTracing");
+		const auto& castedPipeline = pipeline->As<VulkanRayTracingPipeline>();
+		const auto& descriptorSetHandles = castedPipeline->GetDescriptorSetHandles();
+
+		for (auto handle : descriptorSetHandles) {
+			Ref<VulkanDescriptorSet> vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
+			if (vulkanSet->GetSetIndex() == VulkanDescriptorSetManager::TEXTURE_BINDLESS_TABLE_SET_INDEX)
+				continue;
+			vulkanSet->RTUpdateAccelerationStructure(this, name, accelerationStructure);
 		}
 	}
 
@@ -746,6 +900,43 @@ namespace Lucy {
 		VulkanDescriptorSetBindInfo bindInfo;
 		bindInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
 		bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
+		bindInfo.PipelineLayout = castedPipeline->GetPipelineLayout();
+
+		for (auto handle : descriptorSetHandles) {
+			const auto& vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
+			if (vulkanSet->GetSetIndex() == setIndex) {
+				vulkanSet->RTBind(bindInfo);
+				break;
+			}
+		}
+	}
+
+	void VulkanRenderDevice::BindAllDescriptorSets(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindAllDescriptorSets | RayTracing");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		const auto& castedPipeline = pipeline->As<VulkanRayTracingPipeline>();
+		const auto& descriptorSetHandles = castedPipeline->GetDescriptorSetHandles();
+
+		VulkanDescriptorSetBindInfo bindInfo;
+		bindInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
+		bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
+		bindInfo.PipelineLayout = castedPipeline->GetPipelineLayout();
+
+		for (auto handle : descriptorSetHandles) {
+			const auto& vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
+			vulkanSet->RTBind(bindInfo);
+		}
+	}
+
+	void VulkanRenderDevice::BindDescriptorSet(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline, uint32_t setIndex) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindDescriptorSet | RayTracing");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		const auto& castedPipeline = pipeline->As<VulkanRayTracingPipeline>();
+		const auto& descriptorSetHandles = castedPipeline->GetDescriptorSetHandles();
+
+		VulkanDescriptorSetBindInfo bindInfo;
+		bindInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
+		bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
 		bindInfo.PipelineLayout = castedPipeline->GetPipelineLayout();
 
 		for (auto handle : descriptorSetHandles) {
@@ -843,12 +1034,12 @@ namespace Lucy {
 		m_DescriptorSetManager->RegisterShaderBindings(shader);
 	}
 
-	void VulkanRenderDevice::SubmitImmediateCommand(const std::function<void(VkCommandBuffer)>& func, const Ref<VulkanTransientCommandPool>& cmdPool) {
-		VkCommandBuffer commandBuffer = cmdPool->BeginSingleTimeCommand(m_LogicalDevice);
+	void VulkanRenderDevice::SubmitImmediateCommand(const std::function<void(VkCommandBuffer)>& func) {
+		VkCommandBuffer commandBuffer = m_TransientCommandPool->BeginSingleTimeCommand(m_LogicalDevice);
 		func(commandBuffer);
-		cmdPool->EndSingleTimeCommand();
+		m_TransientCommandPool->EndSingleTimeCommand();
 
-		SubmitWorkToGPUImmediate(m_GraphicsQueue, 1, cmdPool->GetTransientCommandBuffer());
+		SubmitWorkToGPUImmediate(m_GraphicsQueue, 1, m_TransientCommandPool->GetTransientCommandBuffer());
 	}
 
 	void VulkanRenderDevice::WaitForDevice() {

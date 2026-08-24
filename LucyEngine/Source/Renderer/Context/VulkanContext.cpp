@@ -99,7 +99,7 @@ namespace Lucy {
 		if (auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(m_Instance, "vkCreateDebugUtilsMessengerEXT"))
 			LUCY_VK_ASSERT(func(m_Instance, &debugForVkInstanceAndDestroy, nullptr, &m_DebugMessenger));
 
-		SetupDebugLabels();
+		LinkExternalFuncs();
 #endif
 		const Ref<Window>& window = GetWindow();
 		window->InitVulkanSurface(m_Instance);
@@ -125,11 +125,21 @@ namespace Lucy {
 		}
 	}
 
-	void VulkanContext::SetupDebugLabels() {
+	void VulkanContext::LinkExternalFuncs() {
 		VulkanExternalFuncLinkage::vkCmdBeginDebugUtilsLabelEXT = (PFN_vkCmdBeginDebugUtilsLabelEXT)(vkGetInstanceProcAddr(m_Instance, "vkCmdBeginDebugUtilsLabelEXT"));
 		VulkanExternalFuncLinkage::vkCmdEndDebugUtilsLabelEXT = (PFN_vkCmdEndDebugUtilsLabelEXT)(vkGetInstanceProcAddr(m_Instance, "vkCmdEndDebugUtilsLabelEXT"));
 		VulkanExternalFuncLinkage::vkCmdInsertDebugUtilsLabelEXT = (PFN_vkCmdInsertDebugUtilsLabelEXT)(vkGetInstanceProcAddr(m_Instance, "vkCmdInsertDebugUtilsLabelEXT"));
 		VulkanExternalFuncLinkage::vkSetDebugUtilsObjectNameEXT = (PFN_vkSetDebugUtilsObjectNameEXT)(vkGetInstanceProcAddr(m_Instance, "vkSetDebugUtilsObjectNameEXT"));
+
+		VulkanExternalFuncLinkage::vkCreateAccelerationStructureKHR = (PFN_vkCreateAccelerationStructureKHR)(vkGetInstanceProcAddr(m_Instance, "vkCreateAccelerationStructureKHR"));
+		VulkanExternalFuncLinkage::vkDestroyAccelerationStructureKHR = (PFN_vkDestroyAccelerationStructureKHR)(vkGetInstanceProcAddr(m_Instance, "vkDestroyAccelerationStructureKHR"));
+		VulkanExternalFuncLinkage::vkGetAccelerationStructureBuildSizesKHR = (PFN_vkGetAccelerationStructureBuildSizesKHR)(vkGetInstanceProcAddr(m_Instance, "vkGetAccelerationStructureBuildSizesKHR"));
+		VulkanExternalFuncLinkage::vkCmdBuildAccelerationStructuresKHR = (PFN_vkCmdBuildAccelerationStructuresKHR)(vkGetInstanceProcAddr(m_Instance, "vkCmdBuildAccelerationStructuresKHR"));
+		VulkanExternalFuncLinkage::vkGetAccelerationStructureDeviceAddressKHR = (PFN_vkGetAccelerationStructureDeviceAddressKHR)(vkGetInstanceProcAddr(m_Instance, "vkGetAccelerationStructureDeviceAddressKHR"));
+
+		VulkanExternalFuncLinkage::vkCreateRayTracingPipelinesKHR = (PFN_vkCreateRayTracingPipelinesKHR)(vkGetInstanceProcAddr(m_Instance, "vkCreateRayTracingPipelinesKHR"));
+		VulkanExternalFuncLinkage::vkGetRayTracingShaderGroupHandlesKHR = (PFN_vkGetRayTracingShaderGroupHandlesKHR)(vkGetInstanceProcAddr(m_Instance, "vkGetRayTracingShaderGroupHandlesKHR"));
+		VulkanExternalFuncLinkage::vkCmdTraceRaysKHR = (PFN_vkCmdTraceRaysKHR)(vkGetInstanceProcAddr(m_Instance, "vkCmdTraceRaysKHR"));
 	}
 
 	void VulkanContext::DestroyDebugCallbacks() {

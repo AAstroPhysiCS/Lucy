@@ -59,9 +59,7 @@ namespace Lucy {
 		for (size_t i = 0; i < swapImageCount; i++) {
 			m_RenderFinishedSemaphores.emplace_back(SemaphoreType::Binary, vulkanDevice);
 		}
-
-		m_TransientCommandPool = Memory::CreateUnique<VulkanTransientCommandPool>(vulkanDevice);
-
+		
 		//for imgui
 		m_ImGuiRenderCommandList = Memory::CreateUnique<RenderCommandList>(RenderCommandListCreateInfo{
 			.RenderDevice = vulkanDevice,
@@ -141,16 +139,16 @@ namespace Lucy {
 
 				for (size_t i = 0; i < info.SubmitFuncs.size(); i++) {
 					RenderGraphPass* pass = vkBatch.Passes[i];
-					/*auto it = std::ranges::find_if(vkBatch.PassBarriers, [&](const VulkanPassBarrier& passBarrier) {
+					auto it = std::ranges::find_if(vkBatch.PassBarriers, [&](const VulkanPassBarrier& passBarrier) {
 						return passBarrier.Pass == pass;
-					});*/
+					});
 
-					/*if (it != vkBatch.PassBarriers.end()) {
+					if (it != vkBatch.PassBarriers.end()) {
 						VkCommandBuffer cmdBuffer = static_cast<VkCommandBuffer>(primaryCommandPool->GetCommandBuffer(m_CurrentFrameIndex));
 						vulkanDevice->BeginDebugMarker(cmdBuffer, "PassVulkanBarrier");
 						ExecuteVulkanBatchBarrier(cmdBuffer, it->Barrier);
 						vulkanDevice->EndDebugMarker(cmdBuffer);
-					}*/
+					}
 
 					info.SubmitFuncs[i](cmdList);
 				}
@@ -437,8 +435,6 @@ namespace Lucy {
 		auto& allocator = GetRenderDevice()->As<VulkanRenderDevice>()->GetAllocator();
 		allocator.DestroyBuffer(s_IDBuffer, s_IDBufferVma);
 
-		m_TransientCommandPool->Destroy();
-
 		const uint32_t swapImageCount = m_SwapChain->As<VulkanSwapChain>()->GetSwapChainImageCount();
 
 		const auto& swapChain = GetSwapChain();
@@ -468,7 +464,7 @@ namespace Lucy {
 	void VulkanRenderer::SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::SubmitImmediateCommand");
 		const auto& renderDevice = GetRenderDevice()->As<VulkanRenderDevice>();
-		renderDevice->SubmitImmediateCommand(func, m_TransientCommandPool);
+		renderDevice->SubmitImmediateCommand(func);
 	}
 
 	void VulkanRenderer::OnWindowResize() {

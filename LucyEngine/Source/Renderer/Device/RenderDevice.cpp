@@ -8,6 +8,8 @@
 
 #include "Renderer/Pipeline/VulkanGraphicsPipeline.h"
 #include "Renderer/Pipeline/VulkanComputePipeline.h"
+#include "Renderer/Pipeline/RayTracingPipeline.h"
+#include "Renderer/Pipeline/VulkanRayTracingPipeline.h"
 
 #include "Renderer/Image/VulkanImageCube.h"
 #include "Renderer/Descriptors/VulkanDescriptorSet.h"
@@ -131,6 +133,23 @@ namespace Lucy {
 		return {};
 	}
 
+	RenderDeviceResourceHandle RenderDevice::CreateRayTracingPipeline(const RayTracingPipelineCreateInfo& createInfo) {
+		static std::mutex pipelineCreationMutex;
+
+		switch (Renderer::GetRenderArchitecture()) {
+			case RenderArchitecture::Vulkan: {
+				auto resource = Memory::CreateRef<VulkanRayTracingPipeline>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
+
+				std::unique_lock<std::mutex> lock(pipelineCreationMutex);
+				auto handle = m_ResourceManager.PushResource(resource);
+				return handle;
+			}
+			default:
+				LUCY_ASSERT(false, "No suitable API found to create the resource!");
+		}
+		return {};
+	}
+
 	RenderDeviceResourceHandle RenderDevice::CreateRenderPass(const RenderPassCreateInfo& createInfo) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
@@ -236,6 +255,32 @@ namespace Lucy {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				auto resource = Memory::CreateRef<VulkanDeviceAddressBuffer>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
+				auto handle = m_ResourceManager.PushResource(resource);
+				return handle;
+			}
+			default:
+				LUCY_ASSERT(false, "No suitable API found to create the resource!");
+		}
+		return {};
+	}
+
+	RenderDeviceResourceHandle RenderDevice::CreateBLAccelerationStructure(const BLAccelerationStructureCreateInfo& createInfo) {
+		switch (Renderer::GetRenderArchitecture()) {
+			case RenderArchitecture::Vulkan: {
+				auto resource = Memory::CreateRef<VulkanAccelerationStructure>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
+				auto handle = m_ResourceManager.PushResource(resource);
+				return handle;
+			}
+			default:
+				LUCY_ASSERT(false, "No suitable API found to create the resource!");
+		}
+		return {};
+	}
+
+	RenderDeviceResourceHandle RenderDevice::CreateTLAccelerationStructure(const TLAccelerationStructureCreateInfo& createInfo) {
+		switch (Renderer::GetRenderArchitecture()) {
+			case RenderArchitecture::Vulkan: {
+				auto resource = Memory::CreateRef<VulkanAccelerationStructure>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
 				auto handle = m_ResourceManager.PushResource(resource);
 				return handle;
 			}

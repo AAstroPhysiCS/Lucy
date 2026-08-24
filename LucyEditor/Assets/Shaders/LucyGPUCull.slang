@@ -24,9 +24,6 @@ struct CullData {
 [[vk::push_constant]]
 PushConstantGlobal<CullData> PushConstants;
 
-// how much a object appears on screen... we are dealing here with perspective projection, so we can obtain
-// the approximate projected radius by getting the Pyy and multiply that by Viewport.y pixels / 2
-
 bool IsConeBackFacing(GPUMeshlet meshlet, float4x4 modelMatrix, float4x4 normalMatrix, float3 worldCenter, float worldRadius, float3 cameraPosition) {
     const float coneCutoff = meshlet.NormalCone.w;
 
@@ -267,7 +264,7 @@ void CullMeshlets(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_GroupThread
         bool visible = true;
 
         if ((view.Data.w & VIEW_FLAG_FRUSTUM) != 0)
-            visible = IsAABBInsideFrustum(aabbCenter, aabbExtents, view);
+            visible = IsSphereInsideFrustum(worldCenter, worldRadius, view);
 
         if (visible && (view.Data.w & VIEW_FLAG_CONE) != 0)
             visible = !IsConeBackFacing(meshlet, modelMatrix, normalMatrix, worldCenter, worldRadius, view.CameraPosition.xyz);

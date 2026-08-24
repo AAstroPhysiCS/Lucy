@@ -13,6 +13,9 @@ namespace Lucy {
 
 	struct GraphicsPipelineCreateInfo;
 	struct ComputePipelineCreateInfo;
+	struct RayTracingPipelineCreateInfo;
+	struct BLAccelerationStructureCreateInfo;
+	struct TLAccelerationStructureCreateInfo;
 
 	struct RenderPassCreateInfo;
 	struct FrameBufferCreateInfo;
@@ -43,8 +46,11 @@ namespace Lucy {
 	class Pipeline;
 	class PipelineConstant;
 	class PipelineManager;
+
 	class GraphicsPipeline;
 	class ComputePipeline;
+	class RayTracingPipeline;
+	class AccelerationStructure;
 
 	class RenderCommandQueue;
 	class RenderCommandList;
@@ -76,12 +82,16 @@ namespace Lucy {
 #pragma region ResourceManager
 		[[nodiscard]] RenderDeviceResourceHandle CreateGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo, const Ref<Shader>& shader);
 		[[nodiscard]] RenderDeviceResourceHandle CreateComputePipeline(const ComputePipelineCreateInfo& createInfo, const Ref<Shader>& shader);
+		[[nodiscard]] RenderDeviceResourceHandle CreateRayTracingPipeline(const RayTracingPipelineCreateInfo& createInfo);
 		[[nodiscard]] RenderDeviceResourceHandle CreateRenderPass(const RenderPassCreateInfo& createInfo);
 
 		[[nodiscard]] RenderDeviceResourceHandle CreateFrameBuffer(const FrameBufferCreateInfo& createInfo);
 		[[nodiscard]] RenderDeviceResourceHandle CreateVertexBuffer(size_t size);
 		[[nodiscard]] RenderDeviceResourceHandle CreateIndexBuffer(size_t size);
 		[[nodiscard]] RenderDeviceResourceHandle CreateDeviceAddressBuffer(const RenderDeviceBufferCreateInfo& createInfo);
+		
+		[[nodiscard]] RenderDeviceResourceHandle CreateBLAccelerationStructure(const BLAccelerationStructureCreateInfo& createInfo);
+		[[nodiscard]] RenderDeviceResourceHandle CreateTLAccelerationStructure(const TLAccelerationStructureCreateInfo& createInfo);
 
 		[[nodiscard]] RenderDeviceResourceHandle CreateDescriptorSet(const DescriptorSetCreateInfo& createInfo);
 		[[nodiscard]] RenderDeviceResourceHandle CreateSampler(const ImageSamplerCreateInfo& createInfo);
@@ -134,18 +144,26 @@ namespace Lucy {
 
 		virtual void BindPushConstant(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline, const PipelineConstant& pushConstant) = 0;
 		virtual void BindPushConstant(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline, const PipelineConstant& pushConstant) = 0;
+		virtual void BindPushConstant(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline, const PipelineConstant& pushConstant) = 0;
 
 		virtual void BindPipeline(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline) = 0;
 		virtual void BindPipeline(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline) = 0;
+		virtual void BindPipeline(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline) = 0;
+
+		virtual void TraceRays(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline, uint32_t width, uint32_t height, uint32_t depth) = 0;
 		
 		virtual void UpdateDescriptorSets(Ref<GraphicsPipeline> pipeline) = 0;
 		virtual void UpdateDescriptorSets(Ref<ComputePipeline> pipeline) = 0;
+		virtual void UpdateDescriptorSets(Ref<RayTracingPipeline> pipeline, const std::string& name, const Ref<AccelerationStructure>& accelerationStructure) = 0;
 
 		virtual void BindAllDescriptorSets(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline) = 0;
 		virtual void BindDescriptorSet(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline, uint32_t setIndex) = 0;
 		
 		virtual void BindAllDescriptorSets(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline) = 0;
 		virtual void BindDescriptorSet(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline, uint32_t setIndex) = 0;
+		
+		virtual void BindAllDescriptorSets(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline) = 0;
+		virtual void BindDescriptorSet(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline, uint32_t setIndex) = 0;
 
 		virtual void DrawIndexedIndirectCount(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset,
 			Ref<RenderDeviceBuffer> countBuffer, size_t countBufferOffset, uint32_t maxDrawCount, uint32_t stride) = 0;

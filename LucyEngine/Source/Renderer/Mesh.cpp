@@ -322,7 +322,7 @@ namespace Lucy {
 
 				const size_t simplifiedIndexCount = meshopt_simplify(lodIndices.data(), baseIndices.data(), baseIndices.size(),
 					&submesh.Vertices[0].Position.x, submesh.Vertices.size(), sizeof(Vertex), targetIndexCount,
-					MESH_LOD_TARGET_ERROR, 0, &lodError);
+					MESH_LOD_TARGET_ERROR, meshopt_SimplifyLockBorder, &lodError);
 
 				if (simplifiedIndexCount < 3) {
 					submesh.LODs.push_back(submesh.LODs.back());

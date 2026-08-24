@@ -47,6 +47,5 @@ namespace Lucy {
 		std::vector<PendingBufferCopy> m_PendingCopies;
 
 		Ref<VulkanRenderDevice> m_RenderDevice = nullptr;
-		Ref<VulkanTransientCommandPool> m_TransientCopyCommandPool = nullptr;
 	};
 }

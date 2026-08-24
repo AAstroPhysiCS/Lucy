@@ -9,6 +9,8 @@
 
 namespace Lucy {
 
+	class AccelerationStructure;
+
 	struct VulkanDescriptorSetBindInfo {
 		VkCommandBuffer CommandBuffer;
 		VkPipelineBindPoint PipelineBindPoint;
@@ -27,8 +29,12 @@ namespace Lucy {
 
 		void RTBind(const VulkanDescriptorSetBindInfo& bindInfo);
 		void RTBake(const Ref<VulkanDescriptorPool>& descriptorPool, RenderDevice* device);
+		
 		void RTUpdate(RenderDevice* device) final override;
 		void RTUpdateImageSamplerDescriptors(RenderDevice* device, const std::string& imageBufferName, const RenderDeviceTextureHandle& handle);
+		void RTUpdateAccelerationStructure(RenderDevice* device, const std::string& name, const Ref<AccelerationStructure>& accelerationStructure);
+
+		[[nodiscard]] bool HasAccelerationStructureBinding(const std::string& name) const { return m_AccelerationStructureBindings.contains(name); }
 
 		VulkanImageSamplerBindingInfo* GetVulkanImageSampler(const std::string& imageBufferName);
 
@@ -41,6 +47,7 @@ namespace Lucy {
 		void RTDestroyResource(RenderDevice* device) final override;
 
 		std::unordered_map<std::string, VulkanImageSamplerBindingInfo> m_ImageSamplerBindingInfos;
+		std::unordered_map<std::string, uint32_t> m_AccelerationStructureBindings;
 
 		std::vector<VkDescriptorSet> m_DescriptorSets;
 		VkDescriptorSetLayout m_DescriptorSetLayout;

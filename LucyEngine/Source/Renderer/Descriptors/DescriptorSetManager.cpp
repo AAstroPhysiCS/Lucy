@@ -28,7 +28,8 @@ namespace Lucy {
 				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, frames * 4 },
 				{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, sampledImageBindlessBindings * maxBindlessSampledImages },
 				{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, storageImageBindlessBindings * maxBindlessStorageImages },
-				{ VK_DESCRIPTOR_TYPE_SAMPLER, samplerBindlessBindings * maxBindlessSamplers }
+				{ VK_DESCRIPTOR_TYPE_SAMPLER, samplerBindlessBindings * maxBindlessSamplers },
+				{ VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, frames * 16 }
 			};
 
 			VulkanDescriptorPoolCreateInfo poolCreateInfo;

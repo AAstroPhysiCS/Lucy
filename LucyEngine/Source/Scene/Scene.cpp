@@ -18,7 +18,8 @@ namespace Lucy {
 			auto& component = e.GetComponent<MeshComponent>();
 			const auto& mesh = component.GetMesh();
 			const auto& transform = e.GetComponent<TransformComponent>().GetMatrix();
-			component.SetObjectHandle(device->GetScene()->RegisterObject(mesh->GetRenderDeviceMeshHandle(), transform, RenderDeviceObjectFlags::None));
+			auto objectHandle = device->GetScene()->RegisterObject(mesh->GetRenderDeviceMeshHandle(), transform, RenderDeviceObjectFlags::None);
+			component.SetObjectHandle(objectHandle);
 		});
 
 		return e;

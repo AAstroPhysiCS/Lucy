@@ -3,6 +3,8 @@
 
 #include "Renderer/Memory/VulkanAllocator.h"
 
+#include "Renderer/Pipeline/RayTracingPipeline.h"
+
 namespace Lucy {
 
     RenderDeviceScene::RenderDeviceScene(RenderDevice* device)
@@ -35,10 +37,10 @@ namespace Lucy {
         }
 
         m_GlobalVertexBuffer = device->CreateDeviceAddressBuffer({ "GlobalVertexBuffer", s_GlobalVertexCapacity * sizeof(Vertex),
-            BufferUsage::Storage | BufferUsage::TransferDestination | BufferUsage::TransferSource, MemoryUsage::GPUOnly });
+            BufferUsage::Storage | BufferUsage::TransferDestination | BufferUsage::TransferSource | BufferUsage::AccelerationStructureBuildInput, MemoryUsage::GPUOnly });
 
         m_GlobalIndexBuffer = device->CreateDeviceAddressBuffer({ "GlobalIndexBuffer", s_GlobalIndexCapacity * sizeof(uint32_t),
-            BufferUsage::Storage | BufferUsage::Index | BufferUsage::TransferDestination | BufferUsage::TransferSource, MemoryUsage::GPUOnly });
+            BufferUsage::Storage | BufferUsage::Index | BufferUsage::TransferDestination | BufferUsage::TransferSource | BufferUsage::AccelerationStructureBuildInput, MemoryUsage::GPUOnly });
 
         m_GlobalsHandle = RTCreateSceneGlobals({});
     }
@@ -79,7 +81,7 @@ namespace Lucy {
         data.Data.y = static_cast<uint32_t>(flags) | static_cast<uint32_t>(RenderDeviceObjectFlags::Alive);
 
         const RenderDeviceObjectHandle& handle = m_Objects.Create(data);
-        Renderer::EnqueueToRenderCommandQueue([this, meshHandle, transform, handle](const auto& device) {
+        Renderer::EnqueueToRenderCommandQueue([this, handle](const auto& device) {
             RTRegisterObject(handle);
         });
         return handle;
@@ -88,7 +90,7 @@ namespace Lucy {
     RenderDeviceObjectHandle RenderDeviceScene::RegisterCullView(const RenderDeviceCullViewData& data) {
 		LUCY_PROFILE_NEW_EVENT("RenderDeviceScene::RegisterCullView");
 		const RenderDeviceObjectHandle& handle = m_CullViews.Create(data);
-		Renderer::EnqueueToRenderCommandQueue([this, data, handle](const auto& device) {
+		Renderer::EnqueueToRenderCommandQueue([this, handle](const auto& device) {
 			RTRegisterCullView(handle);
 		});
 		return handle;
@@ -98,6 +100,11 @@ namespace Lucy {
         LUCY_PROFILE_NEW_EVENT("RenderDeviceScene::RTRegisterObject");
         LUCY_ASSERT(Renderer::IsOnRenderThread());
         RTEnqueueUpdate(m_Objects, RenderDeviceSceneBufferType::Objects, handle);
+
+        for (auto& frameData : m_FrameData) {
+            frameData.TopLevelAccelerationStructureDirty = true;
+            frameData.TopLevelAccelerationStructureRebuild = true;
+        }
     }
 
     RenderDeviceObjectHandle RenderDeviceScene::RegisterPBRMaterial(const RenderDevicePBRMaterialData& data) {
@@ -152,6 +159,9 @@ namespace Lucy {
         object.PreviousTransform = object.Transform;
         object.Transform = transform;
         object.TransformInversedTransposed = glm::transpose(glm::inverse(transform));
+
+        for (auto& frameData : m_FrameData)
+            frameData.TopLevelAccelerationStructureDirty = true;
 
         RTEnqueueUpdate(m_Objects, RenderDeviceSceneBufferType::Objects, handle);
     }
@@ -272,6 +282,7 @@ namespace Lucy {
                 registeredSubmeshLODCount++;
             }
 
+            //TODO: JUST CLEAN THIS UP... YOU HAVE MULTIPLE CALCS
             RenderDeviceSubmeshData& registeredSubmesh = m_Submeshes.Get(submeshHandle);
             registeredSubmesh.Meshlets.x = firstBaseLODMeshletIndex;
             registeredSubmesh.Meshlets.y = registeredBaseLODMeshletCount;
@@ -341,6 +352,9 @@ namespace Lucy {
         renderDeviceMesh.Data.w = registeredSubmeshCount;
 
         RTEnqueueUpdate(m_Meshes, RenderDeviceSceneBufferType::Meshes, handle);
+        //sometimes we are registering meshes with no submeshes (like the cube mesh for skybox)
+        if (!submeshes.empty())
+		    RTCreateMeshBottomLevelAccelerationStructure(handle, submeshes);
 
         m_GlobalVertexCount = requiredVertexCount;
         m_GlobalIndexCount = requiredIndexCount;
@@ -458,6 +472,74 @@ namespace Lucy {
         });
     }
 
+    void RenderDeviceScene::RTCreateMeshBottomLevelAccelerationStructure(const RenderDeviceObjectHandle& meshHandle, const std::vector<Submesh>& submeshes) {
+        LUCY_ASSERT(Renderer::IsOnRenderThread());
+
+        const auto& vertexBuffer = m_RenderDevice->AccessResource<RenderDeviceBuffer>(m_GlobalVertexBuffer);
+        const auto& indexBuffer = m_RenderDevice->AccessResource<RenderDeviceBuffer>(m_GlobalIndexBuffer);
+
+        BLAccelerationStructureCreateInfo createInfo {
+			.Geometries = {},
+        };
+        createInfo.Geometries.reserve(submeshes.size());
+
+        for (const Submesh& submesh : submeshes) {
+            LUCY_ASSERT(!submesh.LODs.empty());
+            const SubmeshLOD& baseLOD = submesh.LODs[0];
+
+            AccelerationStructureGeometry& geometry = createInfo.Geometries.emplace_back();
+            geometry.VertexAddress = vertexBuffer->GetDeviceAddress() + (m_GlobalVertexCount + submesh.BaseVertexCount) * sizeof(Vertex) + offsetof(Vertex, Position);
+            geometry.IndexAddress = indexBuffer->GetDeviceAddress() + (m_GlobalIndexCount + submesh.BaseMeshletIndexCount + baseLOD.FirstMeshletIndex) * sizeof(uint32_t);
+            geometry.Transform = submesh.Transform;
+            geometry.VertexStride = sizeof(Vertex);
+            geometry.VertexCount = submesh.VertexCount;
+            geometry.PrimitiveCount = baseLOD.MeshletIndexCount / 3;
+        }
+
+        if (meshHandle.Index >= m_MeshBLAccelerationStructures.size())
+            m_MeshBLAccelerationStructures.resize(meshHandle.Index + 1);
+        m_MeshBLAccelerationStructures[meshHandle.Index] = m_RenderDevice->CreateBLAccelerationStructure(createInfo);
+    }
+
+    void RenderDeviceScene::RTSyncTopLevelAccelerationStructure(uint32_t frameIndex) {
+        auto& frameData = m_FrameData[frameIndex];
+        if (!frameData.TopLevelAccelerationStructureDirty)
+            return;
+        
+        std::vector<AccelerationStructureInstance> instances;
+        ForEachAlive(m_Objects, [&](RenderDeviceObjectHandle handle, const RenderDeviceObjectData& object) {
+            uint32_t meshIndex = object.Data.x;
+            const auto& blas = m_RenderDevice->AccessResource<AccelerationStructure>(m_MeshBLAccelerationStructures[meshIndex]);
+
+            AccelerationStructureInstance& instance = instances.emplace_back();
+            instance.BottomLevelAccelerationStructureAddress = blas->GetDeviceAddress();
+            instance.Transform = object.Transform;
+            instance.CustomIndex = static_cast<uint32_t>(handle.Index);
+            instance.ShaderBindingTableRecordOffset = 0;
+            instance.Mask = 0xFF;
+        });
+
+        if (instances.empty()) {
+            frameData.TopLevelAccelerationStructureDirty = false;
+            frameData.TopLevelAccelerationStructureRebuild = false;
+            return;
+        }
+
+        TLAccelerationStructureCreateInfo createInfo{ .Instances = std::move(instances) };
+
+        if (!frameData.TopLevelAccelerationStructure || frameData.TopLevelAccelerationStructureRebuild) {
+            if (frameData.TopLevelAccelerationStructure)
+                m_RenderDevice->RTDestroyResource(frameData.TopLevelAccelerationStructure);
+
+            frameData.TopLevelAccelerationStructure = m_RenderDevice->CreateTLAccelerationStructure(createInfo);
+        } else {
+			m_RenderDevice->AccessResource<AccelerationStructure>(frameData.TopLevelAccelerationStructure)->RTUpdate(m_RenderDevice, createInfo);
+        }
+
+        frameData.TopLevelAccelerationStructureDirty = false;
+        frameData.TopLevelAccelerationStructureRebuild = false;
+    }
+
     void RenderDeviceScene::SyncFrame(uint32_t frameIndex) {
         LUCY_PROFILE_NEW_EVENT("RenderDeviceScene::SyncFrame");
         LUCY_ASSERT(Renderer::IsOnRenderThread());
@@ -541,14 +623,17 @@ namespace Lucy {
         if (materialBufferResized || meshBufferResized || meshLODBufferResized || submeshBufferResized || meshletBufferResized || cullViewsBufferResized)
             UploadAllAddressesToGlobalBuffer();
 
-        if (frameData.PendingUpdates.empty())
-            return;
+        if (!frameData.PendingUpdates.empty())
+            RTApplyPendingUpdates(frameIndex);
 
-        RTApplyPendingUpdates(frameIndex);
+		RTSyncTopLevelAccelerationStructure(frameIndex);
     }
 
 	void RenderDeviceScene::RTDestroy() {
         LUCY_ASSERT(Renderer::IsOnRenderThread());
+
+		for (auto& accelerationStructure : m_MeshBLAccelerationStructures)
+			Renderer::EnqueueResourceDestroy(accelerationStructure);
 
         for (auto& frameData : m_FrameData) {
             Renderer::EnqueueResourceDestroy(frameData.GlobalsBuffer);
@@ -571,6 +656,7 @@ namespace Lucy {
         m_MeshLODs.Clear();
         m_Submeshes.Clear();
         m_Meshlets.Clear();
+        m_MeshBLAccelerationStructures.clear();
 
         m_GlobalVertexCount = 0;
         m_GlobalIndexCount = 0;

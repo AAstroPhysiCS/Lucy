@@ -3,6 +3,7 @@
 
 #include "GraphicsPipeline.h"
 #include "ComputePipeline.h"
+#include "RayTracingPipeline.h"
 
 #include "Renderer/Renderer.h"
 
@@ -20,6 +21,12 @@ namespace Lucy {
 
 	RenderDeviceResourceHandle PipelineManager::CreateComputePipeline(const std::string& name, const Ref<Shader>& shader, const ComputePipelineCreateInfo& createInfo) {
 		auto [tuple, success] = m_ComputePipelines.try_emplace(name, m_RenderDevice->CreateComputePipeline(createInfo, shader));
+		LUCY_ASSERT(success);
+		return tuple->second;
+	}
+
+	RenderDeviceResourceHandle PipelineManager::CreateRayTracingPipeline(const std::string& name, const RayTracingPipelineCreateInfo& createInfo) {
+		auto [tuple, success] = m_RayTracingPipelines.try_emplace(name, m_RenderDevice->CreateRayTracingPipeline(createInfo));
 		LUCY_ASSERT(success);
 		return tuple->second;
 	}
@@ -48,6 +55,7 @@ namespace Lucy {
 
 		RecreateAllPipelines.operator()<GraphicsPipeline>();
 		RecreateAllPipelines.operator()<ComputePipeline>();
+		RecreateAllPipelines.operator()<RayTracingPipeline>();
 	}
 
 	void PipelineManager::DestroyPipeline(const std::string& name) {
@@ -57,8 +65,14 @@ namespace Lucy {
 			m_GraphicsPipelines.erase(name);
 			return;
 		}
-		LUCY_ASSERT(m_ComputePipelines.contains(name), "Destroying pipeline that does not exist in the cache!");
-		RenderDeviceResourceHandle handle = m_ComputePipelines.at(name);
+		if (m_ComputePipelines.contains(name)) {
+			RenderDeviceResourceHandle handle = m_ComputePipelines.at(name);
+			m_RenderDevice->RTDestroyResource(handle);
+			m_ComputePipelines.erase(name);
+			return;
+		}
+		LUCY_ASSERT(m_RayTracingPipelines.contains(name), "Destroying pipeline that does not exist in the cache!");
+		RenderDeviceResourceHandle handle = m_RayTracingPipelines.at(name);
 		m_RenderDevice->RTDestroyResource(handle);
 		m_ComputePipelines.erase(name);
 	}
@@ -68,8 +82,11 @@ namespace Lucy {
 			Renderer::EnqueueResourceDestroy(handle);
 		for (auto handle : m_ComputePipelines | std::views::values)
 			Renderer::EnqueueResourceDestroy(handle);
+		for (auto handle : m_RayTracingPipelines | std::views::values)
+			Renderer::EnqueueResourceDestroy(handle);
 		m_GraphicsPipelines.clear();
 		m_ComputePipelines.clear();
+		m_RayTracingPipelines.clear();
 	}
 
 	void PipelineManager::SaveToFileAsPSO() {

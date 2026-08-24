@@ -15,14 +15,53 @@ namespace Lucy {
 
 	class Mesh;
 
-	class VulkanTransientCommandPool;
-
 	struct VulkanDeviceInfo {
 		std::string Name;
-		uint32_t DriverVersion = 0;
-		uint32_t ApiVersion = 0;
-		uint32_t MinUniformBufferAlignment = 0;
-		float TimestampPeriod = 0;
+
+		uint32_t VendorId;
+		uint32_t DeviceId;
+		VkPhysicalDeviceType DeviceType;
+
+		uint32_t DriverVersion;
+		uint32_t ApiVersion;
+
+		uint32_t MinUniformBufferAlignment;
+		uint32_t MinStorageBufferAlignment;
+		uint32_t MinTexelBufferOffsetAlignment;
+
+		uint32_t MaxImageDimension2D;
+		uint32_t MaxBoundDescriptorSets;
+		uint32_t MaxPushConstantsSize;
+
+		uint32_t MaxComputeWorkGroupInvocations;
+		uint32_t MaxComputeWorkGroupSize[3];
+		uint32_t MaxComputeWorkGroupCount[3];
+
+		float MaxSamplerAnisotropy;
+		float TimestampPeriod;
+
+		VkSampleCountFlags FramebufferColorSampleCounts;
+		VkSampleCountFlags FramebufferDepthSampleCounts;
+
+		bool SamplerAnisotropy;
+		bool GeometryShader;
+		bool TessellationShader;
+		bool MultiViewport;
+
+		bool DynamicRendering;
+		bool Synchronization2;
+		bool TimelineSemaphore;
+		bool BufferDeviceAddress;
+		bool DescriptorIndexing;
+
+		bool RayTracingPipeline;
+		bool AccelerationStructure;
+
+		uint32_t ShaderGroupHandleSize;
+		uint32_t ShaderGroupHandleAlignment;
+		uint32_t ShaderGroupBaseAlignment;
+		uint32_t MaxShaderGroupStride;
+		uint32_t MaxRayRecursionDepth;
 	};
 
 	struct QueueFamilyIndices {
@@ -67,18 +106,26 @@ namespace Lucy {
 
 		void BindPushConstant(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline, const PipelineConstant& pushConstant) final override;
 		void BindPushConstant(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline, const PipelineConstant& pushConstant) final override;
+		void BindPushConstant(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline, const PipelineConstant& pushConstant) final override;
 
 		void BindPipeline(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline) final override;
 		void BindPipeline(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline) final override;
+		void BindPipeline(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline) final override;
+
+		void TraceRays(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline, uint32_t width, uint32_t height, uint32_t depth) final override;
 
 		void UpdateDescriptorSets(Ref<GraphicsPipeline> pipeline) final override;
 		void UpdateDescriptorSets(Ref<ComputePipeline> pipeline) final override;
+		void UpdateDescriptorSets(Ref<RayTracingPipeline> pipeline, const std::string& name, const Ref<AccelerationStructure>& accelerationStructure) final override;
 
 		void BindAllDescriptorSets(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline) final override;
 		void BindDescriptorSet(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline, uint32_t setIndex) final override;
 
 		void BindAllDescriptorSets(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline) final override;
 		void BindDescriptorSet(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline, uint32_t setIndex) final override;
+
+		void BindAllDescriptorSets(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline) final override;
+		void BindDescriptorSet(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline, uint32_t setIndex) final override;
 
 		void DrawIndexedIndirectCount(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset, 
 			Ref<RenderDeviceBuffer> countBuffer, size_t countBufferOffset, uint32_t maxDrawCount, uint32_t stride) final override;
@@ -102,7 +149,7 @@ namespace Lucy {
 			VulkanSemaphore& renderFinishedSemaphore, VulkanSemaphore& frameTimelineSemaphore, uint64_t signalValue);
 		void SubmitWorkToGPUAsBatch(const RenderCommandList& renderCommandList, const ExecutionBatch& batch) final override;
 
-		void SubmitImmediateCommand(const std::function<void(VkCommandBuffer)>& func, const Ref<VulkanTransientCommandPool>& cmdPool);
+		void SubmitImmediateCommand(const std::function<void(VkCommandBuffer)>& func);
 
 		void WaitForDevice() final override;
 		void WaitForQueue(TargetQueueFamily queueFamily) final override;
@@ -144,6 +191,7 @@ namespace Lucy {
 		void CreateLogicalDevice(const std::vector<const char*>& enabledValidationLayers);
 
 		void FindQueueFamilies(VkPhysicalDevice device);
+		VulkanDeviceInfo QueryDeviceInfo(VkPhysicalDevice device) const;
 
 		bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
 		bool CheckDeviceFormatSupport(VkPhysicalDevice device) const;
@@ -163,7 +211,11 @@ namespace Lucy {
 			VK_EXT_DEPTH_CLIP_ENABLE_EXTENSION_NAME,
 			VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
 			VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
-			VK_KHR_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME
+			VK_KHR_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME,
+			VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
+			VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+			VK_KHR_RAY_QUERY_EXTENSION_NAME,
+			VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME
 		};
 
 		std::vector<VkFormat> m_DeviceFormatSupportToCheck = {
@@ -180,6 +232,8 @@ namespace Lucy {
 		VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
 
 		VkFence m_ImmediateSubmitFence = VK_NULL_HANDLE;
+
+		Ref<VulkanTransientCommandPool> m_TransientCommandPool = nullptr;
 
 		Unique<VulkanDescriptorSetManager> m_DescriptorSetManager = nullptr;
 		Unique<VulkanRenderDeviceUploadManager> m_UploadManager = nullptr;

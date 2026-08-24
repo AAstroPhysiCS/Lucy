@@ -150,6 +150,35 @@ namespace Lucy {
 	};
 #pragma endregion ShadowPass
 
+#pragma region DDGIPass
+
+	struct RenderDeviceDDGIRayResult {
+		glm::vec4 RadianceAndDistance{ 0.0f };
+	};
+
+	struct RenderDeviceDDGITraceData {
+		RenderDeviceBufferReference RayResults = 0;
+
+		glm::vec4 ProbeOriginAndMaxDistance{ 0.0f };
+		glm::vec4 ProbeSpacing{ 0.0f };
+		glm::uvec4 ProbeCountsAndRays{ 0 };
+	};
+
+	struct DDGIPass final {
+		DDGIPass() = default;
+		~DDGIPass() = default;
+
+		void AddPass(const Ref<RenderGraph>& renderGraph);
+	private:
+		static inline constexpr uint32_t s_RaysPerProbe = 64;
+
+		glm::uvec3 m_ProbeCounts{ 32, 16, 32 };
+		glm::vec3 m_ProbeOrigin{ -3.0f, 1.0f, -3.0f };
+		glm::vec3 m_ProbeSpacing{ 0.5f };
+	};
+
+#pragma endregion DDGIPass
+
 #pragma region CubemapPass
 
 	struct CubemapPass final {

@@ -17,6 +17,7 @@
 #include "Memory/Buffer/PushConstant.h"
 
 #include "Pipeline/ComputePipeline.h"
+#include "Pipeline/RayTracingPipeline.h"
 
 #include "Scene/Components.h"
 
@@ -1118,6 +1119,149 @@ namespace Lucy {
 
 #pragma endregion ShadowPass
 
+#pragma region DDGI
+
+	void DDGIPass::AddPass(const Ref<RenderGraph>& renderGraph) {
+		constexpr uint32_t irradianceTexels = 8;
+		constexpr uint32_t irradianceTileSize = irradianceTexels + 2;
+
+		constexpr uint32_t depthTexels = 16;
+		constexpr uint32_t depthTileSize = depthTexels + 2;
+
+		const uint32_t probeColumns = m_ProbeCounts.x * m_ProbeCounts.z;
+		const uint32_t probeRows = m_ProbeCounts.y;
+
+		const uint32_t probeCount = probeColumns * probeRows;
+
+		renderGraph->AddPass(TargetQueueFamily::Graphics, "DDGITracePass", [=](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.DeclareBuffer(RGResource(DDGIRayResults), {
+				.DebugName = "DDGIRayResults",
+				.Size = probeCount * s_RaysPerProbe * sizeof(RenderDeviceDDGIRayResult),
+				.Usage = BufferUsage::Storage
+			});
+
+			build.DeclareImage(RGResource(DDGIIrradianceAtlas), {
+				.Width = probeColumns * irradianceTileSize,
+				.Height = probeRows * irradianceTileSize,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
+				.Format = ImageFormat::R16G16B16A16_SFLOAT,
+				.GenerateSampler = true,
+				.ImGuiUsage = true,
+			}, RenderPassLoadStoreAttachments::ClearStore);
+
+			build.DeclareImage(RGResource(DDGIDepthAtlas), {
+				.Width = probeColumns * depthTileSize,
+				.Height = probeRows * depthTileSize,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
+				.Format = ImageFormat::R16G16_SFLOAT,
+				.GenerateSampler = true,
+				.ImGuiUsage = true,
+			}, RenderPassLoadStoreAttachments::ClearStore);
+
+			build.WriteBuffer(RGResource(DDGIRayResults), RenderGraphResourceAccess::StorageWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::DDGITracePass");
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<RayTracingPipeline>("DDGITracePipeline");
+
+				RenderCommand& cmd = cmdList.BeginRenderCommand("DDGITracePass");
+
+				GlobalPushConstant<RenderDeviceDDGITraceData> pushConstantData{
+					.Data = {
+						.RayResults = registry.GetBuffer(RGResource(DDGIRayResults))->GetDeviceAddress(),
+						.ProbeOriginAndMaxDistance = glm::vec4{ m_ProbeOrigin, 1000.0f },
+						.ProbeSpacing = glm::vec4{ m_ProbeSpacing, 0.0f },
+						.ProbeCountsAndRays = glm::uvec4{ m_ProbeCounts, s_RaysPerProbe }
+					}
+				};
+
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				cmd.BindPipeline(pipeline);
+				cmd.BindPushConstant(pushConstant);
+				bool tlasExists = cmd.UpdateDescriptorSets("u_TLAS");
+				if (!tlasExists) {
+					cmdList.EndRenderCommand();
+					return;
+				}
+				cmd.BindAllDescriptorSets();
+				cmd.TraceRays(s_RaysPerProbe, probeCount, 1);
+
+				cmdList.EndRenderCommand();
+			};
+		});
+
+		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGIProbeUpdatePass", [=](RenderGraphBuilder& build) {
+			build.ReadBuffer(RGResource(DDGIRayResults), RenderGraphResourceAccess::StorageRead);
+
+			build.WriteImage(RGResource(DDGIIrradianceAtlas), RenderGraphResourceAccess::StorageWrite);
+			build.WriteImage(RGResource(DDGIDepthAtlas), RenderGraphResourceAccess::StorageWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+
+			};
+		});
+		
+		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGIDebugPass", [=](RenderGraphBuilder& build) {
+			struct DDGIDebugData {
+				RenderDeviceBufferReference RayResults;
+				uint32_t RayResultTextureIndex;
+				uint32_t MaxRayDistance;
+				uint32_t RaysPerProbe;
+				uint32_t ProbeCount;
+			};
+
+			build.DeclareImage(RGResource(DDGIRayDebugImage), {
+				.Width = s_RaysPerProbe,
+				.Height = probeCount,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
+				.Format = ImageFormat::R16G16B16A16_SFLOAT,
+				.GenerateSampler = true,
+				.ImGuiUsage = true,
+			}, RenderPassLoadStoreAttachments::ClearStore);
+
+			build.WriteImage(RGResource(DDGIRayDebugImage), RenderGraphResourceAccess::StorageWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::DDGIDebugPass");
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("DDGIDebugPipeline");
+
+				RenderCommand& cmd = cmdList.BeginRenderCommand("DDGIDebugPass");
+				cmd.BindPipeline(pipeline);
+
+				uint32_t rayResultIndex = cmd.BindImageHandleTo("StorageTextures2D", registry.GetImage(RGResource(DDGIRayDebugImage)));
+
+				GlobalPushConstant<DDGIDebugData> pushConstantData{
+					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+					.Data = {
+						.RayResults = registry.GetBuffer(RGResource(DDGIRayResults))->GetDeviceAddress(),
+						.RayResultTextureIndex = rayResultIndex,
+						.MaxRayDistance = 1000,
+						.RaysPerProbe = s_RaysPerProbe,
+						.ProbeCount = probeCount
+					}
+				};
+
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				cmd.BindPushConstant(pushConstant);
+				cmd.BindAllDescriptorSets();
+				cmd.DispatchCompute((s_RaysPerProbe + 7) / 8, (probeCount + 7) / 8, 1);
+
+				cmdList.EndRenderCommand();
+			};
+		});
+	}
+
+#pragma endregion DDGI
+
 #pragma region CubemapPass
 
 	CubemapPass::CubemapPass(Ref<Scene> scene, uint32_t width, uint32_t height)
@@ -1479,5 +1623,4 @@ namespace Lucy {
 		});
 	}
 #pragma endregion BRDFLutPass
-	
 }

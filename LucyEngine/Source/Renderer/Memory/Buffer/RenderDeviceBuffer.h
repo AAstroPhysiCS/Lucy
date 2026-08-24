@@ -24,12 +24,18 @@ namespace Lucy {
 
         Indirect = 1 << 6,
         ShaderDeviceAddress = 1 << 7,
+
+        AccelerationStructureBuildInput = 1 << 8,
+        AccelerationStructureStorage = 1 << 9,
+        ShaderBindingTable = 1 << 10
     };
 
+    //fucking hate enum classes
     [[nodiscard]] constexpr BufferUsage operator|(BufferUsage lhs, BufferUsage rhs) {
         return static_cast<BufferUsage>(std::to_underlying(lhs) | std::to_underlying(rhs));
     }
 
+    //fucking hate enum classes
     [[nodiscard]] constexpr BufferUsage operator&(BufferUsage lhs, BufferUsage rhs) {
         return static_cast<BufferUsage>(std::to_underlying(lhs) & std::to_underlying(rhs));
     }
@@ -94,6 +100,15 @@ namespace Lucy {
 
         if (HasBufferUsage(usage, BufferUsage::ShaderDeviceAddress))
             result |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+        
+        if (HasBufferUsage(usage, BufferUsage::AccelerationStructureBuildInput))
+            result |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+
+        if (HasBufferUsage(usage, BufferUsage::AccelerationStructureStorage))
+            result |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR;
+        
+        if (HasBufferUsage(usage, BufferUsage::ShaderBindingTable))
+            result |= VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
 
         return result;
     }

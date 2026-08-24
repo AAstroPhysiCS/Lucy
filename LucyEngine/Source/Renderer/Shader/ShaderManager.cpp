@@ -12,6 +12,7 @@
 
 #include "VulkanGraphicsShader.h"
 #include "VulkanComputeShader.h"
+#include "VulkanRayTracingShader.h"
 
 #include "Renderer/Renderer.h"
 
@@ -346,6 +347,17 @@ namespace Lucy {
 
 					resources[ShaderStageType::Compute].emplace_back(std::move(shader));
 					break;	
+				}
+				case ShaderStageType::RayGen:
+				case ShaderStageType::Miss:
+				case ShaderStageType::Closest:
+				case ShaderStageType::AnyHit: {
+					auto shader = Memory::CreateRef<VulkanRayTracingShader>(name, path, shaderProgram.EntryPointName, shaderProgram.Stage, device, ProgramBlobToSpan(shaderProgram.Blob));
+					shader->RunReflect(shaderProgram.LinkedProgram, shaderProgram.Stage, shaderProgram.EntryPointName);
+					shader->PrintReflectInfo();
+
+					resources[shaderProgram.Stage].emplace_back(std::move(shader));
+					break;
 				}
 				default: 
 					LUCY_ASSERT(false, "Shader stage {0} is not supported yet!", ShaderStageToShaderString(shaderProgram.Stage));

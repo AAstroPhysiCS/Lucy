@@ -6,6 +6,7 @@
 
 #include "Renderer/Pipeline/GraphicsPipeline.h"
 #include "Renderer/Pipeline/ComputePipeline.h"
+#include "Renderer/Pipeline/RayTracingPipeline.h"
 
 #include "Renderer/Image/VulkanImage.h"
 #include "Renderer/Renderer.h"
@@ -93,12 +94,16 @@ namespace Lucy {
 
 	void RenderCommand::BindPushConstant(const PipelineConstant& pushConstant) {
 		LUCY_PROFILE_NEW_EVENT("RenderCommand::BindPushConstant");
-		LUCY_ASSERT(m_BoundedGraphicsPipeline || m_BoundedComputePipeline, "BindPushConstant failed, bounded pipeline is nullptr.");
+		LUCY_ASSERT(m_BoundedGraphicsPipeline || m_BoundedComputePipeline || m_BoundedRayTracingPipeline, "BindPushConstant failed, bounded pipeline is nullptr.");
 		if (m_BoundedGraphicsPipeline) {
 			m_RenderDevice->BindPushConstant(m_PrimaryCommandPool, m_BoundedGraphicsPipeline, pushConstant);
 			return;
 		}
-		m_RenderDevice->BindPushConstant(m_PrimaryCommandPool, m_BoundedComputePipeline, pushConstant);
+		if (m_BoundedComputePipeline) {
+			m_RenderDevice->BindPushConstant(m_PrimaryCommandPool, m_BoundedComputePipeline, pushConstant);
+			return;
+		}
+		m_RenderDevice->BindPushConstant(m_PrimaryCommandPool, m_BoundedRayTracingPipeline, pushConstant);
 	}
 
 	void RenderCommand::BindPipeline(const Ref<GraphicsPipeline>& pipeline) {
@@ -117,6 +122,20 @@ namespace Lucy {
 		m_Shader = pipeline->GetShader();
 		m_BoundedComputePipeline = pipeline;
 	}
+	
+	void RenderCommand::BindPipeline(const Ref<RayTracingPipeline>& pipeline) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::BindPipeline | RayTracing");
+		LUCY_ASSERT(pipeline, "BindPipeline failed, pipeline is nullptr.");
+		m_RenderDevice->BindPipeline(m_PrimaryCommandPool, pipeline);
+		m_Shader = pipeline->GetShader();
+		m_BoundedRayTracingPipeline = pipeline;
+	}
+
+	void RenderCommand::TraceRays(uint32_t width, uint32_t height, uint32_t depth) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::TraceRays");
+		LUCY_ASSERT(m_BoundedRayTracingPipeline, "TraceRays failed, pipeline is nullptr.");
+		m_RenderDevice->TraceRays(m_PrimaryCommandPool, m_BoundedRayTracingPipeline, width, height, depth);
+	}
 
 	void RenderCommand::UpdateDescriptorSets() {
 		LUCY_PROFILE_NEW_EVENT("RenderCommand::UpdateDescriptorSets");
@@ -124,27 +143,50 @@ namespace Lucy {
 			m_RenderDevice->UpdateDescriptorSets(m_BoundedGraphicsPipeline);
 			return;
 		}
-		m_RenderDevice->UpdateDescriptorSets(m_BoundedComputePipeline);
+		if (m_BoundedComputePipeline) {
+			m_RenderDevice->UpdateDescriptorSets(m_BoundedComputePipeline);
+			return;
+		}
+	}
+
+	bool RenderCommand::UpdateDescriptorSets(const std::string& tlasName) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::UpdateDescriptorSets");
+		LUCY_ASSERT(m_BoundedRayTracingPipeline, "UpdateDescriptorSets failed, bounded pipeline is nullptr.");
+		const auto& scene = m_RenderDevice->GetScene();
+		const auto& tlasHandle = scene->GetCurrentTopLevelAccelerationStructureHandle();
+		if (!tlasHandle)
+			return false;
+		const auto& tlas = m_RenderDevice->AccessResource<AccelerationStructure>(tlasHandle);
+		m_RenderDevice->UpdateDescriptorSets(m_BoundedRayTracingPipeline, tlasName, tlas);
+		return true;
 	}
 
 	void RenderCommand::BindAllDescriptorSets() {
 		LUCY_PROFILE_NEW_EVENT("RenderCommand::BindAllDescriptorSets");
-		LUCY_ASSERT(m_BoundedGraphicsPipeline || m_BoundedComputePipeline, "BindAllDescriptorSets failed, bounded pipeline is nullptr.");
+		LUCY_ASSERT(m_BoundedGraphicsPipeline || m_BoundedComputePipeline || m_BoundedRayTracingPipeline, "BindAllDescriptorSets failed, bounded pipeline is nullptr.");
 		if (m_BoundedGraphicsPipeline) {
 			m_RenderDevice->BindAllDescriptorSets(m_PrimaryCommandPool, m_BoundedGraphicsPipeline);
 			return;
 		}
-		m_RenderDevice->BindAllDescriptorSets(m_PrimaryCommandPool, m_BoundedComputePipeline);
+		if (m_BoundedComputePipeline) {
+			m_RenderDevice->BindAllDescriptorSets(m_PrimaryCommandPool, m_BoundedComputePipeline);
+			return;
+		}
+		m_RenderDevice->BindAllDescriptorSets(m_PrimaryCommandPool, m_BoundedRayTracingPipeline);
 	}
 
 	void RenderCommand::BindDescriptorSet(uint32_t setIndex) {
 		LUCY_PROFILE_NEW_EVENT("RenderCommand::BindDescriptorSet");
-		LUCY_ASSERT(m_BoundedGraphicsPipeline || m_BoundedComputePipeline, "BindDescriptorSet failed, bounded pipeline is nullptr.");
+		LUCY_ASSERT(m_BoundedGraphicsPipeline || m_BoundedComputePipeline || m_BoundedRayTracingPipeline, "BindDescriptorSet failed, bounded pipeline is nullptr.");
 		if (m_BoundedGraphicsPipeline) {
 			m_RenderDevice->BindDescriptorSet(m_PrimaryCommandPool, m_BoundedGraphicsPipeline, setIndex);
 			return;
 		}
-		m_RenderDevice->BindDescriptorSet(m_PrimaryCommandPool, m_BoundedComputePipeline, setIndex);
+		if (m_BoundedComputePipeline) {
+			m_RenderDevice->BindDescriptorSet(m_PrimaryCommandPool, m_BoundedComputePipeline, setIndex);
+			return;
+		}
+		m_RenderDevice->BindDescriptorSet(m_PrimaryCommandPool, m_BoundedRayTracingPipeline, setIndex);
 	}
 
 	void RenderCommand::DrawMesh(Ref<Mesh> mesh) {

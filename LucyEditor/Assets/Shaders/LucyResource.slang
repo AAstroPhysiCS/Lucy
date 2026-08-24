@@ -363,7 +363,7 @@ uint SelectLOD(GPUSubmesh submesh, float3 worldCenter, float worldScale, GPUCull
         return firstLOD + lodCount - 1;
 
     float pixelWorldSize = GetPixelWorldSize(worldCenter, submesh.BoundingSphere.w * worldScale, view);
-    float maxPixelError = 4.0f;
+    float maxPixelError = 2.0f;
 
     // Try the cheapest LOD first.
     for (int lodOffset = int(lodCount) - 1; lodOffset >= 0; lodOffset--) {

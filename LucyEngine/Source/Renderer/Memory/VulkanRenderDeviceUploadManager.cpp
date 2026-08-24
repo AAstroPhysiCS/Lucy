@@ -8,7 +8,7 @@
 namespace Lucy {
 	
 	VulkanRenderDeviceUploadManager::VulkanRenderDeviceUploadManager(const Ref<VulkanRenderDevice>& device)
-		: m_RenderDevice(device), m_TransientCopyCommandPool(Memory::CreateUnique<VulkanTransientCommandPool>(device)) {
+		: m_RenderDevice(device) {
 		m_Frames.resize(Renderer::GetMaxFramesInFlight());
 
 		auto& allocator = device->GetAllocator();
@@ -57,7 +57,7 @@ namespace Lucy {
 				//vkCmdPipelineBarrier2(commandBuffer, &depInfo);
 				vkCmdCopyBuffer(commandBuffer, stagingBuffer, buffer, static_cast<uint32_t>(copyRegions.size()), copyRegions.data());
 				//vkCmdPipelineBarrier2(commandBuffer, &depInfo);
-			}, m_TransientCopyCommandPool);
+			});
 		};
 
 		UploadFrame& frame = m_Frames[frameIndex];
@@ -96,6 +96,5 @@ namespace Lucy {
 			if (frame.Buffer != VK_NULL_HANDLE)
 				allocator.DestroyBuffer(frame.Buffer, frame.Allocation);
 		}
-		m_TransientCopyCommandPool->Destroy();
 	}
 }

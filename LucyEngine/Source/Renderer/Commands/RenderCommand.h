@@ -73,8 +73,12 @@ namespace Lucy {
 		
 		void BindPipeline(const Ref<GraphicsPipeline>& pipeline);
 		void BindPipeline(const Ref<ComputePipeline>& pipeline);
+		void BindPipeline(const Ref<RayTracingPipeline>& pipeline);
+
+		void TraceRays(uint32_t width, uint32_t height, uint32_t depth);
 		
 		void UpdateDescriptorSets();
+		bool UpdateDescriptorSets(const std::string& tlasName);
 		void BindAllDescriptorSets();
 		void BindDescriptorSet(uint32_t setIndex);
 		
@@ -143,6 +147,7 @@ namespace Lucy {
 
 		Ref<GraphicsPipeline> m_BoundedGraphicsPipeline = nullptr;
 		Ref<ComputePipeline> m_BoundedComputePipeline = nullptr;
+		Ref<RayTracingPipeline> m_BoundedRayTracingPipeline = nullptr;
 
 		Rasterization m_DynamicRasterizationConfig;
 		ClearColor m_DynamicClearColor;

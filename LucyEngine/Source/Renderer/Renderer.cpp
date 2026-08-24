@@ -21,6 +21,7 @@
 #include "Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 
 #include "Pipeline/ComputePipeline.h"
+#include "Pipeline/RayTracingPipeline.h"
 
 namespace Lucy {
 
@@ -289,6 +290,25 @@ namespace Lucy {
 			const auto& shader = s_ShaderManager.GetShader(ShaderStageType::Compute, shaderName, entryPointName);
 			s_PipelineManager->CreateComputePipeline(pipelineName, shader, ComputePipelineCreateInfo{});
 		};
+		
+		const auto CreateRayTracingPipeline = [](const char* shaderName, const char* pipelineName, const char* const entryPointName[4]) {
+			if (!s_ShaderManager.HasShader(shaderName)) {
+				LUCY_WARN("Shader '{0}' cannot be found while creating ray tracing pipeline '{1}'!",
+					shaderName, pipelineName);
+				return;
+			}
+			auto rayGen = s_ShaderManager.GetShader(ShaderStageType::RayGen, shaderName, entryPointName[0]);
+			auto miss = s_ShaderManager.GetShader(ShaderStageType::Miss, shaderName, entryPointName[1]);
+			auto closestHit = s_ShaderManager.GetShader(ShaderStageType::Closest, shaderName, entryPointName[2]);
+			auto anyHit = s_ShaderManager.GetShader(ShaderStageType::AnyHit, shaderName, entryPointName[3]);
+
+			s_PipelineManager->CreateRayTracingPipeline(pipelineName, RayTracingPipelineCreateInfo{
+				.RayGenShader = rayGen,
+				.MissShader = miss,
+				.ClosestHitShader = closestHit,
+				.AnyHitShader = anyHit,
+			});
+		};
 
 		for (const auto& node : acyclicGraph) {
 			RenderGraphPass* pass = node.Pass;
@@ -315,7 +335,7 @@ namespace Lucy {
 
 			struct RenderGraphPipelineCreateInfo {
 				const char* ShaderName;
-				const char* EntryPointName = "main";
+				const char* EntryPointName[4] = {"main", "main", "main", "main"};
 				const char* PassName;
 				const char* PipelineName;
 				Rasterization RasterizationConfig = {};
@@ -374,7 +394,7 @@ namespace Lucy {
 #endif
 			};
 
-			constexpr size_t computePipelineCount = 15;
+			constexpr size_t computePipelineCount = 16;
 
 			constexpr const std::array<RenderGraphPipelineCreateInfo, computePipelineCount> computePipelineCreateInfos = {
 #if USE_COMPUTE_FOR_CUBEMAP_GEN
@@ -448,6 +468,20 @@ namespace Lucy {
 					.ShaderName = "LucyGPUCullShadows",
 					.EntryPointName = "CullShadowMeshlets",
 					.PipelineName = "GPUCullShadowMeshletsPipeline"
+				},
+				RenderGraphPipelineCreateInfo {
+					.ShaderName = "LucyDDGIDebug",
+					.EntryPointName = "DDGIDebugMain",
+					.PipelineName = "DDGIDebugPipeline"
+				},
+			};
+
+			constexpr uint32_t rayTracingPipelineCount = 1;
+			constexpr const std::array<RenderGraphPipelineCreateInfo, rayTracingPipelineCount> rayTracingPipelineCreateInfos = {
+				RenderGraphPipelineCreateInfo {
+					.ShaderName = "LucyDDGI",
+					.EntryPointName = {"RayGen", "Miss", "ClosestHit", "AnyHit"},
+					.PipelineName = "DDGITracePipeline"
 				}
 			};
 
@@ -456,15 +490,21 @@ namespace Lucy {
 			taskScheduler->ScheduleBatch(TaskScheduler::Launch::Async, TaskPriority::High, [&](const TaskArgs& args, const TaskBatchArgs& batchArgs) {
 				const auto& createInfo = graphicsPipelineCreateInfos[batchArgs.BatchIndex];
 				std::unique_lock lock(pipelineMutex);
-				CreateGraphicsPipeline(createInfo.ShaderName, createInfo.PassName, createInfo.PipelineName, createInfo.EntryPointName,
+				CreateGraphicsPipeline(createInfo.ShaderName, createInfo.PassName, createInfo.PipelineName, createInfo.EntryPointName[0],
 					createInfo.RasterizationConfig, createInfo.DepthConfig, createInfo.BlendConfig);
 			}, graphicsPipelineCount, 1);
 
 			taskScheduler->ScheduleBatch(TaskScheduler::Launch::Async, TaskPriority::High, [&](const TaskArgs& args, const TaskBatchArgs& batchArgs) {
 				const auto& createInfo = computePipelineCreateInfos[batchArgs.BatchIndex];
 				std::unique_lock lock(pipelineMutex);
-				CreateComputePipeline(createInfo.ShaderName, createInfo.PipelineName, createInfo.EntryPointName);
+				CreateComputePipeline(createInfo.ShaderName, createInfo.PipelineName, createInfo.EntryPointName[0]);
 			}, computePipelineCount, 1);
+			
+			taskScheduler->ScheduleBatch(TaskScheduler::Launch::Async, TaskPriority::High, [&](const TaskArgs& args, const TaskBatchArgs& batchArgs) {
+				const auto& createInfo = rayTracingPipelineCreateInfos[batchArgs.BatchIndex];
+				std::unique_lock lock(pipelineMutex);
+				CreateRayTracingPipeline(createInfo.ShaderName, createInfo.PipelineName, createInfo.EntryPointName);
+			}, rayTracingPipelineCount, 1);
 
 			taskScheduler->WaitForAllTasks();
 		}

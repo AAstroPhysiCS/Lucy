@@ -71,8 +71,6 @@ namespace Lucy {
 
 		RenderContextResultCodes m_LastSwapChainResult = RenderContextResultCodes::SUCCESS;
 
-		Ref<VulkanTransientCommandPool> m_TransientCommandPool = nullptr;
-
 		ImGuiVulkanImpl m_ImGuiPassImpl;
 		Unique<RenderCommandList> m_ImGuiRenderCommandList;
 

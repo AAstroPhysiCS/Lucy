@@ -47,7 +47,8 @@ namespace Lucy {
 
 		void LoadMesh(const Entity& e, const std::string& path);
 
-		inline Ref<Mesh> GetMesh() { return m_Mesh; }
+		Ref<Mesh> GetMesh() { return m_Mesh; }
+		const Ref<Mesh>& GetMesh() const { return m_Mesh; }
 
 		void SetObjectHandle(const RenderDeviceObjectHandle& handle) { m_Handle = handle; }
 		const RenderDeviceObjectHandle& GetRenderDeviceObjectHandle() const { return m_Handle; }
