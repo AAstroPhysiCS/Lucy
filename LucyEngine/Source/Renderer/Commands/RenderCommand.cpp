@@ -18,8 +18,8 @@
 
 namespace Lucy {
 
-	RenderCommand::RenderCommand(const std::string& nameOfDraw, const Ref<RenderDevice>& renderDevice, const Ref<CommandPool>& primaryCmdPool)
-		: m_DebugName(nameOfDraw), m_RenderDevice(renderDevice), m_PrimaryCommandPool(primaryCmdPool) {
+	RenderCommand::RenderCommand(const Ref<RenderDevice>& renderDevice, const Ref<CommandPool>& primaryCmdPool)
+		: m_RenderDevice(renderDevice), m_PrimaryCommandPool(primaryCmdPool) {
 	}
 
 	RenderDeviceResourceHandle RenderCommand::GetGlobalIndexBufferHandle() const {
@@ -32,16 +32,6 @@ namespace Lucy {
 
 	void RenderCommand::EndSecondaryRenderCommand() {
 		//TODO:
-	}
-
-	void RenderCommand::BeginDebugMarker() {
-		LUCY_PROFILE_NEW_EVENT("RenderCommand::BeginDebugMarker");
-		m_RenderDevice->BeginDebugMarker(m_PrimaryCommandPool, m_DebugName.c_str());
-	}
-
-	void RenderCommand::EndDebugMarker() {
-		LUCY_PROFILE_NEW_EVENT("RenderCommand::EndDebugMarker");
-		m_RenderDevice->EndDebugMarker(m_PrimaryCommandPool);
 	}
 
 	void RenderCommand::BeginTimestamp() {
@@ -189,7 +179,7 @@ namespace Lucy {
 		m_RenderDevice->BindDescriptorSet(m_PrimaryCommandPool, m_BoundedRayTracingPipeline, setIndex);
 	}
 
-	void RenderCommand::DrawMesh(Ref<Mesh> mesh) {
+	void RenderCommand::DrawMesh(const Unique<Mesh>& mesh) {
 		LUCY_PROFILE_NEW_EVENT("RenderCommand::DrawMesh");
 		LUCY_ASSERT(m_BoundedGraphicsPipeline, "DrawMesh failed, bounded pipeline is nullptr.");
 		const auto& gpuScene = m_RenderDevice->GetScene();

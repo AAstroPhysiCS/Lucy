@@ -23,7 +23,7 @@ namespace Lucy {
 
 		Renderer::EnqueueToRenderCommandQueue([this, e](const Ref<RenderDevice>& device) mutable {
 			const auto& transform = e.GetComponent<TransformComponent>().GetMatrix();
-			m_Handle = device->GetScene()->RegisterObject(m_Mesh->GetRenderDeviceMeshHandle(), transform, RenderDeviceObjectFlags::None);
+			m_Handle = device->GetScene()->RTRegisterObject(m_Mesh->GetRenderDeviceMeshHandle(), transform, RenderDeviceObjectFlags::None);
 		});
 	}
 

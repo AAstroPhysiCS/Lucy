@@ -51,7 +51,8 @@ namespace Lucy {
 				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, frames * 16 },
 				{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, frames * 16 },
 				{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, frames * 16 },
-				{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, frames * 16 }
+				{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, frames * 16 },
+				{ VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, frames * 16 }
 			};
 
 			VulkanDescriptorPoolCreateInfo poolCreateInfo;

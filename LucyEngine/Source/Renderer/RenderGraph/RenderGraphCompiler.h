@@ -59,7 +59,7 @@ namespace Lucy {
 			case RenderGraphResourceAccess::StorageReadWrite:
 				switch (queueFamily) {
 					case TargetQueueFamily::Graphics:
-						return VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+						return VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_RAY_TRACING_SHADER_BIT_KHR;
 					case TargetQueueFamily::Compute:
 						return VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
 					default:

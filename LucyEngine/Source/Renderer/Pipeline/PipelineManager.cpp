@@ -41,7 +41,7 @@ namespace Lucy {
 	void PipelineManager::RTRecreateAllPipelinesDependentOnShader(const std::vector<Ref<Shader>>& shadersThatAreReloaded) {
 		const auto RecreateAllPipelines = [&]<typename TPipeline>() {
 			for (auto handle : (std::same_as<TPipeline, GraphicsPipeline>
-				? m_GraphicsPipelines : m_ComputePipelines)
+				? m_GraphicsPipelines : std::same_as<TPipeline, ComputePipeline> ? m_ComputePipelines : m_RayTracingPipelines)
 				| std::views::values) {
 				const auto& pipeline = m_RenderDevice->AccessResource<TPipeline>(handle);
 				for (const auto& shader : shadersThatAreReloaded) {
@@ -74,7 +74,7 @@ namespace Lucy {
 		LUCY_ASSERT(m_RayTracingPipelines.contains(name), "Destroying pipeline that does not exist in the cache!");
 		RenderDeviceResourceHandle handle = m_RayTracingPipelines.at(name);
 		m_RenderDevice->RTDestroyResource(handle);
-		m_ComputePipelines.erase(name);
+		m_RayTracingPipelines.erase(name);
 	}
 
 	void PipelineManager::DestroyAll() {

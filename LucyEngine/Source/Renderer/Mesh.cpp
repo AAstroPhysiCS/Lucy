@@ -70,7 +70,10 @@ namespace Lucy {
 	}
 
 	void Mesh::Load(const Ref<RenderDevice>& device, std::vector<Vertex>& vertices, std::vector<uint32_t>& indices) {
-		m_RenderDeviceMeshHandle = device->GetScene()->RegisterMesh(vertices, indices, m_Submeshes);
+		const auto& scene = device->GetScene();
+		m_MyGlobalVertexOffset = scene->GetGlobalVertexCount();
+		m_MyGlobalIndexOffset = scene->GetGlobalIndexCount();
+		m_RenderDeviceMeshHandle = scene->RTRegisterMesh(vertices, indices, m_Submeshes);
 		//need to submit since registermesh also submits
 		Renderer::EnqueueToRenderCommandQueue([this](const auto& device) {
 			ReleaseCPUData();

@@ -5,6 +5,9 @@
 
 #include "Renderer.h"
 
+#include "Mesh.h"
+#include "MeshFactory.h"
+
 #include "RenderGraph/RenderGraph.h"
 #include "RenderGraph/RenderGraphBuilder.h"
 #include "RenderGraph/RenderGraphRegistry.h"
@@ -111,11 +114,10 @@ namespace Lucy {
 			build.ReadBuffer(RGResource(VisibleObjectsCount), RenderGraphResourceAccess::StorageRead);
 			build.WriteBuffer(RGResource(SubmeshDispatch), RenderGraphResourceAccess::StorageWrite);
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::SubmeshDispatchBuildPass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUBuildSubmeshDispatchPipeline");
 
-				RenderCommand& command = cmdList.BeginRenderCommand("SubmeshDispatchBuildPass");
 				command.BindPipeline(pipeline);	
 
 				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
@@ -124,8 +126,6 @@ namespace Lucy {
 
 				command.BindPushConstant(pushConstant);
 				command.DispatchCompute(1, 1, 1);
-
-				cmdList.EndRenderCommand();
 			};
 		});
 	}
@@ -154,10 +154,9 @@ namespace Lucy {
 			build.WriteBuffer(RGResource(VisibleSubmeshes), RenderGraphResourceAccess::StorageWrite);
 			build.WriteBuffer(RGResource(VisibleSubmeshesCount), RenderGraphResourceAccess::StorageReadWrite);
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::SubmeshCullPass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUCullSubmeshesPipeline");
-				RenderCommand& command = cmdList.BeginRenderCommand("SubmeshCullPass");
 				command.BindPipeline(pipeline);
 
 				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
@@ -166,8 +165,6 @@ namespace Lucy {
 
 				command.BindPushConstant(pushConstant);
 				command.DispatchComputeIndirect(registry.GetBuffer(RGResource(SubmeshDispatch)), 0);
-
-				cmdList.EndRenderCommand();
 			};
 		});
 	}
@@ -185,11 +182,10 @@ namespace Lucy {
 			build.ReadBuffer(RGResource(VisibleSubmeshesCount), RenderGraphResourceAccess::StorageRead);
 			build.WriteBuffer(RGResource(MeshletDispatch), RenderGraphResourceAccess::StorageWrite);
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::MeshletDispatchBuildPass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUBuildMeshletDispatchPipeline");
 
-				RenderCommand& command = cmdList.BeginRenderCommand("MeshletDispatchBuildPass");
 				command.BindPipeline(pipeline);
 
 				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
@@ -198,7 +194,6 @@ namespace Lucy {
 
 				command.BindPushConstant(pushConstant);
 				command.DispatchCompute(1, 1, 1);
-				cmdList.EndRenderCommand();
 			};
 		});
 	}
@@ -229,13 +224,11 @@ namespace Lucy {
 			build.WriteBuffer(RGResource(VisibleSubmeshesCount), RenderGraphResourceAccess::TransferWrite);
 			build.WriteBuffer(RGResource(DrawCounts), RenderGraphResourceAccess::TransferWrite);
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::ResetPass");
-				RenderCommand& command = cmdList.BeginRenderCommand("BufferResetPass");
 				command.FillBuffer(registry.GetBuffer(RGResource(VisibleObjectsCount)), 0, sizeof(uint32_t), 0);
 				command.FillBuffer(registry.GetBuffer(RGResource(VisibleSubmeshesCount)), 0, sizeof(uint32_t), 0);
 				command.FillBuffer(registry.GetBuffer(RGResource(DrawCounts)), 0, RenderBin::Count * sizeof(uint32_t), 0);
-				cmdList.EndRenderCommand();
 			};
 		});
 
@@ -259,11 +252,10 @@ namespace Lucy {
 			build.WriteBuffer(RGResource(VisibleObjects), RenderGraphResourceAccess::StorageWrite);
 			build.WriteBuffer(RGResource(VisibleObjectsCount), RenderGraphResourceAccess::StorageReadWrite);
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::ObjectCullPass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUCullObjectsPipeline");
 
-				RenderCommand& command = cmdList.BeginRenderCommand("ObjectCullPass");
 				command.BindPipeline(pipeline);
 
 				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
@@ -272,8 +264,6 @@ namespace Lucy {
 
 				command.BindPushConstant(pushConstant);
 				command.DispatchCompute((RenderDeviceScene::GetObjectCapacity() + 63) / 64, 1, 1);
-
-				cmdList.EndRenderCommand();
 			};
 		});
 	}
@@ -308,11 +298,10 @@ namespace Lucy {
 			build.WriteBuffer(RGResource(IndirectCommands), RenderGraphResourceAccess::StorageWrite);
 			build.WriteBuffer(RGResource(DrawCounts), RenderGraphResourceAccess::StorageReadWrite);
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::MeshletCullPass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUCullMeshletsPipeline");
 
-				RenderCommand& command = cmdList.BeginRenderCommand("MeshletCullPass");
 				command.BindPipeline(pipeline);
 
 				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
@@ -322,8 +311,6 @@ namespace Lucy {
 				command.BindAllDescriptorSets();
 				command.BindPushConstant(pushConstant);
 				command.DispatchComputeIndirect(registry.GetBuffer(RGResource(MeshletDispatch)), 0);
-
-				cmdList.EndRenderCommand();
 			};
 		});
 	}
@@ -346,7 +333,7 @@ namespace Lucy {
 				.Width = m_Width,
 				.Height = m_Height,
 				.ImageType = ImageType::Type2D,
-				.ImageUsage = ImageUsage::AsColorAttachment,
+				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
 				.Format = ImageFormat::R8G8B8A8_UNORM,
 				.GenerateSampler = true,
 				.ImGuiUsage = true,
@@ -376,12 +363,11 @@ namespace Lucy {
 
 			build.BindRenderTarget(RGResource(GeometryImage), RGResource(GeometryDepthImage));
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::PBRGeometryPass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("PBRGeometryPipeline");
 				const auto& settings = Renderer::GetRendererSettings();
 
-				RenderCommand& draw = cmdList.BeginRenderCommand("PBRForwardPass");
 				draw.BindPipeline(pipeline);
 
 				uint32_t shadowImagesIndex = draw.BindImageHandleTo("TextureArrays2D_Float2", registry.GetImage(RGResource(ShadowImages)));
@@ -445,8 +431,6 @@ namespace Lucy {
 					draw.DrawIndexedIndirectCount(registry.GetBuffer(RGResource(IndirectCommands)), commandOffset, 
 						registry.GetBuffer(RGResource(DrawCounts)), countOffset, commandCapacityPerBin, sizeof(VkDrawIndexedIndirectCommand));
 				}
-
-				cmdList.EndRenderCommand();
 			};
 		});
 
@@ -483,11 +467,10 @@ namespace Lucy {
 
 			build.BindRenderTarget(RGResource(IDPassImage), RGResource(IDPassDepthImage));
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::IDPass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("IDPipeline");
 
-				RenderCommand& draw = cmdList.BeginRenderCommand("IDPass");
 				draw.BindPipeline(pipeline);
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
@@ -513,8 +496,6 @@ namespace Lucy {
 
 				draw.DrawIndexedIndirectCount(registry.GetBuffer(RGResource(IndirectCommands)), 0,
 					registry.GetBuffer(RGResource(DrawCounts)), 0, commandCapacityPerBin, sizeof(VkDrawIndexedIndirectCommand));
-
-				cmdList.EndRenderCommand();
 			};
 		});
 	}
@@ -626,9 +607,8 @@ namespace Lucy {
 			build.WriteBuffer(RGResource(ShadowVisibleSubmeshCount), RenderGraphResourceAccess::TransferWrite);
 			build.WriteBuffer(RGResource(ShadowDrawCounts), RenderGraphResourceAccess::TransferWrite);
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::ShadowResetPass");
-				RenderCommand& command = cmdList.BeginRenderCommand("ShadowResetPass");
 				command.FillBuffer(registry.GetBuffer(RGResource(ShadowVisibleObjectCount)), 0, sizeof(uint32_t), 0);
 				command.FillBuffer(registry.GetBuffer(RGResource(ShadowVisibleSubmeshCount)), 0, sizeof(uint32_t), 0);
 				command.FillBuffer(registry.GetBuffer(RGResource(ShadowDrawCounts)), 0, sizeof(uint32_t), 0);
@@ -637,8 +617,6 @@ namespace Lucy {
 				for (uint32_t frameIndex = 0; frameIndex < Renderer::GetMaxFramesInFlight(); frameIndex++) {
 					s_ShadowCullPushConstants[frameIndex] = CreateGPUCullPushConstant(renderGraph->GetRegistry(), frameIndex);
 				}
-
-				cmdList.EndRenderCommand();
 			};
 		});
 
@@ -655,11 +633,10 @@ namespace Lucy {
 			build.WriteBuffer(RGResource(ShadowVisibleObjects), RenderGraphResourceAccess::StorageWrite);
 			build.WriteBuffer(RGResource(ShadowVisibleObjectCount), RenderGraphResourceAccess::StorageReadWrite);
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::ShadowObjectCullPass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUCullShadowObjectsPipeline");
 
-				RenderCommand& command = cmdList.BeginRenderCommand("ShadowObjectCullPass");
 				command.BindPipeline(pipeline);
 
 				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
@@ -668,8 +645,6 @@ namespace Lucy {
 
 				command.BindPushConstant(pushConstant);
 				command.DispatchCompute((objectCapacity + 63) / 64, 1, 1);
-
-				cmdList.EndRenderCommand();
 			};
 		});
 
@@ -679,11 +654,10 @@ namespace Lucy {
 			build.ReadBuffer(RGResource(ShadowVisibleObjectCount), RenderGraphResourceAccess::StorageRead);
 			build.WriteBuffer(RGResource(ShadowSubmeshDispatches), RenderGraphResourceAccess::StorageWrite);
 
-			return [=, *this](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=, *this](RenderGraphRegistry& registry, RenderCommand& command) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::ShadowSubmeshDispatchBuildPass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUBuildShadowSubmeshDispatchPipeline");
 
-				RenderCommand& command = cmdList.BeginRenderCommand("ShadowSubmeshDispatchBuildPass");
 				command.BindPipeline(pipeline);
 
 				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
@@ -692,8 +666,6 @@ namespace Lucy {
 
 				command.BindPushConstant(pushConstant);
 				command.DispatchCompute(1, 1, 1);
-
-				cmdList.EndRenderCommand();
 			};
 		});
 
@@ -715,12 +687,10 @@ namespace Lucy {
 			build.WriteBuffer(RGResource(ShadowVisibleSubmeshes), RenderGraphResourceAccess::StorageWrite);
 			build.WriteBuffer(RGResource(ShadowVisibleSubmeshCount), RenderGraphResourceAccess::StorageReadWrite);
 
-			return [=, *this](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=, *this](RenderGraphRegistry& registry, RenderCommand& command) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::ShadowSubmeshCullPass");
 
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUCullShadowSubmeshesPipeline");
-
-				RenderCommand& command = cmdList.BeginRenderCommand("ShadowSubmeshCullPass");
 				command.BindPipeline(pipeline);
 
 				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
@@ -729,8 +699,6 @@ namespace Lucy {
 
 				command.BindPushConstant(pushConstant);
 				command.DispatchComputeIndirect(registry.GetBuffer(RGResource(ShadowSubmeshDispatches)), 0);
-
-				cmdList.EndRenderCommand();
 			};
 		});
 
@@ -741,11 +709,9 @@ namespace Lucy {
 
 			build.WriteBuffer(RGResource(ShadowMeshletDispatches), RenderGraphResourceAccess::StorageWrite);
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::ShadowMeshletDispatchBuildPass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUBuildShadowMeshletDispatchPipeline");
-
-				RenderCommand& command = cmdList.BeginRenderCommand("ShadowMeshletDispatchBuildPass");
 				command.BindPipeline(pipeline);
 
 				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
@@ -754,8 +720,6 @@ namespace Lucy {
 
 				command.BindPushConstant(pushConstant);
 				command.DispatchCompute(1, 1, 1);
-
-				cmdList.EndRenderCommand();
 			};
 		});
 
@@ -778,12 +742,9 @@ namespace Lucy {
 			build.WriteBuffer(RGResource(ShadowIndirectCommands), RenderGraphResourceAccess::StorageWrite);
 			build.WriteBuffer(RGResource(ShadowDrawCounts), RenderGraphResourceAccess::StorageReadWrite);
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::ShadowMeshletCullPass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUCullShadowMeshletsPipeline");
-
-				RenderCommand& command = cmdList.BeginRenderCommand("ShadowMeshletCullPass");
-
 				command.BindPipeline(pipeline);
 				command.BindAllDescriptorSets();
 
@@ -793,8 +754,6 @@ namespace Lucy {
 
 				command.BindPushConstant(pushConstant);
 				command.DispatchComputeIndirect(registry.GetBuffer(RGResource(ShadowMeshletDispatches)), 0);
-
-				cmdList.EndRenderCommand();
 			};
 		});
 
@@ -835,12 +794,9 @@ namespace Lucy {
 
 			build.BindRenderTarget(RGResource(ShadowImages), RGResource(VSMDepth));
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::ShadowDrawPass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("VSMPipeline");
-
-				RenderCommand& draw = cmdList.BeginRenderCommand("ShadowDrawPass");
-
 				draw.BindPipeline(pipeline);
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
@@ -867,8 +823,6 @@ namespace Lucy {
 
 				draw.DrawIndexedIndirectCount(registry.GetBuffer(RGResource(ShadowIndirectCommands)), 0,
 					registry.GetBuffer(RGResource(ShadowDrawCounts)), 0, commandCapacity, sizeof(VkDrawIndexedIndirectCommand));
-
-				cmdList.EndRenderCommand();
 			};
 		});
 
@@ -877,7 +831,7 @@ namespace Lucy {
 			Vertical
 		};
 
-		const auto ExecuteGaussianBlur = [=](RenderGraphRegistry& registry, RenderCommandList& cmdList, GaussianBlurDirection direction) {
+		const auto ExecuteGaussianBlur = [=](RenderGraphRegistry& registry, RenderCommand& cmd, GaussianBlurDirection direction) {
 			LUCY_PROFILE_NEW_EVENT("RendererPasses::ExecuteGaussianBlur");
 
 			const auto& shadowImages = registry.GetImage(RGResource(ShadowImages));
@@ -890,7 +844,6 @@ namespace Lucy {
 				? "VSMHorizontalBlurComputePipeline" : "VSMVerticalBlurComputePipeline");
 			auto& pushConstant = blurPipeline->GetPipelineConstants("PushConstants");
 
-			RenderCommand& cmd = cmdList.BeginRenderCommand(direction == GaussianBlurDirection::Horizontal ? "VSMHorizontalBlur" : "VSMVerticalBlur");
 			cmd.BindPipeline(blurPipeline);
 
 			struct BlurData {
@@ -926,8 +879,6 @@ namespace Lucy {
 			cmd.BindAllDescriptorSets();
 			cmd.BindPushConstant(pushConstant);
 			cmd.DispatchCompute((width + 7) / 8, (height + 7) / 8, RenderDeviceSceneGlobalData::NUM_CASCADES);
-
-			cmdList.EndRenderCommand();
 		};
 
 		renderGraph->AddPass(TargetQueueFamily::Compute, "VSMHorizontalBlurCompute", [=, *this](RenderGraphBuilder& build) {
@@ -1121,6 +1072,11 @@ namespace Lucy {
 
 #pragma region DDGI
 
+	DDGIPass::DDGIPass(uint32_t width, uint32_t height) 
+		: m_Width(width), m_Height(height) {
+		s_ProbeSphere = MeshFactory::CreateSphere(8, 12);
+	}
+
 	void DDGIPass::AddPass(const Ref<RenderGraph>& renderGraph) {
 		constexpr uint32_t irradianceTexels = 8;
 		constexpr uint32_t irradianceTileSize = irradianceTexels + 2;
@@ -1132,8 +1088,9 @@ namespace Lucy {
 		const uint32_t probeRows = m_ProbeCounts.y;
 
 		const uint32_t probeCount = probeColumns * probeRows;
+		m_ProbeOrigin = -0.5f * glm::vec3(m_ProbeCounts - glm::vec3(1)) * m_ProbeSpacing;
 
-		renderGraph->AddPass(TargetQueueFamily::Graphics, "DDGITracePass", [=](RenderGraphBuilder& build) {
+		renderGraph->AddPass(TargetQueueFamily::Graphics, "DDGITracePass", [probeColumns, probeRows, probeCount, this](RenderGraphBuilder& build) {
 			build.SetInFlightMode(true);
 
 			build.DeclareBuffer(RGResource(DDGIRayResults), {
@@ -1164,16 +1121,14 @@ namespace Lucy {
 
 			build.WriteBuffer(RGResource(DDGIRayResults), RenderGraphResourceAccess::StorageWrite);
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::DDGITracePass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<RayTracingPipeline>("DDGITracePipeline");
-
-				RenderCommand& cmd = cmdList.BeginRenderCommand("DDGITracePass");
 
 				GlobalPushConstant<RenderDeviceDDGITraceData> pushConstantData{
 					.Data = {
 						.RayResults = registry.GetBuffer(RGResource(DDGIRayResults))->GetDeviceAddress(),
-						.ProbeOriginAndMaxDistance = glm::vec4{ m_ProbeOrigin, 1000.0f },
+						.ProbeOriginAndMaxDistance = glm::vec4{ m_ProbeOrigin, 100000.0f },
 						.ProbeSpacing = glm::vec4{ m_ProbeSpacing, 0.0f },
 						.ProbeCountsAndRays = glm::uvec4{ m_ProbeCounts, s_RaysPerProbe }
 					}
@@ -1186,35 +1141,88 @@ namespace Lucy {
 				cmd.BindPushConstant(pushConstant);
 				bool tlasExists = cmd.UpdateDescriptorSets("u_TLAS");
 				if (!tlasExists) {
-					cmdList.EndRenderCommand();
 					return;
 				}
 				cmd.BindAllDescriptorSets();
 				cmd.TraceRays(s_RaysPerProbe, probeCount, 1);
-
-				cmdList.EndRenderCommand();
 			};
 		});
 
-		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGIProbeUpdatePass", [=](RenderGraphBuilder& build) {
+		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGIProbeUpdatePass", [](RenderGraphBuilder& build) {
 			build.ReadBuffer(RGResource(DDGIRayResults), RenderGraphResourceAccess::StorageRead);
 
 			build.WriteImage(RGResource(DDGIIrradianceAtlas), RenderGraphResourceAccess::StorageWrite);
 			build.WriteImage(RGResource(DDGIDepthAtlas), RenderGraphResourceAccess::StorageWrite);
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
 
 			};
 		});
+
+		renderGraph->AddPass(TargetQueueFamily::Graphics, "DDGIProbeDebugPass", [probeColumns, probeRows, probeCount, 
+			width = m_Width, height = m_Height, origin = m_ProbeOrigin, spacing = m_ProbeSpacing, counts = m_ProbeCounts](RenderGraphBuilder& build) {
+			build.SetViewportArea(width, height);
+			build.SetInFlightMode(true);
+
+			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUVerticesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUIndicesBuffer), RenderGraphResourceAccess::IndexRead);
+
+			build.ReadImage(RGResource(GeometryImage), RenderGraphResourceAccess::ColorAttachmentWrite);
+			build.ReadImage(RGResource(GeometryDepthImage), RenderGraphResourceAccess::DepthAttachmentWrite);
+
+			build.BindRenderTarget(RGResource(GeometryImage), RGResource(GeometryDepthImage));
+
+			struct DDGIProbeDebugData {
+				glm::vec4 ProbeOriginAndRadius;
+				glm::vec4 ProbeSpacing;
+				glm::uvec4 ProbeCounts;
+			};
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::DDGIProbeDebugPass");
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("DDGIProbeDebugPipeline");
+				cmd.BindPipeline(pipeline);
+
+				GlobalPushConstant<DDGIProbeDebugData> pushConstantData{
+					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+					.Data = {
+						.ProbeOriginAndRadius = glm::vec4{ origin, 0.08f },
+						.ProbeSpacing = glm::vec4{ spacing, 0.0f },
+						.ProbeCounts = glm::uvec4{ counts, 0 },
+					}
+				};
+
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+				cmd.BindPushConstant(pushConstant);
+				cmd.BindBuffers(registry.GetBuffer(RGResource(GPUIndicesBuffer)));
+
+				cmd.DrawIndexed(s_ProbeSphere->GetIndicesSize(), probeCount, s_ProbeSphere->GetMyGlobalIndexOffset(), s_ProbeSphere->GetMyGlobalVertexOffset(), 0);
+			};
+		});
 		
-		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGIDebugPass", [=](RenderGraphBuilder& build) {
+		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGIDebugPass", [probeColumns, probeRows, probeCount, 
+			width = m_Width, height = m_Height, origin = m_ProbeOrigin, spacing = m_ProbeSpacing, counts = m_ProbeCounts](RenderGraphBuilder& build) {
 			struct DDGIDebugData {
 				RenderDeviceBufferReference RayResults;
-				uint32_t RayResultTextureIndex;
-				uint32_t MaxRayDistance;
-				uint32_t RaysPerProbe;
+				uint32_t SceneColorTextureIndex;
+				uint32_t SceneDepthTextureIndex;
+
 				uint32_t ProbeCount;
+				uint32_t MarkerRadiusPixels;
+				uint32_t RaysPerProbe;
+				uint32_t MaxRayDistance;
+				uint32_t RayResultTextureIndex;
+
+				glm::vec4 ProbeOrigin;
+				glm::vec4 ProbeSpacing;
+
+				glm::uvec4 ProbeCounts;
+				glm::uvec4 OutputSize;
 			};
+
+			build.ReadBuffer(RGResource(DDGIRayResults), RenderGraphResourceAccess::StorageRead);
 
 			build.DeclareImage(RGResource(DDGIRayDebugImage), {
 				.Width = s_RaysPerProbe,
@@ -1228,11 +1236,9 @@ namespace Lucy {
 
 			build.WriteImage(RGResource(DDGIRayDebugImage), RenderGraphResourceAccess::StorageWrite);
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::DDGIDebugPass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("DDGIDebugPipeline");
-
-				RenderCommand& cmd = cmdList.BeginRenderCommand("DDGIDebugPass");
 				cmd.BindPipeline(pipeline);
 
 				uint32_t rayResultIndex = cmd.BindImageHandleTo("StorageTextures2D", registry.GetImage(RGResource(DDGIRayDebugImage)));
@@ -1241,10 +1247,17 @@ namespace Lucy {
 					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
 					.Data = {
 						.RayResults = registry.GetBuffer(RGResource(DDGIRayResults))->GetDeviceAddress(),
-						.RayResultTextureIndex = rayResultIndex,
-						.MaxRayDistance = 1000,
+						.SceneColorTextureIndex = {},
+						.SceneDepthTextureIndex = {},
+						.ProbeCount = probeCount,
+						.MarkerRadiusPixels = 2,
 						.RaysPerProbe = s_RaysPerProbe,
-						.ProbeCount = probeCount
+						.MaxRayDistance = 100000,
+						.RayResultTextureIndex = rayResultIndex,
+						.ProbeOrigin = glm::vec4{ origin, 0.0f },
+						.ProbeSpacing = glm::vec4{ spacing, 0.0f },
+						.ProbeCounts = glm::uvec4{ counts, 0 },
+						.OutputSize = glm::uvec4{ probeColumns * irradianceTileSize, probeRows * irradianceTileSize, 0, 0 }
 					}
 				};
 
@@ -1254,8 +1267,6 @@ namespace Lucy {
 				cmd.BindPushConstant(pushConstant);
 				cmd.BindAllDescriptorSets();
 				cmd.DispatchCompute((s_RaysPerProbe + 7) / 8, (probeCount + 7) / 8, 1);
-
-				cmdList.EndRenderCommand();
 			};
 		});
 	}
@@ -1278,16 +1289,15 @@ namespace Lucy {
 			build.ReadImage(RGResource(GeometryDepthImage), RenderGraphResourceAccess::DepthAttachmentWrite);
 			build.BindRenderTarget(RGResource(GeometryImage), RGResource(GeometryDepthImage));
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::CubemapPass");
 				
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("SkyboxPipeline");
 				const auto& settings = Renderer::GetRendererSettings();
 
 				bool imageBound = false;
-				const Ref<Mesh>& cubeMesh = Renderer::GetEnvCubeMesh();
+				const Unique<Mesh>& cubeMesh = Renderer::GetEnvCubeMesh();
 
-				RenderCommand& draw = cmdList.BeginRenderCommand("Skybox Draw");
 				draw.BindPipeline(pipeline);
 
 				uint32_t index = INVALID_INDEX;
@@ -1300,7 +1310,6 @@ namespace Lucy {
 				});
 
 				if (!imageBound) {
-					cmdList.EndRenderCommand();
 					return;
 				}
 
@@ -1320,8 +1329,6 @@ namespace Lucy {
 				draw.BindAllDescriptorSets();
 				draw.BindPushConstant(pushConstant);
 				draw.DrawMesh(cubeMesh);
-
-				cmdList.EndRenderCommand();
 			};
 		});
 
@@ -1341,7 +1348,7 @@ namespace Lucy {
 
 			build.BindRenderTarget(RGResource(HDRLayeredImage));
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::HDRImageToLayeredImage");
 				static const glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
 
@@ -1354,8 +1361,6 @@ namespace Lucy {
 
 				const auto& cubeMesh = Renderer::GetEnvCubeMesh();
 				const uint32_t cubeMeshIndexCount = Renderer::GetEnvCubeMeshIndexCount();
-
-				RenderCommand& draw = cmdList.BeginRenderCommand("Cubemap Prep Draw");
 				draw.BindPipeline(pipeline);
 
 				uint32_t originalHDRImageIndex = draw.BindImageHandleTo("Textures2D", registry.GetImage(RGResource(OriginalHDRImage)));
@@ -1380,8 +1385,6 @@ namespace Lucy {
 
 				draw.BindPushConstant(pushConstant);
 				draw.DrawIndexed(cubeMeshIndexCount, 1, 0, 0, 0);
-
-				cmdList.EndRenderCommand();
 			};
 		});
 	}
@@ -1402,7 +1405,7 @@ namespace Lucy {
 			build.ReadExternalImage(RGResource(IrradianceImage), RenderGraphResourceAccess::StorageRead);
 			build.WriteImage(RGResource(IrradianceImage), RenderGraphResourceAccess::StorageWrite);
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::IrradiancePass");
 				static const glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
 				
@@ -1414,7 +1417,6 @@ namespace Lucy {
 				const auto& cubeImage = registry.GetImage(RGResource(HDRLayeredImage));
 				const auto& irradianceImage = registry.GetImage(RGResource(IrradianceImage));
 
-				RenderCommand& draw = cmdList.BeginRenderCommand("Irradiance Draw Compute");
 				draw.BindPipeline(pipeline);
 
 				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
@@ -1447,8 +1449,6 @@ namespace Lucy {
 
 				//draw.SetImageLayout(cubeImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, 1, layerCount);
 				//draw.SetImageLayout(irradianceImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, 1, layerCount);
-
-				cmdList.EndRenderCommand();
 			};
 		});
 #else
@@ -1470,11 +1470,10 @@ namespace Lucy {
 
 			build.BindRenderTarget(RGResource(IrradianceImage));
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("IrradiancePipeline");
 				const auto& mesh = Renderer::GetEnvCubeMesh();
 
-				RenderCommand& draw = cmdList.BeginRenderCommand("Irradiance Draw");
 				const auto& environmentMap = registry.GetImage(RGResource(HDRLayeredImage));
 
 				pipeline->BindGlobalImageHandleTo("u_EnvironmentMap", environmentMap);
@@ -1484,8 +1483,6 @@ namespace Lucy {
 				draw.BindAllDescriptorSets();
 				draw.BindBuffers(mesh);
 				draw.DrawIndexed(36, 1, 0, 0, 0);
-
-				cmdList.EndRenderCommand();
 			};
 		});
 #endif
@@ -1513,7 +1510,7 @@ namespace Lucy {
 			build.ReadImage(RGResource(HDRLayeredImage), RenderGraphResourceAccess::StorageRead);
 			build.WriteImage(RGResource(PrefilterImage), RenderGraphResourceAccess::StorageWrite);
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::PrefilterPass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("PrefilterComputePipeline");
 
@@ -1524,7 +1521,6 @@ namespace Lucy {
 					glm::uvec3 TextureData;    // x: environment map index, y: prefilter map index, z: sampler index
 				};
 
-				RenderCommand& cmd = cmdList.BeginRenderCommand("Prefilter Draw Compute");
 				cmd.BindPipeline(pipeline);
 
 				uint32_t layeredImageIndex = cmd.BindImageHandleTo("CubeTextures", registry.GetImage(RGResource(HDRLayeredImage)));
@@ -1557,8 +1553,6 @@ namespace Lucy {
 					cmd.BindPushConstant(pushConstant);
 					cmd.DispatchCompute(groupsX, groupsY, 6);
 				}
-
-				cmdList.EndRenderCommand();
 			};
 		});
 	}
@@ -1577,14 +1571,13 @@ namespace Lucy {
 			build.ReadExternalImage(RGResource(BRDFLutImage), RenderGraphResourceAccess::StorageRead);
 			build.WriteExternalImage(RGResource(BRDFLutImage), RenderGraphResourceAccess::StorageWrite);
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::BRDFLutPass");
 				static constexpr uint32_t workGroupSize = 8;
 
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("BRDFLutComputePipeline");
 				const auto& brdfLutImage = registry.GetImage(RGResource(BRDFLutImage));
 
-				RenderCommand& draw = cmdList.BeginRenderCommand("BRDFLut Draw Compute");
 				draw.BindPipeline(pipeline);
 
 				struct LocalPushConstant {
@@ -1604,8 +1597,6 @@ namespace Lucy {
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
 				draw.DispatchCompute(m_Size / workGroupSize, m_Size / workGroupSize, 1);
-
-				cmdList.EndRenderCommand();
 			};
 		});
 

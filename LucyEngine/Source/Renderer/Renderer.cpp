@@ -9,6 +9,8 @@
 #include "Renderer/VulkanRenderer.h"
 #include "RenderPass.h"
 
+#include "MeshFactory.h"
+
 #include "Scene/Entity.h"
 
 #include "RenderGraph/RenderGraph.h"
@@ -87,64 +89,7 @@ namespace Lucy {
 			s_BlankArrayHandle = device->CreateImage(blankArrayCreateInfo);
 		});
 
-		constexpr auto MakeSkyCube = []() {
-			constexpr std::array<float, 108> vertices = {
-				//back face
-				-1.0f, -1.0f, -1.0f,
-				1.0f, 1.0f, -1.0f,
-				1.0f, -1.0f, -1.0f,
-				1.0f, 1.0f, -1.0f,
-				-1.0f, -1.0f, -1.0f,
-				-1.0f, 1.0f, -1.0f,
-				// front face
-				-1.0f, -1.0f, 1.0f,
-				1.0f, -1.0f, 1.0f,
-				1.0f, 1.0f, 1.0f,
-				1.0f, 1.0f, 1.0f,
-				-1.0f, 1.0f, 1.0f,
-				-1.0f, -1.0f, 1.0f,
-				// left face
-				-1.0f, 1.0f, 1.0f,
-				-1.0f, 1.0f, -1.0f,
-				-1.0f, -1.0f, -1.0f,
-				-1.0f, -1.0f, -1.0f,
-				-1.0f, -1.0f, 1.0f,
-				-1.0f, 1.0f, 1.0f,
-				// right face
-				1.0f, 1.0f, 1.0f,
-				1.0f, -1.0f, -1.0f,
-				1.0f, 1.0f, -1.0f,
-				1.0f, -1.0f, -1.0f,
-				1.0f, 1.0f, 1.0f,
-				1.0f, -1.0f, 1.0f,
-				// bottom face
-				-1.0f, -1.0f, -1.0f,
-				1.0f, -1.0f, -1.0f,
-				1.0f, -1.0f, 1.0f,
-				1.0f, -1.0f, 1.0f,
-				-1.0f, -1.0f, 1.0f,
-				-1.0f, -1.0f, -1.0f,
-				// top face
-				-1.0f, 1.0f, -1.0f,
-				1.0f, 1.0f, 1.0f,
-				1.0f, 1.0f, -1.0f,
-				1.0f, 1.0f, 1.0f,
-				-1.0f, 1.0f, -1.0f,
-				-1.0f, 1.0f, 1.0f
-			};
-
-			std::array<uint32_t, vertices.size() / 3> indices;
-			for (uint32_t i = 0; i < indices.size(); i++)
-				indices[i] = i;
-
-			return std::pair{ vertices, indices };
-		};
-
-		constexpr auto skyCube = MakeSkyCube();
-		constexpr auto vertices = skyCube.first;
-		constexpr auto indices = skyCube.second;
-
-		s_CubeMesh = Memory::CreateRef<Mesh>(vertices, indices);
+		s_CubeMesh = MeshFactory::CreateCube();
 		
 		if (config.ThreadingPolicy == ThreadingPolicy::Singlethreaded)
 			s_Backend->FlushCommandQueue();
@@ -344,9 +289,9 @@ namespace Lucy {
 			};
 
 #if !USE_COMPUTE_FOR_CUBEMAP_GEN
-			constexpr size_t graphicsPipelineCount = 6;
+			constexpr size_t graphicsPipelineCount = 7;
 #else
-			constexpr size_t graphicsPipelineCount = 5;
+			constexpr size_t graphicsPipelineCount = 6;
 #endif
 			constexpr const std::array<RenderGraphPipelineCreateInfo, graphicsPipelineCount> graphicsPipelineCreateInfos = {
 				// PBR Geometry Pipeline
@@ -392,6 +337,11 @@ namespace Lucy {
 					.PipelineName = "IrradiancePipeline",
 				},
 #endif
+				{
+					.ShaderName = "LucyDDGIProbeDebug",
+					.PassName = "DDGIProbeDebugPass",
+					.PipelineName = "DDGIProbeDebugPipeline",
+				},
 			};
 
 			constexpr size_t computePipelineCount = 16;
@@ -473,7 +423,7 @@ namespace Lucy {
 					.ShaderName = "LucyDDGIDebug",
 					.EntryPointName = "DDGIDebugMain",
 					.PipelineName = "DDGIDebugPipeline"
-				},
+				}
 			};
 
 			constexpr uint32_t rayTracingPipelineCount = 1;

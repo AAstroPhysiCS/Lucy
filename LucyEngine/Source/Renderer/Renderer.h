@@ -105,7 +105,7 @@ namespace Lucy {
 		static Ref<Image> GetBlankCubeImage();
 		static Ref<Image> GetBlankArrayImage();
 
-		static const Ref<Mesh>& GetEnvCubeMesh() { return s_CubeMesh; }
+		static const Unique<Mesh>& GetEnvCubeMesh() { return s_CubeMesh; }
 		static uint32_t GetEnvCubeMeshIndexCount();
 
 		static RenderContextResultCodes WaitAndPresent();
@@ -145,7 +145,7 @@ namespace Lucy {
 
 		static inline RenderDeviceResourceHandle s_BlankCubeHandle{};
 		static inline RenderDeviceResourceHandle s_BlankArrayHandle{};
-		static inline Ref<Mesh> s_CubeMesh = nullptr;
+		static inline Unique<Mesh> s_CubeMesh = nullptr;
 
 		friend class Application; //for Init etc.
 		friend class MaterialManager; //for creating materials TODO: change this

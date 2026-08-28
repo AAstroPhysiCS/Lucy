@@ -81,6 +81,8 @@ namespace Lucy {
 
 	void ImGuiVulkanImpl::Render(const Ref<VulkanSwapChain>& swapChain, RenderCommandList& cmdList) {
 		LUCY_PROFILE_NEW_EVENT("ImGuiVulkanImpl::Render");
+		const auto& vulkanDevice = cmdList.m_CreateInfo.RenderDevice->As<VulkanRenderDevice>();
+
 		const auto& renderPass = swapChain->GetRenderPass();
 		const auto& frameBuffer = swapChain->GetFrameBuffer();
 
@@ -93,11 +95,15 @@ namespace Lucy {
 		beginInfo.CommandBuffer = (VkCommandBuffer)cmdList.GetPrimaryCommandPool()->GetCommandBuffer(frameIndex);
 		beginInfo.VulkanFrameBuffer = frameBuffer->GetVulkanHandles()[imageIndex];
 
-		auto& cmd = cmdList.BeginRenderCommand("ImGuiPass");
+		auto cmd = cmdList.BeginRenderCommand();
+		vulkanDevice->BeginDebugMarker(cmdList.GetPrimaryCommandPool(), "ImGui Pass");
+
 		renderPass->RTBegin(beginInfo);
 		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), beginInfo.CommandBuffer);
 		renderPass->RTEnd();
-		cmdList.EndRenderCommand();
+
+		vulkanDevice->EndDebugMarker(cmdList.GetPrimaryCommandPool());
+		cmdList.EndRenderCommand("ImGui Pass Draw", cmd);
 	}
 
 	void ImGuiVulkanImpl::Destroy() {

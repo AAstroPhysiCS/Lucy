@@ -143,14 +143,16 @@ namespace Lucy {
 						return passBarrier.Pass == pass;
 					});
 
-					if (it != vkBatch.PassBarriers.end()) {
+					if (it != vkBatch.PassBarriers.end() && (!it->Barrier.ImageBarriers.empty() || !it->Barrier.BufferBarriers.empty())) {
 						VkCommandBuffer cmdBuffer = static_cast<VkCommandBuffer>(primaryCommandPool->GetCommandBuffer(m_CurrentFrameIndex));
 						vulkanDevice->BeginDebugMarker(cmdBuffer, "PassVulkanBarrier");
 						ExecuteVulkanBatchBarrier(cmdBuffer, it->Barrier);
 						vulkanDevice->EndDebugMarker(cmdBuffer);
 					}
 
+					vulkanDevice->BeginDebugMarker(primaryCommandPool, pass->GetName().c_str());
 					info.SubmitFuncs[i](cmdList);
+					vulkanDevice->EndDebugMarker(primaryCommandPool);
 				}
 
 				if (!vkBatch.PostBatchBarrier.ImageBarriers.empty() || !vkBatch.PostBatchBarrier.BufferBarriers.empty()) {
@@ -210,36 +212,28 @@ namespace Lucy {
 				uint64_t begin = results[scope.BeginQueryIndex];
 				uint64_t end = results[scope.EndQueryIndex];
 				float ms = static_cast<float>(end - begin) * timestampPeriod / 1000000.0f;
-				metricsOutput.TimeOfPasses[scope.PassName] = ms;
+				metricsOutput.TimeOfPasses[scope.NameOfDraw] = ms;
 				metricsOutput.Time += ms;
 			}
 			return metricsOutput;
 		};
 
+		const auto ProcessQueue = [&](const std::vector<RenderCommandList>& cmdListOfQueue) {
+			for (const auto& cmdList : cmdListOfQueue) {
+				const auto& queryData = cmdList.GetQueryData(m_CurrentFrameIndex);
+				if (!queryData.TimestampScopes.empty()) {
+					auto metricsOutput = ProcessQuery(queryData, timestampResults, vulkanDevice->GetTimestampPeriod());
+					m_CommandQueueMetricsOutput.Time += metricsOutput.Time;
+					for (const auto& [passName, time] : metricsOutput.TimeOfPasses)
+						m_CommandQueueMetricsOutput.TimeOfPasses[passName] += time;
+				}
+			}
+		};
+
 		const auto& cmdListsGraphics = m_RenderCommandQueue->GetCommandLists(TargetQueueFamily::Graphics);
 		const auto& cmdListsCompute = m_RenderCommandQueue->GetCommandLists(TargetQueueFamily::Compute);
-
-		for (const auto& cmdList : cmdListsGraphics) {
-			const auto& queryData = cmdList.GetQueryData(m_CurrentFrameIndex);
-			if (!queryData.TimestampScopes.empty()) {
-				auto metricsOutput = ProcessQuery(queryData, timestampResults, vulkanDevice->GetTimestampPeriod());
-				m_CommandQueueMetricsOutput.Time += metricsOutput.Time;
-				for (const auto& [passName, time] : metricsOutput.TimeOfPasses)
-					m_CommandQueueMetricsOutput.TimeOfPasses[passName] += time;
-			}
-		}
-
-		for (const auto& cmdList : cmdListsCompute) {
-			const auto& queryData = cmdList.GetQueryData(m_CurrentFrameIndex);
-			if (!queryData.TimestampScopes.empty()) {
-				auto metricsOutput = ProcessQuery(queryData, timestampResults, vulkanDevice->GetTimestampPeriod());
-				m_CommandQueueMetricsOutput.Time += metricsOutput.Time;
-				for (const auto& [passName, time] : metricsOutput.TimeOfPasses)
-					m_CommandQueueMetricsOutput.TimeOfPasses[passName] += time;
-			}
-		}
-
-
+		ProcessQueue(cmdListsGraphics);
+		ProcessQueue(cmdListsCompute);
 	}
 
 	void VulkanRenderer::InternalImGuiPass(uint64_t signalValue, bool hasSceneWork) {
@@ -370,7 +364,9 @@ namespace Lucy {
 					case TargetQueueFamily::Compute: {
 						passExecuteFuncs.push_back([=](RenderCommandList& cmdList) {
 							LUCY_PROFILE_NEW_EVENT("RendererBackend::SubmitToCompute");
-							pass->Execute(cmdList);
+							RenderCommand cmd = cmdList.BeginRenderCommand();
+							pass->Execute(cmd);
+							cmdList.EndRenderCommand(pass->GetName(), cmd);
 						});
 						break;
 					}
@@ -378,7 +374,9 @@ namespace Lucy {
 						if (!renderFrameHandleMap.contains(pass->GetName())) {
 							passExecuteFuncs.push_back([=](RenderCommandList& cmdList) {
 								LUCY_PROFILE_NEW_EVENT("RendererBackend::SubmitToCompute");
-								pass->Execute(cmdList);
+								RenderCommand cmd = cmdList.BeginRenderCommand();
+								pass->Execute(cmd);
+								cmdList.EndRenderCommand(pass->GetName(), cmd);
 							});
 							break;
 						}
@@ -388,16 +386,20 @@ namespace Lucy {
 							const auto& device = GetRenderDevice();
 							const auto& renderPass = device->AccessResource<RenderPass>(renderPassHandle);
 							const auto& frameBuffer = device->AccessResource<FrameBuffer>(frameBufferHandle);
+							RenderCommand cmd = cmdList.BeginRenderCommand();
 							device->BeginRenderPass(renderPass, frameBuffer, cmdList.GetPrimaryCommandPool());
-							pass->Execute(cmdList);
+							pass->Execute(cmd);
 							device->EndRenderPass(renderPass);
+							cmdList.EndRenderCommand(pass->GetName(), cmd);
 						});
 						break;
 					}
 					case TargetQueueFamily::Transfer: {
 						passExecuteFuncs.push_back([=](RenderCommandList& cmdList) {
 							LUCY_PROFILE_NEW_EVENT("RendererBackend::SubmitToTransfer");
-							pass->Execute(cmdList);
+							RenderCommand cmd = cmdList.BeginRenderCommand();
+							pass->Execute(cmd);
+							cmdList.EndRenderCommand(pass->GetName(), cmd);
 						});
 						break;
 					}

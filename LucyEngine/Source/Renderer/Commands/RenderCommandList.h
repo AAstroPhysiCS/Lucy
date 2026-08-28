@@ -16,13 +16,13 @@ namespace Lucy {
 	};
 
 	struct TimestampQueryScope {
-		std::string PassName;
+		std::string NameOfDraw = "Unknown Draw";
 		uint32_t BeginQueryIndex = 0;
 		uint32_t EndQueryIndex = 0;
 	};
 
 	struct PipelineQueryScope {
-		std::string PassName;
+		std::string NameOfDraw = "Unknown Draw";
 		uint32_t QueryIndex = 0;
 	};
 
@@ -41,8 +41,8 @@ namespace Lucy {
 		RenderCommandList(RenderCommandList&&) noexcept = default;
 		RenderCommandList& operator=(RenderCommandList&&) noexcept = default;
 
-		RenderCommand& BeginRenderCommand(const std::string& nameOfDraw);
-		void EndRenderCommand();
+		RenderCommand BeginRenderCommand();
+		void EndRenderCommand(const std::string& nameOfDraw, RenderCommand& cmd);
 
 		bool IsCurrentFrameSlotAvailable(uint32_t frameIndex) const;
 		bool IsCurrentFrameSlotRecorded(uint32_t frameIndex) const;
@@ -68,5 +68,6 @@ namespace Lucy {
 
 		friend class RenderCommandQueue; //for Destroy/Recreate
 		friend class VulkanRenderer; //for ResetRenderCommand
+		friend struct ImGuiVulkanImpl; //for RenderDevice
 	};
 }

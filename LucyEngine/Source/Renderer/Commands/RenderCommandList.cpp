@@ -8,8 +8,6 @@
 
 namespace Lucy {
 
-	static inline RenderCommand* s_CurrentActiveRenderCommand = nullptr;
-
 	RenderCommandList::RenderCommandList(const RenderCommandListCreateInfo& createInfo) 
 		: m_CreateInfo(createInfo) {
 		auto commandPoolCreateInfo = CommandPoolCreateInfo{
@@ -41,40 +39,23 @@ namespace Lucy {
 		m_QueryDatas.resize(Renderer::GetMaxFramesInFlight());
 	}
 
-	RenderCommand& RenderCommandList::BeginRenderCommand(const std::string& nameOfDraw) {
-		LUCY_ASSERT(!s_CurrentActiveRenderCommand, "There is an active ongoing render command that needs to be closed!");
+	RenderCommand RenderCommandList::BeginRenderCommand() {
 		LUCY_PROFILE_NEW_EVENT("RenderCommandList::BeginRenderCommand");
-
-		if (!m_RenderCommands.empty() && m_RenderCommands.back().GetDebugName() == nameOfDraw) {
-			auto& cmd = m_RenderCommands.back();
-			cmd.BeginDebugMarker();
-			s_CurrentActiveRenderCommand = &cmd;
-			return cmd;
-		}
-
-		m_RenderCommands.emplace_back(nameOfDraw, m_CreateInfo.RenderDevice, m_PrimaryCommandPool);
-
-		RenderCommand& cmd = m_RenderCommands.back();
+		RenderCommand cmd = { m_CreateInfo.RenderDevice, m_PrimaryCommandPool };
 		cmd.BeginTimestamp();
-		cmd.BeginDebugMarker();
-
-		s_CurrentActiveRenderCommand = &cmd;
 		return cmd;
 	}
 
-	void RenderCommandList::EndRenderCommand() {
-		LUCY_ASSERT(s_CurrentActiveRenderCommand, "There isn't any active ongoing render command right now!");
+	void RenderCommandList::EndRenderCommand(const std::string& nameOfDraw, RenderCommand& cmd) {
+		LUCY_ASSERT(&cmd, "There isn't any active ongoing render command right now!");
 		LUCY_PROFILE_NEW_EVENT("RenderCommandList::EndRenderCommand");
 
-		s_CurrentActiveRenderCommand->EndPipelineStatistics();
-		s_CurrentActiveRenderCommand->EndDebugMarker();
-		s_CurrentActiveRenderCommand->EndTimestamp();
+		cmd.EndPipelineStatistics();
+		cmd.EndTimestamp();
 
 		auto& queryData = m_QueryDatas[Renderer::GetCurrentFrameIndex()];
-		queryData.TimestampScopes.emplace_back(s_CurrentActiveRenderCommand->GetDebugName(), s_CurrentActiveRenderCommand->m_BeginTimestampIndex, s_CurrentActiveRenderCommand->m_EndTimestampIndex);
-		queryData.PipelineScopes.emplace_back(s_CurrentActiveRenderCommand->GetDebugName(), s_CurrentActiveRenderCommand->m_BeginPipelineQueryIndex);
-
-		s_CurrentActiveRenderCommand = nullptr;
+		queryData.TimestampScopes.emplace_back(nameOfDraw, cmd.m_BeginTimestampIndex, cmd.m_EndTimestampIndex);
+		queryData.PipelineScopes.emplace_back(nameOfDraw, cmd.m_BeginPipelineQueryIndex);
 	}
 
 	bool RenderCommandList::IsCurrentFrameSlotAvailable(uint32_t frameIndex) const {

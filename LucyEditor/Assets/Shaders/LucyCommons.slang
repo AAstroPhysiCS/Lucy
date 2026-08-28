@@ -4,6 +4,7 @@
 static constexpr const float PI = 3.1415926535897932384626433832795f;
 static constexpr const float TWO_PI = 6.283185307179586476925286766559f;
 static constexpr const float HALF_PI = 1.57079632679489661923132169163975f;
+static constexpr const float GOLDEN_RATIO = 1.61803398875f;
 
 static constexpr const uint NUM_CASCADES = 4;
 

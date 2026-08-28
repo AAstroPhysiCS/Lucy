@@ -41,10 +41,11 @@ namespace Lucy {
 
 			VkDeviceSize Capacity = 0;
 			VkDeviceSize Offset = 0;
+
+			std::vector<PendingBufferCopy> PendingCopies;
 		};
 
 		std::vector<UploadFrame> m_Frames;
-		std::vector<PendingBufferCopy> m_PendingCopies;
 
 		Ref<VulkanRenderDevice> m_RenderDevice = nullptr;
 	};

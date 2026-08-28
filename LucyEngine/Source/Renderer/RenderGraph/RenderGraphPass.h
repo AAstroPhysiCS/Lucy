@@ -6,7 +6,7 @@
 
 namespace Lucy {
 
-	class RenderCommandList;
+	class RenderCommand;
 
 	class RenderGraphRegistry;
 	class RenderGraphBuilder;
@@ -18,7 +18,7 @@ namespace Lucy {
 		Always
 	};
 
-	using RenderGraphExecuteFunc = std::function<void(RenderGraphRegistry&, RenderCommandList&)>;
+	using RenderGraphExecuteFunc = std::function<void(RenderGraphRegistry&, RenderCommand&)>;
 	using RenderGraphSetupFunc = std::function<RenderGraphExecuteFunc(RenderGraphBuilder&)>;
 
 	enum class RenderGraphPassState : uint8_t {
@@ -127,7 +127,7 @@ namespace Lucy {
 		RenderGraphPass& operator=(const RenderGraphPass& other) = delete;
 		RenderGraphPass& operator=(RenderGraphPass&& other) noexcept = delete;
 
-		void Execute(RenderCommandList& cmdList);
+		void Execute(RenderCommand& cmd);
 		void Setup(RenderGraphBuilder& build);
 		
 		void AddRenderTarget(const RenderGraphResource& renderTargetToAdd);

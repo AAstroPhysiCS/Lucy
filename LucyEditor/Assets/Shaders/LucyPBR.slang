@@ -198,7 +198,7 @@ PixelOutput main(PixelInput input) {
         F0, 
         materialSample.Metallic,
         materialSample.Roughness,
-             materialSample.BaseColor.rgb,
+        materialSample.BaseColor.rgb,
         PushConstants.Root->DirectionalLight.Color
     ) * shadow.r;
 

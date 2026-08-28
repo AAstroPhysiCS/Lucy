@@ -2,11 +2,22 @@
 #include "LucyDDGICommon.slang"
 
 struct DDGIDebugData {
-	DDGIRayResult* RayResults;
-    uint RayResultTextureIndex;
+    DDGIRayResult *RayResults;
+
+    uint SceneColorTextureIndex;
+    uint SceneDepthTextureIndex;
+
+    uint ProbeCount;
+    uint MarkerRadiusPixels;
+    uint RaysPerProbe;
     uint MaxRayDistance;
-	uint RaysPerProbe;
-	uint ProbeCount;
+    uint RayResultTextureIndex;
+
+    float4 ProbeOrigin;
+    float4 ProbeSpacing;
+
+    uint4 ProbeCounts;
+    uint4 OutputSize;
 };
 
 [[vk::push_constant]]
@@ -24,15 +35,13 @@ void DDGIDebugMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
         return;
 
     uint resultIndex = probeIndex * PushConstants.Data.RaysPerProbe + rayIndex;
-
     float4 result = PushConstants.Data.RayResults[resultIndex].RadianceAndDistance;
 
     float normalizedDistance = saturate(result.w / PushConstants.Data.MaxRayDistance);
-
     float hit = result.x > 0.5f ? 1.0f : 0.0f;
 
     float3 debugColor = lerp(float3(1.0f, 0.0f, 0.0f), float3(0.0f, 1.0f, 0.0f), normalizedDistance);
     debugColor *= hit;
-
+    
     BindlessTable::StorageTextures2D[PushConstants.Data.RayResultTextureIndex][dispatchThreadID.xy] = float4(debugColor, 1.0f);
 }

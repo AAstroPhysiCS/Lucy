@@ -35,7 +35,7 @@ namespace Lucy {
 
 	class RenderCommand final {
 	public:
-		RenderCommand(const std::string& nameOfDraw, const Ref<RenderDevice>& renderDevice, const Ref<CommandPool>& primaryCmdPool);
+		RenderCommand(const Ref<RenderDevice>& renderDevice, const Ref<CommandPool>& primaryCmdPool);
 		~RenderCommand() = default;
 		//TODO: Dynamic raster and depth configuration
 #pragma region Rasterization
@@ -82,10 +82,10 @@ namespace Lucy {
 		void BindAllDescriptorSets();
 		void BindDescriptorSet(uint32_t setIndex);
 		
-		void DrawMesh(Ref<Mesh> mesh);
+		void DrawMesh(const Unique<Mesh>& mesh);
 
 		template <typename TLocalPushConstant, typename TFunction>
-		void DrawIndexedMeshWithPushConstant(Ref<Mesh> mesh, const glm::mat4& meshTransform, TFunction&& function) {
+		void DrawIndexedMeshWithPushConstant(const Unique<Mesh>& mesh, const glm::mat4& meshTransform, TFunction&& function) {
 			LUCY_ASSERT(m_BoundedGraphicsPipeline, "DrawIndexedMeshWithPushConstant failed, bounded pipeline is nullptr.");
 			LUCY_ASSERT(m_Shader, "DrawIndexedMeshWithPushConstant failed, shader is nullptr.");
 
@@ -122,17 +122,11 @@ namespace Lucy {
 
 		void DispatchCompute(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
 		void DispatchComputeIndirect(const Ref<RenderDeviceBuffer>& resource, size_t offset);
-
-		double GetRenderTime(const std::vector<uint64_t>& renderTimes) const { return (double)(renderTimes[m_EndTimestampIndex] - renderTimes[m_BeginTimestampIndex]); }
-		const std::string& GetDebugName() const { return m_DebugName; }
 	private:
 		RenderDeviceResourceHandle GetGlobalIndexBufferHandle() const;
 
 		void BeginSecondaryRenderCommand();
 		void EndSecondaryRenderCommand();
-
-		void BeginDebugMarker();
-		void EndDebugMarker();
 
 		void BeginTimestamp();
 		void EndTimestamp();
@@ -140,7 +134,6 @@ namespace Lucy {
 		void BeginPipelineStatistics();
 		void EndPipelineStatistics();
 
-		std::string m_DebugName = "Unknown";
 		Ref<RenderDevice> m_RenderDevice = nullptr;
 		Ref<Shader> m_Shader = nullptr;
 		Ref<CommandPool> m_PrimaryCommandPool = nullptr;

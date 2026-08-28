@@ -62,17 +62,15 @@ namespace Lucy {
         return m_Globals.Create(data);
     }
 
-    RenderDeviceObjectHandle RenderDeviceScene::RegisterMesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices, std::vector<Submesh>& submeshes) {
+    RenderDeviceObjectHandle RenderDeviceScene::RTRegisterMesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices, std::vector<Submesh>& submeshes) {
         LUCY_PROFILE_NEW_EVENT("RenderDeviceScene::RTRegisterMesh");
         const RenderDeviceObjectHandle& handle = m_Meshes.Create(RenderDeviceMeshData{}); //uninitialized
-        Renderer::EnqueueToRenderCommandQueue([this, vertices = std::move(vertices), indices = std::move(indices), submeshes = std::move(submeshes), handle](const auto& device) {
-            RTRegisterMesh(handle, vertices, indices, submeshes);
-        });
+        RTRegisterMesh(handle, vertices, indices, submeshes);
         return handle;
     }
 
-    RenderDeviceObjectHandle RenderDeviceScene::RegisterObject(const RenderDeviceObjectHandle& meshHandle, const glm::mat4& transform, RenderDeviceObjectFlags flags) {
-        LUCY_PROFILE_NEW_EVENT("RenderDeviceScene::RegisterObject");
+    RenderDeviceObjectHandle RenderDeviceScene::RTRegisterObject(const RenderDeviceObjectHandle& meshHandle, const glm::mat4& transform, RenderDeviceObjectFlags flags) {
+        LUCY_PROFILE_NEW_EVENT("RenderDeviceScene::RTRegisterObject");
         RenderDeviceObjectData data{};
         data.Transform = transform;
         data.TransformInversedTransposed = glm::transpose(glm::inverse(transform));
@@ -81,18 +79,16 @@ namespace Lucy {
         data.Data.y = static_cast<uint32_t>(flags) | static_cast<uint32_t>(RenderDeviceObjectFlags::Alive);
 
         const RenderDeviceObjectHandle& handle = m_Objects.Create(data);
-        Renderer::EnqueueToRenderCommandQueue([this, handle](const auto& device) {
-            RTRegisterObject(handle);
-        });
+        RTRegisterObject(handle);
         return handle;
     }
 
     RenderDeviceObjectHandle RenderDeviceScene::RegisterCullView(const RenderDeviceCullViewData& data) {
 		LUCY_PROFILE_NEW_EVENT("RenderDeviceScene::RegisterCullView");
 		const RenderDeviceObjectHandle& handle = m_CullViews.Create(data);
-		Renderer::EnqueueToRenderCommandQueue([this, handle](const auto& device) {
-			RTRegisterCullView(handle);
-		});
+        Renderer::EnqueueToRenderCommandQueue([this, handle](const auto& device) {
+            RTRegisterCullView(handle);
+        });
 		return handle;
     }
 
@@ -109,7 +105,7 @@ namespace Lucy {
 
     RenderDeviceObjectHandle RenderDeviceScene::RegisterPBRMaterial(const RenderDevicePBRMaterialData& data) {
         const RenderDeviceObjectHandle& handle = m_PBRMaterials.Create(data);
-        Renderer::EnqueueToRenderCommandQueue([this, data, handle](const auto& device) {
+        Renderer::EnqueueToRenderCommandQueue([this, handle, data](const auto& device) {
             RTRegisterPBRMaterial(handle, data);
         });
         return handle;
@@ -509,6 +505,9 @@ namespace Lucy {
         std::vector<AccelerationStructureInstance> instances;
         ForEachAlive(m_Objects, [&](RenderDeviceObjectHandle handle, const RenderDeviceObjectData& object) {
             uint32_t meshIndex = object.Data.x;
+			//guard bcs sometimes meshes do not have any submesh... so we dont have a BLAS for them... so lets skip for tlas as well
+            if (meshIndex >= m_MeshBLAccelerationStructures.size())
+                return;
             const auto& blas = m_RenderDevice->AccessResource<AccelerationStructure>(m_MeshBLAccelerationStructures[meshIndex]);
 
             AccelerationStructureInstance& instance = instances.emplace_back();

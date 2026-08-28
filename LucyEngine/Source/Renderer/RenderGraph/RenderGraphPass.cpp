@@ -35,9 +35,9 @@ namespace Lucy {
 		SetViewportArea(width, height);
 	}
 
-	void RenderGraphPass::Execute(RenderCommandList& cmdList) {
+	void RenderGraphPass::Execute(RenderCommand& cmd) {
 		LUCY_PROFILE_NEW_EVENT("RenderGraphPass::Execute");
-		m_ExecuteFunc(m_CreateInfo.Registry, cmdList);
+		m_ExecuteFunc(m_CreateInfo.Registry, cmd);
 		for (const auto& resource : m_ResourceReads) {
 			if (!resource.IsExternal || !resource.IsTransient)
 				continue;

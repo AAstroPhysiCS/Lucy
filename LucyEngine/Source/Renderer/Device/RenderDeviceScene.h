@@ -26,9 +26,9 @@ namespace Lucy {
         RenderDeviceScene(RenderDeviceScene&&) = delete;
         RenderDeviceScene& operator=(RenderDeviceScene&&) = delete;
         
-        RenderDeviceObjectHandle RegisterMesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices, std::vector<Submesh>& submeshes);
+        RenderDeviceObjectHandle RTRegisterMesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices, std::vector<Submesh>& submeshes);
         RenderDeviceObjectHandle RegisterPBRMaterial(const RenderDevicePBRMaterialData& data);
-        RenderDeviceObjectHandle RegisterObject(const RenderDeviceObjectHandle& meshHandle, const glm::mat4& transform, RenderDeviceObjectFlags flags);
+        RenderDeviceObjectHandle RTRegisterObject(const RenderDeviceObjectHandle& meshHandle, const glm::mat4& transform, RenderDeviceObjectFlags flags);
         RenderDeviceObjectHandle RegisterCullView(const RenderDeviceCullViewData& data);
 
         void UpdateCamera(const CameraViewProjection& camera);
@@ -82,6 +82,9 @@ namespace Lucy {
     public:
         [[nodiscard]] const RenderDeviceResourceHandle& GetGlobalVertexBufferHandle() const { return m_GlobalVertexBuffer; }
         [[nodiscard]] const RenderDeviceResourceHandle& GetGlobalIndexBufferHandle() const { return m_GlobalIndexBuffer; }
+
+		[[nodiscard]] uint32_t GetGlobalVertexCount() const { return m_GlobalVertexCount; }
+		[[nodiscard]] uint32_t GetGlobalIndexCount() const { return m_GlobalIndexCount; }
 
         constexpr RenderDeviceResourceHandle GetCurrentFrameBufferHandle(std::string_view name) { return GetCurrentFrameBufferHandle(name, Renderer::GetCurrentFrameIndex()); }
         std::vector<RenderDeviceResourceHandle> GetCurrentFrameBufferHandles(std::string_view name);
@@ -322,13 +325,13 @@ namespace Lucy {
         uint64_t m_GlobalVertexCount = 0;
         uint64_t m_GlobalIndexCount = 0;
 
-        static inline uint64_t s_ObjectCapacity = 1024;
-        static inline uint64_t s_MaterialCapacity = 16384;
-        static inline uint64_t s_MeshCapacity = 1024;
+        static inline uint64_t s_ObjectCapacity = 256;
+        static inline uint64_t s_MaterialCapacity = 8196;
+        static inline uint64_t s_MeshCapacity = 256;
         static inline uint64_t s_SubmeshCapacity = 64 * 1024;
         static inline uint64_t s_MeshletCapacity = 1024 * 1024;
 
-        static inline uint64_t s_GlobalVertexCapacity = 1024 * 1024 * 8;
+        static inline uint64_t s_GlobalVertexCapacity = 1024 * 1024 * 4;
         static inline uint64_t s_GlobalIndexCapacity = 3 * s_GlobalVertexCapacity * 10;
     };
 }

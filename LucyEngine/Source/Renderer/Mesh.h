@@ -160,6 +160,10 @@ namespace Lucy {
 
 		MetadataInfo GetMetadataInfo() const { return m_MetadataInfo; }
 		uint32_t GetIndicesSize() const { return m_MetadataInfo.TotalIndicesSize; }
+		uint32_t GetVerticesSize() const { return m_MetadataInfo.TotalVerticesSize; }
+
+		uint32_t GetMyGlobalVertexOffset() const { return m_MyGlobalVertexOffset; }
+		uint32_t GetMyGlobalIndexOffset() const { return m_MyGlobalIndexOffset; }
 
 		const RenderDeviceObjectHandle& GetRenderDeviceMeshHandle() const { return m_RenderDeviceMeshHandle; }
 
@@ -222,6 +226,9 @@ namespace Lucy {
 
 		glm::vec3 m_MeshID = glm::vec3(-1.0f);
 		MetadataInfo m_MetadataInfo;
+
+		uint32_t m_MyGlobalVertexOffset = 0;
+		uint32_t m_MyGlobalIndexOffset = 0;
 
 		Unique<Assimp::Importer> m_Importer = nullptr;
 	private:

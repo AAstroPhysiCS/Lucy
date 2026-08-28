@@ -152,6 +152,8 @@ namespace Lucy {
 
 #pragma region DDGIPass
 
+	class Mesh;
+
 	struct RenderDeviceDDGIRayResult {
 		glm::vec4 RadianceAndDistance{ 0.0f };
 	};
@@ -165,16 +167,21 @@ namespace Lucy {
 	};
 
 	struct DDGIPass final {
-		DDGIPass() = default;
+		DDGIPass(uint32_t width, uint32_t height);
 		~DDGIPass() = default;
 
 		void AddPass(const Ref<RenderGraph>& renderGraph);
 	private:
 		static inline constexpr uint32_t s_RaysPerProbe = 64;
 
-		glm::uvec3 m_ProbeCounts{ 32, 16, 32 };
-		glm::vec3 m_ProbeOrigin{ -3.0f, 1.0f, -3.0f };
-		glm::vec3 m_ProbeSpacing{ 0.5f };
+		glm::vec3 m_ProbeCounts{ 32, 16, 32 };
+		glm::vec3 m_ProbeOrigin{ 0.0f, 0.0f, 0.0f };
+		glm::vec3 m_ProbeSpacing{ 2.5f };
+
+		uint32_t m_Width = 0;
+		uint32_t m_Height = 0;
+
+		static inline Unique<Mesh> s_ProbeSphere;
 	};
 
 #pragma endregion DDGIPass
