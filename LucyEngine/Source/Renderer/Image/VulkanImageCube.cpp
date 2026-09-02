@@ -45,7 +45,7 @@ namespace Lucy {
 		if (m_CreateInfo.GenerateMipmap)
 			GenerateMipmapsImmediate();
 		else //transitioning only then, when we dont care about mipmapping. Mipmapping already transitions to the right layout
-			SetLayoutImmediate(GetInitialImageLayout(), 0, 0, 1, m_CreateInfo.Layers);
+			SetLayoutImmediate(GetPreferredLayout(), 0, 0, 1, m_CreateInfo.Layers);
 
 		RTCreateSampler(vulkanDevice);
 		RTCreateVulkanImageViewHandle(vulkanDevice);
@@ -58,7 +58,7 @@ namespace Lucy {
 		allocator.CreateVulkanImageVma(m_CreateInfo.Width, m_CreateInfo.Height, m_MaxMipLevel, (VkFormat)GetAPIImageFormat(m_CreateInfo.Format), m_CurrentLayout,
 			flags, VK_IMAGE_TYPE_2D, m_Image, m_ImageVma, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT, m_CreateInfo.Layers);
 		
-		SetLayoutImmediate(GetInitialImageLayout(), 0, 0, m_MaxMipLevel, m_CreateInfo.Layers);
+		SetLayoutImmediate(GetPreferredLayout(), 0, 0, m_MaxMipLevel, m_CreateInfo.Layers);
 
 		RTCreateSampler(vulkanDevice);
 		RTCreateVulkanImageViewHandle(vulkanDevice);
@@ -90,8 +90,8 @@ namespace Lucy {
 				if (oldImageView)
 					vkDestroyImageView(vulkanDevice->GetLogicalDevice(), oldImageView, nullptr);
 
-				if (oldSamplerHandle)
-					vulkanDevice->RTDestroyResource(oldSamplerHandle);
+				//if (oldSamplerHandle)
+					//vulkanDevice->RTDestroyResource(oldSamplerHandle);
 
 				if (oldImage)
 					vulkanDevice->GetAllocator().DestroyImage(oldImage, oldImageVma);
@@ -111,7 +111,7 @@ namespace Lucy {
 		VulkanAllocator& allocator = vulkanDevice->GetAllocator();
 
 		m_ImageView.RTDestroyResource();
-		vulkanDevice->RTDestroyResource(m_SamplerHandle);
+		//vulkanDevice->RTDestroyResource(m_SamplerHandle);
 
 		allocator.DestroyImage(m_Image, m_ImageVma);
 		m_Image = VK_NULL_HANDLE;

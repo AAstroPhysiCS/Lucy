@@ -32,11 +32,11 @@ namespace Lucy {
 
 		static inline const MaterialImageType ALBEDO_TYPE = { "Albedo", 0 };
 		static inline const MaterialImageType NORMALS_TYPE = { "Normals", 1 };
-		//static inline const MaterialImageType ORM_TYPE = { "ORM", 2 };
-		static inline const MaterialImageType AO_TYPE = { "AO", 2 };
-		static inline const MaterialImageType ROUGHNESS_TYPE = { "Roughness", 3 };
-		static inline const MaterialImageType METALLIC_TYPE = { "Metallic", 4 };
-		static inline const MaterialImageType EMISSIVE_TYPE = { "Emissive", 5 };
+		static inline const MaterialImageType ORM_TYPE = { "ORM", 2 };
+		static inline const MaterialImageType AO_TYPE = { "AO", 3 };
+		static inline const MaterialImageType ROUGHNESS_TYPE = { "Roughness", 4 };
+		static inline const MaterialImageType METALLIC_TYPE = { "Metallic", 5 };
+		static inline const MaterialImageType EMISSIVE_TYPE = { "Emissive", 6 };
 	private:
 
 		RenderDevicePBRMaterialData m_MaterialData;

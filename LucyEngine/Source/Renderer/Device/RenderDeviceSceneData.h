@@ -62,6 +62,7 @@ namespace Lucy {
 
         RenderDeviceTextureResource AlbedoMap;
         RenderDeviceTextureResource NormalMap;
+        RenderDeviceTextureResource ORMMap;
         RenderDeviceTextureResource AOMap;
         RenderDeviceTextureResource RoughnessMap;
         RenderDeviceTextureResource MetallicMap;
@@ -78,10 +79,10 @@ namespace Lucy {
             &RenderDevicePBRMaterialData::ORME,
             &RenderDevicePBRMaterialData::AlbedoMap,
             &RenderDevicePBRMaterialData::NormalMap,
+            &RenderDevicePBRMaterialData::ORMMap,
             &RenderDevicePBRMaterialData::AOMap,
             &RenderDevicePBRMaterialData::RoughnessMap,
             &RenderDevicePBRMaterialData::MetallicMap,
-            //&RenderDevicePBRMaterialData::ORMMap,
             &RenderDevicePBRMaterialData::EmissiveMap,
             &RenderDevicePBRMaterialData::NormalStrength
         >{};

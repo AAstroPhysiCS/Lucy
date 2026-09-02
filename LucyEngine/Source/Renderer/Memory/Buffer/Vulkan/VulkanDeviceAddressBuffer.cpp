@@ -19,12 +19,13 @@ namespace Lucy {
         VkBufferUsageFlags vulkanUsage = ToVulkanBufferUsage(GetUsage());
         vulkanUsage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
         auto memoryUsage = GetCreateInfo().MemoryUsage;
+		auto sharingMode = GetCreateInfo().ShareAmongQueues ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
 
         if (memoryUsage == MemoryUsage::GPUOnly) {
-            auto result = vulkanDevice->GetAllocator().CreateVulkanBufferVma(memoryUsage, GetSize(), vulkanUsage | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, false, m_Buffer, m_Allocation);
+            auto result = vulkanDevice->GetAllocator().CreateVulkanBufferVma(memoryUsage, GetSize(), vulkanUsage | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, false, m_Buffer, m_Allocation, sharingMode);
             m_MappedData = result.pMappedData;
         } else {
-            auto result = vulkanDevice->GetAllocator().CreateVulkanBufferVma(memoryUsage, GetSize(), vulkanUsage | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, true, m_Buffer, m_Allocation);
+            auto result = vulkanDevice->GetAllocator().CreateVulkanBufferVma(memoryUsage, GetSize(), vulkanUsage | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, true, m_Buffer, m_Allocation, sharingMode);
             m_MappedData = result.pMappedData;
         }
 

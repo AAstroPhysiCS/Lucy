@@ -73,7 +73,7 @@ namespace Lucy::VulkanAPI {
 
 	VkImageCreateInfo ImageCreateInfo(VkImageType imageType, VkExtent3D extent, uint32_t mipLevels, uint32_t arrayLayers,
 									  VkFormat format, VkImageTiling tiling, VkImageLayout initialLayout, VkImageUsageFlags usage,
-									  VkSharingMode sharingMode, VkSampleCountFlagBits samples, VkImageCreateFlags flags);
+									  VkSharingMode sharingMode, VkSampleCountFlagBits samples, uint32_t queueFamilyIndexCount = 0, const uint32_t* const pQueueFamilyIndices = nullptr, VkImageCreateFlags flags = 0);
 	VkImageViewCreateInfo ImageViewCreateInfo(VkImage image, VkImageViewType viewType, VkFormat format, VkImageSubresourceRange subresourceRange, VkComponentMapping components);
 	VkImageBlit ImageBlit(VkImageSubresourceLayers srcSubresource, VkOffset3D srcOffsets[2], VkImageSubresourceLayers dstSubresource, VkOffset3D dstOffsets[2]);
 	VkImageSubresourceLayers ImageSubresourceLayers(VkImageAspectFlags aspectMask, uint32_t mipLevel, uint32_t baseArrayLayer, uint32_t layerCount);

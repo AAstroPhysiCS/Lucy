@@ -81,7 +81,7 @@ namespace Lucy {
 		ImGuizmo::SetDrawlist();
 		ImGuizmo::SetRect(windowPos.x, windowPos.y, ImGui::GetWindowWidth(), ImGui::GetWindowHeight());
 
-		Entity& e = SceneExplorerPanel::GetInstance().GetEntityContext();
+		Entity e = SceneExplorerPanel::GetInstance().GetEntityContext();
 		if (e.IsValid()) {
 			const auto& scene = SceneExplorerPanel::GetInstance().GetActiveScene();
 			TransformComponent& t = e.GetComponent<TransformComponent>();

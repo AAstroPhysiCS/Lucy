@@ -28,7 +28,7 @@ namespace Lucy {
 				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, frames * 4 },
 				{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, sampledImageBindlessBindings * maxBindlessSampledImages },
 				{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, storageImageBindlessBindings * maxBindlessStorageImages },
-				{ VK_DESCRIPTOR_TYPE_SAMPLER, samplerBindlessBindings * maxBindlessSamplers },
+				{ VK_DESCRIPTOR_TYPE_SAMPLER, 16 },
 				{ VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, frames * 16 }
 			};
 
@@ -63,18 +63,6 @@ namespace Lucy {
 
 			m_PerShaderDescriptorPool = Memory::CreateRef<VulkanDescriptorPool>(poolCreateInfo);
 		}
-
-		m_DefaultSamplerHandle = m_RenderDevice->CreateSampler(ImageSamplerCreateInfo{
-			.MipmapEnabled = true,
-			.MipmapLevel = 11,
-			.Parameter = {
-				.U = ImageAddressMode::REPEAT,
-				.V = ImageAddressMode::REPEAT,
-				.W = ImageAddressMode::REPEAT,
-				.Min = ImageFilterMode::LINEAR,
-				.Mag = ImageFilterMode::LINEAR,
-			},
-		});
 	}
 
 	void VulkanDescriptorSetManager::RegisterShaderBindings(const Ref<Shader>& shader) {
@@ -84,7 +72,7 @@ namespace Lucy {
 		const auto CreateDescriptorSet = [&](auto& descriptorSets, const auto& descriptorPool, const auto& createInfo) {
 			RenderDeviceResourceHandle descriptorSetHandle = m_RenderDevice->CreateDescriptorSet(createInfo);
 			const auto& descriptorSet = m_RenderDevice->AccessResource<VulkanDescriptorSet>(descriptorSetHandle);
-			descriptorSet->RTBake(descriptorPool, m_RenderDevice);
+			descriptorSet->Bake(descriptorPool, m_RenderDevice);
 			descriptorSets.try_emplace(createInfo.SetIndex, descriptorSetHandle);
 		};
 
@@ -108,6 +96,8 @@ namespace Lucy {
 			if (set == TEXTURE_BINDLESS_TABLE_SET_INDEX || set == GLOBAL_PER_FRAME_SET_INDEX)
 				continue;
 
+			for (auto& variable : createInfo.ShaderVariables)
+				variable.StageFlag |= VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 			CreateDescriptorSet(m_DescriptorSetsPerShader, m_PerShaderDescriptorPool, createInfo);
 		}
 

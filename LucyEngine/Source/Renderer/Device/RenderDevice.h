@@ -79,6 +79,11 @@ namespace Lucy {
 		[[nodiscard]] virtual RenderDeviceTextureHandle BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<ComputePipeline>& pipeline, const Ref<Image>& image, uint32_t mip) = 0;
 
 		[[nodiscard]] const Unique<RenderDeviceScene>& GetScene() { return m_DeviceScene; }
+
+		const RenderDeviceResourceHandle& GetLinearRepeatSampler() const { return m_LinearRepeatSampler; }
+		const RenderDeviceResourceHandle& GetLinearClampSampler() const { return m_LinearClampSampler; }
+		const RenderDeviceResourceHandle& GetNearestRepeatSampler() const { return m_NearestRepeatSampler; }
+		const RenderDeviceResourceHandle& GetNearestClampSampler() const { return m_NearestClampSampler; }
 #pragma region ResourceManager
 		[[nodiscard]] RenderDeviceResourceHandle CreateGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo, const Ref<Shader>& shader);
 		[[nodiscard]] RenderDeviceResourceHandle CreateComputePipeline(const ComputePipelineCreateInfo& createInfo, const Ref<Shader>& shader);
@@ -109,8 +114,8 @@ namespace Lucy {
 		[[nodiscard]] bool IsValidResource(RenderDeviceResourceHandle handle) const;
 		void RTDestroyResource(RenderDeviceResourceHandle& handle);
 #pragma endregion ResourceManager
-		void CreatePipelineDeviceQueries(size_t pipelineCount);
-		void CreateTimestampDeviceQueries(size_t passCount);
+		void CreateQueries(size_t pipelineCount, size_t passCount);
+		virtual void CreateDeviceResources();
 
 		[[nodiscard]] uint32_t RTBeginTimestamp(Ref<CommandPool> cmdPool);
 		[[nodiscard]] uint32_t RTEndTimestamp(Ref<CommandPool> cmdPool);
@@ -179,7 +184,7 @@ namespace Lucy {
 		virtual void BeginDebugMarker(Ref<CommandPool> cmdPool, const char* labelName) = 0;
 		virtual void EndDebugMarker(Ref<CommandPool> cmdPool) = 0;
 
-		virtual void Destroy() = 0;
+		virtual void Destroy();
 	private:
 		RenderDeviceResourceManager m_ResourceManager{ this };
 	protected:
@@ -187,6 +192,10 @@ namespace Lucy {
 
 		Ref<RenderDeviceQuery> m_RenderDeviceTimestampQuery = nullptr; //initialized after we call CreateDeviceQueries
 		Ref<RenderDeviceQuery> m_RenderDevicePipelineQuery = nullptr;
+
+		RenderDeviceResourceHandle m_LinearRepeatSampler{};
+		RenderDeviceResourceHandle m_LinearClampSampler{};
+		RenderDeviceResourceHandle m_NearestRepeatSampler{};
+		RenderDeviceResourceHandle m_NearestClampSampler{};
 	};
 }
-

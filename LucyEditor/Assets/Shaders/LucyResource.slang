@@ -98,10 +98,10 @@ public struct PBRMaterial {
 
     GPUTextureResource AlbedoMap;
     GPUTextureResource NormalMap;
+    GPUTextureResource ORMMap;
     GPUTextureResource AOMap;
     GPUTextureResource RoughnessMap;
     GPUTextureResource MetallicMap;
-    //GPUTextureResource ORMMap;
     GPUTextureResource EmissiveMap;
 
     float NormalStrength = 1.0f;
@@ -119,6 +119,29 @@ public struct PBRMaterial {
         result.Roughness = ORME.y;
         result.Metallic = ORME.z;
 
+        if (HasNormalMap()) {
+            float2 normalXY = NormalMap.Sample2DTexture(uv).xy * 2.0f - 1.0f;
+            normalXY *= NormalStrength;
+            // basically x^2 + y^2 + z^2 = 1 -> z = sqrt(1 - x^2 - y^2)
+            // we need this for BC5 normals (bistro etc...)
+            float normalZ = sqrt(saturate(1.0f - dot(normalXY, normalXY)));
+            result.NormalTS = normalize(float3(normalXY, normalZ));
+        }
+
+        float3 emissive = EmissiveMap.Sample2DTexture(uv, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+        result.EmissiveColorAndStrength = float4(emissive, ORME.w);
+        result.AlphaCutoff = AlphaCutoff;
+
+        if (ORMMap.IsValid()) {
+            float3 orm = ORMMap.Sample2DTexture(uv, ORME).xyz;
+
+            result.AO = orm.r;
+            result.Roughness = orm.g;
+            result.Metallic = orm.b;
+
+            return result;
+        }
+
         if (AOMap.IsValid()) {
             float3 ao = AOMap.Sample2DTexture(uv).xyz;
             result.AO *= ao.r;
@@ -134,36 +157,12 @@ public struct PBRMaterial {
             result.Metallic *= m.b;
         }
 
-        /*
-        if (ORMMap.IsValid()) {
-            float3 orm = ORMMap.Sample2DTexture(uv, ORME).xyz;
-
-            result.AO *= orm.r;
-            result.Roughness *= orm.g;
-            result.Metallic *= orm.b;
-        }*/
-
-        if (HasNormalMap()) {
-            float2 normalXY = NormalMap.Sample2DTexture(uv).xy * 2.0f - 1.0f;
-            normalXY *= NormalStrength;
-            // basically x^2 + y^2 + z^2 = 1 -> z = sqrt(1 - x^2 - y^2)
-            // we need this for BC5 normals (bistro etc...)
-            float normalZ = sqrt(saturate(1.0f - dot(normalXY, normalXY)));
-            result.NormalTS = normalize(float3(normalXY, normalZ));
-        }
-
-        float3 emissive = EmissiveMap.Sample2DTexture(uv, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
-        result.EmissiveColorAndStrength = float4(emissive, ORME.w);
-
-        result.AlphaCutoff = AlphaCutoff;
-
         return result;
     }
 };
 
 struct GPUVertex {
     float3 Position;
-    float3 MeshID;
     float2 TextureCoords;
     float3 Normals;
     float3 Tangents;

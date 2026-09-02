@@ -493,7 +493,7 @@ namespace Lucy {
 	}
 
 	void VulkanRayTracingPipeline::RTRecreate(Ref<Shader> shader) {
-		
+		LUCY_ASSERT(false); //TODO:
 	}
 
 	void VulkanRayTracingPipeline::RTTrace(void* commandBufferHandle, uint32_t width, uint32_t height, uint32_t depth) {
@@ -502,17 +502,6 @@ namespace Lucy {
 
 	void VulkanRayTracingPipeline::RTBind(void* commandBufferHandle) {
 		vkCmdBindPipeline(static_cast<VkCommandBuffer>(commandBufferHandle), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, m_PipelineHandle);
-	}
-
-	void VulkanRayTracingPipeline::RTUpdateAccelerationStructure(RenderDevice* device, const std::string& name, const Ref<AccelerationStructure>& accelerationStructure) {
-		for (const auto& handle : m_DescriptorSetHandles) {
-			const auto& descriptorSet = device->AccessResource<VulkanDescriptorSet>(handle);
-			if (!descriptorSet->HasAccelerationStructureBinding(name))
-				continue;
-			descriptorSet->RTUpdateAccelerationStructure(device, name, accelerationStructure);
-			return;
-		}
-		LUCY_ASSERT(false, "Acceleration structure binding '{0}' does not exist", name);
 	}
 
 	void VulkanRayTracingPipeline::RTDestroyResource(RenderDevice* device) {

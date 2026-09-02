@@ -45,6 +45,7 @@ namespace Lucy {
         RenderDeviceSize Size = 0;
         BufferUsage Usage = BufferUsage::None;
         MemoryUsage MemoryUsage = MemoryUsage::GPUOnly;
+		bool ShareAmongQueues = false;
     };
 
     class RenderDeviceBuffer : public RenderDeviceResource {

@@ -8,6 +8,7 @@ struct VertexOutput {
     [[vk::location(3)]] float4 a_TangentWSOut : TANGENT0;
     [[vk::location(4)]] float a_ViewDepthOut : TEXCOORD1;
     [[vk::location(5)]] uint a_MaterialID : TEXCOORD2;
+    [[vk::location(6)]] uint a_ObjectID : TEXCOORD3;
 };
 
 struct LocalPushConstant {
@@ -51,6 +52,7 @@ VertexOutput main(uint vertexIndex: SV_VulkanVertexID, uint drawIndex: SV_Vulkan
     output.a_TangentWSOut = float4(T, handedness);
     output.a_ViewDepthOut = viewPos.z;
     output.a_MaterialID = submesh.Draw.w;
+    output.a_ObjectID = visibleDraw.ObjectIndex;
 
     return output;
 }
@@ -65,10 +67,12 @@ struct PixelInput {
     [[vk::location(3)]] float4 a_TangentWSOut : TANGENT0;
     [[vk::location(4)]] float a_ViewDepthOut : TEXCOORD1;
     [[vk::location(5)]] uint a_MaterialID : TEXCOORD2;
+    [[vk::location(6)]] uint a_ObjectID : TEXCOORD3;
 };
 
 struct PixelOutput {
     [[vk::location(0)]] float4 a_Color : SV_Target0;
+    [[vk::location(1)]] uint a_ObjectID : SV_Target1;
 };
 
 static const int NULL_TEXTURE_SLOT = -1;
@@ -213,15 +217,17 @@ PixelOutput main(PixelInput input) {
     float2 brdf = PushConstants.Data.u_PBRTextureResources[2].Sample2DTexture_Float2(float2(NdotV, materialSample.Roughness));
 
     // Indirect diffuse (ambient term) — AO affects only diffuse IBL
-    float3 diffuseIBL = PushConstants.Data.u_PBRTextureResources[3].SampleCubeTexture(normalsWS).rgb * materialSample.BaseColor.rgb * materialSample.AO * kD;
+    float3 diffuseIBL = PushConstants.Data.u_PBRTextureResources[3].SampleCubeTexture(normalsWS).rgb * materialSample.BaseColor.rgb * kD;
     // Indirect specular (prefiltered env map * BRDF LUT)
     float3 specularIBL = prefilterColor * (F0 * brdf.x + brdf.y);
 
     float3 ibl = diffuseIBL + specularIBL;
-    float3 outputColor = ibl + directLight;
+    float3 emissive = materialSample.EmissiveColorAndStrength.rgb * materialSample.EmissiveColorAndStrength.a;
+    float3 outputColor = ibl + directLight + emissive;
 
     outputColor = pow(outputColor, float3(1.0f / gamma));
     output.a_Color = float4(outputColor, alpha);
+    output.a_ObjectID = input.a_ObjectID + 1; //hacky workaround ik
 
     if (DEBUG_CASCADED_SHADOW_MAPS)
         output.a_Color = shadow;

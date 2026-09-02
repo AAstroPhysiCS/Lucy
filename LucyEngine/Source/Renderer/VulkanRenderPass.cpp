@@ -77,6 +77,8 @@ namespace Lucy {
 																			(uint32_t)subpassDependencies.size(), subpassDependencies.data());
 		m_AttachmentCount = createInfo.attachmentCount;
 		m_ColorAttachmentCount = (uint32_t)colorAttachments.size();
+		m_ColorAttachmentFormats = colorAttachments | std::views::transform([](const RenderPassLayout::Attachment& attachment) { return attachment.Format; }) | 
+			std::ranges::to<std::vector<ImageFormat>>();
 
 		VkRenderPassMultiviewCreateInfo renderPassMultiview = VulkanAPI::RenderPassMultiviewCreateInfo(createInfo.subpassCount, &m_CreateInfo.Multiview.ViewMask, 1, &m_CreateInfo.Multiview.CorrelationMask);
 		if (m_CreateInfo.Multiview.IsValid())

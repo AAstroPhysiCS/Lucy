@@ -23,19 +23,18 @@ namespace Lucy {
 		m_Image(std::exchange(other.m_Image, VK_NULL_HANDLE)),
 		m_ImageVma(std::exchange(other.m_ImageVma, VK_NULL_HANDLE)),
 		m_CurrentLayout(std::exchange(other.m_CurrentLayout, VK_IMAGE_LAYOUT_UNDEFINED)),
-		m_ImageView(std::move(other.m_ImageView)),
-		m_SamplerHandle(std::exchange(other.m_SamplerHandle, {})) {
+		m_ImageView(std::move(other.m_ImageView)) {
 	}
 
 	VulkanImage& VulkanImage::operator=(VulkanImage&& other) noexcept {
 		if (this == &other)
 			return *this;
+		Image::operator=(std::move(other));
 
 		m_Image = std::exchange(other.m_Image, VK_NULL_HANDLE);
 		m_ImageVma = std::exchange(other.m_ImageVma, VK_NULL_HANDLE);
 		m_CurrentLayout = std::exchange(other.m_CurrentLayout, VK_IMAGE_LAYOUT_UNDEFINED);
 		m_ImageView = std::move(other.m_ImageView);
-		m_SamplerHandle = std::exchange(other.m_SamplerHandle, {});
 
 		return *this;
 	}
@@ -67,6 +66,24 @@ namespace Lucy {
 
 	void VulkanImage::CopyImageToBufferImmediate(const VkBuffer& bufferToCopy, uint32_t layerCount) {
 		CopyImageToBufferImmediate(m_Image, bufferToCopy, layerCount);
+	}
+
+	void VulkanImage::CopyPixelToBufferImmediate(const VkBuffer& bufferToCopy, uint32_t x, uint32_t y) {
+		Renderer::SubmitImmediateCommand([=, this](VkCommandBuffer commandBuffer) {
+			VkBufferImageCopy copyRegion{};
+			copyRegion.bufferOffset = 0;
+			copyRegion.bufferRowLength = 0;
+			copyRegion.bufferImageHeight = 0;
+			copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			copyRegion.imageSubresource.mipLevel = 0;
+			copyRegion.imageSubresource.baseArrayLayer = 0;
+			copyRegion.imageSubresource.layerCount = 1;
+
+			copyRegion.imageOffset = { static_cast<int32_t>(x), static_cast<int32_t>(y), 0 };
+			copyRegion.imageExtent = { 1, 1, 1 };
+
+			vkCmdCopyImageToBuffer(commandBuffer, GetVulkanHandle(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, bufferToCopy, 1, &copyRegion);
+		});
 	}
 
 	void VulkanImage::AddLabel(VkImage image, const Ref<VulkanRenderDevice>& device) {
@@ -252,22 +269,6 @@ namespace Lucy {
 		imageView = VulkanImageView{ imageViewCreateInfo, vulkanDevice, GetDebugName() };
 	}
 
-	void VulkanImage::RTCreateSampler(const Ref<VulkanRenderDevice>& device) {
-		if (!m_CreateInfo.GenerateSampler)
-			return;
-		m_SamplerHandle = device->CreateSampler(ImageSamplerCreateInfo{
-			.MipmapEnabled = true,
-			.MipmapLevel = (float)m_MaxMipLevel,
-			.Parameter = {
-				.U = ImageAddressMode::REPEAT,
-				.V = ImageAddressMode::REPEAT,
-				.W = ImageAddressMode::REPEAT,
-				.Min = ImageFilterMode::LINEAR,
-				.Mag = ImageFilterMode::LINEAR,
-			},
-		});
-	}
-
 	VulkanImageView::VulkanImageView(const ImageViewCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device, std::string_view debugName)
 		: m_CreateInfo(createInfo), m_VulkanDevice(device), m_DebugName(debugName) {
 		RTCreateView();
@@ -434,27 +435,24 @@ namespace Lucy {
 		return flags;
 	}
 
-	VkImageLayout VulkanImage::GetInitialImageLayout() {
-		VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
-
+	VkImageLayout VulkanImage::GetPreferredLayout() const {
 		switch (m_CreateInfo.ImageUsage) {
 			case ImageUsage::AsTexture:
+				return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			case ImageUsage::AsColorAttachment:
 			case ImageUsage::AsColorTransientAttachment:
 			case ImageUsage::AsColorTransferAttachment:
-				layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				break;
+				return m_CreateInfo.GenerateSampler
+					? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+					: VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 			case ImageUsage::AsDepthAttachment:
-				layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-				break;
+				return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 			case ImageUsage::AsColorStorageTransferAttachment:
-				layout = VK_IMAGE_LAYOUT_GENERAL;
-				break;
+				return VK_IMAGE_LAYOUT_GENERAL;
 			default:
 				LUCY_ASSERT(false);
+				return VK_IMAGE_LAYOUT_UNDEFINED;
 		}
-
-		return layout;
 	}
 
 	uint32_t GetAPIImageFormat(ImageFormat format) {

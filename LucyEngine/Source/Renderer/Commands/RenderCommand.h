@@ -61,7 +61,6 @@ namespace Lucy {
 		void CopyBufferToImage(Ref<ByteBuffer> srcBuffer, Ref<Image> destImage);
 		void CopyImageToBuffer(Ref<Image> srcImage, Ref<ByteBuffer> destBuffer);
 #pragma endregion Image
-
 		[[nodiscard]] RenderDeviceTextureHandle BindImageHandleTo(const std::string& imageBufferName, const Ref<Image>& image, uint32_t mip = -1);
 
 		void FillBuffer(Ref<RenderDeviceBuffer> buffer, size_t offset, size_t size, uint32_t value);
@@ -122,6 +121,11 @@ namespace Lucy {
 
 		void DispatchCompute(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
 		void DispatchComputeIndirect(const Ref<RenderDeviceBuffer>& resource, size_t offset);
+
+		const RenderDeviceResourceHandle& GetLinearRepeatSampler() const { return m_RenderDevice->GetLinearRepeatSampler(); }
+		const RenderDeviceResourceHandle& GetLinearClampSampler() const { return m_RenderDevice->GetLinearClampSampler(); }
+		const RenderDeviceResourceHandle& GetNearestRepeatSampler() const { return m_RenderDevice->GetNearestRepeatSampler(); }
+		const RenderDeviceResourceHandle& GetNearestClampSampler() const { return m_RenderDevice->GetNearestClampSampler(); }
 	private:
 		RenderDeviceResourceHandle GetGlobalIndexBufferHandle() const;
 

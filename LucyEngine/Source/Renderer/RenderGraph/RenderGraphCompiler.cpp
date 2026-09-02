@@ -43,13 +43,23 @@ namespace Lucy {
 			};
 		};
 
+		const auto GetImageLayout = [](RenderGraphResourceAccess access, const Ref<VulkanImage>& image) {
+			switch (access) {
+				case RenderGraphResourceAccess::ColorAttachmentWrite:
+				case RenderGraphResourceAccess::DepthAttachmentWrite:
+					return image->GetPreferredLayout();
+				default:
+					return ToImageLayout(access, image->GetFormat() == ImageFormat::D32_SFLOAT);
+			}
+		};
+
 		const auto CreateSameQueueImageBarrier = [&](TargetQueueFamily queueFamily, const Ref<VulkanImage>& image, RenderGraphResourceAccess srcAccess, RenderGraphResourceAccess dstAccess) {
 			const bool isDepth = image->GetFormat() == ImageFormat::D32_SFLOAT;
 			return VkImageMemoryBarrier2{
 				VulkanAPI::VulkanPipelineBarrier(
 					image->GetVulkanHandle(),
-					ToImageLayout(srcAccess, isDepth),
-					ToImageLayout(dstAccess, isDepth),
+					GetImageLayout(srcAccess, image),
+					GetImageLayout(dstAccess, image),
 					CreateImageRange(image),
 					ToStageMask(srcAccess, queueFamily),
 					ToStageMask(dstAccess, queueFamily),
@@ -66,8 +76,8 @@ namespace Lucy {
 			return VkImageMemoryBarrier2{
 				VulkanAPI::VulkanPipelineBarrier(
 					image->GetVulkanHandle(),
-					ToImageLayout(srcAccess, isDepth),
-					ToImageLayout(dstAccess, isDepth),
+					GetImageLayout(srcAccess, image),
+					GetImageLayout(dstAccess, image),
 					CreateImageRange(image),
 					ToStageMask(srcAccess, srcQueue),
 					VK_PIPELINE_STAGE_2_NONE,
@@ -84,8 +94,8 @@ namespace Lucy {
 			return VkImageMemoryBarrier2{
 				VulkanAPI::VulkanPipelineBarrier(
 					image->GetVulkanHandle(),
-					ToImageLayout(srcAccess, isDepth),
-					ToImageLayout(dstAccess, isDepth),
+					GetImageLayout(srcAccess, image),
+					GetImageLayout(dstAccess, image),
 					CreateImageRange(image),
 					VK_PIPELINE_STAGE_2_NONE,
 					ToStageMask(dstAccess, dstQueue),
@@ -165,17 +175,24 @@ namespace Lucy {
 
 		auto& idProvider = GetExecutionBatchIDProvider();
 
-		for (auto& rgBatch : batches) {
+		std::vector<ExecutionBatchID> executionBatchIDs;
+		executionBatchIDs.resize(batches.size());
+
+		for (size_t batchIndex = 0; batchIndex < batches.size(); batchIndex++) {
+			const RenderGraphBatch& rgBatch = batches[batchIndex];
 			TargetQueueFamily family = rgBatch.Passes[0]->GetTargetQueueFamily();
 
 			ExecutionBatch batch = VulkanExecutionBatch{
 				.QueueFamily = family,
-				.Passes = std::move(rgBatch.Passes),
+				.Passes = rgBatch.Passes,
+				.SignalRequired = rgBatch.SignalRequired
 			};
+
 			batch.ID = idProvider.RequestID();
+			executionBatchIDs[batchIndex] = batch.ID;
 
 			auto& vkBatch = batch.AsVulkanBatch();
-
+			
 			// Same-queue barriers execute immediately before their destination pass
 			for (const auto& br : rgBatch.IntraQueueTransition) {
 				auto it = std::ranges::find_if(vkBatch.PassBarriers, [&](const VulkanPassBarrier& barrier) {
@@ -234,6 +251,53 @@ namespace Lucy {
 			}
 
 			result.emplace_back(std::move(batch));
+		}
+
+		for (size_t batchIndex = 0; batchIndex < batches.size(); batchIndex++) {
+			const RenderGraphBatch& rgBatch = batches[batchIndex];
+			VulkanExecutionBatch& vkBatch = result[batchIndex].AsVulkanBatch();
+			vkBatch.Dependencies.reserve(rgBatch.Dependencies.size());
+
+			for (size_t dependencyBatchIndex : rgBatch.Dependencies) {
+				LUCY_ASSERT(dependencyBatchIndex < batches.size());
+
+				VkPipelineStageFlags2 waitStageMask = VK_PIPELINE_STAGE_2_NONE;
+				const RenderGraphBatch& dependencyBatch = batches[dependencyBatchIndex];
+
+				for (const auto& transition : rgBatch.IncomingInterQueueTransitions) {
+					const bool comesFromDependencyBatch = std::ranges::find(dependencyBatch.Passes, transition.SrcPass) != dependencyBatch.Passes.end();
+					if (!comesFromDependencyBatch)
+						continue;
+
+					waitStageMask |= ToStageMask(transition.DstAccess, transition.DstQueue);
+				}
+
+				/*
+				 * There should normally be an incoming transition for every physical
+				 * cross-queue resource dependency.
+				 *
+				 * Keep a conservative fallback so a logical dependency can never become
+				 * an empty Vulkan semaphore wait stage.
+				 */
+				if (waitStageMask == VK_PIPELINE_STAGE_2_NONE) {
+					switch (vkBatch.QueueFamily) {
+						case TargetQueueFamily::Graphics:
+							waitStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+							break;
+						case TargetQueueFamily::Compute:
+							waitStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+							break;
+						case TargetQueueFamily::Transfer:
+							waitStageMask = VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT;
+							break;
+						default:
+							LUCY_ASSERT(false);
+							break;
+					}
+				}
+
+				vkBatch.Dependencies.emplace_back(VulkanBatchDependency{ .SourceBatchID = executionBatchIDs[dependencyBatchIndex], .WaitStageMask = waitStageMask });
+			}
 		}
 
 		return result;

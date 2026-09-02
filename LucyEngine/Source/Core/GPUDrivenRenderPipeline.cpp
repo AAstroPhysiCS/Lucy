@@ -23,12 +23,12 @@ namespace Lucy {
 		m_MainCullViewHandle = deviceScene->RegisterCullView({});
 
 		Renderer::AddRendererPass<GPUDrivenRendererPass>(createInfo.RenderDevice);
-		Renderer::AddRendererPass<ForwardPBRPass>(scene, viewportWidth, viewportHeight);
 		Renderer::AddRendererPass<CubemapPass>(scene, viewportWidth, viewportHeight);
 		Renderer::AddRendererPass<IrradiancePass>(scene, CubemapPass::HDRImageSize);
 		Renderer::AddRendererPass<BRDFLutPass>(512);
 		Renderer::AddRendererPass<PrefilterPass>(scene, CubemapPass::HDRImageSize);
 		Renderer::AddRendererPass<ShadowPass>(createInfo.RenderDevice, scene, 2048);
+		Renderer::AddRendererPass<ForwardPBRPass>(scene, viewportWidth, viewportHeight);
 		Renderer::AddRendererPass<DDGIPass>(viewportWidth, viewportHeight);
 	}
 

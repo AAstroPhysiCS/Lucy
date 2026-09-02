@@ -11,8 +11,7 @@ namespace Lucy {
 
 		void OnEvent(Event& e) final override;
 
-		void SetEntityContext(Entity e);
-		inline Entity& GetEntityContext() { return m_EntityContext; }
+		Entity GetEntityContext() { return m_Scene->GetEntityContext(); }
 
 		void SetScene(Ref<Scene> scene);
 		inline Ref<Scene> GetActiveScene() { return m_Scene; }
@@ -22,7 +21,6 @@ namespace Lucy {
 
 		void Render();
 
-		Entity m_EntityContext;
 		Ref<Scene> m_Scene = nullptr;
 	};
 }

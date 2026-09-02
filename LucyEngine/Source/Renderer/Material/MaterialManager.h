@@ -33,6 +33,8 @@ namespace Lucy {
 
 		std::map<RenderDeviceObjectHandle, Ref<Material>> m_Materials;
 
+		std::unordered_map<std::filesystem::path, RenderDeviceResourceHandle> m_TextureCache;
+
 		const Unique<PipelineManager>& m_PipelineManager; //we need this to create materials bcs it references pipelines
 	};
 }

@@ -14,7 +14,7 @@ namespace Lucy {
 		bool IsInFlight = false;
 		
 		RenderDeviceResourceHandle RenderPassHandle{};
-		std::vector<RenderDeviceResourceHandle> ImageBufferHandles;
+		std::vector<std::vector<RenderDeviceResourceHandle>> ImageBufferHandles;
 		std::vector<RenderDeviceResourceHandle> DepthImageHandles;
 	};
 

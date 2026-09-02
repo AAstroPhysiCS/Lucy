@@ -95,14 +95,20 @@ namespace Lucy {
 
 		RenderGraphPass* SrcPass = nullptr;
 		RenderGraphPass* DstPass = nullptr;
+
+		size_t SrcBatchIndex = 0;
 	};
 
 	struct RenderGraphBatch {
 		std::vector<RenderGraphPass*> Passes;
+		std::vector<size_t> Dependencies;
+
 		std::vector<RenderGraphInterQueueTransition> IncomingInterQueueTransitions; //acquire
 		std::vector<RenderGraphInterQueueTransition> OutgoingInterQueueTransitions; //release
 
 		std::vector<RenderGraphIntraQueueTransition> IntraQueueTransition;
+
+		bool SignalRequired = false;
 	};
 
 	using RenderGraphBatches = std::vector<RenderGraphBatch>;

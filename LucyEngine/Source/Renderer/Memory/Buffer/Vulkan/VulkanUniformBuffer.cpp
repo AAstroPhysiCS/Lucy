@@ -16,9 +16,11 @@ namespace Lucy {
 		m_Buffers.resize(maxFramesInFlight, VK_NULL_HANDLE);
 		m_BufferVma.resize(maxFramesInFlight, VK_NULL_HANDLE);
 
+		auto sharingMode = m_CreateInfo.SharedAmongQueues ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
+
 		VulkanAllocator& allocator = device->GetAllocator();
 		for (uint32_t i = 0; i < maxFramesInFlight; i++)
-			allocator.CreateVulkanBufferVma(MemoryUsage::CPUOnly, m_CreateInfo.BufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, false, m_Buffers[i], m_BufferVma[i]);
+			allocator.CreateVulkanBufferVma(MemoryUsage::CPUOnly, m_CreateInfo.BufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, false, m_Buffers[i], m_BufferVma[i], sharingMode);
 	}
 
 	void VulkanUniformBuffer::RTLoadToDevice(RenderDevice* device) {

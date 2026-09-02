@@ -21,27 +21,32 @@ namespace Lucy {
 
 		const auto& albedo = HasImage(PBRMaterial::ALBEDO_TYPE) ? GetImage(PBRMaterial::ALBEDO_TYPE) : nullptr;
 		const auto& normals = HasImage(PBRMaterial::NORMALS_TYPE) ? GetImage(PBRMaterial::NORMALS_TYPE) : nullptr;
-		const auto& metallic = HasImage(PBRMaterial::METALLIC_TYPE) ? GetImage(PBRMaterial::METALLIC_TYPE) : nullptr;
-		const auto& roughness = HasImage(PBRMaterial::ROUGHNESS_TYPE) ? GetImage(PBRMaterial::ROUGHNESS_TYPE) : nullptr;
-		const auto& ao = HasImage(PBRMaterial::AO_TYPE) ? GetImage(PBRMaterial::AO_TYPE) : nullptr;
-		//const auto& orm = HasImage(PBRMaterial::ORM_TYPE) ? GetImage(PBRMaterial::ORM_TYPE) : nullptr;
+		const auto& orm = HasImage(PBRMaterial::ORM_TYPE) ? GetImage(PBRMaterial::ORM_TYPE) : nullptr;
 
 		const auto BindTexture = [&](const Ref<Image>& image, RenderDeviceTextureResource& resource) {
 			if (!image) {
 				resource.TextureIndex = INVALID_INDEX;
 				resource.SamplerIndex = INVALID_INDEX;
-				return;
+				return false;
 			}
 
 			resource.TextureIndex = device->BindGlobalImageHandleTo("Textures2D", pipeline, image, -1);
-			resource.SamplerIndex = 0;
+			resource.SamplerIndex = image->GetSamplerHandle();
+			return true;
 		};
 
 		BindTexture(albedo, m_MaterialData.AlbedoMap);
 		BindTexture(normals, m_MaterialData.NormalMap);
-		BindTexture(metallic, m_MaterialData.MetallicMap);
-		BindTexture(roughness, m_MaterialData.RoughnessMap);
-		BindTexture(ao, m_MaterialData.AOMap);
+		bool ormBound = BindTexture(orm, m_MaterialData.ORMMap);
+		if (!ormBound) {
+			const auto& metallic = HasImage(PBRMaterial::METALLIC_TYPE) ? GetImage(PBRMaterial::METALLIC_TYPE) : nullptr;
+			const auto& roughness = HasImage(PBRMaterial::ROUGHNESS_TYPE) ? GetImage(PBRMaterial::ROUGHNESS_TYPE) : nullptr;
+			const auto& ao = HasImage(PBRMaterial::AO_TYPE) ? GetImage(PBRMaterial::AO_TYPE) : nullptr;
+
+			BindTexture(metallic, m_MaterialData.MetallicMap);
+			BindTexture(roughness, m_MaterialData.RoughnessMap);
+			BindTexture(ao, m_MaterialData.AOMap);
+		}
 
 		return m_MaterialData;
 	}

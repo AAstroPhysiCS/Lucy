@@ -17,6 +17,7 @@ namespace Lucy {
 		DescriptorType Type = UndefinedDescriptorType;
 		std::vector<ShaderBlockLayoutElement> ShaderChildrenVariables;
 		std::vector<ShaderMemberVariable> ShaderMemberVariables;
+		bool SharedAmongQueues = false;
 	};
 
 	class UniformBuffer : public ByteBuffer, public RenderDeviceResource {

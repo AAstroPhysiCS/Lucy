@@ -44,12 +44,22 @@ namespace Lucy {
 
 		VkPipelineMultisampleStateCreateInfo multisamplingCreateInfo = VulkanAPI::PipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT);
 
-		VkPipelineColorBlendAttachmentState colorBlendAttachment = 
-			VulkanAPI::PipelineColorBlendAttachmentState(m_CreateInfo.BlendConfiguration.BlendEnable,
-			m_CreateInfo.BlendConfiguration.SrcColorBlendFactor, m_CreateInfo.BlendConfiguration.DstColorBlendFactor, m_CreateInfo.BlendConfiguration.ColorBlendOp,
-			m_CreateInfo.BlendConfiguration.SrcAlphaBlendFactor, m_CreateInfo.BlendConfiguration.DstAlphaBlendFactor, m_CreateInfo.BlendConfiguration.AlphaBlendOp);
+		std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments;
+		colorBlendAttachments.reserve(renderPass->GetColorAttachmentCount());
 
-		std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments(renderPass->GetColorAttachmentCount(), colorBlendAttachment);
+		for (uint32_t attachmentIndex = 0; attachmentIndex < renderPass->GetColorAttachmentCount(); attachmentIndex++) {
+			ImageFormat format = renderPass->GetColorAttachmentFormats()[attachmentIndex];
+			
+			//TODO: temp, change this later
+			bool supportsBlending = format != ImageFormat::R32_UINT;
+
+			VkPipelineColorBlendAttachmentState colorBlendAttachment =
+				VulkanAPI::PipelineColorBlendAttachmentState(supportsBlending ? m_CreateInfo.BlendConfiguration.BlendEnable : VK_FALSE,
+				m_CreateInfo.BlendConfiguration.SrcColorBlendFactor, m_CreateInfo.BlendConfiguration.DstColorBlendFactor, m_CreateInfo.BlendConfiguration.ColorBlendOp,
+				m_CreateInfo.BlendConfiguration.SrcAlphaBlendFactor, m_CreateInfo.BlendConfiguration.DstAlphaBlendFactor, m_CreateInfo.BlendConfiguration.AlphaBlendOp);
+
+			colorBlendAttachments.emplace_back(colorBlendAttachment);
+		}
 
 		VkPipelineColorBlendStateCreateInfo colorBlending = VulkanAPI::PipelineColorBlendStateCreateInfo((uint32_t)colorBlendAttachments.size(), colorBlendAttachments.data());
 

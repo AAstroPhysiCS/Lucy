@@ -13,8 +13,8 @@ namespace Lucy {
 
 		auto& allocator = device->GetAllocator();
 
-		//512mb per frame, should be enough for most cases. If not, TODO: implement a dynamic buffer growth strategy
-		constexpr size_t capacityPerFrame = 512ull * 1024ull * 1024ull;
+		//768mb per frame, should be enough for most cases. If not, TODO: implement a dynamic buffer growth strategy
+		constexpr size_t capacityPerFrame = 768ull * 1024ull * 1024ull;
 
 		for (uint32_t frameIndex = 0; frameIndex < m_Frames.size(); frameIndex++) {
 			UploadFrame& frame = m_Frames[frameIndex];

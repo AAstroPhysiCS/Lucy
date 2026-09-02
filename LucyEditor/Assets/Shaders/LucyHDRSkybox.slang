@@ -6,7 +6,7 @@ struct VertexOutput {
 };
 
 struct LocalPushConstant {
-    uint3 u_Data; // x: environment map index, y: sampler index, z: mip level
+    float3 u_Data; // x: environment map index, y: sampler index, z: mip level
 };
 
 [vk::push_constant]

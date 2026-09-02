@@ -25,6 +25,14 @@ namespace Lucy {
 		return e;
 	}
 
+	void Scene::SetEntityContext(Entity e) {
+		m_EntityContext = e.m_Entity;
+	}
+	
+	Entity Scene::GetEntityContext() {
+		return Entity{ this, m_EntityContext };
+	}
+
 	Entity Scene::CreateMesh() {
 		Entity e = CreateEntity();
 		e.AddComponent<TagComponent>("Empty Mesh");
@@ -47,7 +55,7 @@ namespace Lucy {
 		m_Registry.destroy(e.m_Entity);
 	}
 
-	Entity Scene::GetEntityByMeshID(const glm::vec3& meshID) {
+	Entity Scene::GetEntityByMeshID(uint32_t meshID) {
 		auto view = m_Registry.view<MeshComponent>();
 		for (auto entity : view) {
 			Entity e{ this, entity };
@@ -55,7 +63,7 @@ namespace Lucy {
 			const Ref<Mesh>& mesh = meshComponent.GetMesh();
 			if (!mesh)
 				continue;
-			const glm::vec3& meshIDValue = mesh->GetMeshID();
+			uint32_t meshIDValue = meshComponent.GetRenderDeviceObjectHandle().Index + 1;
 
 			if (meshIDValue == meshID)
 				return e;

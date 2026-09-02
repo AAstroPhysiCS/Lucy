@@ -17,14 +17,13 @@ namespace Lucy {
 
 	struct Vertex final {
 		glm::vec3 Position = glm::vec3{0.0f};
-		glm::vec3 MeshID = glm::vec3{0.0f};
 		glm::vec2 TexCoords = glm::vec2{0.0f};
 		glm::vec3 Normal = glm::vec3{0.0f};
 		glm::vec3 Tangent = glm::vec3{0.0f};
 		glm::vec3 Bitangent = glm::vec3{0.0f};
 
 		[[nodiscard]] static consteval uint32_t GetComponentCount() {
-			return decltype(Position)::length() + decltype(MeshID)::length() + decltype(TexCoords)::length() 
+			return decltype(Position)::length() + decltype(TexCoords)::length() 
 				+ decltype(Normal)::length() + decltype(Tangent)::length() + decltype(Bitangent)::length();
 		}
 
@@ -36,7 +35,7 @@ namespace Lucy {
 			};
 		}
 
-		[[nodiscard]] static constexpr std::array<VkVertexInputAttributeDescription, 6> GetAttributeDescriptions(uint32_t binding) {
+		[[nodiscard]] static constexpr std::array<VkVertexInputAttributeDescription, 5> GetAttributeDescriptions(uint32_t binding) {
 			return {
 				VkVertexInputAttributeDescription{
 					.location = 0,
@@ -47,29 +46,23 @@ namespace Lucy {
 				VkVertexInputAttributeDescription{
 					.location = 1,
 					.binding = binding,
-					.format = VK_FORMAT_R32G32B32_SFLOAT,
-					.offset = offsetof(Vertex, MeshID)
-				},
-				VkVertexInputAttributeDescription{
-					.location = 2,
-					.binding = binding,
 					.format = VK_FORMAT_R32G32_SFLOAT,
 					.offset = offsetof(Vertex, TexCoords)
 				},
 				VkVertexInputAttributeDescription{
-					.location = 3,
+					.location = 2,
 					.binding = binding,
 					.format = VK_FORMAT_R32G32B32_SFLOAT,
 					.offset = offsetof(Vertex, Normal)
 				},
 				VkVertexInputAttributeDescription{
-					.location = 4,
+					.location = 3,
 					.binding = binding,
 					.format = VK_FORMAT_R32G32B32_SFLOAT,
 					.offset = offsetof(Vertex, Tangent)
 				},
 				VkVertexInputAttributeDescription{
-					.location = 5,
+					.location = 4,
 					.binding = binding,
 					.format = VK_FORMAT_R32G32B32_SFLOAT,
 					.offset = offsetof(Vertex, Bitangent)

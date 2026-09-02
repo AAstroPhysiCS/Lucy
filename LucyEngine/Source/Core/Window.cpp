@@ -58,6 +58,7 @@ namespace Lucy {
 		}
 
 		glfwSetWindowUserPointer(m_Window, &m_Data);
+		glfwGetWindowContentScale(m_Window, &m_ContentScale.x, &m_ContentScale.y);
 
 		//TODO: Icon for the window (later)
 		//GLFWimage icon;

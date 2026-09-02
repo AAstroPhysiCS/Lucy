@@ -185,7 +185,7 @@ namespace Lucy {
 			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::MeshletDispatchBuildPass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUBuildMeshletDispatchPipeline");
-
+/**/
 				command.BindPipeline(pipeline);
 
 				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
@@ -348,7 +348,16 @@ namespace Lucy {
 				}, RenderPassLoadStoreAttachments::ClearStore
 			);
 
-			build.ReadImage(RGResource(ShadowImages), RenderGraphResourceAccess::ShaderSampledRead);
+			build.DeclareImage(RGResource(ObjectIDImage), {
+				.Width = m_Width,
+				.Height = m_Height,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsColorTransferAttachment,
+				.Format = ImageFormat::R32_UINT,
+				.GenerateSampler = false
+			}, RenderPassLoadStoreAttachments::ClearStore);
+
+			build.ReadImage(RGResource(ShadowImagesFinal), RenderGraphResourceAccess::ShaderSampledRead);
 			build.ReadExternalImage(RGResource(BRDFLutImage), RenderGraphResourceAccess::ShaderSampledRead);
 
 			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
@@ -362,6 +371,7 @@ namespace Lucy {
 			build.ReadBuffer(RGResource(DrawCounts), RenderGraphResourceAccess::IndirectRead);
 
 			build.BindRenderTarget(RGResource(GeometryImage), RGResource(GeometryDepthImage));
+			build.BindRenderTarget(RGResource(ObjectIDImage));
 
 			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::PBRGeometryPass");
@@ -370,7 +380,7 @@ namespace Lucy {
 
 				draw.BindPipeline(pipeline);
 
-				uint32_t shadowImagesIndex = draw.BindImageHandleTo("TextureArrays2D_Float2", registry.GetImage(RGResource(ShadowImages)));
+				uint32_t shadowImagesIndex = draw.BindImageHandleTo("TextureArrays2D_Float2", registry.GetImage(RGResource(ShadowImagesFinal)));
 				uint32_t brdfImageIndex = draw.BindImageHandleTo("Textures2D_Float2", registry.GetImage(RGResource(BRDFLutImage)));
 
 				uint32_t irradianceIndex = INVALID_INDEX;
@@ -408,10 +418,10 @@ namespace Lucy {
 					.Data = {
 						.VisibleDraws = registry.GetBuffer(RGResource(VisibleDraws))->GetDeviceAddress(),
 						.PBRTextureResources = {
-							{ .TextureIndex = shadowImagesIndex, .SamplerIndex = 0 },
-							{ .TextureIndex = prefilterIndex, .SamplerIndex = 0 },
-							{ .TextureIndex = brdfImageIndex, .SamplerIndex = 0 },
-							{ .TextureIndex = irradianceIndex, .SamplerIndex = 0 },
+							{ .TextureIndex = shadowImagesIndex, .SamplerIndex = draw.GetLinearRepeatSampler() },
+							{ .TextureIndex = prefilterIndex, .SamplerIndex = draw.GetLinearRepeatSampler() },
+							{ .TextureIndex = brdfImageIndex, .SamplerIndex = draw.GetLinearRepeatSampler() },
+							{ .TextureIndex = irradianceIndex, .SamplerIndex = draw.GetLinearRepeatSampler() },
 						}
 					}
 				};
@@ -431,71 +441,6 @@ namespace Lucy {
 					draw.DrawIndexedIndirectCount(registry.GetBuffer(RGResource(IndirectCommands)), commandOffset, 
 						registry.GetBuffer(RGResource(DrawCounts)), countOffset, commandCapacityPerBin, sizeof(VkDrawIndexedIndirectCommand));
 				}
-			};
-		});
-
-		renderGraph->AddPass(TargetQueueFamily::Graphics, "IDPass", [=, *this](RenderGraphBuilder& build) {
-			build.SetViewportArea(m_Width, m_Height);
-			build.SetInFlightMode(true);
-
-			build.DeclareImage(RGResource(IDPassImage), {
-				.Width = m_Width,
-				.Height = m_Height,
-				.ImageType = ImageType::Type2D,
-				.ImageUsage = ImageUsage::AsColorTransferAttachment,
-				.Format = ImageFormat::R8G8B8A8_UNORM,
-				.GenerateSampler = true
-			}, RenderPassLoadStoreAttachments::ClearStore,
-				RGResource(IDPassDepthImage), {
-				.Width = m_Width,
-				.Height = m_Height,
-				.ImageType = ImageType::Type2D,
-				.ImageUsage = ImageUsage::AsDepthAttachment,
-				.Format = ImageFormat::D32_SFLOAT,
-				.GenerateSampler = true,
-			}, RenderPassLoadStoreAttachments::ClearStore);
-
-			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
-			build.ReadExternalBuffer(RGResource(GPUObjectsBuffer), RenderGraphResourceAccess::StorageRead);
-			build.ReadExternalBuffer(RGResource(GPUSubmeshesBuffer), RenderGraphResourceAccess::StorageRead);
-			build.ReadExternalBuffer(RGResource(GPUVerticesBuffer), RenderGraphResourceAccess::StorageRead);
-			build.ReadExternalBuffer(RGResource(GPUIndicesBuffer), RenderGraphResourceAccess::IndexRead);
-
-			build.ReadBuffer(RGResource(VisibleDraws), RenderGraphResourceAccess::StorageRead);
-			build.ReadBuffer(RGResource(IndirectCommands), RenderGraphResourceAccess::IndirectRead);
-			build.ReadBuffer(RGResource(DrawCounts), RenderGraphResourceAccess::IndirectRead);
-
-			build.BindRenderTarget(RGResource(IDPassImage), RGResource(IDPassDepthImage));
-
-			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
-				LUCY_PROFILE_NEW_EVENT("RendererPasses::IDPass");
-				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("IDPipeline");
-
-				draw.BindPipeline(pipeline);
-				draw.UpdateDescriptorSets();
-				draw.BindAllDescriptorSets();
-
-				struct LocalPushConstant {
-					RenderDeviceBufferReference VisibleDraws;
-				};
-
-				GlobalPushConstant<LocalPushConstant> pushConstantData{
-					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
-					.Data = {
-						.VisibleDraws = registry.GetBuffer(RGResource(VisibleDraws))->GetDeviceAddress()
-					}
-				};
-
-				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
-				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
-
-				draw.BindPushConstant(pushConstant);
-				draw.BindBuffers(registry.GetBuffer(RGResource(GPUIndicesBuffer)));
-
-				const uint32_t commandCapacityPerBin = RenderDeviceScene::GetMeshletCapacity();
-
-				draw.DrawIndexedIndirectCount(registry.GetBuffer(RGResource(IndirectCommands)), 0,
-					registry.GetBuffer(RGResource(DrawCounts)), 0, commandCapacityPerBin, sizeof(VkDrawIndexedIndirectCommand));
 			};
 		});
 	}
@@ -836,6 +781,7 @@ namespace Lucy {
 
 			const auto& shadowImages = registry.GetImage(RGResource(ShadowImages));
 			const auto& shadowImagesBlurred = registry.GetImage(RGResource(ShadowImagesBlurred));
+			const auto& shadowImagesFinal = registry.GetImage(RGResource(ShadowImagesFinal));
 
 			auto width = shadowImages->GetWidth();
 			auto height = shadowImages->GetHeight();
@@ -854,7 +800,7 @@ namespace Lucy {
 			if (direction == GaussianBlurDirection::Horizontal) {
 				uint32_t inputIndex = cmd.BindImageHandleTo("TextureArrays2D_Float2", shadowImages);
 				uint32_t outputIndex = cmd.BindImageHandleTo("StorageTextureArrays2D_Float2", shadowImagesBlurred);
-				uint32_t samplerIndex = 0; //TODO:
+				uint32_t samplerIndex = cmd.GetLinearRepeatSampler();
 
 				BlurData data = {
 					.BlurData = { 1, 0, width, height },
@@ -864,8 +810,8 @@ namespace Lucy {
 				pushConstant.SetData(reinterpret_cast<uint8_t*>(&data), sizeof(data));
 			} else {
 				uint32_t inputIndex = cmd.BindImageHandleTo("TextureArrays2D_Float2", shadowImagesBlurred);
-				uint32_t outputIndex = cmd.BindImageHandleTo("StorageTextureArrays2D_Float2", shadowImages);
-				uint32_t samplerIndex = 0;
+				uint32_t outputIndex = cmd.BindImageHandleTo("StorageTextureArrays2D_Float2", shadowImagesFinal);
+				uint32_t samplerIndex = cmd.GetLinearRepeatSampler();
 
 				BlurData data = {
 					.BlurData = { 0, 1, width, height },
@@ -907,9 +853,19 @@ namespace Lucy {
 
 		renderGraph->AddPass(TargetQueueFamily::Compute, "VSMVerticalBlurCompute", [=, *this](RenderGraphBuilder& build) {
 			build.SetInFlightMode(true);
+
+			build.DeclareImage(RGResource(ShadowImagesFinal), {
+				.Width = m_ShadowMapSize,
+				.Height = m_ShadowMapSize,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
+				.Layers = RenderDeviceSceneGlobalData::NUM_CASCADES,
+				.Format = ImageFormat::R32G32_SFLOAT,
+				.GenerateSampler = true,
+			}, RenderPassLoadStoreAttachments::ClearDontCare);
 			
 			build.ReadImage(RGResource(ShadowImagesBlurred), RenderGraphResourceAccess::ShaderSampledRead);
-			build.WriteImage(RGResource(ShadowImages), RenderGraphResourceAccess::StorageWrite);
+			build.WriteImage(RGResource(ShadowImagesFinal), RenderGraphResourceAccess::StorageWrite);
 
 			return std::bind(
 				ExecuteGaussianBlur,
@@ -1090,7 +1046,7 @@ namespace Lucy {
 		const uint32_t probeCount = probeColumns * probeRows;
 		m_ProbeOrigin = -0.5f * glm::vec3(m_ProbeCounts - glm::vec3(1)) * m_ProbeSpacing;
 
-		renderGraph->AddPass(TargetQueueFamily::Graphics, "DDGITracePass", [probeColumns, probeRows, probeCount, this](RenderGraphBuilder& build) {
+		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGITracePass", [probeColumns, probeRows, probeCount, this](RenderGraphBuilder& build) {
 			build.SetInFlightMode(true);
 
 			build.DeclareBuffer(RGResource(DDGIRayResults), {
@@ -1125,10 +1081,11 @@ namespace Lucy {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::DDGITracePass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<RayTracingPipeline>("DDGITracePipeline");
 
-				GlobalPushConstant<RenderDeviceDDGITraceData> pushConstantData{
+				GlobalPushConstant<RenderDeviceDDGITraceData> pushConstantData {
+					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
 					.Data = {
 						.RayResults = registry.GetBuffer(RGResource(DDGIRayResults))->GetDeviceAddress(),
-						.ProbeOriginAndMaxDistance = glm::vec4{ m_ProbeOrigin, 100000.0f },
+						.ProbeOriginAndMaxDistance = glm::vec4{ m_ProbeOrigin, 10000.0f },
 						.ProbeSpacing = glm::vec4{ m_ProbeSpacing, 0.0f },
 						.ProbeCountsAndRays = glm::uvec4{ m_ProbeCounts, s_RaysPerProbe }
 					}
@@ -1169,14 +1126,18 @@ namespace Lucy {
 			build.ReadExternalBuffer(RGResource(GPUIndicesBuffer), RenderGraphResourceAccess::IndexRead);
 
 			build.ReadImage(RGResource(GeometryImage), RenderGraphResourceAccess::ColorAttachmentWrite);
+			build.ReadImage(RGResource(ObjectIDImage), RenderGraphResourceAccess::ColorAttachmentWrite);
 			build.ReadImage(RGResource(GeometryDepthImage), RenderGraphResourceAccess::DepthAttachmentWrite);
 
 			build.BindRenderTarget(RGResource(GeometryImage), RGResource(GeometryDepthImage));
+			build.BindRenderTarget(RGResource(ObjectIDImage));
 
 			struct DDGIProbeDebugData {
+				RenderDeviceBufferReference RayResults;
+
 				glm::vec4 ProbeOriginAndRadius;
 				glm::vec4 ProbeSpacing;
-				glm::uvec4 ProbeCounts;
+				glm::uvec4 ProbeCountsAndRays;
 			};
 
 			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
@@ -1187,9 +1148,10 @@ namespace Lucy {
 				GlobalPushConstant<DDGIProbeDebugData> pushConstantData{
 					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
 					.Data = {
+						.RayResults = registry.GetBuffer(RGResource(DDGIRayResults))->GetDeviceAddress(),
 						.ProbeOriginAndRadius = glm::vec4{ origin, 0.08f },
 						.ProbeSpacing = glm::vec4{ spacing, 0.0f },
-						.ProbeCounts = glm::uvec4{ counts, 0 },
+						.ProbeCountsAndRays = glm::uvec4{ counts, s_RaysPerProbe },
 					}
 				};
 
@@ -1252,7 +1214,7 @@ namespace Lucy {
 						.ProbeCount = probeCount,
 						.MarkerRadiusPixels = 2,
 						.RaysPerProbe = s_RaysPerProbe,
-						.MaxRayDistance = 100000,
+						.MaxRayDistance = 10000,
 						.RayResultTextureIndex = rayResultIndex,
 						.ProbeOrigin = glm::vec4{ origin, 0.0f },
 						.ProbeSpacing = glm::vec4{ spacing, 0.0f },
@@ -1286,8 +1248,11 @@ namespace Lucy {
 			build.SetInFlightMode(true);
 
 			build.ReadImage(RGResource(GeometryImage), RenderGraphResourceAccess::ColorAttachmentWrite);
+			build.ReadImage(RGResource(ObjectIDImage), RenderGraphResourceAccess::ColorAttachmentWrite);
 			build.ReadImage(RGResource(GeometryDepthImage), RenderGraphResourceAccess::DepthAttachmentWrite);
+
 			build.BindRenderTarget(RGResource(GeometryImage), RGResource(GeometryDepthImage));
+			build.BindRenderTarget(RGResource(ObjectIDImage));
 
 			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::CubemapPass");
@@ -1314,12 +1279,12 @@ namespace Lucy {
 				}
 
 				struct LocalPushConstant {
-					glm::uvec3 Data; // x: environment map index, y: sampler index, z: mip level
+					glm::vec3 Data; // x: environment map index, y: sampler index, z: mip level
 				};
 
 				GlobalPushConstant<LocalPushConstant> pushConstantData {
 					registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
-					{ .Data = { index, 0, settings.EnvironmentLOD } }
+					{ .Data = { index, static_cast<float>(draw.GetLinearRepeatSampler().Index), settings.EnvironmentLOD}}
 				};
 
 				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
@@ -1373,7 +1338,7 @@ namespace Lucy {
 					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
 					.Data = {
 						.CaptureProjection = captureProjection, 
-						.Data = { originalHDRImageIndex, 0 } 
+						.Data = { originalHDRImageIndex, draw.GetLinearRepeatSampler() } 
 					}
 				};
 
@@ -1433,7 +1398,7 @@ namespace Lucy {
 					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
 					.Data = {
 						.ProjMatrix = captureProjection,
-						.Data = { m_Size, 0, layeredImageIndex, irradianceImageIndex, }
+						.Data = { m_Size, static_cast<float>(draw.GetLinearClampSampler().Index), layeredImageIndex, irradianceImageIndex }
 					}
 				};
 
@@ -1541,7 +1506,7 @@ namespace Lucy {
 						.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
 						.Data = {
 							.PrefilterParams = glm::vec4(mipSize, mipSize, mip / float(MAX_MIP_LEVELS - 1), mip),
-							.TextureData = { layeredImageIndex, prefilterImageIndices[mip], 0}
+							.TextureData = { layeredImageIndex, prefilterImageIndices[mip], cmd.GetLinearClampSampler() }
 						}
 					};
 

@@ -50,7 +50,7 @@ namespace Lucy {
 		vkGetDeviceQueue(m_LogicalDevice, m_QueueFamilyIndices.ComputeFamily, 0, &m_ComputeQueue);
 		vkGetDeviceQueue(m_LogicalDevice, m_QueueFamilyIndices.TransferFamily, 0, &m_TransferQueue);
 
-		m_Allocator.Init(instance, m_LogicalDevice, m_PhysicalDevice, apiVersion);
+		m_Allocator.Init(instance, this, apiVersion);
 
 		VkFenceCreateInfo fenceCreateInfo{};
 		fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -63,44 +63,18 @@ namespace Lucy {
 		m_TransientCommandPool = Memory::CreateUnique<VulkanTransientCommandPool>(shared_from_this()->As<VulkanRenderDevice>());
 	}
 
+	void VulkanRenderDevice::CreateDeviceResources() {
+		RenderDevice::CreateDeviceResources();
+
+		const auto& globalDescriptorSet = AccessResource<VulkanDescriptorSet>(m_DescriptorSetManager->GetGlobalDescriptorSet(0));
+		globalDescriptorSet->RTUpdateSamplerDescriptors(this, m_LinearRepeatSampler);
+		globalDescriptorSet->RTUpdateSamplerDescriptors(this, m_LinearClampSampler);
+		globalDescriptorSet->RTUpdateSamplerDescriptors(this, m_NearestRepeatSampler);
+		globalDescriptorSet->RTUpdateSamplerDescriptors(this, m_NearestClampSampler);
+	}
+
 	void VulkanRenderDevice::PickDeviceByRanking(const std::vector<VkPhysicalDevice>& devices) {
-
 		LUCY_INFO("----------Available Devices----------");
-#if USE_INTEGRATED_GRAPHICS
-		for (const auto& device : devices) {
-			VkPhysicalDeviceProperties properties;
-			vkGetPhysicalDeviceProperties(device, &properties);
-
-			VkPhysicalDeviceFeatures features;
-			vkGetPhysicalDeviceFeatures(device, &features);
-
-			if (properties.deviceType != VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
-				continue;
-
-			VulkanDeviceInfo deviceInfo = { properties.deviceName, properties.driverVersion, properties.apiVersion };
-			LUCY_INFO(std::format("Device Name: {0}", deviceInfo.Name));
-			LUCY_INFO(std::format("Device Driver Version: {0}", deviceInfo.DriverVersion));
-			LUCY_INFO(std::format("Device API Version: {0}", deviceInfo.ApiVersion));
-			LUCY_INFO("-------------------------------------");
-			deviceInfo.MinUniformBufferAlignment = (uint32_t)properties.limits.minUniformBufferOffsetAlignment;
-			deviceInfo.TimestampPeriod = properties.limits.timestampPeriod;
-
-			FindQueueFamilies(device);
-
-			bool isDeviceRequirementsCovered = CheckDeviceExtensionSupport(device) && CheckDeviceFormatSupport(device);
-
-			if (features.multiViewport
-				&& features.geometryShader
-				&& features.samplerAnisotropy
-				&& features.tessellationShader
-				&& m_QueueFamilyIndices.IsComplete()
-				&& isDeviceRequirementsCovered) {
-				m_DeviceInfo = deviceInfo;
-				m_PhysicalDevice = device;
-				return;
-			}
-		}
-#else
 		for (const auto& device : devices) {
 			VulkanDeviceInfo deviceInfo = QueryDeviceInfo(device);
 
@@ -109,20 +83,22 @@ namespace Lucy {
 			LUCY_INFO(std::format("Device API Version: {0}", deviceInfo.ApiVersion));
 			LUCY_INFO("-------------------------------------");
 
-			FindQueueFamilies(device);
-
 			bool isDeviceRequirementsCovered = CheckDeviceExtensionSupport(device) && CheckDeviceFormatSupport(device);
-
-			if (/*deviceInfo.DeviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU && */deviceInfo.SamplerAnisotropy && deviceInfo.GeometryShader
-				&& deviceInfo.TessellationShader && deviceInfo.MultiViewport && deviceInfo.DynamicRendering && deviceInfo.Synchronization2 
-				&& m_QueueFamilyIndices.IsComplete() && isDeviceRequirementsCovered) {
+#if USE_INTEGRATED_GRAPHICS
+			bool preferredDeviceType = deviceInfo.DeviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU;
+#else
+			bool preferredDeviceType = deviceInfo.DeviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+#endif
+			if (preferredDeviceType && deviceInfo.SamplerAnisotropy && deviceInfo.GeometryShader && deviceInfo.TessellationShader && 
+				deviceInfo.MultiViewport && deviceInfo.DynamicRendering && deviceInfo.Synchronization2 && isDeviceRequirementsCovered) {
+				FindQueueFamilies(device);
+				if (!m_QueueFamilyIndices.IsComplete())
+					return;
 				m_DeviceInfo = deviceInfo;
 				m_PhysicalDevice = device;
 				return;
 			}
 		}
-#endif
-
 		LUCY_ASSERT(false, "No suitable device found!");
 	}
 
@@ -429,7 +405,7 @@ namespace Lucy {
 		return allFormatIsSupported;
 	}
 
-	void VulkanRenderDevice::SubmitWorkToGPU(const RenderCommandList& renderCommandList, VulkanSemaphore& waitSemaphore, VkPipelineStageFlags2 waitStage, 
+	void VulkanRenderDevice::SubmitWorkToGPU(const RenderCommandList& renderCommandList, const std::vector<VulkanQueueSubmitInfo>& waits, 
 		VulkanSemaphore& renderFinishedSemaphore, VulkanSemaphore& frameTimelineSemaphore, uint64_t signalValue) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::SubmitWorkToGPU");
 		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
@@ -444,12 +420,17 @@ namespace Lucy {
 		cmdInfo.commandBuffer = cmd;
 		cmdInfo.deviceMask = 0;
 
-		VkSemaphoreSubmitInfo waitInfo{};
-		waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-		waitInfo.semaphore = (VkSemaphore)waitSemaphore.GetHandle();
-		waitInfo.value = 0;
-		waitInfo.stageMask = waitStage;
-		waitInfo.deviceIndex = 0;
+		std::vector<VkSemaphoreSubmitInfo> waitInfos;
+		waitInfos.reserve(waits.size());
+
+		for (const auto& wait : waits) {
+			auto& info = waitInfos.emplace_back();
+			info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+			info.semaphore = static_cast<VkSemaphore>(wait.Semaphore.GetHandle());
+			info.value = wait.Value;
+			info.stageMask = wait.StageMask;
+			info.deviceIndex = 0;
+		}
 
 		std::array<VkSemaphoreSubmitInfo, 2> signalInfos{};
 
@@ -467,15 +448,14 @@ namespace Lucy {
 
 		VkSubmitInfo2 submitInfo{};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-		submitInfo.waitSemaphoreInfoCount = 1;
-		submitInfo.pWaitSemaphoreInfos = &waitInfo;
+		submitInfo.waitSemaphoreInfoCount = static_cast<uint32_t>(waitInfos.size());
+		submitInfo.pWaitSemaphoreInfos = waitInfos.data();
 		submitInfo.commandBufferInfoCount = 1;
 		submitInfo.pCommandBufferInfos = &cmdInfo;
-		submitInfo.signalSemaphoreInfoCount = (uint32_t)signalInfos.size();
+		submitInfo.signalSemaphoreInfoCount = static_cast<uint32_t>(signalInfos.size());
 		submitInfo.pSignalSemaphoreInfos = signalInfos.data();
 
 		LUCY_VK_ASSERT(vkQueueSubmit2(m_GraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE));
-
 		cmdPool->SetState(frameIndex, CommandBufferSlotState::Pending);
 	}
 
@@ -583,6 +563,8 @@ namespace Lucy {
 
 	void VulkanRenderDevice::Destroy() {
 		LUCY_PROFILE_DESTROY();
+		RenderDevice::Destroy();
+
 		auto& scene = GetScene();
 		scene->RTDestroy();
 
@@ -683,28 +665,23 @@ namespace Lucy {
 				}
 
 				if (slot.Data.ImageHandle == imageHandle && slot.Data.Mip == mip) {
-					return RenderDeviceTextureHandle{
-						.Index = index,
-						.Generation = slot.Generation
-					};
+					return RenderDeviceTextureHandle{ .Index = index, .Generation = slot.Generation };
 				}
 
 				index++;
 			}
 
-			RenderDeviceTextureHandle handle = imageSampler->Images.Create(
-				VulkanImageDescriptor{
-					.ImageHandle = imageHandle,
-					.Mip = mip,
-					.ImageInfo = VulkanAPI::DescriptorImageInfo(
-						vulkanImage->GetCurrentLayout(), 
-						imageView, 
-						Renderer::AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle()
-					)
-				}
+			RenderDeviceTextureHandle handle = imageSampler->Images.Create(VulkanImageDescriptor{
+				.ImageHandle = imageHandle,
+				.Mip = mip,
+				.ImageInfo = VulkanAPI::DescriptorImageInfo(
+					vulkanImage->GetCurrentLayout(), 
+					imageView, 
+					AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle()
+				)}
 			);
 
-			descriptorSet->RTUpdateImageSamplerDescriptors(this, imageBufferName, handle);
+			descriptorSet->RTUpdateImageDescriptors(this, imageBufferName, handle);
 
 			return handle;
 		}
@@ -730,28 +707,23 @@ namespace Lucy {
 				}
 
 				if (slot.Data.ImageHandle == imageHandle && slot.Data.Mip == mip) {
-					return RenderDeviceTextureHandle{
-						.Index = index,
-						.Generation = slot.Generation
-					};
+					return RenderDeviceTextureHandle{ .Index = index, .Generation = slot.Generation };
 				}
 
 				index++;
 			}
 
-			RenderDeviceTextureHandle handle = imageSampler->Images.Create(
-				VulkanImageDescriptor{
-					.ImageHandle = imageHandle,
-					.Mip = mip,
-					.ImageInfo = VulkanAPI::DescriptorImageInfo(
-						vulkanImage->GetCurrentLayout(),
-						imageView,
-						Renderer::AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle()
-					)
-				}
+			RenderDeviceTextureHandle handle = imageSampler->Images.Create(VulkanImageDescriptor{
+				.ImageHandle = imageHandle,
+				.Mip = mip,
+				.ImageInfo = VulkanAPI::DescriptorImageInfo(
+					vulkanImage->GetCurrentLayout(),
+					imageView,
+					AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle()
+				)}
 			);
 
-			descriptorSet->RTUpdateImageSamplerDescriptors(this, imageBufferName, handle);
+			descriptorSet->RTUpdateImageDescriptors(this, imageBufferName, handle);
 
 			return handle;
 		}
@@ -829,12 +801,14 @@ namespace Lucy {
 		const auto& castedPipeline = pipeline->As<VulkanRayTracingPipeline>();
 		const auto& descriptorSetHandles = castedPipeline->GetDescriptorSetHandles();
 
-		for (auto handle : descriptorSetHandles) {
-			Ref<VulkanDescriptorSet> vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
-			if (vulkanSet->GetSetIndex() == VulkanDescriptorSetManager::TEXTURE_BINDLESS_TABLE_SET_INDEX)
+		for (const auto& handle : descriptorSetHandles) {
+			const auto& descriptorSet = AccessResource<VulkanDescriptorSet>(handle);
+			if (!descriptorSet->HasAccelerationStructureBinding(name))
 				continue;
-			vulkanSet->RTUpdateAccelerationStructure(this, name, accelerationStructure);
+			descriptorSet->RTUpdateAccelerationStructure(this, name, accelerationStructure);
+			return;
 		}
+		LUCY_ASSERT(false, "Acceleration structure binding '{0}' does not exist", name);
 	}
 
 	void VulkanRenderDevice::BindAllDescriptorSets(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline) {

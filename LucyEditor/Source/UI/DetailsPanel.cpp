@@ -34,7 +34,7 @@ namespace Lucy {
 		
 		ImGui::Begin("Details", nullptr, ImGuiWindowFlags_NoBringToFrontOnFocus);
 
-		Entity& entityContext = SceneExplorerPanel::GetInstance().GetEntityContext();
+		Entity entityContext = SceneExplorerPanel::GetInstance().GetEntityContext();
 		if (!entityContext.IsValid()) {
 			ImGui::End();
 			return;

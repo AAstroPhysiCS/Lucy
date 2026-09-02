@@ -29,9 +29,12 @@ namespace Lucy {
 		Entity CreateMesh();
 		Entity CreateEntity();
 		void RemoveEntity(Entity& e);
-		Entity GetEntityByMeshID(const glm::vec3& meshID);
+		Entity GetEntityByMeshID(uint32_t meshID);
 
-		inline EditorCamera& GetEditorCamera() { return m_Camera; }
+		void SetEntityContext(Entity e);
+		Entity GetEntityContext();
+
+		EditorCamera& GetEditorCamera() { return m_Camera; }
 
 		void OnEvent(Event& e);
 		void Update(float deltaTime);
@@ -77,6 +80,7 @@ namespace Lucy {
 
 		entt::registry m_Registry;
 		EditorCamera m_Camera { 0.01f, 1000.0f, 90.0f };
+		entt::entity m_EntityContext = static_cast<entt::entity>(std::numeric_limits<uint32_t>::max());
 
 		friend class Entity;
 	};

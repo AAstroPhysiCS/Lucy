@@ -80,10 +80,13 @@ namespace Lucy {
 
 		for (const auto& overlay : m_Overlays) {
 			overlay->SetRenderPipeline(m_RenderPipeline);
-			overlay->OnRendererInit(m_Window);
 		}
 		
 		Renderer::InitializeImGui();
+
+		for (const auto& overlay : m_Overlays) {
+			overlay->OnRendererInit(m_Window);
+		}
 
 		double lastFrameTime = glfwGetTime();
 

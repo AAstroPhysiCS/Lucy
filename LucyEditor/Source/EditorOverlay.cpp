@@ -37,6 +37,14 @@ namespace Lucy {
 		sceneExplorerPanel.SetScene(m_Scene);
 
 		viewportPanel.SetRenderPipeline(m_RenderPipeline);
+		
+		const float uiScale = glm::max(window->GetWindowContentScale().x, window->GetWindowContentScale().y);
+
+		ImGuiIO& io = ImGui::GetIO();
+		io.FontGlobalScale = uiScale;
+
+		ImGuiStyle& style = ImGui::GetStyle();
+		style.ScaleAllSizes(uiScale);
 	}
 
 	void EditorOverlay::Begin() {

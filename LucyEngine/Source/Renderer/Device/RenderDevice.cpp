@@ -36,22 +36,66 @@ namespace Lucy {
 		return nullptr;
 	}
 
-	void RenderDevice::CreatePipelineDeviceQueries(size_t pipelineCount) {
+	void RenderDevice::CreateQueries(size_t pipelineCount, size_t passCount) {
 		LUCY_INFO("Creating pipeline queries. Pipeline count: {0}", pipelineCount);
 		m_RenderDevicePipelineQuery = RenderDeviceQuery::Create({
 			.Device = shared_from_this()->As<RenderDevice>(),
 			.QueryCount = (uint32_t)pipelineCount,
 			.QueryType = RenderDeviceQueryType::Pipeline
 		});
-	}
 
-	void RenderDevice::CreateTimestampDeviceQueries(size_t passCount) {
 		LUCY_INFO("Creating timestamp queries. Pass count: {0}", passCount);
-
 		m_RenderDeviceTimestampQuery = RenderDeviceQuery::Create({
 			.Device = shared_from_this()->As<RenderDevice>(),
 			.QueryCount = (uint32_t)passCount * 2,
 			.QueryType = RenderDeviceQueryType::Timestamp
+		});
+	}
+
+	void RenderDevice::CreateDeviceResources() {
+		LUCY_INFO("Creating samplers");
+		m_LinearRepeatSampler = CreateSampler(ImageSamplerCreateInfo{
+			.MipmapEnabled = true,
+			.Parameter = {
+				.U = ImageAddressMode::REPEAT,
+				.V = ImageAddressMode::REPEAT,
+				.W = ImageAddressMode::REPEAT,
+				.Min = ImageFilterMode::LINEAR,
+				.Mag = ImageFilterMode::LINEAR,
+			},
+		});
+
+		m_LinearClampSampler = CreateSampler(ImageSamplerCreateInfo{
+			.MipmapEnabled = true,
+			.Parameter = {
+				.U = ImageAddressMode::CLAMP_TO_EDGE,
+				.V = ImageAddressMode::CLAMP_TO_EDGE,
+				.W = ImageAddressMode::CLAMP_TO_EDGE,
+				.Min = ImageFilterMode::LINEAR,
+				.Mag = ImageFilterMode::LINEAR,
+			},
+		});
+
+		m_NearestRepeatSampler = CreateSampler(ImageSamplerCreateInfo{
+			.MipmapEnabled = true,
+			.Parameter = {
+				.U = ImageAddressMode::REPEAT,
+				.V = ImageAddressMode::REPEAT,
+				.W = ImageAddressMode::REPEAT,
+				.Min = ImageFilterMode::NEAREST,
+				.Mag = ImageFilterMode::NEAREST,
+			},
+		});
+
+		m_NearestClampSampler = CreateSampler(ImageSamplerCreateInfo{
+			.MipmapEnabled = true,
+			.Parameter = {
+				.U = ImageAddressMode::CLAMP_TO_EDGE,
+				.V = ImageAddressMode::CLAMP_TO_EDGE,
+				.W = ImageAddressMode::CLAMP_TO_EDGE,
+				.Min = ImageFilterMode::NEAREST,
+				.Mag = ImageFilterMode::NEAREST,
+			},
 		});
 	}
 
@@ -348,5 +392,17 @@ namespace Lucy {
 
 	void RenderDevice::RTDestroyResource(RenderDeviceResourceHandle& handle) {
 		m_ResourceManager.RTDestroyResource(handle);
+	}
+
+	void RenderDevice::Destroy() {
+		m_DeviceScene->RTDestroy();
+
+		m_RenderDeviceTimestampQuery->Destroy();
+		m_RenderDevicePipelineQuery->Destroy();
+
+		RTDestroyResource(m_LinearClampSampler);
+		RTDestroyResource(m_LinearRepeatSampler);
+		RTDestroyResource(m_NearestClampSampler);
+		RTDestroyResource(m_NearestRepeatSampler);
 	}
 }

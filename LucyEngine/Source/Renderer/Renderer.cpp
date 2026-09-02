@@ -61,16 +61,18 @@ namespace Lucy {
 
 		s_ShaderManager.InitializeShaders(device);
 
-		EnqueueToRenderCommandQueue([](const Ref<RenderDevice>& device) {
-			for (const auto& [name, stageMap] : s_ShaderManager.GetShaderLibrary())
-				for (const auto& [type, shaderList] : stageMap)
-					for (const auto& shader : shaderList)
-						device->RegisterShaderBindings(shader);
-		});
+		for (const auto& [name, stageMap] : s_ShaderManager.GetShaderLibrary())
+			for (const auto& [type, shaderList] : stageMap)
+				for (const auto& shader : shaderList)
+					device->RegisterShaderBindings(shader);
+
+		device->CreateDeviceResources();
 
 		s_RenderGraph = Memory::CreateRef<RenderGraph>(s_Config.RenderArchitecture, device);
 		s_PipelineManager = Memory::CreateUnique<PipelineManager>(device);
 		s_MaterialManager = Memory::CreateUnique<MaterialManager>(s_PipelineManager);
+
+		s_CubeMesh = MeshFactory::CreateCube();
 
 		EnqueueToRenderCommandQueue([](const Ref<RenderDevice>& device) {
 			static ImageCreateInfo blankCubeCreateInfo;
@@ -89,8 +91,6 @@ namespace Lucy {
 			s_BlankArrayHandle = device->CreateImage(blankArrayCreateInfo);
 		});
 
-		s_CubeMesh = MeshFactory::CreateCube();
-		
 		if (config.ThreadingPolicy == ThreadingPolicy::Singlethreaded)
 			s_Backend->FlushCommandQueue();
 	}
@@ -113,11 +113,12 @@ namespace Lucy {
 				bool usingRenderTargetsOfAnotherPass = currentPass != renderTargetPass;
 
 				RenderPassLoadStoreAttachments loadStoreOp = s_RenderGraph->GetLoadStoreAttachmentsByRGResource(rgRenderTarget);
+				VkImageLayout preferredLayout = image->As<VulkanImage>()->GetPreferredLayout();
 				VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 				if (usingRenderTargetsOfAnotherPass) {
 					loadStoreOp = RenderPassLoadStoreAttachments::LoadStore;
-					initialLayout = image->As<VulkanImage>()->GetCurrentLayout();
+					initialLayout = preferredLayout;
 				}
 
 				if (isDepth) {
@@ -126,8 +127,8 @@ namespace Lucy {
 						.Samples = image->GetSamples(),
 						.LoadStoreOperation = loadStoreOp,
 						.StencilLoadStoreOperation = RenderPassLoadStoreAttachments::DontCareDontCare,
-						.Initial = (RenderPassInternalLayout)(usingRenderTargetsOfAnotherPass ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED),
-						.Final = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+						.Initial = static_cast<RenderPassInternalLayout>(usingRenderTargetsOfAnotherPass ? preferredLayout : VK_IMAGE_LAYOUT_UNDEFINED),
+						.Final = static_cast<RenderPassInternalLayout>(preferredLayout),
 						.Reference = RenderPassLayout::AttachmentReference{ VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL }
 					};
 					continue;
@@ -135,7 +136,7 @@ namespace Lucy {
 
 				colorAttachments.emplace_back(image->GetFormat(), image->GetSamples(),
 											  loadStoreOp, RenderPassLoadStoreAttachments::DontCareDontCare,
-											  initialLayout, image->As<VulkanImage>()->GetCurrentLayout(),
+											  initialLayout, preferredLayout,
 											  RenderPassLayout::AttachmentReference{ VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
 			}
 
@@ -164,7 +165,7 @@ namespace Lucy {
 		const auto CreateFrameBuffer = [&](RenderGraphPass* currentPass, const RGRenderTargetElements& rgRenderTargetElements, auto renderPassHandle,
 												uint32_t frameBufferWidth, uint32_t frameBufferHeight, bool isInFlight) {
 			size_t framesCount = isInFlight ? Renderer::GetMaxFramesInFlight() : 1;
-			std::vector<RenderDeviceResourceHandle> imageBufferHandles(framesCount);
+			std::vector<std::vector<RenderDeviceResourceHandle>> imageBufferHandles(framesCount);
 			std::vector<RenderDeviceResourceHandle> depthImageHandles(framesCount);
 
 			for (const auto& rgRenderTarget : rgRenderTargetElements) {
@@ -185,10 +186,11 @@ namespace Lucy {
 
 				for (uint32_t frameIndex = 0; frameIndex < framesCount; frameIndex++) {
 					const auto handle = handles[frameIndex];
-					if (isDepth)
+					if (isDepth) {
 						depthImageHandles[frameIndex] = handle;
-					else
-						imageBufferHandles[frameIndex] = handle;
+						continue;
+					}
+					imageBufferHandles[frameIndex].emplace_back(handle);
 				}
 			}
 
@@ -289,9 +291,9 @@ namespace Lucy {
 			};
 
 #if !USE_COMPUTE_FOR_CUBEMAP_GEN
-			constexpr size_t graphicsPipelineCount = 7;
-#else
 			constexpr size_t graphicsPipelineCount = 6;
+#else
+			constexpr size_t graphicsPipelineCount = 5;
 #endif
 			constexpr const std::array<RenderGraphPipelineCreateInfo, graphicsPipelineCount> graphicsPipelineCreateInfos = {
 				// PBR Geometry Pipeline
@@ -300,12 +302,6 @@ namespace Lucy {
 					.PassName = "PBRGeometryPass",
 					.PipelineName = "PBRGeometryPipeline",
 					.RasterizationConfig = {.DisableBackCulling = true, .CullingMode = CullingMode::None}
-				},
-				// ID Pipeline
-				{
-					.ShaderName = "LucyID",
-					.PassName = "IDPass",
-					.PipelineName = "IDPipeline"
 				},
 				// Skybox Pipeline
 				{
@@ -459,8 +455,8 @@ namespace Lucy {
 			taskScheduler->WaitForAllTasks();
 		}
 
-		device->CreatePipelineDeviceQueries(s_PipelineManager->GetGraphicsPipelineCount() * 6); //some of my passes include viewmasks... and it crashes if you do not include them.
-		device->CreateTimestampDeviceQueries(s_RenderGraph->GetPassCount());
+		//some of my passes include viewmasks... and it crashes if you do not include them.
+		device->CreateQueries(s_PipelineManager->GetGraphicsPipelineCount() * 6, s_RenderGraph->GetPassCount());
 	}
 
 	void Renderer::ImportExternalRenderGraphResource(const RenderGraphResource& renderGraphResource, RenderDeviceResourceHandle renderResourceHandle, RGResourceData data) {
@@ -565,7 +561,7 @@ namespace Lucy {
 		const auto& frameBufferHandle = s_RenderFrameHandleMap.at(name).FrameBufferHandle;
 		const auto& frameBuffer = device->AccessResource<FrameBuffer>(frameBufferHandle);
 		if (GetRenderArchitecture() == RenderArchitecture::Vulkan)
-			return device->AccessResource<Image>(frameBuffer->As<VulkanFrameBuffer>()->GetImageHandles()[GetCurrentFrameIndex()]);
+			return device->AccessResource<Image>(frameBuffer->As<VulkanFrameBuffer>()->GetImageHandles()[GetCurrentFrameIndex()][0]);
 		LUCY_ASSERT(false);
 		return nullptr;
 	}
@@ -639,19 +635,18 @@ namespace Lucy {
 				const auto& [renderPassHandle, frameBufferHandle] = s_RenderFrameHandleMap.at("PBRGeometryPass");
 				AccessResource<FrameBuffer>(frameBufferHandle)->RTRecreate(newWidth, newHeight);
 			}
-
-			{
-				const auto& [renderPassHandle, frameBufferHandle] = s_RenderFrameHandleMap.at("IDPass");
-				AccessResource<FrameBuffer>(frameBufferHandle)->RTRecreate(newWidth, newHeight);
-			}
 		});
 
 		EventHandler::AddListener<EntityPickedEvent>(evt, [](const EntityPickedEvent& e) {
 			auto scene = e.GetScene();
 			auto id = OnMousePicking(e);
-			if (id == glm::vec3(-1.0))
+			if (id == 0) {
+				scene->SetEntityContext({});
 				return;
-			e.GetEntity() = scene->GetEntityByMeshID(id);
+			}
+			auto& entity = e.GetEntity();
+			entity = scene->GetEntityByMeshID(id);
+			scene->SetEntityContext(entity);
 		});
 	}
 
@@ -665,15 +660,16 @@ namespace Lucy {
 		s_Backend->OnViewportResize();
 	}
 
-	glm::vec3 Renderer::OnMousePicking(const EntityPickedEvent& e) {
+	uint32_t Renderer::OnMousePicking(const EntityPickedEvent& e) {
 		LUCY_PROFILE_NEW_EVENT("Renderer::OnMousePicking");
+		constexpr auto objectImageIndex = 1; //the object id is stored in the second attachment of the framebuffer
 
 		const auto& device = GetRenderDevice();
-		auto frameBufferHandle = s_RenderFrameHandleMap.at("IDPass").FrameBufferHandle;
+		auto frameBufferHandle = s_RenderFrameHandleMap.at("PBRGeometryPass").FrameBufferHandle;
 		const auto& frameBuffer = device->AccessResource<FrameBuffer>(frameBufferHandle);
 		if (GetRenderArchitecture() == RenderArchitecture::Vulkan)
-			return s_Backend->OnMousePicking(e, device->AccessResource<Image>(frameBuffer->As<VulkanFrameBuffer>()->GetImageHandles()[GetCurrentFrameIndex()]));
-		return glm::vec3(-1.0f);
+			return s_Backend->OnMousePicking(e, device->AccessResource<Image>(frameBuffer->As<VulkanFrameBuffer>()->GetImageHandles()[GetCurrentFrameIndex()][objectImageIndex]));
+		return 0;
 	}
 
 	void Renderer::DestroyAllShaders() {

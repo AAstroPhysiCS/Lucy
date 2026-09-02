@@ -21,7 +21,10 @@ namespace Lucy {
 		VulkanFrameBuffer& operator=(VulkanFrameBuffer&&) = delete;
 		
 		inline const std::vector<VkFramebuffer>& GetVulkanHandles() const { return m_FrameBufferHandles; }
-		inline const std::vector<RenderDeviceResourceHandle>& GetImageHandles() const { return m_ImageHandles; }
+		
+		inline const std::vector<std::vector<RenderDeviceResourceHandle>>& GetImageHandles() const { return m_ImageHandles; }
+		inline const std::vector<RenderDeviceResourceHandle>& GetImageHandles(uint32_t frameIndex) const { return m_ImageHandles[frameIndex]; }
+
 		inline bool IsInFlight() const { return m_CreateInfo.IsInFlight; }
 
 		void RTRecreate(uint32_t width, uint32_t height) final override;
@@ -31,12 +34,12 @@ namespace Lucy {
 		void DestroyHandles(VulkanRenderDevice* device);
 
 		//Helper functions
-		Ref<VulkanImage> GetImage(uint32_t index);
+		Ref<VulkanImage> GetImage(uint32_t frameIndex, uint32_t attachmentIndex);
 		Ref<VulkanImage> GetDepthImage(uint32_t index);
 		Ref<VulkanRenderPass> GetRenderPass();
 
 		std::vector<VkFramebuffer> m_FrameBufferHandles;
-		std::vector<RenderDeviceResourceHandle> m_ImageHandles;
+		std::vector<std::vector<RenderDeviceResourceHandle>> m_ImageHandles;
 		std::vector<RenderDeviceResourceHandle> m_DepthImageHandles;
 	};
 

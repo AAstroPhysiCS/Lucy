@@ -89,6 +89,7 @@ namespace Lucy {
 		VulkanRenderDevice& operator=(VulkanRenderDevice&&) = delete;
 
 		void Init(VkInstance instance, const std::vector<const char*>& enabledValidationLayers, VkSurfaceKHR surface, uint32_t apiVersion);
+		void CreateDeviceResources() final override;
 		void Destroy() final override;
 
 		void BeginCommandBuffer(Ref<CommandPool> cmdPool);
@@ -145,7 +146,7 @@ namespace Lucy {
 
 		void RegisterShaderBindings(const Ref<Shader>& shader) final override;
 
-		void SubmitWorkToGPU(const RenderCommandList& renderCommandList, VulkanSemaphore& waitSemaphore, VkPipelineStageFlags2 waitStage,
+		void SubmitWorkToGPU(const RenderCommandList& renderCommandList, const std::vector<VulkanQueueSubmitInfo>& waits,
 			VulkanSemaphore& renderFinishedSemaphore, VulkanSemaphore& frameTimelineSemaphore, uint64_t signalValue);
 		void SubmitWorkToGPUAsBatch(const RenderCommandList& renderCommandList, const ExecutionBatch& batch) final override;
 

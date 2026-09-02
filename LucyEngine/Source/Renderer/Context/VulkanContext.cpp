@@ -98,9 +98,9 @@ namespace Lucy {
 #ifdef LUCY_DEBUG
 		if (auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(m_Instance, "vkCreateDebugUtilsMessengerEXT"))
 			LUCY_VK_ASSERT(func(m_Instance, &debugForVkInstanceAndDestroy, nullptr, &m_DebugMessenger));
-
-		LinkExternalFuncs();
 #endif
+		LinkExternalFuncs();
+
 		const Ref<Window>& window = GetWindow();
 		window->InitVulkanSurface(m_Instance);
 	}

@@ -28,10 +28,11 @@ namespace Lucy {
 		VulkanDescriptorSet& operator=(VulkanDescriptorSet&&) = delete;
 
 		void RTBind(const VulkanDescriptorSetBindInfo& bindInfo);
-		void RTBake(const Ref<VulkanDescriptorPool>& descriptorPool, RenderDevice* device);
+		void Bake(const Ref<VulkanDescriptorPool>& descriptorPool, RenderDevice* device);
 		
 		void RTUpdate(RenderDevice* device) final override;
-		void RTUpdateImageSamplerDescriptors(RenderDevice* device, const std::string& imageBufferName, const RenderDeviceTextureHandle& handle);
+		void RTUpdateImageDescriptors(RenderDevice* device, const std::string& imageBufferName, const RenderDeviceTextureHandle& handle);
+		void RTUpdateSamplerDescriptors(RenderDevice* device, const RenderDeviceResourceHandle& samplerHandle);
 		void RTUpdateAccelerationStructure(RenderDevice* device, const std::string& name, const Ref<AccelerationStructure>& accelerationStructure);
 
 		[[nodiscard]] bool HasAccelerationStructureBinding(const std::string& name) const { return m_AccelerationStructureBindings.contains(name); }
@@ -40,8 +41,8 @@ namespace Lucy {
 
 		inline VkDescriptorSetLayout GetDescriptorSetLayout() const { return m_DescriptorSetLayout; }
 	private:
-		void RTInitializeBufferDescriptors(RenderDevice* device);
-		void RTWriteBufferDescriptors(uint32_t frameIndex, RenderDevice* device);
+		void InitializeBufferDescriptors(RenderDevice* device);
+		void WriteBufferDescriptors(uint32_t frameIndex, RenderDevice* device);
 
 		void RTCreate(const Ref<VulkanRenderDevice>& vulkanDevice);
 		void RTDestroyResource(RenderDevice* device) final override;

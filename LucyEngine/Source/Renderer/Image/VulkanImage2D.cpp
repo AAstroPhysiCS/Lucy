@@ -109,7 +109,7 @@ namespace Lucy {
 		if (m_CreateInfo.GenerateMipmap)
 			GenerateMipmapsImmediate();
 		else //transitioning only then, when we dont care about mipmapping. Mipmapping already transitions to the right layout
-			SetLayoutImmediate(GetInitialImageLayout());
+			SetLayoutImmediate(GetPreferredLayout());
 
 		allocator.DestroyBuffer(imageStagingBuffer, imageStagingBufferVma);
 
@@ -131,7 +131,7 @@ namespace Lucy {
 		if (m_CreateInfo.GenerateMipmap)
 			GenerateMipmapsImmediate();
 		else
-			SetLayoutImmediate(GetInitialImageLayout());
+			SetLayoutImmediate(GetPreferredLayout());
 
 		RTCreateSampler(vulkanDevice);
 		RTCreateVulkanImageViewHandle(vulkanDevice);
@@ -152,7 +152,7 @@ namespace Lucy {
 		if (m_CreateInfo.GenerateMipmap)
 			GenerateMipmapsImmediate();
 		else
-			SetLayoutImmediate(GetInitialImageLayout());
+			SetLayoutImmediate(GetPreferredLayout());
 
 		RTCreateSampler(vulkanDevice);
 		RTCreateVulkanImageViewHandle(vulkanDevice);
@@ -260,7 +260,7 @@ namespace Lucy {
 		TransitionImageLayoutImmediate(m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 		CopyBufferToImageImmediate(imageStagingBuffer, copyRegions);
-		SetLayoutImmediate(GetInitialImageLayout());
+		SetLayoutImmediate(GetPreferredLayout());
 
 		allocator.DestroyBuffer(imageStagingBuffer, imageStagingBufferVma);
 
@@ -276,7 +276,7 @@ namespace Lucy {
 			//ImGui_ImplVulkan_RemoveTexture((VkDescriptorSet)m_ImGuiID);
 
 		m_ImageView.RTDestroyResource();
-		device->RTDestroyResource(m_SamplerHandle);
+		//device->RTDestroyResource(m_SamplerHandle);
 		auto vulkanDevice = reinterpret_cast<VulkanRenderDevice*>(device);
 
 		VulkanAllocator& allocator = vulkanDevice->GetAllocator();
@@ -312,8 +312,8 @@ namespace Lucy {
 				if (oldImageView)
 					vkDestroyImageView(vulkanDevice->GetLogicalDevice(), oldImageView, nullptr);
 
-				if (oldSamplerHandle)
-					vulkanDevice->RTDestroyResource(oldSamplerHandle);
+				//if (oldSamplerHandle)
+					//vulkanDevice->RTDestroyResource(oldSamplerHandle);
 
 				if (oldImage)
 					vulkanDevice->GetAllocator().DestroyImage(oldImage, oldImageVma);

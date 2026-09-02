@@ -30,7 +30,6 @@ namespace Lucy {
 		void RTDestroy();
 
 		const RenderDeviceResourceHandle& GetGlobalDescriptorSet(uint32_t setIndex) const { return m_GlobalDescriptorSets.at(setIndex); }
-		const RenderDeviceResourceHandle& GetDefaultSamplerHandle() const { return m_DefaultSamplerHandle; }
 		std::vector<RenderDeviceResourceHandle> GetDescriptorSetHandles(const Ref<Shader>& shader);
 	private:
 		VulkanRenderDevice* m_RenderDevice = nullptr;
@@ -39,7 +38,5 @@ namespace Lucy {
 
 		std::unordered_map<uint32_t, RenderDeviceResourceHandle> m_GlobalDescriptorSets;
 		std::unordered_map<uint32_t, RenderDeviceResourceHandle> m_DescriptorSetsPerShader;
-
-		RenderDeviceResourceHandle m_DefaultSamplerHandle{};
 	};
 }

@@ -29,9 +29,11 @@ namespace Lucy {
 		void RTEnd();
 		void RTRecreate(const Ref<RenderDevice>& device) final override;
 
-		inline VkRenderPass GetVulkanHandle() { return m_RenderPass; }
-		inline uint32_t GetAttachmentCount() { return m_AttachmentCount; }
-		inline uint32_t GetColorAttachmentCount() { return m_ColorAttachmentCount; }
+		VkRenderPass GetVulkanHandle() { return m_RenderPass; }
+		uint32_t GetAttachmentCount() { return m_AttachmentCount; }
+		uint32_t GetColorAttachmentCount() { return m_ColorAttachmentCount; }
+
+		const std::vector<ImageFormat>& GetColorAttachmentFormats() { return m_ColorAttachmentFormats; }
 	private:
 		void RTCreate(const Ref<VulkanRenderDevice>& vulkanDevice);
 		void RTDestroyResource(RenderDevice* device) final override;
@@ -39,6 +41,7 @@ namespace Lucy {
 		VkRenderPass m_RenderPass = VK_NULL_HANDLE;
 		uint32_t m_AttachmentCount = 0;
 		uint32_t m_ColorAttachmentCount = 0;
+		std::vector<ImageFormat> m_ColorAttachmentFormats;
 
 		//just a helper member variable, to save the commandbuffer that was given in begininfo
 		VkCommandBuffer m_BoundedCommandBuffer = VK_NULL_HANDLE;

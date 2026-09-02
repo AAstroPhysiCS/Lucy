@@ -32,7 +32,7 @@ namespace Lucy {
 
 		void OnWindowResize() final override;
 		void OnViewportResize() final override;
-		glm::vec3 OnMousePicking(const EntityPickedEvent& e, const Ref<Image>& currentFrameBufferImage) final override;
+		uint32_t OnMousePicking(const EntityPickedEvent& e, const Ref<Image>& currentFrameBufferImage) final override;
 
 		void InitializeImGui() final override;
 	private:
@@ -48,7 +48,7 @@ namespace Lucy {
 
 		void InternalImGuiPass(uint64_t signalValue, bool hasSceneWork);
 
-		void LinkBatches(RenderSubmitQueue& submitQueue, uint64_t signalValue);
+		void LinkBatches(RenderSubmitQueue& submitQueue);
 		void ExecuteVulkanBatchBarrier(VkCommandBuffer cmdBuffer, const VulkanBatchBarrier& barrier);
 
 		/*
@@ -62,10 +62,8 @@ namespace Lucy {
 		std::vector<VulkanSemaphore> m_RenderFinishedSemaphores;
 		std::vector<VulkanSemaphore> m_InFlightFences;
 
-		std::vector<VulkanSemaphore> m_SceneFinishedSemaphores;
-
-		// [frameIndex][bridgeIndex]
-		std::vector<std::vector<VulkanSemaphore>> m_BridgeSemaphores;
+		std::array<VulkanSemaphore, static_cast<size_t>(TargetQueueFamily::Count)> m_QueueSemaphores;
+		std::array<uint64_t, static_cast<size_t>(TargetQueueFamily::Count)> m_QueueSemaphoreValues{};
 
 		std::vector<uint64_t> m_FrameFenceValues;
 

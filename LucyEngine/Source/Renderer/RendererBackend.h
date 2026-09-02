@@ -60,7 +60,7 @@ namespace Lucy {
 
 		virtual void OnWindowResize() = 0;
 		virtual void OnViewportResize() = 0;
-		virtual glm::vec3 OnMousePicking(const EntityPickedEvent& e, const Ref<Image>& currentFrameBufferImage) = 0;
+		virtual uint32_t OnMousePicking(const EntityPickedEvent& e, const Ref<Image>& currentFrameBufferImage) = 0;
 
 		virtual void InitializeImGui() = 0;
 	protected:

@@ -170,19 +170,8 @@ namespace Lucy {
         uint64_t requiredVertexCount = m_GlobalVertexCount + vertices.size();
         uint64_t requiredIndexCount = m_GlobalIndexCount + indices.size();
 
-        /*RTEnsureGlobalBufferCapacity<Vertex>(
-            m_GlobalVertexBuffer,
-            requiredVertexCount,
-            m_GlobalVertexCapacity,
-            m_GlobalVertexBuffer->GetUsage()
-        );
-
-        RTEnsureGlobalBufferCapacity<uint32_t>(
-            m_GlobalIndexBuffer,
-            requiredIndexCount,
-            m_GlobalIndexCapacity,
-            m_GlobalIndexBuffer->GetUsage()
-        );*/
+        //bool vertexBufferResized = RTEnsureDeviceAddressBufferCapacity<Vertex>(m_GlobalVertexBuffer);
+        //bool indexBufferResized = RTEnsureDeviceAddressBufferCapacity<uint32_t>(m_GlobalIndexBuffer);
 
         if (!vertices.empty()) {
             const auto& vertexBuffer = m_RenderDevice->AccessResource<RenderDeviceBuffer>(m_GlobalVertexBuffer);

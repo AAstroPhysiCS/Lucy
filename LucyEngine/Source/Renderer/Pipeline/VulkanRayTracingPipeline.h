@@ -56,7 +56,6 @@ namespace Lucy {
 		void RTRecreate(Ref<Shader> shader) final override;
 		void RTTrace(void* commandBufferHandle, uint32_t width, uint32_t height, uint32_t depth) final override;
 		void RTBind(void* commandBufferHandle) final override;
-		void RTUpdateAccelerationStructure(RenderDevice* device, const std::string& name, const Ref<AccelerationStructure>& accelerationStructure);
 	private:
 		void Create(const Ref<VulkanRenderDevice>& vulkanDevice);
 		void RTDestroyResource(RenderDevice* device) final override;

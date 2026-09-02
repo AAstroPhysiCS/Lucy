@@ -19,7 +19,6 @@ namespace Lucy {
 	}
 
 	void VulkanDescriptorSet::RTCreate(const Ref<VulkanRenderDevice>& vulkanDevice) {
-		LUCY_ASSERT(Renderer::IsOnRenderThread());
 		const auto& scene = vulkanDevice->GetScene();
 
 		for (const auto& variable : m_CreateInfo.ShaderVariables) {
@@ -78,6 +77,7 @@ namespace Lucy {
 	}
 
 	void VulkanDescriptorSet::RTBind(const VulkanDescriptorSetBindInfo& bindInfo) {
+		LUCY_PROFILE_NEW_EVENT("VulkanDescriptorSet::RTBind");
 		LUCY_ASSERT(Renderer::IsOnRenderThread());
 		//if the descriptor set needs to be updated per frame (aka if the descriptor set is non-global)
 		if (m_CreateInfo.Count == Renderer::GetMaxFramesInFlight())
@@ -86,8 +86,8 @@ namespace Lucy {
 			vkCmdBindDescriptorSets(bindInfo.CommandBuffer, bindInfo.PipelineBindPoint, bindInfo.PipelineLayout, m_CreateInfo.SetIndex, 1, &m_DescriptorSets[0], 0, nullptr);
 	}
 
-	void VulkanDescriptorSet::RTBake(const Ref<VulkanDescriptorPool>& descriptorPool, RenderDevice* device) {
-		LUCY_ASSERT(Renderer::IsOnRenderThread());
+	void VulkanDescriptorSet::Bake(const Ref<VulkanDescriptorPool>& descriptorPool, RenderDevice* device) {
+		LUCY_PROFILE_NEW_EVENT("VulkanDescriptorSet::Bake");
 		
 		const uint32_t maxFramesInFlight = m_CreateInfo.Count;
 		auto vulkanDevice = device->As<VulkanRenderDevice>();
@@ -151,25 +151,23 @@ namespace Lucy {
 		m_DescriptorSets.resize(maxFramesInFlight);
 		LUCY_VK_ASSERT(vkAllocateDescriptorSets(logicalDevice, &allocInfo, m_DescriptorSets.data()));
 
-		RTInitializeBufferDescriptors(device);
+		InitializeBufferDescriptors(device);
 	}
 
-	void VulkanDescriptorSet::RTInitializeBufferDescriptors(RenderDevice* device) {
-		LUCY_PROFILE_NEW_EVENT("VulkanDescriptorSet::RTInitializeBufferDescriptors");
+	void VulkanDescriptorSet::InitializeBufferDescriptors(RenderDevice* device) {
+		LUCY_PROFILE_NEW_EVENT("VulkanDescriptorSet::InitializeBufferDescriptors");
 		
-		LUCY_ASSERT(Renderer::IsOnRenderThread());
 		LUCY_ASSERT(!m_DescriptorSets.empty());
 
 		const uint32_t maxFramesInFlight = m_CreateInfo.Count;
 
 		for (uint32_t frameIndex = 0; frameIndex < maxFramesInFlight; frameIndex++)
-			RTWriteBufferDescriptors(frameIndex, device);
+			WriteBufferDescriptors(frameIndex, device);
 	}
 
-	void VulkanDescriptorSet::RTWriteBufferDescriptors(uint32_t frameIndex, RenderDevice* device) {
-		LUCY_PROFILE_NEW_EVENT("VulkanDescriptorSet::RTWriteBufferDescriptors");
+	void VulkanDescriptorSet::WriteBufferDescriptors(uint32_t frameIndex, RenderDevice* device) {
+		LUCY_PROFILE_NEW_EVENT("VulkanDescriptorSet::WriteBufferDescriptors");
 
-		LUCY_ASSERT(Renderer::IsOnRenderThread());
 		LUCY_ASSERT(!m_DescriptorSets.empty());
 
 		auto vulkanDevice = reinterpret_cast<VulkanRenderDevice*>(device);
@@ -220,11 +218,10 @@ namespace Lucy {
 
 	void VulkanDescriptorSet::RTUpdate(RenderDevice* device) {
 		LUCY_PROFILE_NEW_EVENT("VulkanDescriptorSet::RTUpdate");
-
-		auto vulkanRenderDevice = reinterpret_cast<VulkanRenderDevice*>(device);
-
 		LUCY_ASSERT(Renderer::IsOnRenderThread());
 		LUCY_ASSERT(!m_DescriptorSets.empty());
+
+		auto vulkanRenderDevice = reinterpret_cast<VulkanRenderDevice*>(device);
 
 		for (RenderDeviceResourceHandle bufferHandle : GetAllUniformBufferHandles() | std::views::values) {
 			const auto& uniformBuffer = vulkanRenderDevice->AccessResource<VulkanUniformBuffer>(bufferHandle);
@@ -245,11 +242,11 @@ namespace Lucy {
 		}
 
 		//not updating everything every frame
-		//RTUpdateImageSamplerDescriptors(device);
+		//RTUpdateImageDescriptors(device);
 	}
 
-	void VulkanDescriptorSet::RTUpdateImageSamplerDescriptors(RenderDevice* device, const std::string& imageBufferName, const RenderDeviceTextureHandle& handle) {
-		LUCY_PROFILE_NEW_EVENT("VulkanDescriptorSet::RTUpdateImageSamplerDescriptor");
+	void VulkanDescriptorSet::RTUpdateImageDescriptors(RenderDevice* device, const std::string& imageBufferName, const RenderDeviceTextureHandle& handle) {
+		LUCY_PROFILE_NEW_EVENT("VulkanDescriptorSet::RTUpdateImageDescriptors");
 		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 
 		auto* bindingInfo = GetVulkanImageSampler(imageBufferName);
@@ -264,7 +261,25 @@ namespace Lucy {
 		vkUpdateDescriptorSets(logicalDevice, 1, &setWrite, 0, nullptr);
 	}
 
+	void VulkanDescriptorSet::RTUpdateSamplerDescriptors(RenderDevice* device, const RenderDeviceResourceHandle& samplerHandle) {
+		LUCY_PROFILE_NEW_EVENT("VulkanDescriptorSet::RTUpdateSamplerDescriptors");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		auto* bindingInfo = GetVulkanImageSampler("Samplers");
+
+		VkDescriptorImageInfo samplerInfo{};
+		samplerInfo.sampler = device->AccessResource<VulkanImageSampler>(samplerHandle)->GetVulkanHandle();
+
+		VkDescriptorSet descriptorSet = m_CreateInfo.Count == Renderer::GetMaxFramesInFlight() ? m_DescriptorSets[frameIndex] : m_DescriptorSets[0];
+		
+		VkWriteDescriptorSet setWrite = VulkanAPI::WriteDescriptorSet(descriptorSet, samplerHandle.Index, bindingInfo->Binding, 1,
+			static_cast<VkDescriptorType>(ConvertDescriptorType(bindingInfo->DescriptorType)), nullptr, &samplerInfo);
+
+		VkDevice logicalDevice = device->As<VulkanRenderDevice>()->GetLogicalDevice();
+		vkUpdateDescriptorSets(logicalDevice, 1, &setWrite, 0, nullptr);
+	}
+
 	void VulkanDescriptorSet::RTUpdateAccelerationStructure(RenderDevice* device, const std::string& name, const Ref<AccelerationStructure>& accelerationStructure) {
+		LUCY_PROFILE_NEW_EVENT("VulkanDescriptorSet::RTUpdateAccelerationStructure");
 		LUCY_ASSERT(Renderer::IsOnRenderThread());
 
 		auto* vulkanDevice = reinterpret_cast<VulkanRenderDevice*>(device);

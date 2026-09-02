@@ -13,11 +13,7 @@ namespace Lucy {
 	class RenderGraphPass;
 	class VulkanImage;
 
-	struct VulkanQueueSubmitInfo {
-		VkPipelineStageFlags2 StageMask = VK_PIPELINE_STAGE_2_NONE;
-		uint64_t Value = 0;
-		VulkanSemaphore Semaphore;
-	};
+	using ExecutionBatchID = size_t;
 
 	struct VulkanImageMemoryBarrier {
 		Ref<VulkanImage> Image;
@@ -34,22 +30,38 @@ namespace Lucy {
 		VulkanBatchBarrier Barrier;
 	};
 
+	struct VulkanQueueSubmitInfo {
+		VkPipelineStageFlags2 StageMask = VK_PIPELINE_STAGE_2_NONE;
+		uint64_t Value = 0;
+		VulkanSemaphore Semaphore;
+	};
+
+	struct VulkanBatchDependency {
+		ExecutionBatchID SourceBatchID = 0;
+		VkPipelineStageFlags2 WaitStageMask = VK_PIPELINE_STAGE_2_NONE;
+	};
+
 	struct VulkanExecutionBatch {
 		TargetQueueFamily QueueFamily;
 		std::vector<RenderGraphPass*> Passes;
-		VulkanBatchBarrier PreBatchBarrier; //release
+
+		VulkanBatchBarrier PreBatchBarrier; //acquire
 		std::vector<VulkanPassBarrier> PassBarriers; //barriers inside of a single batch
-		VulkanBatchBarrier PostBatchBarrier; //acquire
+		VulkanBatchBarrier PostBatchBarrier; //release
+
+		std::vector<VulkanBatchDependency> Dependencies;
+
 		std::vector<VulkanQueueSubmitInfo> Waits;
 		std::vector<VulkanQueueSubmitInfo> Signals;
+
+		uint64_t SignalValue = 0;
+		bool SignalRequired = false;
 	};
 
 	// TODO: DELETE, is for testing
 	struct D3D12ExecutionBatch {
 
 	};
-
-	using ExecutionBatchID = size_t;
 
 	struct ExecutionBatch : public std::variant<VulkanExecutionBatch, D3D12ExecutionBatch> {
 		using std::variant<VulkanExecutionBatch, D3D12ExecutionBatch>::variant;

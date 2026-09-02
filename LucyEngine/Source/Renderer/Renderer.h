@@ -127,7 +127,7 @@ namespace Lucy {
 
 		static void OnWindowResize();
 		static void OnViewportResize();
-		static glm::vec3 OnMousePicking(const EntityPickedEvent& e);
+		static uint32_t OnMousePicking(const EntityPickedEvent& e);
 
 		static void DestroyAllShaders();
 

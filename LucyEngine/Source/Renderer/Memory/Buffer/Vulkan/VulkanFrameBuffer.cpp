@@ -26,11 +26,9 @@ namespace Lucy {
 			std::vector<VkImageView> imageViewHandles;
 			imageViewHandles.reserve(renderPass->GetColorAttachmentCount() + (renderPass->IsDepthBuffered() ? 1 : 0));
 
-			if (m_CreateInfo.IsInFlight) {
-				imageViewHandles.push_back(GetImage(frameIndex)->GetImageView().GetVulkanHandle());
-			} else {
-				for (uint32_t i = 0; i < m_ImageHandles.size(); i++)
-					imageViewHandles.push_back(GetImage(i)->GetImageView().GetVulkanHandle());
+			for (const RenderDeviceResourceHandle& imageHandle : m_CreateInfo.ImageBufferHandles[frameIndex]) {
+				const auto& image = vulkanDevice->AccessResource<VulkanImage>(imageHandle);
+				imageViewHandles.emplace_back(image->GetImageView().GetVulkanHandle());
 			}
 
 			if (renderPass->IsDepthBuffered()) {
@@ -45,8 +43,8 @@ namespace Lucy {
 		}
 	}
 
-	Ref<VulkanImage> VulkanFrameBuffer::GetImage(uint32_t index) {
-		return Renderer::AccessResource<VulkanImage>(m_ImageHandles[index]);
+	Ref<VulkanImage> VulkanFrameBuffer::GetImage(uint32_t frameIndex, uint32_t attachmentIndex) {
+		return Renderer::AccessResource<VulkanImage>(m_ImageHandles[frameIndex][attachmentIndex]);
 	}
 
 	Ref<VulkanImage> VulkanFrameBuffer::GetDepthImage(uint32_t index) {
@@ -61,10 +59,14 @@ namespace Lucy {
 		m_CreateInfo.Width = width;
 		m_CreateInfo.Height = height;
 
-		for (uint32_t i = 0; i < m_ImageHandles.size(); i++)
-			GetImage(i)->RTRecreate(width, height);
-		for (uint32_t i = 0; i < m_DepthImageHandles.size(); i++)
-			GetDepthImage(i)->RTRecreate(width, height);
+		for (uint32_t frameIndex = 0; frameIndex < m_ImageHandles.size(); frameIndex++) {
+			for (uint32_t attachmentIndex = 0; attachmentIndex < m_ImageHandles[frameIndex].size(); attachmentIndex++) {
+				GetImage(frameIndex, attachmentIndex)->RTRecreate(width, height);
+			}
+		}
+
+		for (uint32_t frameIndex = 0; frameIndex < m_DepthImageHandles.size(); frameIndex++)
+			GetDepthImage(frameIndex)->RTRecreate(width, height);
 
 		Renderer::EnqueueResourceRecreate([this](const Ref<RenderDevice>& device) -> RenderDeletionFunc {
 			auto vulkanDevice = device->As<VulkanRenderDevice>();

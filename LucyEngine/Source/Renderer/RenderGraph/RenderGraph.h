@@ -14,6 +14,8 @@ namespace Lucy {
 
 	class RenderGraph final {
 	public:
+		using DAG = DirectedAcyclicGraph<RenderGraphPass, RenderGraphResource>;
+
 		RenderGraph(RenderArchitecture arch, Ref<RenderDevice> device);
 		~RenderGraph() = default;
 
@@ -37,7 +39,7 @@ namespace Lucy {
 		void ImportExternalResource(const RenderGraphResource& rgResource, const std::vector<RenderDeviceResourceHandle>& handles, RGResourceData data = {});
 		void ImportExternalTransientResource(const RenderGraphResource& rgResource, RenderDeviceResourceHandle handle);
 
-		DirectedAcyclicGraph<RenderGraphPass, RenderGraphResource>& GetAcyclicGraph() { return m_AcyclicGraph; }
+		DAG& GetAcyclicGraph() { return m_AcyclicGraph; }
 		const RenderGraphRegistry& GetRegistry() const { return m_Registry; }
 		size_t GetPassCount() const { return m_Passes.size(); }
 	private:
@@ -96,12 +98,12 @@ namespace Lucy {
 
 		RenderGraphBatches CreateBatchesForRendering() const;
 
-		bool CheckIfPassNeedsCulling(RenderGraphPass* pass, const std::unordered_set<RenderGraphResource>& inputResources, const std::unordered_set<RenderGraphResource>& outputResources);
+		bool CheckIfPassNeedsCulling(DAG::NodeID nodeId, const std::unordered_set<RenderGraphResource>& inputResources);
 		void Update();
 		
 		std::map<std::string, RenderGraphPass> m_Passes;
 		
-		DirectedAcyclicGraph<RenderGraphPass, RenderGraphResource> m_AcyclicGraph;
+		DAG m_AcyclicGraph;
 
 		Ref<RenderDevice> m_RenderDevice = nullptr;
 		RenderGraphRegistry m_Registry;

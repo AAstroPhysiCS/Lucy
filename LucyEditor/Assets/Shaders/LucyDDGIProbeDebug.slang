@@ -2,9 +2,11 @@
 #include "LucyDDGICommon.slang"
 
 struct DDGIProbeDebugData {
+    DDGIRayResult* RayResults;
+
     float4 ProbeOriginAndRadius;
     float4 ProbeSpacing;
-    uint4 ProbeCounts;
+    uint4 ProbeCountsAndRays;
 };
 
 [[vk::push_constant]]
@@ -14,14 +16,14 @@ struct VertexOutput {
     float4 Position : SV_Position;
 
     [[vk::location(0)]]
-    float3 Normal : NORMAL;
+    nointerpolation uint ProbeIndex : PROBE_INDEX;
 };
 
 [shader("vertex")]
 VertexOutput main(uint vertexIndex: SV_VulkanVertexID, uint instanceIndex: SV_VulkanInstanceID) {
     SceneCamera camera = PushConstants.Root->Camera;
 
-    uint3 probeCoordinate = GetProbeCoordinate(instanceIndex, PushConstants.Data.ProbeCounts.xyz);
+    uint3 probeCoordinate = GetProbeCoordinate(instanceIndex, PushConstants.Data.ProbeCountsAndRays.xyz);
     float3 probePosition = PushConstants.Data.ProbeOriginAndRadius.xyz + float3(probeCoordinate) * PushConstants.Data.ProbeSpacing.xyz;
     GPUVertex vertex = PushConstants.Root->Addresses.Vertices[vertexIndex];
 
@@ -31,12 +33,13 @@ VertexOutput main(uint vertexIndex: SV_VulkanVertexID, uint instanceIndex: SV_Vu
     
     VertexOutput output;
     output.Position = mul(camera.u_ProjMatrix, viewPosition);
+    output.ProbeIndex = instanceIndex;
     return output;
 }
 
 struct PixelInput {
     [[vk::location(0)]]
-    float3 Normal : NORMAL;
+    nointerpolation uint ProbeIndex : PROBE_INDEX;
 };
 
 struct PixelOutput {
@@ -45,10 +48,17 @@ struct PixelOutput {
 
 [shader("fragment")]
 PixelOutput main(PixelInput input) {
-    float3 normal = normalize(input.Normal);
-    float3 color = float3(1.0f, 1.0f, 1.0f);
-    //do some sort of basic lighting
+    uint raysPerProbe = PushConstants.Data.ProbeCountsAndRays.w;
+    uint firstRayIndex = input.ProbeIndex * raysPerProbe;
+
+    float3 irradiance = float3(0.0f);
+
+    for (uint rayIndex = 0; rayIndex < raysPerProbe; rayIndex++) {
+        irradiance += PushConstants.Data.RayResults[firstRayIndex + rayIndex].RadianceAndDistance.xyz;
+    }
+    irradiance /= float(raysPerProbe);
+
     PixelOutput output;
-    output.Color = float4(color, 1.0f);
+    output.Color = float4(irradiance, 1.0f);
     return output;
 }

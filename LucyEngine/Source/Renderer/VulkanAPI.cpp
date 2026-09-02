@@ -444,8 +444,8 @@ namespace Lucy::VulkanAPI {
 	}
 
 	VkImageCreateInfo VulkanAPI::ImageCreateInfo(VkImageType imageType, VkExtent3D extent, uint32_t mipLevels, uint32_t arrayLayers,
-												 VkFormat format, VkImageTiling tiling, VkImageLayout initialLayout, VkImageUsageFlags usage,
-												 VkSharingMode sharingMode, VkSampleCountFlagBits samples, VkImageCreateFlags flags) {
+												VkFormat format, VkImageTiling tiling, VkImageLayout initialLayout, VkImageUsageFlags usage, VkSharingMode sharingMode, 
+												VkSampleCountFlagBits samples, uint32_t queueFamilyIndexCount, const uint32_t* pQueueFamilyIndices, VkImageCreateFlags flags) {
 		VkImageCreateInfo imageCreateInfo{};
 		imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		imageCreateInfo.imageType = imageType;
@@ -459,6 +459,8 @@ namespace Lucy::VulkanAPI {
 		imageCreateInfo.flags = flags;
 		imageCreateInfo.sharingMode = sharingMode;
 		imageCreateInfo.samples = samples;
+		imageCreateInfo.queueFamilyIndexCount = queueFamilyIndexCount;
+		imageCreateInfo.pQueueFamilyIndices = pQueueFamilyIndices;
 
 		return imageCreateInfo;
 	}

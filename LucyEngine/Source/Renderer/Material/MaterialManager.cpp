@@ -1,4 +1,7 @@
 #include "lypch.h"
+
+#include <numeric>
+
 #include "MaterialManager.h"
 #include "PBRMaterial.h"
 
@@ -29,6 +32,7 @@ namespace Lucy {
 	}
 
 	void MaterialManager::RTDestroyMaterial(RenderDeviceObjectHandle handle) {
+		//TODO: delete from cache
 		m_Materials.at(handle)->RTDestroyResource();
 		m_Materials.erase(handle);
 	}
@@ -42,6 +46,7 @@ namespace Lucy {
 		for (auto& [id, material] : m_Materials) {
 			material->RTDestroyResource();
 		}
+		m_TextureCache.clear();
 		m_Materials.clear();
 	}
 
@@ -113,14 +118,22 @@ namespace Lucy {
 	}
 
 	void MaterialManager::LoadMaterialTextures(aiMaterial* aiMaterial, const std::string& importedFilePath, const Ref<Material>& material) {
+		const auto IsValidTexture = [&aiMaterial](aiString& path, aiTextureType textureType) {
+			if (aiMaterial->GetTexture(textureType, 0, &path) != aiReturn_SUCCESS || path.length == 0)
+				return false;
+			return true;
+		};
+
 		const auto TryLoadTextureIntoSlot = [&](aiTextureType textureType, MaterialImageType slot, ImageFormat format) -> bool {
 			aiString path;
-			if (aiMaterial->GetTexture(textureType, 0, &path) != aiReturn_SUCCESS || path.length == 0)
+			if (!IsValidTexture(path, textureType))
 				return false;
 
 			auto properTexturePath = FileSystem::GetParentPath(importedFilePath) / std::string(path.C_Str());
 
-			Renderer::EnqueueToRenderCommandQueue([material, properTexturePath, path, slot, format](const Ref<RenderDevice>& device) {
+			const std::filesystem::path canonicalPath = std::filesystem::weakly_canonical(properTexturePath);
+
+			Renderer::EnqueueToRenderCommandQueue([material, properTexturePath, path, slot, format, this, canonicalPath](const Ref<RenderDevice>& device) {
 				ImageCreateInfo createInfo{};
 				createInfo.Format = format;
 				createInfo.ImageType = ImageType::Type2D;
@@ -134,35 +147,85 @@ namespace Lucy {
 				createInfo.GenerateSampler = true;
 				createInfo.ImGuiUsage = true;
 
-				RenderDeviceResourceHandle textureHandle = device->CreateImage(properTexturePath, createInfo, "PBR Image: " + std::string(path.C_Str()));
+				RenderDeviceResourceHandle textureHandle{};
+				if (auto it = m_TextureCache.find(canonicalPath); it != m_TextureCache.end()) {
+					textureHandle = it->second;
+				} else {
+					textureHandle = device->CreateImage(properTexturePath, createInfo, "PBR Image: " + std::string(path.C_Str()));
+					m_TextureCache.emplace(canonicalPath, textureHandle);
+				}
+
 				material->SetTexture(slot, textureHandle);
-				
+
 				const auto& data = std::any_cast<RenderDevicePBRMaterialData>(material->BuildRenderData(device));
 				device->GetScene()->UpdatePBRMaterial(material->GetMaterialDeviceID(), data);
 			});
 
 			return true;
 		};
-
+		//fucking cancer to support all possible combinations
 		switch (material->GetMaterialType()) {
 			case MaterialType::PBR: {
 				bool loadedBase = TryLoadTextureIntoSlot(aiTextureType_BASE_COLOR, PBRMaterial::ALBEDO_TYPE, ImageFormat::R8G8B8A8_SRGB);
 				if (!loadedBase) {
 					TryLoadTextureIntoSlot(aiTextureType_DIFFUSE, PBRMaterial::ALBEDO_TYPE, ImageFormat::R8G8B8A8_SRGB);
 				}
+
 				bool loadedNormal = TryLoadTextureIntoSlot(aiTextureType_NORMALS, PBRMaterial::NORMALS_TYPE, ImageFormat::R8G8B8A8_UNORM);
 				if (!loadedNormal) {
 					TryLoadTextureIntoSlot(aiTextureType_NORMAL_CAMERA, PBRMaterial::NORMALS_TYPE, ImageFormat::R8G8B8A8_UNORM);
 				}
-				TryLoadTextureIntoSlot(aiTextureType_AMBIENT_OCCLUSION, PBRMaterial::AO_TYPE, ImageFormat::R8G8B8A8_UNORM);
-				TryLoadTextureIntoSlot(aiTextureType_DIFFUSE_ROUGHNESS, PBRMaterial::ROUGHNESS_TYPE, ImageFormat::R8G8B8A8_UNORM);
-				TryLoadTextureIntoSlot(aiTextureType_METALNESS, PBRMaterial::METALLIC_TYPE, ImageFormat::R8G8B8A8_UNORM);
+
 				TryLoadTextureIntoSlot(aiTextureType_EMISSIVE, PBRMaterial::EMISSIVE_TYPE, ImageFormat::R8G8B8A8_SRGB);
-				//TODO:
-				//bool loadedGLTF = TryLoadTextureIntoSlot(aiTextureType_GLTF_METALLIC_ROUGHNESS, PBRMaterial::ORM_TYPE, ImageFormat::R8G8B8A8_UNORM);
+
+				bool loadedORM = TryLoadTextureIntoSlot(aiTextureType_GLTF_METALLIC_ROUGHNESS, PBRMaterial::ORM_TYPE, ImageFormat::R8G8B8A8_UNORM);
+				//fucking cancer to try to support every model
+				if (!loadedORM) {
+					aiString aoPath;
+					bool hasAO = IsValidTexture(aoPath, aiTextureType_AMBIENT_OCCLUSION);
+
+					aiString roughnessPath;
+					bool hasRoughness = IsValidTexture(roughnessPath, aiTextureType_DIFFUSE_ROUGHNESS);
+
+					aiString metallicPath;
+					bool hasMetallic = IsValidTexture(metallicPath, aiTextureType_METALNESS);
+
+					if (hasAO && hasRoughness && hasMetallic) {
+						if (aoPath == roughnessPath && roughnessPath == metallicPath) {
+							TryLoadTextureIntoSlot(aiTextureType_DIFFUSE_ROUGHNESS, PBRMaterial::ORM_TYPE, ImageFormat::R8G8B8A8_UNORM);
+							break;
+						}
+					}
+
+					aiString specularPath;
+					bool hasSpecular = IsValidTexture(specularPath, aiTextureType_SPECULAR);
+
+					if (hasSpecular) {
+						bool packedSpecularTexture = false;
+						
+						if (hasAO && specularPath == aoPath)
+							packedSpecularTexture = true;
+						if (hasRoughness && specularPath == roughnessPath)
+							packedSpecularTexture = true;
+						if (hasMetallic && specularPath == metallicPath)
+							packedSpecularTexture = true;
+
+						// Amazon Lumberyard Bistro stores AO, roughness and metallic
+						// packed into the specular texture
+						if (packedSpecularTexture || (!hasAO && !hasRoughness && !hasMetallic)) {
+							TryLoadTextureIntoSlot(aiTextureType_SPECULAR, PBRMaterial::ORM_TYPE, ImageFormat::R8G8B8A8_UNORM);
+							break;
+						}
+					}
+
+					TryLoadTextureIntoSlot(aiTextureType_AMBIENT_OCCLUSION, PBRMaterial::AO_TYPE, ImageFormat::R8G8B8A8_UNORM);
+					TryLoadTextureIntoSlot(aiTextureType_DIFFUSE_ROUGHNESS, PBRMaterial::ROUGHNESS_TYPE, ImageFormat::R8G8B8A8_UNORM);
+					TryLoadTextureIntoSlot(aiTextureType_METALNESS, PBRMaterial::METALLIC_TYPE, ImageFormat::R8G8B8A8_UNORM);
+				}
 				break;
 			}
 			default:
+				LUCY_ASSERT(false, "Material type not yet implemented!");
 				break;
 		}
 	}

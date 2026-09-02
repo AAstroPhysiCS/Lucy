@@ -43,18 +43,18 @@ namespace Lucy {
 
 		m_InFlightFences.reserve(m_MaxFramesInFlight);
 		m_ImageAvailableSemaphores.reserve(m_MaxFramesInFlight);
-		m_SceneFinishedSemaphores.reserve(m_MaxFramesInFlight);
 
 		m_RenderFinishedSemaphores.reserve(swapImageCount);
 
-		m_BridgeSemaphores.resize(m_MaxFramesInFlight);
 		m_FrameFenceValues.resize(m_MaxFramesInFlight, 0);
 
 		for (size_t i = 0; i < m_MaxFramesInFlight; i++) {
 			m_InFlightFences.emplace_back(SemaphoreType::Timeline, vulkanDevice);
 			m_ImageAvailableSemaphores.emplace_back(SemaphoreType::Binary, vulkanDevice);
-			m_SceneFinishedSemaphores.emplace_back(SemaphoreType::Binary, vulkanDevice);
 		}
+
+		for (auto& semaphore : m_QueueSemaphores)
+			semaphore = VulkanSemaphore(SemaphoreType::Timeline, vulkanDevice);
 
 		for (size_t i = 0; i < swapImageCount; i++) {
 			m_RenderFinishedSemaphores.emplace_back(SemaphoreType::Binary, vulkanDevice);
@@ -112,7 +112,7 @@ namespace Lucy {
 
 		const auto& vulkanDevice = m_RenderDevice->As<VulkanRenderDevice>();
 		auto& submitQueue = m_RenderCommandQueue->GetRenderSubmitQueue();
-		const bool hasSceneWork = !submitQueue.empty();
+		bool hasSceneWork = !submitQueue.empty();
 
 		uint64_t signalValue = m_FrameFenceValues[m_CurrentFrameIndex] + 1;
 
@@ -120,7 +120,7 @@ namespace Lucy {
 			LUCY_PROFILE_NEW_EVENT("VulkanRenderer::RenderFrame::SubmitQueue");
 
 			m_RenderCommandQueue->AllocateCommandLists(submitQueue);
-			LinkBatches(submitQueue, signalValue);
+			LinkBatches(submitQueue);
 
 			for (auto& [id, info] : submitQueue) {
 				auto& vkBatch = info.Batch.AsVulkanBatch();
@@ -238,6 +238,9 @@ namespace Lucy {
 
 	void VulkanRenderer::InternalImGuiPass(uint64_t signalValue, bool hasSceneWork) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::InternalImGuiPass");
+
+		constexpr size_t queueCount = static_cast<size_t>(TargetQueueFamily::Count);
+
 		const auto& imguiPool = m_ImGuiRenderCommandList->GetPrimaryCommandPool();
 		const auto& swapChain = GetSwapChain()->As<VulkanSwapChain>();
 
@@ -245,15 +248,85 @@ namespace Lucy {
 		m_ImGuiPassImpl.Render(swapChain, *m_ImGuiRenderCommandList.get());
 		m_RenderDevice->EndCommandBuffer(imguiPool);
 
-		VulkanSemaphore& waitSem = hasSceneWork
-			? m_SceneFinishedSemaphores[m_CurrentFrameIndex]
-			: m_ImageAvailableSemaphores[m_CurrentFrameIndex];
+		std::vector<VulkanQueueSubmitInfo> waits;
+		waits.emplace_back(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, 0, m_ImageAvailableSemaphores[m_CurrentFrameIndex]);
 
-		m_RenderDevice->As<VulkanRenderDevice>()->SubmitWorkToGPU(*m_ImGuiRenderCommandList.get(), waitSem, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-			m_RenderFinishedSemaphores[m_ImageIndex], m_InFlightFences[m_CurrentFrameIndex], signalValue);
+		if (hasSceneWork) {
+			std::array<bool, queueCount> activeQueues{};
+
+			for (const auto& [id, info] : m_RenderCommandQueue->GetRenderSubmitQueue())
+				activeQueues[static_cast<size_t>(info.Batch.AsVulkanBatch().QueueFamily)] = true;
+
+			for (size_t queueIndex = 0; queueIndex < queueCount; queueIndex++) {
+				if (!activeQueues[queueIndex])
+					continue;
+
+				waits.emplace_back(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, m_QueueSemaphoreValues[queueIndex], m_QueueSemaphores[queueIndex]);
+			}
+		}
+
+		m_RenderDevice->As<VulkanRenderDevice>()->SubmitWorkToGPU(*m_ImGuiRenderCommandList.get(), waits, m_RenderFinishedSemaphores[m_ImageIndex], m_InFlightFences[m_CurrentFrameIndex], signalValue);
 	}
 
-	void VulkanRenderer::LinkBatches(RenderSubmitQueue& submitQueue, uint64_t signalValue) {
+	void VulkanRenderer::LinkBatches(RenderSubmitQueue& submitQueue) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::LinkBatches");
+
+		constexpr size_t queueCount = static_cast<size_t>(TargetQueueFamily::Count);
+
+		for (auto& [id, info] : submitQueue) {
+			auto& vkBatch = info.Batch.AsVulkanBatch();
+
+			vkBatch.Waits.clear();
+			vkBatch.Signals.clear();
+			vkBatch.SignalValue = 0;
+		}
+
+		if (submitQueue.empty())
+			return;
+
+		std::array<VulkanExecutionBatch*, queueCount> queueTails{};
+
+		const auto SignalBatch = [&](VulkanExecutionBatch& batch) {
+			if (batch.SignalValue != 0)
+				return;
+
+			size_t queueIndex = static_cast<size_t>(batch.QueueFamily);
+			batch.SignalValue = ++m_QueueSemaphoreValues[queueIndex];
+			batch.Signals.emplace_back(VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, batch.SignalValue, m_QueueSemaphores[queueIndex]);
+		};
+
+		for (auto& [id, info] : submitQueue) {
+			auto& vkBatch = info.Batch.AsVulkanBatch();
+
+			queueTails[static_cast<size_t>(vkBatch.QueueFamily)] = &vkBatch;
+
+			if (vkBatch.SignalRequired)
+				SignalBatch(vkBatch);
+		}
+
+		for (VulkanExecutionBatch* queueTail : queueTails) {
+			if (queueTail)
+				SignalBatch(*queueTail);
+		}
+
+		for (auto& [id, info] : submitQueue) {
+			auto& destinationBatch = info.Batch.AsVulkanBatch();
+
+			for (const VulkanBatchDependency& dependency : destinationBatch.Dependencies) {
+				auto sourceIt = submitQueue.find(dependency.SourceBatchID);
+				LUCY_ASSERT(sourceIt != submitQueue.end());
+
+				auto& sourceBatch = sourceIt->second.Batch.AsVulkanBatch();
+
+				LUCY_ASSERT(sourceBatch.SignalValue != 0);
+
+				size_t sourceQueueIndex = static_cast<size_t>(sourceBatch.QueueFamily);
+				destinationBatch.Waits.emplace_back(dependency.WaitStageMask, sourceBatch.SignalValue, m_QueueSemaphores[sourceQueueIndex]);
+			}
+		}
+	}
+
+/*	void VulkanRenderer::LinkBatches(RenderSubmitQueue& submitQueue) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::LinkBatches");
 
 		for (auto& [id, info] : submitQueue) {
@@ -321,7 +394,7 @@ namespace Lucy {
 		const VkPipelineStageFlags2 lastSignalStages = GetDefaultSignalStage(lastBatch.QueueFamily);
 
 		lastBatch.Signals.emplace_back(lastSignalStages, 0, sceneFinishedSemaphore);
-	}
+	}*/
 
 	void VulkanRenderer::ExecuteVulkanBatchBarrier(VkCommandBuffer cmdBuffer, const VulkanBatchBarrier& barrier) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::RenderFrame::SubmitQueue::ExecuteVulkanBatchBarrier");
@@ -386,11 +459,11 @@ namespace Lucy {
 							const auto& device = GetRenderDevice();
 							const auto& renderPass = device->AccessResource<RenderPass>(renderPassHandle);
 							const auto& frameBuffer = device->AccessResource<FrameBuffer>(frameBufferHandle);
-							RenderCommand cmd = cmdList.BeginRenderCommand();
 							device->BeginRenderPass(renderPass, frameBuffer, cmdList.GetPrimaryCommandPool());
+							RenderCommand cmd = cmdList.BeginRenderCommand();
 							pass->Execute(cmd);
-							device->EndRenderPass(renderPass);
 							cmdList.EndRenderCommand(pass->GetName(), cmd);
+							device->EndRenderPass(renderPass);
 						});
 						break;
 					}
@@ -453,10 +526,8 @@ namespace Lucy {
 			m_RenderFinishedSemaphores[i].Destroy();
 		}
 
-		for (auto& perFrameBridges : m_BridgeSemaphores) {
-			for (auto& semaphore : perFrameBridges)
-				semaphore.Destroy();
-		}
+		for (auto& semaphore : m_QueueSemaphores)
+			semaphore.Destroy();
 
 		FlushCommandQueue();
 		RendererBackend::Destroy();
@@ -496,49 +567,42 @@ namespace Lucy {
 		s_IDBufferVma = VK_NULL_HANDLE;
 	}
 	
-	glm::vec3 VulkanRenderer::OnMousePicking(const EntityPickedEvent& e, const Ref<Image>& currentFrameBufferImage) {
+	uint32_t VulkanRenderer::OnMousePicking(const EntityPickedEvent& e, const Ref<Image>& currentFrameBufferImage) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderer::OnMousePicking");
+
+		constexpr auto invalid = 0;
 
 		float viewportMouseX = e.GetViewportMouseX();
 		float viewportMouseY = e.GetViewportMouseY();
 
 		if (viewportMouseX < 0 && viewportMouseY < 0)
-			return glm::vec3(-1.0f);
+			return invalid;
 
 		const auto& image = currentFrameBufferImage->As<VulkanImage2D>();
 		uint32_t imageWidth = image->GetWidth();
 		uint32_t imageHeight = image->GetHeight();
-		VkDeviceSize imageSize = (VkDeviceSize)imageWidth * imageHeight * 4;
+
+		uint32_t x = static_cast<uint32_t>(viewportMouseX);
+		uint32_t y = imageHeight - 1 - static_cast<uint32_t>(viewportMouseY);
+
+		if (x >= imageWidth || y >= imageHeight)
+			return invalid;
 
 		auto& allocator = GetRenderDevice()->As<VulkanRenderDevice>()->GetAllocator();
 		if (!s_IDBuffer)
-			allocator.CreateVulkanBufferVma(MemoryUsage::CPUOnly, imageSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT, false, s_IDBuffer, s_IDBufferVma);
+			allocator.CreateVulkanBufferVma(MemoryUsage::CPUOnly, sizeof(uint32_t), VK_BUFFER_USAGE_TRANSFER_DST_BIT, false, s_IDBuffer, s_IDBufferVma);
+
+		VkImageLayout previousLayout = image->GetCurrentLayout();
 
 		image->SetLayoutImmediate(VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-		image->CopyImageToBufferImmediate(s_IDBuffer);
-
-		ByteBuffer rawData;
+		image->CopyPixelToBufferImmediate(s_IDBuffer, x, y);
 
 		void* rawDataMapped;
 		allocator.MapMemory(s_IDBufferVma, rawDataMapped);
-		rawData.SetData((uint8_t*)rawDataMapped, imageSize);
+		uint32_t meshID = *static_cast<const uint32_t*>(rawDataMapped);
 		allocator.UnmapMemory(s_IDBufferVma);
 
-		uint32_t flippedY = imageHeight - 1 - (uint32_t)(viewportMouseY);
-		uint32_t bufferPos = (uint32_t) (4 * ((flippedY * imageWidth) + viewportMouseX));
-		glm::vec3 meshID = glm::vec3(rawData[bufferPos], rawData[bufferPos + 1], rawData[bufferPos + 2]);
-
-		image->SetLayoutImmediate(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-		//checking if the data that is being read make sense
-		if ((meshID.x > 255.0f || meshID.x < 0.0f) ||
-			(meshID.y > 255.0f || meshID.y < 0.0f) ||
-			(meshID.z > 255.0f || meshID.z < 0.0f))
-			return glm::vec3(-1.0f);
-
-		//checking if we clicked on the void
-		if (meshID.x == 0 && meshID.y == 0 && meshID.z == 0)
-			return glm::vec3(-1.0f);
+		image->SetLayoutImmediate(previousLayout);
 
 		return meshID;
 	}

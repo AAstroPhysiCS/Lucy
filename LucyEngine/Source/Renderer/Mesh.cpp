@@ -149,8 +149,6 @@ namespace Lucy {
 				Vertex& vertex = submesh.Vertices[vertexIndex];
 				vertex = {};
 
-				vertex.MeshID = m_MeshID;
-
 				if (positions) {
 					aiVector3D& position = positions[vertexIndex];
 					vertex.Position = { position.x, position.y, position.z };
@@ -265,7 +263,6 @@ namespace Lucy {
 	void Mesh::OptimizeMeshData(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices) {
 		meshopt_Stream vertexStreams[] = {
 			{ &vertices[0].Position.x, sizeof(float) * 3, sizeof(Vertex) },
-			{ &vertices[0].MeshID.x, sizeof(float) * 3, sizeof(Vertex) },
 			{ &vertices[0].TexCoords.x, sizeof(float) * 2, sizeof(Vertex) },
 			{ &vertices[0].Normal.x, sizeof(float) * 3, sizeof(Vertex) },
 			{ &vertices[0].Tangent.x, sizeof(float) * 3, sizeof(Vertex) },

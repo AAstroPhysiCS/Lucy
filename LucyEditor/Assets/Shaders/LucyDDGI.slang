@@ -59,7 +59,6 @@ void Miss(inout DDGIRayPayload payload) {
 
 [shader("closesthit")]
 void ClosestHit(inout DDGIRayPayload payload, BuiltInTriangleIntersectionAttributes attributes) {
-
     payload.Radiance = float3(1.0f, 0.0f, 0.0f);
     payload.Distance = 444.0f;
 }

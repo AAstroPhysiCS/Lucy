@@ -16,7 +16,6 @@ namespace Lucy {
 
 	struct ImageSamplerCreateInfo {
 		bool MipmapEnabled = false;
-		float MipmapLevel = 0.0f;
 		ImageParameter Parameter;
 	};
 
@@ -31,7 +30,6 @@ namespace Lucy {
 
 		inline ImageParameter GetParameter() const { return m_CreateInfo.Parameter; }
 
-		inline float GetMipmapLevel() const { return m_CreateInfo.MipmapLevel; }
 		inline bool IsMipmapEnabled() const { return m_CreateInfo.MipmapEnabled; }
 	protected:
 		ImageSampler(const ImageSamplerCreateInfo& createInfo)

@@ -45,15 +45,16 @@ namespace Lucy {
 
 		GLFWwindow* Raw();
 
-		inline int32_t GetWidth() const { return m_CreateInfo.Width; }
-		inline int32_t GetHeight() const { return m_CreateInfo.Height; }
+		int32_t GetWidth() const { return m_CreateInfo.Width; }
+		int32_t GetHeight() const { return m_CreateInfo.Height; }
 		
 		void InitVulkanSurface(VkInstance instance);
 		void DestroyVulkanSurface(VkInstance instance);
-		inline VkSurfaceKHR GetVulkanSurface() const { return m_Surface; }
+		VkSurfaceKHR GetVulkanSurface() const { return m_Surface; }
 
 		void SetTitle(const char* title);
-		inline const std::string& GetTitle() const { return m_CreateInfo.Title; }
+		const std::string& GetTitle() const { return m_CreateInfo.Title; }
+		const glm::vec2& GetWindowContentScale() const { return m_ContentScale; }
 
 		static Ref<Window> Create(const WindowCreateInfo& createInfo);
 	protected:
@@ -63,6 +64,8 @@ namespace Lucy {
 		VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
 
 		WindowData m_Data;
+
+		glm::vec2 m_ContentScale{ 0.0f, 0.0f };
 	};
 
 	class WinWindow : public Window {
