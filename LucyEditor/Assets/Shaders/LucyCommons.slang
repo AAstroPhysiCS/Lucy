@@ -13,6 +13,8 @@ static constexpr const uint32_t NUM_PREFILTER_MIP_LEVELS = 5u;
 static constexpr const uint SAMPLE_COUNT = 1024u;
 static constexpr const uint MAX_MIP = 5u;
 
+#define DIELECTRIC_SPECULAR 0.04
+
 #define IDENTITY_MATRIX float4x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)
 
 float4 SRGBtoLINEAR(float4 srgbIn) {

@@ -58,7 +58,7 @@ namespace Lucy {
 		static void ImportExternalRenderGraphTransientResource(const RenderGraphResource& renderGraphResource, RenderDeviceResourceHandle renderResourceHandle);
 	public:
 		template <typename TRendererPass, typename ... TArgs> requires IsRendererPass<TRendererPass>
-		static inline void AddRendererPass(TArgs ... args) {
+		static void AddRendererPass(TArgs ... args) {
 			TRendererPass rendererPass(args...);
 			rendererPass.AddPass(s_RenderGraph);
 		}
@@ -68,7 +68,7 @@ namespace Lucy {
 
 #pragma region RenderDevice
 		template <typename TResource> requires IsRenderResource<TResource>
-		static inline Ref<TResource> AccessResource(RenderDeviceResourceHandle handle) {
+		static Ref<TResource> AccessResource(RenderDeviceResourceHandle handle) {
 			if (!handle)
 				return nullptr;
 			auto& device = GetRenderDevice();
@@ -86,22 +86,23 @@ namespace Lucy {
 
 		static bool IsValidRenderResource(RenderDeviceResourceHandle handle);
 
-		static inline uint32_t GetCurrentImageIndex() { return s_Backend->GetCurrentImageIndex(); }
-		static inline uint32_t GetCurrentFrameIndex() { return s_Backend->GetCurrentFrameIndex(); }
-		static inline uint32_t GetMaxFramesInFlight() { return s_Backend->GetMaxFramesInFlight(); }
+		static uint32_t GetCurrentImageIndex() { return s_Backend->GetCurrentImageIndex(); }
+		static uint32_t GetCurrentFrameIndex() { return s_Backend->GetCurrentFrameIndex(); }
+		static uint32_t GetMaxFramesInFlight() { return s_Backend->GetMaxFramesInFlight(); }
+		static uint64_t GetFrameNumber() { return s_Backend->GetFrameNumber(); }
 
-		static inline const RenderCommandQueueMetricsOutput& GetCommandQueueMetrics() { return s_Backend->GetCommandQueueMetrics(); }
+		static const RenderCommandQueueMetricsOutput& GetCommandQueueMetrics() { return s_Backend->GetCommandQueueMetrics(); }
 
 		static void ReloadShader(const std::string& name);
-		static inline const ShaderLibrary& GetShaderLibrary() { return s_ShaderManager.GetShaderLibrary(); }
+		static const ShaderLibrary& GetShaderLibrary() { return s_ShaderManager.GetShaderLibrary(); }
 
-		static inline Unique<PipelineManager>& GetPipelineManager() { return s_PipelineManager; }
+		static Unique<PipelineManager>& GetPipelineManager() { return s_PipelineManager; }
 		static Unique<MaterialManager>& GetMaterialManager();
 
-		static inline RenderArchitecture GetRenderArchitecture() { return s_Config.RenderArchitecture; }
-		static inline RendererSettings& GetRendererSettings() { return s_Config.Settings; }
+		static RenderArchitecture GetRenderArchitecture() { return s_Config.RenderArchitecture; }
+		static RendererSettings& GetRendererSettings() { return s_Config.Settings; }
 
-		static inline RenderDeviceResourceHandle GetBlankCubeImageHandle() { return s_BlankCubeHandle; }
+		static RenderDeviceResourceHandle GetBlankCubeImageHandle() { return s_BlankCubeHandle; }
 		static Ref<Image> GetBlankCubeImage();
 		static Ref<Image> GetBlankArrayImage();
 
@@ -117,8 +118,8 @@ namespace Lucy {
 
 		static void OnEvent(Event& evt);
 	private:
-		static inline const Ref<RenderContext>& GetRenderContext() { return s_Backend->GetRenderContext(); }
-		static inline const Ref<RenderDevice>& GetRenderDevice() { return s_Backend->GetRenderDevice(); }
+		static const Ref<RenderContext>& GetRenderContext() { return s_Backend->GetRenderContext(); }
+		static const Ref<RenderDevice>& GetRenderDevice() { return s_Backend->GetRenderDevice(); }
 
 		static void Init(RendererConfiguration config, const Ref<Window>& window);
 		static void Destroy();

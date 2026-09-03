@@ -19,20 +19,20 @@ namespace Lucy {
 			std::copy(other.m_Data.begin(), other.m_Data.end(), std::back_inserter(m_Data));
 		}
 
-		Buffer& operator=(const Buffer& other) { 
-			if (this != &other) {
+		Buffer(Buffer&& other) noexcept {
+			m_Data = std::move(other.m_Data);
+		}
+
+		Buffer& operator=(const Buffer& other) {
+			if (this != std::addressof(other)) {
 				Clear();
 				std::copy(other.m_Data.begin(), other.m_Data.end(), std::back_inserter(m_Data));
 			}
 			return *this;
 		}
 
-		Buffer(Buffer&& other) noexcept {
-			m_Data = std::move(other.m_Data);
-		}
-
 		Buffer& operator=(Buffer&& other) noexcept {
-			if (this != &other) {
+			if (this != std::addressof(other)) {
 				Clear();
 				m_Data = std::move(other.m_Data);
 			}

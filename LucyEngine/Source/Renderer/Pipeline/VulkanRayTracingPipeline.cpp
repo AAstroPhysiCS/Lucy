@@ -419,14 +419,21 @@ namespace Lucy {
 			}
 		};
 
+		const auto AddShaderPushConstants = [&](const Ref<Shader>& shader) {
+			const auto& pushConstants = shader->GetShaderPushConstants();
+			for (const auto& pushConstant : pushConstants)
+				AddPushConstant(pushConstant);
+		};
+
 		AddShaderDescriptorSets(GetRayGenShader());
 		AddShaderDescriptorSets(GetMissShader());
 		AddShaderDescriptorSets(GetClosestHitShader());
 		AddShaderDescriptorSets(GetAnyHitShader());
 
-		const auto& rayGenPushConstants = GetRayGenShader()->GetShaderPushConstants();
-		for (auto& pushConstant : rayGenPushConstants)
-			AddPushConstant(pushConstant);
+		AddShaderPushConstants(GetRayGenShader());
+		AddShaderPushConstants(GetMissShader());
+		AddShaderPushConstants(GetClosestHitShader());
+		AddShaderPushConstants(GetAnyHitShader());
 		
 		const auto& pushConstants = GetPipelineConstants();
 		std::vector<VkPushConstantRange> pushConstantRanges;
@@ -493,7 +500,73 @@ namespace Lucy {
 	}
 
 	void VulkanRayTracingPipeline::RTRecreate(Ref<Shader> shader) {
-		LUCY_ASSERT(false); //TODO:
+		const auto& shaderLibrary = Renderer::GetShaderLibrary();
+		LUCY_ASSERT(shaderLibrary.contains(shader->GetName()), "Could not find reloaded ray tracing shader: {0}", shader->GetName());
+		
+		const auto& shaderStageMap = shaderLibrary.at(shader->GetName());
+		const auto FindShader = [&](ShaderStageType stage, const Ref<Shader>& currentShader) -> Ref<Shader> {
+			if (!currentShader)
+				return nullptr;
+
+			LUCY_ASSERT(shaderStageMap.contains(stage), "Reloaded ray tracing shader {0} does not contain stage {1}", shader->GetName(), ShaderStageToShaderString(stage));
+			const auto& shaders = shaderStageMap.at(stage);
+			auto shaderIt = std::ranges::find_if(shaders, [&](const Ref<Shader>& reloadedShader) {
+				return reloadedShader->GetEntryPointName() == currentShader->GetEntryPointName();
+			});
+
+			LUCY_ASSERT(shaderIt != shaders.end(), "Could not find entry point {0} for reloaded ray tracing shader {1}", currentShader->GetEntryPointName(), shader->GetName());
+			return *shaderIt;
+		};
+
+		RayTracingPipelineCreateInfo createInfo{
+			.RayGenShader = FindShader(ShaderStageType::RayGen, GetRayGenShader()),
+			.MissShader = FindShader(ShaderStageType::Miss, GetMissShader()),
+			.ClosestHitShader = FindShader(ShaderStageType::Closest, GetClosestHitShader()),
+			.AnyHitShader = FindShader(ShaderStageType::AnyHit, GetAnyHitShader())
+		};
+
+		Renderer::EnqueueResourceRecreate([this, createInfo](const Ref<RenderDevice>& device) -> RenderDeletionFunc {
+			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+
+			VkPipeline oldPipelineHandle = std::exchange(m_PipelineHandle, VK_NULL_HANDLE);
+			VkPipelineLayout oldPipelineLayoutHandle = std::exchange(m_PipelineLayoutHandle, VK_NULL_HANDLE);
+
+			RenderDeviceResourceHandle oldShaderBindingTableHandle = std::exchange(m_ShaderBindingTableHandle, {});
+			std::vector<VkDescriptorSetLayout> oldEmptyDescriptorSetLayouts = std::exchange(m_EmptyDescriptorSetLayouts, {});
+
+			m_DescriptorSetHandles.clear();
+
+			m_RayGenRegion = {};
+			m_MissRegion = {};
+			m_HitRegion = {};
+			m_CallableRegion = {};
+
+			m_ShaderGroupCount = 0;
+
+			Pipeline::RTDestroyResource(device.get());
+
+			SetCreateInfo(createInfo);
+			Create(vulkanDevice);
+
+			return [oldPipelineHandle, oldPipelineLayoutHandle, oldShaderBindingTableHandle, oldEmptyDescriptorSetLayouts](const Ref<RenderDevice>& device) mutable {
+				const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+				VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
+
+				if (oldPipelineHandle != VK_NULL_HANDLE)
+					vkDestroyPipeline(logicalDevice, oldPipelineHandle, nullptr);
+
+				if (oldPipelineLayoutHandle != VK_NULL_HANDLE)
+					vkDestroyPipelineLayout(logicalDevice, oldPipelineLayoutHandle, nullptr);
+
+				for (VkDescriptorSetLayout layout : oldEmptyDescriptorSetLayouts) {
+					if (layout != VK_NULL_HANDLE)
+						vkDestroyDescriptorSetLayout(logicalDevice, layout, nullptr);
+				}
+
+				if (oldShaderBindingTableHandle)
+					device->RTDestroyResource(oldShaderBindingTableHandle);
+			};
+		});
 	}
 
 	void VulkanRayTracingPipeline::RTTrace(void* commandBufferHandle, uint32_t width, uint32_t height, uint32_t depth) {

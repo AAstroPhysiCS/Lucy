@@ -97,6 +97,11 @@ namespace Lucy {
 		Ref<Shader> GetAnyHitShader() const { return m_CreateInfo.AnyHitShader; }
 	protected:
 		const RayTracingPipelineCreateInfo& GetCreateInfo() const { return m_CreateInfo; }
+
+		void SetCreateInfo(RayTracingPipelineCreateInfo createInfo) {
+			m_CreateInfo = std::move(createInfo);
+			SetShader(m_CreateInfo.RayGenShader);
+		}
 	private:
 		RayTracingPipelineCreateInfo m_CreateInfo;
 	};

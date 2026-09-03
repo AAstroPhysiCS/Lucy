@@ -12,11 +12,10 @@ namespace Lucy {
 
 	PipelineConstant& Pipeline::GetPipelineConstants(const std::string& name) {
 		LUCY_PROFILE_NEW_EVENT("Pipeline::GetPipelineConstants");
-		for (PipelineConstant& pushConstant : m_PushConstants) {
-			if (name == pushConstant.GetName()) {
-				return pushConstant;
-			}
-		}
+		auto it = std::ranges::find_if(m_PushConstants, [&name](const PipelineConstant& pushConstant) {
+			return pushConstant.GetName() == name;
+		});
+		return *it;
 		LUCY_ASSERT(false, "Could not find a suitable Push Constant for the given name: {0}", name);
 	}
 
@@ -25,6 +24,20 @@ namespace Lucy {
 	}
 
 	void Pipeline::AddPushConstant(const ShaderVariable& pc) {
-		m_PushConstants.emplace_back(pc.Name, pc.BufferSize, 0, pc.StageFlag);
+		auto it = std::ranges::find_if(m_PushConstants, [&pc](const PipelineConstant& pushConstant) {
+			return pushConstant.GetName() == pc.Name;
+		});
+
+		if (it == m_PushConstants.end()) {
+			m_PushConstants.emplace_back(pc.Name, pc.BufferSize, 0, pc.StageFlag);
+			return;
+		}
+
+		VkPushConstantRange range = it->GetHandle();
+		
+		uint32_t size = std::max(range.size, pc.BufferSize);
+		VkShaderStageFlags stageFlags = range.stageFlags | pc.StageFlag;
+
+		*it = PipelineConstant(pc.Name, size, range.offset, stageFlags);
 	}
 }

@@ -20,6 +20,7 @@ namespace Lucy {
 		auto& settings = Renderer::GetRendererSettings();
 
 		ImGui::SliderFloat("Environment LOD", &settings.EnvironmentLOD, 0.0f, PrefilterPass::MAX_MIP_LEVELS);
+		ImGui::SliderFloat("DDGI Strength", &settings.DDGIStrength, 1.0f, 5.0f);
 
 		ImGui::SeparatorText("GPU Culling");
 
@@ -40,12 +41,12 @@ namespace Lucy {
 		DrawCullFlag("Occlusion Culling", GPUCullViewFlags::EnableOcclusionCulling);
 		DrawCullFlag("Freeze Culling View", GPUCullViewFlags::CameraFreeze);
 
-		if (settings.FreezeCullingView)
+		if ((settings.CullViewFlags & static_cast<uint32_t>(GPUCullViewFlags::CameraFreeze)) != 0)
 			ImGui::TextColored({ 1.0f, 0.7f, 0.0f, 1.0f }, "Culling camera is frozen");
 
-		ImGui::SameLine();
-
 		ImGui::Text("Flags: 0x%08X", settings.CullViewFlags);
+
+		ImGui::Checkbox("Show probe spheres", &settings.ShowProbeSpheres);
 
 		ImGui::SeparatorText("Shaders");
 

@@ -416,9 +416,9 @@ namespace Lucy {
 					.PipelineName = "GPUCullShadowMeshletsPipeline"
 				},
 				RenderGraphPipelineCreateInfo {
-					.ShaderName = "LucyDDGIDebug",
-					.EntryPointName = "DDGIDebugMain",
-					.PipelineName = "DDGIDebugPipeline"
+					.ShaderName = "LucyDDGIProbeUpdate",
+					.EntryPointName = "DDGIProbeUpdateMain",
+					.PipelineName = "DDGIProbeUpdatePipeline"
 				}
 			};
 

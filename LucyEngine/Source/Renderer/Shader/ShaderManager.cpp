@@ -461,87 +461,41 @@ namespace Lucy {
 
 	std::vector<Ref<Shader>> ShaderManager::ReloadShader(Ref<RenderDevice> device, const std::string& name) {
 		auto& shaderStageMap = m_Shaders.at(name);
-		auto type = ShaderStageType::Vertex;
 
 		std::filesystem::path path;
-		if (shaderStageMap.contains(ShaderStageType::VertexAndFragment))
-			type = ShaderStageType::VertexAndFragment;
-		else
-			type = ShaderStageType::Compute;
+		for (const auto& shaderList : shaderStageMap | std::views::values) {
+			if (shaderList.empty())
+				continue;
 
-		path = shaderStageMap.at(type)[0]->GetPath();
-		shaderStageMap.at(type).clear();
+			path = shaderList.front()->GetPath();
+			break;
+		}
+
+		LUCY_ASSERT(!path.empty(), "Could not find shader path for shader: {0}", name);
 
 		if (path.parent_path() == GetCacheFolder())
 			path = (GetShaderFolder() / path.stem().stem()).replace_extension(".slang");
 
 		Slang::ComPtr<slang::ISession> hotReloadSession = CreateNewSlangSession();
-
 		auto slangModule = CreateSlangModule(name, path, device, hotReloadSession);
 
-		const std::vector<ShaderProgram>& shaderPrograms = RunSlangCompiler(path, slangModule, hotReloadSession);
+		auto shaderPrograms = RunSlangCompiler(path, slangModule, hotReloadSession);
 		if (shaderPrograms.empty()) {
 			LUCY_CRITICAL("Failed to compile shader: {0}", path.string());
 			return {};
 		}
-		//TODO: Maybe clean it?
 
-		for (size_t i = 0; i < shaderPrograms.size(); i++) {
-			const auto& shaderProgram = shaderPrograms[i];
+		std::ranges::stable_sort(shaderPrograms, {}, &ShaderProgram::Stage);
 
-			if (shaderProgram.Stage == ShaderStageType::Fragment)
-				continue;
+		ShaderStageMap reloadedShaderStageMap = CreateShaders(name, path, device, shaderPrograms);
 
-			if (!shaderProgram.Blob) {
-				LUCY_CRITICAL("No compiled blobs found for shader stage: {0} in shader: {1}", ShaderStageToShaderString(shaderProgram.Stage), name);
-				continue;
-			}
+		std::vector<Ref<Shader>> reloadedShaders;
+		for (const auto& shaderList : reloadedShaderStageMap | std::views::values)
+			reloadedShaders.insert(reloadedShaders.end(), shaderList.begin(), shaderList.end());
 
-			LUCY_INFO("Shader {0} has {1} bytes of compiled code", path.string(), shaderProgram.Blob->getBufferSize());
+		shaderStageMap = std::move(reloadedShaderStageMap);
 
-			/*
-			* We cant use here the entry point name that we arbitarily set... some drivers still replace the name with "main"... so just default it to main
-			*/
-			switch (shaderProgram.Stage) {
-				case ShaderStageType::Vertex: {
-					//the next shader stage must be Fragment (the name of fragment and entrypoint must be the same as the vertex shader stage)
-					const auto& fragmentProgram = shaderPrograms[i + 1];
-					LUCY_ASSERT(fragmentProgram.Stage == ShaderStageType::Fragment, 
-						"Shader {0} has vertex stage but next stage is not fragment, it is: {1}", path.string(), ShaderStageToShaderString(fragmentProgram.Stage));
-
-					auto shader = Memory::CreateRef<VulkanGraphicsShader>(name, path, shaderProgram.EntryPointName, device, ProgramBlobToSpan(shaderProgram.Blob), ProgramBlobToSpan(fragmentProgram.Blob));
-					shader->RunReflect(shaderProgram.LinkedProgram, ShaderStageType::Vertex, shaderProgram.EntryPointName);
-					shader->RunReflect(fragmentProgram.LinkedProgram, ShaderStageType::Fragment, fragmentProgram.EntryPointName);
-					shader->PrintReflectInfo();
-
-					shaderStageMap[type].emplace_back(std::move(shader));
-					break;
-				}
-				case ShaderStageType::Compute: {
-					auto shader = Memory::CreateRef<VulkanComputeShader>(name, path, shaderProgram.EntryPointName, device, ProgramBlobToSpan(shaderProgram.Blob));
-					shader->RunReflect(shaderProgram.LinkedProgram, ShaderStageType::Compute, shaderProgram.EntryPointName);
-					shader->PrintReflectInfo();
-
-					shaderStageMap[type].emplace_back(std::move(shader));
-					break;	
-				}
-				case ShaderStageType::RayGen:
-				case ShaderStageType::Miss:
-				case ShaderStageType::Closest:
-				case ShaderStageType::AnyHit: {
-					auto shader = Memory::CreateRef<VulkanRayTracingShader>(name, path, shaderProgram.EntryPointName, shaderProgram.Stage, device, ProgramBlobToSpan(shaderProgram.Blob));
-					shader->RunReflect(shaderProgram.LinkedProgram, shaderProgram.Stage, shaderProgram.EntryPointName);
-					shader->PrintReflectInfo();
-
-					shaderStageMap[type].emplace_back(std::move(shader));
-					break;
-				}
-				default: 
-					LUCY_ASSERT(false, "Shader stage {0} is not supported yet!", ShaderStageToShaderString(shaderProgram.Stage));
-			}
-		}
-
-		return shaderStageMap[type];
+		return reloadedShaders;
 	}
 
 	void ShaderManager::DestroyAllShaders(Ref<RenderDevice> device) {

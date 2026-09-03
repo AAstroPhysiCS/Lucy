@@ -1,4 +1,5 @@
 #include "LucyCommons.slang"
+#include "LucyDDGICommon.slang"
 
 struct VertexOutput {
     float4 a_Pos : SV_Position;
@@ -14,6 +15,8 @@ struct VertexOutput {
 struct LocalPushConstant {
     GPUVisibleDraw* u_VisibleDraws;
     GPUTextureResource u_PBRTextureResources[4];
+
+    DDGISamplingData u_DDGI;
 };
 
 [[vk::push_constant]]
@@ -91,8 +94,6 @@ static const float4 DEBUG_CASCADE_COLORS[NUM_CASCADES] = {
 };
 
 #include "LucySamplingUtilities.slang"
-
-#define DIELECTRIC_SPECULAR 0.04
 
 float ChebyshevUpperBound(float2 moments, float t) {
     const float minVariance = 0.00001f;
@@ -193,8 +194,6 @@ PixelOutput main(PixelInput input) {
 
     float4 shadow = ShadowContribution(input, input.a_PosOutWS);
 
-    float3 ambientValue = materialSample.BaseColor.rgb * materialSample.AO;
-
     float3 directLight = BRDF(
         viewDirectionLight,
         viewDirCamera,
@@ -221,7 +220,13 @@ PixelOutput main(PixelInput input) {
     // Indirect specular (prefiltered env map * BRDF LUT)
     float3 specularIBL = prefilterColor * (F0 * brdf.x + brdf.y);
 
-    float3 ibl = diffuseIBL + specularIBL;
+    float3 ddgiIrradiance = SampleDDGIIrradiance(PushConstants.Data.u_DDGI, input.a_PosOutWS, normalsWS);
+    float3 diffuseDDGI = ddgiIrradiance * materialSample.BaseColor.rgb * kD / PI;
+    diffuseDDGI *= PushConstants.Data.u_DDGI.Settings.x;
+
+    float3 indirectDiffuse = IsInsideDDGIVolume(PushConstants.Data.u_DDGI, input.a_PosOutWS) ? diffuseDDGI : diffuseIBL;
+
+    float3 ibl = indirectDiffuse + specularIBL;
     float3 emissive = materialSample.EmissiveColorAndStrength.rgb * materialSample.EmissiveColorAndStrength.a;
     float3 outputColor = ibl + directLight + emissive;
 

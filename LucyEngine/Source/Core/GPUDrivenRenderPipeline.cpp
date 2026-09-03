@@ -28,8 +28,9 @@ namespace Lucy {
 		Renderer::AddRendererPass<BRDFLutPass>(512);
 		Renderer::AddRendererPass<PrefilterPass>(scene, CubemapPass::HDRImageSize);
 		Renderer::AddRendererPass<ShadowPass>(createInfo.RenderDevice, scene, 2048);
+		Renderer::AddRendererPass<DDGIPass>(scene, viewportWidth, viewportHeight);
 		Renderer::AddRendererPass<ForwardPBRPass>(scene, viewportWidth, viewportHeight);
-		Renderer::AddRendererPass<DDGIPass>(viewportWidth, viewportHeight);
+		Renderer::AddRendererPass<DDGIProbeDebugPass>(scene, viewportWidth, viewportHeight);
 	}
 
 	void GPUDrivenRenderPipeline::BeginFrame(const Ref<RenderDevice>& device, Ref<Scene>& scene) {

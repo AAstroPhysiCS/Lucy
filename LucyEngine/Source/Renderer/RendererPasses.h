@@ -161,25 +161,72 @@ namespace Lucy {
 	struct RenderDeviceDDGITraceData {
 		RenderDeviceBufferReference RayResults = 0;
 
+		RenderDeviceTextureResource EnvironmentMap{};
+		RenderDeviceTextureResource IrradianceHistory{};
+		RenderDeviceTextureResource DepthHistory{};
+
 		glm::vec4 ProbeOriginAndMaxDistance{ 0.0f };
 		glm::vec4 ProbeSpacing{ 0.0f };
 		glm::uvec4 ProbeCountsAndRays{ 0 };
+		uint32_t FrameNumber = 0;
 	};
 
 	struct DDGIPass final {
-		DDGIPass(uint32_t width, uint32_t height);
+		DDGIPass(const Ref<Scene>& scene, uint32_t width, uint32_t height);
 		~DDGIPass() = default;
 
 		void AddPass(const Ref<RenderGraph>& renderGraph);
+
+		static const glm::vec3& GetProbeCounts() { return s_ProbeCounts; }
+		static const glm::vec3& GetProbeOrigin() { return s_ProbeOrigin; }
+		static const glm::vec3& GetProbeSpacing() { return s_ProbeSpacing; }
+
+		static constexpr uint32_t GetRaysPerProbe() { return s_RaysPerProbe; }
+		static constexpr uint32_t GetProbeCount() { return s_ProbeCount; }
+
+		static constexpr uint32_t GetIrradianceTexels() { return s_IrradianceTexels; }
+		static constexpr uint32_t GetIrradianceTileSize() { return s_IrradianceTileSize; }
+
+		static constexpr uint32_t GetDepthTexels() { return s_DepthTexels; }
+		static constexpr uint32_t GetDepthTileSize() { return s_DepthTileSize; }
+
+		static constexpr float GetMaxRayDistance() { return s_MaxRayDistance; }
 	private:
 		static inline constexpr uint32_t s_RaysPerProbe = 64;
 
-		glm::vec3 m_ProbeCounts{ 32, 16, 32 };
-		glm::vec3 m_ProbeOrigin{ 0.0f, 0.0f, 0.0f };
-		glm::vec3 m_ProbeSpacing{ 2.5f };
+		static inline constexpr glm::vec3 s_ProbeCounts{ 32, 16, 32 };
+		static inline constexpr glm::vec3 s_ProbeSpacing{ 2.5f };
+		static inline constexpr glm::vec3 s_ProbeOrigin = -0.5f * glm::vec3(s_ProbeCounts - glm::vec3(1)) * s_ProbeSpacing;
+
+		static inline float s_MaxRayDistance = glm::length(glm::vec3(s_ProbeCounts - glm::vec3(1)) * s_ProbeSpacing);
+
+		static constexpr uint32_t s_IrradianceTexels = 8;
+		static constexpr uint32_t s_IrradianceTileSize = s_IrradianceTexels + 2;
+
+		static constexpr uint32_t s_DepthTexels = 16;
+		static constexpr uint32_t s_DepthTileSize = s_DepthTexels + 2;
+
+		static constexpr uint32_t s_ProbeColumns = s_ProbeCounts.x * s_ProbeCounts.z;
+		static constexpr uint32_t s_ProbeRows = s_ProbeCounts.y;
+
+		static constexpr uint32_t s_ProbeCount = s_ProbeColumns * s_ProbeRows;
 
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
+
+		Ref<Scene> m_Scene;
+	};
+
+	struct DDGIProbeDebugPass final {
+		DDGIProbeDebugPass(const Ref<Scene>& scene, uint32_t width, uint32_t height);
+		~DDGIProbeDebugPass() = default;
+
+		void AddPass(const Ref<RenderGraph>& renderGraph);
+	private:
+		uint32_t m_Width = 0;
+		uint32_t m_Height = 0;
+
+		Ref<Scene> m_Scene;
 
 		static inline Unique<Mesh> s_ProbeSphere;
 	};

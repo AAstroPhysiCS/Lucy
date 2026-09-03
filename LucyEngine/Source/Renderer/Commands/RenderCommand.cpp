@@ -59,10 +59,12 @@ namespace Lucy {
 
 	RenderDeviceTextureHandle RenderCommand::BindImageHandleTo(const std::string& imageBufferName, const Ref<Image>& image, uint32_t mip) {
 		LUCY_PROFILE_NEW_EVENT("RenderCommand::BindImageHandleTo");
-		LUCY_ASSERT(m_BoundedGraphicsPipeline || m_BoundedComputePipeline, "BindGlobalImageHandleTo needs to be called after a BindPipeline call.");
+		LUCY_ASSERT(m_BoundedGraphicsPipeline || m_BoundedComputePipeline || m_BoundedRayTracingPipeline, "BindGlobalImageHandleTo needs to be called after a BindPipeline call.");
 		if (m_BoundedGraphicsPipeline)
 			return m_RenderDevice->BindGlobalImageHandleTo(imageBufferName, m_BoundedGraphicsPipeline, image, mip);
-		return m_RenderDevice->BindGlobalImageHandleTo(imageBufferName, m_BoundedComputePipeline, image, mip);
+		if (m_BoundedComputePipeline)
+			return m_RenderDevice->BindGlobalImageHandleTo(imageBufferName, m_BoundedComputePipeline, image, mip);
+		return m_RenderDevice->BindGlobalImageHandleTo(imageBufferName, m_BoundedRayTracingPipeline, image, mip);
 	}
 
 	void RenderCommand::FillBuffer(Ref<RenderDeviceBuffer> buffer, size_t offset, size_t size, uint32_t value) {

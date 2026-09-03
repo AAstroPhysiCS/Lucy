@@ -499,6 +499,7 @@ namespace Lucy {
 
 		EndFrame();
 
+		m_FrameNumber++;
 		m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % m_MaxFramesInFlight;
 
 		m_RenderCommandQueue->ClearSubmitQueue();

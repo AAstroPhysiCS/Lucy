@@ -735,6 +735,48 @@ namespace Lucy {
 		LUCY_ASSERT(false, "Compute::BindGlobalImageHandleTo did not work for name: {0}", imageBufferName);
 		return {};
 	}
+
+	RenderDeviceTextureHandle VulkanRenderDevice::BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<RayTracingPipeline>& pipeline, const Ref<Image>& image, uint32_t mip) {
+		//TODO: change immediately whenever you have time... its 1 bcs 0 is set 2 (the set for u_TLAS only), 1 is set 0...
+		const auto& descriptorSetHandle = pipeline->As<VulkanRayTracingPipeline>()->GetDescriptorSetHandles()[1];
+		const auto& descriptorSet = AccessResource<VulkanDescriptorSet>(descriptorSetHandle);
+
+		if (auto imageSampler = descriptorSet->GetVulkanImageSampler(imageBufferName)) {
+			const auto& vulkanImage = image->As<VulkanImage>();
+			const auto& imageHandle = image->GetMyHandle();
+			VkImageView imageView = mip == static_cast<uint32_t>(-1) ? vulkanImage->GetImageView().GetVulkanHandle() : vulkanImage->GetImageView().GetMipViewVulkanHandle(mip);
+
+			for (uint32_t index = 0; const auto& slot : imageSampler->Images) {
+				if (!slot.Alive) {
+					index++;
+					continue;
+				}
+
+				if (slot.Data.ImageHandle == imageHandle && slot.Data.Mip == mip) {
+					return RenderDeviceTextureHandle{ .Index = index, .Generation = slot.Generation };
+				}
+
+				index++;
+			}
+
+			RenderDeviceTextureHandle handle = imageSampler->Images.Create(VulkanImageDescriptor{
+				.ImageHandle = imageHandle,
+				.Mip = mip,
+				.ImageInfo = VulkanAPI::DescriptorImageInfo(
+					vulkanImage->GetCurrentLayout(),
+					imageView,
+					AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle()
+				)}
+			);
+
+			descriptorSet->RTUpdateImageDescriptors(this, imageBufferName, handle);
+
+			return handle;
+		}
+
+		LUCY_ASSERT(false, "RayTracing::BindGlobalImageHandleTo did not work for name: {0}", imageBufferName);
+		return {};
+	}
 	
 	void VulkanRenderDevice::BindPushConstant(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline, const PipelineConstant& pushConstant) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindPushConstant | Graphics");

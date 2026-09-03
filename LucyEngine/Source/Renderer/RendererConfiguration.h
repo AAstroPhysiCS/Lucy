@@ -22,9 +22,10 @@ namespace Lucy {
 
 	struct RendererSettings {
 		float EnvironmentLOD = 0.0f;
+		float DDGIStrength = 1.0f;
 
 		uint32_t CullViewFlags = static_cast<uint32_t>(GPUCullViewFlags::EnableFrustumCulling) | static_cast<uint32_t>(GPUCullViewFlags::EnableConeCulling);
-		bool FreezeCullingView = false;
+		bool ShowProbeSpheres = false;
 	};
 
 	struct RendererConfiguration {
@@ -32,6 +33,6 @@ namespace Lucy {
 		RenderType RenderType = RenderType::Rasterizer;
 		ThreadingPolicy ThreadingPolicy = ThreadingPolicy::Singlethreaded;
 
-		RendererSettings Settings;
+		RendererSettings Settings{};
 	};
 }

@@ -29,6 +29,8 @@ namespace Lucy {
 		uint32_t m_MaxFramesInFlight = 0;
 		uint32_t m_ImageIndex = 0;
 		uint32_t m_CurrentFrameIndex = 0;
+
+		uint64_t m_FrameNumber = 0;
 	private:
 		static Ref<RendererBackend> Create(RendererConfiguration config, const Ref<Window>& window);
 	public:
@@ -50,13 +52,14 @@ namespace Lucy {
 
 		virtual void Destroy();
 		
-		inline const RendererConfiguration& GetRendererConfig() const { return m_RendererConfiguration; }
+		const RendererConfiguration& GetRendererConfig() const { return m_RendererConfiguration; }
 
-		inline const RenderCommandQueueMetricsOutput& GetCommandQueueMetrics() const { return m_CommandQueueMetricsOutput; }
+		const RenderCommandQueueMetricsOutput& GetCommandQueueMetrics() const { return m_CommandQueueMetricsOutput; }
 
-		inline uint32_t GetCurrentImageIndex() const { return m_ImageIndex; }
-		inline uint32_t GetCurrentFrameIndex() const { return m_CurrentFrameIndex; }
-		inline uint32_t GetMaxFramesInFlight() const { return m_MaxFramesInFlight; }
+		uint32_t GetCurrentImageIndex() const { return m_ImageIndex; }
+		uint32_t GetCurrentFrameIndex() const { return m_CurrentFrameIndex; }
+		uint32_t GetMaxFramesInFlight() const { return m_MaxFramesInFlight; }
+		uint64_t GetFrameNumber() const { return m_FrameNumber; }
 
 		virtual void OnWindowResize() = 0;
 		virtual void OnViewportResize() = 0;
@@ -77,9 +80,9 @@ namespace Lucy {
 
 		virtual void FlushDeletionQueue() = 0;
 
-		inline const Ref<RenderContext>& GetRenderContext() const { return m_Context; }
-		inline const Ref<RenderDevice>& GetRenderDevice() const { return m_RenderDevice; }
-		inline const Ref<SwapChain>& GetSwapChain() const { return m_SwapChain; }
+		const Ref<RenderContext>& GetRenderContext() const { return m_Context; }
+		const Ref<RenderDevice>& GetRenderDevice() const { return m_RenderDevice; }
+		const Ref<SwapChain>& GetSwapChain() const { return m_SwapChain; }
 
 		RendererBackend(RendererConfiguration config, const Ref<Window>& window);
 

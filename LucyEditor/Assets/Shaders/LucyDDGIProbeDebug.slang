@@ -2,11 +2,11 @@
 #include "LucyDDGICommon.slang"
 
 struct DDGIProbeDebugData {
-    DDGIRayResult* RayResults;
+    uint3 IrradianceAtlasData; // x = texture index, y = interior texels, z = tile size
 
     float4 ProbeOriginAndRadius;
-    float4 ProbeSpacing;
-    uint4 ProbeCountsAndRays;
+    float3 ProbeSpacing;
+    uint3 ProbeCounts;
 };
 
 [[vk::push_constant]]
@@ -23,8 +23,8 @@ struct VertexOutput {
 VertexOutput main(uint vertexIndex: SV_VulkanVertexID, uint instanceIndex: SV_VulkanInstanceID) {
     SceneCamera camera = PushConstants.Root->Camera;
 
-    uint3 probeCoordinate = GetProbeCoordinate(instanceIndex, PushConstants.Data.ProbeCountsAndRays.xyz);
-    float3 probePosition = PushConstants.Data.ProbeOriginAndRadius.xyz + float3(probeCoordinate) * PushConstants.Data.ProbeSpacing.xyz;
+    uint3 probeCoordinate = GetProbeCoordinate(instanceIndex, PushConstants.Data.ProbeCounts);
+    float3 probePosition = PushConstants.Data.ProbeOriginAndRadius.xyz + float3(probeCoordinate) * PushConstants.Data.ProbeSpacing;
     GPUVertex vertex = PushConstants.Root->Addresses.Vertices[vertexIndex];
 
     float radius = PushConstants.Data.ProbeOriginAndRadius.w;
@@ -48,17 +48,32 @@ struct PixelOutput {
 
 [shader("fragment")]
 PixelOutput main(PixelInput input) {
-    uint raysPerProbe = PushConstants.Data.ProbeCountsAndRays.w;
-    uint firstRayIndex = input.ProbeIndex * raysPerProbe;
+    uint irradianceAtlasIndex = PushConstants.Data.IrradianceAtlasData.x;
+    uint irradianceTexels = PushConstants.Data.IrradianceAtlasData.y;
+    uint irradianceTileSize = PushConstants.Data.IrradianceAtlasData.z;
+
+    uint3 probeCounts = PushConstants.Data.ProbeCounts;
+    uint3 probeCoordinate = GetProbeCoordinate(input.ProbeIndex, probeCounts);
+
+    uint2 atlasTile = uint2(probeCoordinate.x + probeCoordinate.z * probeCounts.x, probeCoordinate.y);
+
+    uint2 tileStart = atlasTile * irradianceTileSize + uint2(1, 1);
 
     float3 irradiance = float3(0.0f);
 
-    for (uint rayIndex = 0; rayIndex < raysPerProbe; rayIndex++) {
-        irradiance += PushConstants.Data.RayResults[firstRayIndex + rayIndex].RadianceAndDistance.xyz;
+    for (uint y = 0; y < irradianceTexels; y++) {
+        for (uint x = 0; x < irradianceTexels; x++) {
+            uint2 atlasCoordinate = tileStart + uint2(x, y);
+            irradiance += BindlessTable::Textures2D[NonUniformResourceIndex(irradianceAtlasIndex)].Load(int3(atlasCoordinate, 0)).rgb;
+        }
     }
-    irradiance /= float(raysPerProbe);
+
+    irradiance /= float(irradianceTexels * irradianceTexels);
+
+    // only for debug visualization
+    float3 color = irradiance / (irradiance + 1.0f);
 
     PixelOutput output;
-    output.Color = float4(irradiance, 1.0f);
+    output.Color = float4(color, 1.0f);
     return output;
 }

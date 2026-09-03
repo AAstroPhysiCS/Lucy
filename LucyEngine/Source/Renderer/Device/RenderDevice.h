@@ -77,6 +77,7 @@ namespace Lucy {
 	public:
 		[[nodiscard]] virtual RenderDeviceTextureHandle BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<GraphicsPipeline>& pipeline, const Ref<Image>& image, uint32_t mip) = 0;
 		[[nodiscard]] virtual RenderDeviceTextureHandle BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<ComputePipeline>& pipeline, const Ref<Image>& image, uint32_t mip) = 0;
+		[[nodiscard]] virtual RenderDeviceTextureHandle BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<RayTracingPipeline>& pipeline, const Ref<Image>& image, uint32_t mip) = 0;
 
 		[[nodiscard]] const Unique<RenderDeviceScene>& GetScene() { return m_DeviceScene; }
 

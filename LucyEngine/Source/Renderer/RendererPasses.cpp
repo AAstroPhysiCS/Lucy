@@ -370,8 +370,21 @@ namespace Lucy {
 			build.ReadBuffer(RGResource(IndirectCommands), RenderGraphResourceAccess::IndirectRead);
 			build.ReadBuffer(RGResource(DrawCounts), RenderGraphResourceAccess::IndirectRead);
 
+			build.ReadImage(RGResource(DDGIIrradianceAtlas), RenderGraphResourceAccess::ShaderSampledRead);
+			build.ReadImage(RGResource(DDGIDepthAtlas), RenderGraphResourceAccess::ShaderSampledRead);
+
 			build.BindRenderTarget(RGResource(GeometryImage), RGResource(GeometryDepthImage));
 			build.BindRenderTarget(RGResource(ObjectIDImage));
+
+			struct RenderDeviceDDGISamplingData {
+				RenderDeviceTextureResource IrradianceAtlas;
+				RenderDeviceTextureResource DepthAtlas;
+
+				glm::vec4 ProbeOriginAndMaxDistance;
+				glm::vec4 ProbeSpacingAndBias;
+				glm::vec4 Settings;
+				glm::uvec3 ProbeCounts;
+			};
 
 			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::PBRGeometryPass");
@@ -405,13 +418,24 @@ namespace Lucy {
 				if (irradianceIndex == INVALID_INDEX)
 					irradianceIndex = draw.BindImageHandleTo("CubeTextures", Renderer::GetBlankCubeImage());
 
+				uint32_t currentFrameIndex = Renderer::GetCurrentFrameIndex();
+
+				uint32_t ddgiIrradianceIndex = draw.BindImageHandleTo("Textures2D", registry.GetImage(RGResource(DDGIIrradianceAtlas), currentFrameIndex));
+				uint32_t ddgiDepthIndex = draw.BindImageHandleTo("Textures2D_Float2", registry.GetImage(RGResource(DDGIDepthAtlas), currentFrameIndex));
+
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
 
 				struct LocalPushConstant {
 					RenderDeviceBufferReference VisibleDraws = 0;
 					RenderDeviceTextureResource PBRTextureResources[4];
+
+					RenderDeviceDDGISamplingData DDGI;
 				};
+
+				const auto& origin = DDGIPass::GetProbeOrigin();
+				const auto& spacing = DDGIPass::GetProbeSpacing();
+				const auto& counts = DDGIPass::GetProbeCounts();
 
 				GlobalPushConstant<LocalPushConstant> pushConstantData{
 					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
@@ -422,6 +446,20 @@ namespace Lucy {
 							{ .TextureIndex = prefilterIndex, .SamplerIndex = draw.GetLinearRepeatSampler() },
 							{ .TextureIndex = brdfImageIndex, .SamplerIndex = draw.GetLinearRepeatSampler() },
 							{ .TextureIndex = irradianceIndex, .SamplerIndex = draw.GetLinearRepeatSampler() },
+						},
+						.DDGI = {
+							.IrradianceAtlas = {
+								.TextureIndex = ddgiIrradianceIndex,
+								.SamplerIndex = draw.GetLinearClampSampler()
+							},
+							.DepthAtlas = {
+								.TextureIndex = ddgiDepthIndex,
+								.SamplerIndex = draw.GetLinearClampSampler()
+							},
+							.ProbeOriginAndMaxDistance = glm::vec4{ origin, DDGIPass::GetMaxRayDistance() },
+							.ProbeSpacingAndBias = glm::vec4{ spacing, 0.2f },
+							.Settings = glm::vec4{ settings.DDGIStrength, 0.0f, 0.0f, 0.0f },
+							.ProbeCounts = counts
 						}
 					}
 				};
@@ -1028,36 +1066,24 @@ namespace Lucy {
 
 #pragma region DDGI
 
-	DDGIPass::DDGIPass(uint32_t width, uint32_t height) 
-		: m_Width(width), m_Height(height) {
-		s_ProbeSphere = MeshFactory::CreateSphere(8, 12);
+	DDGIPass::DDGIPass(const Ref<Scene>& scene, uint32_t width, uint32_t height) 
+		: m_Scene(scene), m_Width(width), m_Height(height) {
 	}
 
 	void DDGIPass::AddPass(const Ref<RenderGraph>& renderGraph) {
-		constexpr uint32_t irradianceTexels = 8;
-		constexpr uint32_t irradianceTileSize = irradianceTexels + 2;
-
-		constexpr uint32_t depthTexels = 16;
-		constexpr uint32_t depthTileSize = depthTexels + 2;
-
-		const uint32_t probeColumns = m_ProbeCounts.x * m_ProbeCounts.z;
-		const uint32_t probeRows = m_ProbeCounts.y;
-
-		const uint32_t probeCount = probeColumns * probeRows;
-		m_ProbeOrigin = -0.5f * glm::vec3(m_ProbeCounts - glm::vec3(1)) * m_ProbeSpacing;
-
-		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGITracePass", [probeColumns, probeRows, probeCount, *this](RenderGraphBuilder& build) {
+		
+		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGITracePass", [*this](RenderGraphBuilder& build) {
 			build.SetInFlightMode(true);
 
 			build.DeclareBuffer(RGResource(DDGIRayResults), {
 				.DebugName = "DDGIRayResults",
-				.Size = probeCount * s_RaysPerProbe * sizeof(RenderDeviceDDGIRayResult),
+				.Size = s_ProbeCount * s_RaysPerProbe * sizeof(RenderDeviceDDGIRayResult),
 				.Usage = BufferUsage::Storage
 			});
 
 			build.DeclareImage(RGResource(DDGIIrradianceAtlas), {
-				.Width = probeColumns * irradianceTileSize,
-				.Height = probeRows * irradianceTileSize,
+				.Width = s_ProbeColumns * s_IrradianceTileSize,
+				.Height = s_ProbeRows * s_IrradianceTileSize,
 				.ImageType = ImageType::Type2D,
 				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
 				.Format = ImageFormat::R16G16B16A16_SFLOAT,
@@ -1066,8 +1092,8 @@ namespace Lucy {
 			}, RenderPassLoadStoreAttachments::ClearStore);
 
 			build.DeclareImage(RGResource(DDGIDepthAtlas), {
-				.Width = probeColumns * depthTileSize,
-				.Height = probeRows * depthTileSize,
+				.Width = s_ProbeColumns * s_DepthTileSize,
+				.Height = s_ProbeRows * s_DepthTileSize,
 				.ImageType = ImageType::Type2D,
 				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
 				.Format = ImageFormat::R16G16_SFLOAT,
@@ -1075,53 +1101,158 @@ namespace Lucy {
 				.ImGuiUsage = true,
 			}, RenderPassLoadStoreAttachments::ClearStore);
 
+			build.ReadImage(RGResource(DDGIIrradianceAtlas), RenderGraphResourceAccess::ShaderSampledRead);
+			build.ReadImage(RGResource(DDGIDepthAtlas), RenderGraphResourceAccess::ShaderSampledRead);
+
 			build.WriteBuffer(RGResource(DDGIRayResults), RenderGraphResourceAccess::StorageWrite);
 
 			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::DDGITracePass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<RayTracingPipeline>("DDGITracePipeline");
+				cmd.BindPipeline(pipeline);
 
-				GlobalPushConstant<RenderDeviceDDGITraceData> pushConstantData {
+				uint32_t prefilterImageIndex = INVALID_INDEX;
+				bool imageBound = false;
+
+				m_Scene->ViewForEach<HDRCubemapComponent>([&imageBound, &prefilterImageIndex, &cmd, &registry](const HDRCubemapComponent& hdrComponent) {
+					if (!hdrComponent.IsPrimary || imageBound)
+						return;
+					prefilterImageIndex = cmd.BindImageHandleTo("CubeTextures", registry.GetImage(RGResource(PrefilterImage)));
+					imageBound = true;
+				});
+
+				if (!imageBound)
+					prefilterImageIndex = cmd.BindImageHandleTo("CubeTextures", Renderer::GetBlankCubeImage());
+
+				uint32_t currentFrameIndex = Renderer::GetCurrentFrameIndex();
+				uint32_t previousFrameIndex = (currentFrameIndex + Renderer::GetMaxFramesInFlight() - 1) % Renderer::GetMaxFramesInFlight();
+
+				const auto& irradianceHistory = registry.GetImage(RGResource(DDGIIrradianceAtlas), previousFrameIndex);
+				const auto& depthHistory = registry.GetImage(RGResource(DDGIDepthAtlas), previousFrameIndex);
+
+				uint32_t irradianceHistoryIndex = cmd.BindImageHandleTo("Textures2D", irradianceHistory);
+				uint32_t depthHistoryIndex = cmd.BindImageHandleTo("Textures2D_Float2", depthHistory);
+
+				GlobalPushConstant<RenderDeviceDDGITraceData> pushConstantData{
 					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
 					.Data = {
 						.RayResults = registry.GetBuffer(RGResource(DDGIRayResults))->GetDeviceAddress(),
-						.ProbeOriginAndMaxDistance = glm::vec4{ m_ProbeOrigin, 10000.0f },
-						.ProbeSpacing = glm::vec4{ m_ProbeSpacing, 0.0f },
-						.ProbeCountsAndRays = glm::uvec4{ m_ProbeCounts, s_RaysPerProbe }
+						.EnvironmentMap = {
+							.TextureIndex = prefilterImageIndex,
+							.SamplerIndex = cmd.GetLinearClampSampler().Index
+						},
+						.IrradianceHistory = {
+							.TextureIndex = irradianceHistoryIndex,
+							.SamplerIndex = cmd.GetLinearClampSampler().Index
+						},
+						.DepthHistory = {
+							.TextureIndex = depthHistoryIndex,
+							.SamplerIndex = cmd.GetLinearClampSampler().Index
+						},
+						.ProbeOriginAndMaxDistance = glm::vec4{ s_ProbeOrigin, s_MaxRayDistance },
+						.ProbeSpacing = glm::vec4{ s_ProbeSpacing, 0.0f },
+						.ProbeCountsAndRays = glm::uvec4{ s_ProbeCounts, s_RaysPerProbe },
+						.FrameNumber = static_cast<uint32_t>(Renderer::GetFrameNumber())
 					}
 				};
 
 				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
 				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
 
-				cmd.BindPipeline(pipeline);
 				cmd.BindPushConstant(pushConstant);
 				bool tlasExists = cmd.UpdateDescriptorSets("u_TLAS");
-				if (!tlasExists) {
+				if (!tlasExists)
 					return;
-				}
 				cmd.BindAllDescriptorSets();
-				cmd.TraceRays(s_RaysPerProbe, probeCount, 1);
+				cmd.TraceRays(s_RaysPerProbe, s_ProbeCount, 1);
 			};
 		});
 
-		/*renderGraph->AddPass(TargetQueueFamily::Compute, "DDGIProbeUpdatePass", [](RenderGraphBuilder& build) {
+		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGIProbeUpdatePass", [](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
 			build.ReadBuffer(RGResource(DDGIRayResults), RenderGraphResourceAccess::StorageRead);
 
 			build.WriteImage(RGResource(DDGIIrradianceAtlas), RenderGraphResourceAccess::StorageWrite);
 			build.WriteImage(RGResource(DDGIDepthAtlas), RenderGraphResourceAccess::StorageWrite);
 
-			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
+			struct DDGIProbeUpdateData {
+				RenderDeviceBufferReference RayResults;
 
+				glm::uvec4 AtlasIndices;
+
+				glm::uvec4 ProbeCountsAndRays;
+				glm::uvec4 AtlasTexelData;
+
+				glm::vec2 DistanceData;
+
+				// x = irradiance hysteresis
+				// y = depth hysteresis
+				// z = history valid
+				glm::vec3 TemporalData;
+
+				uint32_t FrameNumber;
 			};
-		});*/
 
-		renderGraph->AddPass(TargetQueueFamily::Graphics, "DDGIProbeDebugPass", [probeColumns, probeRows, probeCount, 
-			width = m_Width, height = m_Height, origin = m_ProbeOrigin, spacing = m_ProbeSpacing, counts = m_ProbeCounts](RenderGraphBuilder& build) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::DDGIProbeUpdatePass");
+
+				uint32_t currentFrameIndex = Renderer::GetCurrentFrameIndex();
+				uint32_t maxFramesInFlight = Renderer::GetMaxFramesInFlight();
+				uint32_t previousFrameIndex = (currentFrameIndex + maxFramesInFlight - 1) % maxFramesInFlight;
+
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("DDGIProbeUpdatePipeline");
+
+				cmd.BindPipeline(pipeline);
+
+				const auto& irradianceAtlas = registry.GetImage(RGResource(DDGIIrradianceAtlas), currentFrameIndex);
+				const auto& depthAtlas = registry.GetImage(RGResource(DDGIDepthAtlas), currentFrameIndex);
+				const auto& irradianceHistory = registry.GetImage(RGResource(DDGIIrradianceAtlas), previousFrameIndex);
+				const auto& depthHistory = registry.GetImage(RGResource(DDGIDepthAtlas), previousFrameIndex);
+
+				uint32_t irradianceAtlasIndex = cmd.BindImageHandleTo("StorageTextures2D", irradianceAtlas);
+				uint32_t depthAtlasIndex = cmd.BindImageHandleTo("StorageTextures2D_Float2", depthAtlas);
+				uint32_t irradianceHistoryIndex = cmd.BindImageHandleTo("Textures2D", irradianceHistory);
+				uint32_t depthHistoryIndex = cmd.BindImageHandleTo("Textures2D_Float2", depthHistory);
+
+				bool historyValid = Renderer::GetFrameNumber() > 0;
+				GlobalPushConstant<DDGIProbeUpdateData> pushConstantData{
+					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+					.Data = {
+						.RayResults = registry.GetBuffer(RGResource(DDGIRayResults))->GetDeviceAddress(),
+						.AtlasIndices = glm::uvec4{ irradianceAtlasIndex, depthAtlasIndex, irradianceHistoryIndex, depthHistoryIndex },
+						.ProbeCountsAndRays = glm::uvec4{ s_ProbeCounts, s_RaysPerProbe },
+						.AtlasTexelData = glm::uvec4{ s_IrradianceTexels, s_IrradianceTileSize, s_DepthTexels, s_DepthTileSize },
+						.DistanceData = glm::vec2{ DDGIPass::GetMaxRayDistance(), 32.0f },
+						.TemporalData = glm::vec3{ 0.97f, 0.97f, historyValid ? 1.0f : 0.0f },
+						.FrameNumber = static_cast<uint32_t>(Renderer::GetFrameNumber())
+					}
+				};
+
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				cmd.BindPushConstant(pushConstant);
+				cmd.BindAllDescriptorSets();
+
+				// One workgroup per probe.
+				// numthreads(18,18,1)
+				cmd.DispatchCompute(s_ProbeCount, 1, 1);
+			};
+		});
+	}
+
+	DDGIProbeDebugPass::DDGIProbeDebugPass(const Ref<Scene>& scene, uint32_t width, uint32_t height) 
+		: m_Scene(scene), m_Width(width), m_Height(height) {
+		s_ProbeSphere = MeshFactory::CreateSphere(8, 12);
+	}
+
+	void DDGIProbeDebugPass::AddPass(const Ref<RenderGraph>& renderGraph) {
+		renderGraph->AddPass(TargetQueueFamily::Graphics, "DDGIProbeDebugPass", [width = m_Width, height = m_Height, *this](RenderGraphBuilder& build) {
 			build.SetViewportArea(width, height);
 			build.SetInFlightMode(true);
 
-			build.ReadBuffer(RGResource(DDGIRayResults), RenderGraphResourceAccess::StorageRead);
+			build.ReadImage(RGResource(DDGIIrradianceAtlas), RenderGraphResourceAccess::ShaderSampledRead);
 
 			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
 			build.ReadExternalBuffer(RGResource(GPUVerticesBuffer), RenderGraphResourceAccess::StorageRead);
@@ -1135,101 +1266,41 @@ namespace Lucy {
 			build.BindRenderTarget(RGResource(ObjectIDImage));
 
 			struct DDGIProbeDebugData {
-				RenderDeviceBufferReference RayResults;
-
+				glm::uvec3 IrradianceAtlasData;
 				glm::vec4 ProbeOriginAndRadius;
-				glm::vec4 ProbeSpacing;
-				glm::uvec4 ProbeCountsAndRays;
+				glm::vec3 ProbeSpacing;
+				glm::uvec3 ProbeCounts;
 			};
 
 			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
+				const auto& settings = Renderer::GetRendererSettings();
+				if (!settings.ShowProbeSpheres)
+					return;
+
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::DDGIProbeDebugPass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("DDGIProbeDebugPipeline");
 				cmd.BindPipeline(pipeline);
 
+				uint32_t currentFrameIndex = Renderer::GetCurrentFrameIndex();
+				auto irradianceAtlasHandle = cmd.BindImageHandleTo("Textures2D", registry.GetImage(RGResource(DDGIIrradianceAtlas), currentFrameIndex));
+
 				GlobalPushConstant<DDGIProbeDebugData> pushConstantData{
 					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
 					.Data = {
-						.RayResults = registry.GetBuffer(RGResource(DDGIRayResults))->GetDeviceAddress(),
-						.ProbeOriginAndRadius = glm::vec4{ origin, 0.08f },
-						.ProbeSpacing = glm::vec4{ spacing, 0.0f },
-						.ProbeCountsAndRays = glm::uvec4{ counts, s_RaysPerProbe },
+						.IrradianceAtlasData = glm::uvec3{ irradianceAtlasHandle.Index, DDGIPass::GetIrradianceTexels(), DDGIPass::GetIrradianceTileSize() },
+						.ProbeOriginAndRadius = glm::vec4{ DDGIPass::GetProbeOrigin(), 0.08f},
+						.ProbeSpacing = DDGIPass::GetProbeSpacing(),
+						.ProbeCounts = DDGIPass::GetProbeCounts(),
 					}
 				};
 
 				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
 				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+				cmd.BindAllDescriptorSets();
 				cmd.BindPushConstant(pushConstant);
 				cmd.BindBuffers(registry.GetBuffer(RGResource(GPUIndicesBuffer)));
 
-				cmd.DrawIndexed(s_ProbeSphere->GetIndicesSize(), probeCount, s_ProbeSphere->GetMyGlobalIndexOffset(), s_ProbeSphere->GetMyGlobalVertexOffset(), 0);
-			};
-		});
-		
-		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGIDebugPass", [probeColumns, probeRows, probeCount, 
-			width = m_Width, height = m_Height, origin = m_ProbeOrigin, spacing = m_ProbeSpacing, counts = m_ProbeCounts](RenderGraphBuilder& build) {
-			build.SetInFlightMode(true);
-
-			struct DDGIDebugData {
-				RenderDeviceBufferReference RayResults;
-				uint32_t SceneColorTextureIndex;
-				uint32_t SceneDepthTextureIndex;
-
-				uint32_t ProbeCount;
-				uint32_t MarkerRadiusPixels;
-				uint32_t RaysPerProbe;
-				uint32_t MaxRayDistance;
-				uint32_t RayResultTextureIndex;
-
-				glm::vec4 ProbeOrigin;
-				glm::vec4 ProbeSpacing;
-
-				glm::uvec4 ProbeCounts;
-			};
-
-			build.DeclareImage(RGResource(DDGIRayDebugImage), {
-				.Width = s_RaysPerProbe,
-				.Height = probeCount,
-				.ImageType = ImageType::Type2D,
-				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
-				.Format = ImageFormat::R16G16B16A16_SFLOAT,
-				.GenerateSampler = true,
-				.ImGuiUsage = true,
-			}, RenderPassLoadStoreAttachments::ClearStore);
-
-			build.ReadBuffer(RGResource(DDGIRayResults), RenderGraphResourceAccess::StorageRead);
-			build.WriteImage(RGResource(DDGIRayDebugImage), RenderGraphResourceAccess::StorageWrite);
-
-			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
-				LUCY_PROFILE_NEW_EVENT("RendererPasses::DDGIDebugPass");
-				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("DDGIDebugPipeline");
-				cmd.BindPipeline(pipeline);
-
-				uint32_t rayResultIndex = cmd.BindImageHandleTo("StorageTextures2D", registry.GetImage(RGResource(DDGIRayDebugImage)));
-
-				GlobalPushConstant<DDGIDebugData> pushConstantData{
-					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
-					.Data = {
-						.RayResults = registry.GetBuffer(RGResource(DDGIRayResults))->GetDeviceAddress(),
-						.SceneColorTextureIndex = {},
-						.SceneDepthTextureIndex = {},
-						.ProbeCount = probeCount,
-						.MarkerRadiusPixels = 2,
-						.RaysPerProbe = s_RaysPerProbe,
-						.MaxRayDistance = 10000,
-						.RayResultTextureIndex = rayResultIndex,
-						.ProbeOrigin = glm::vec4{ origin, 0.0f },
-						.ProbeSpacing = glm::vec4{ spacing, 0.0f },
-						.ProbeCounts = glm::uvec4{ counts, 0 }
-					}
-				};
-
-				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
-				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
-
-				cmd.BindPushConstant(pushConstant);
-				cmd.BindAllDescriptorSets();
-				cmd.DispatchCompute((s_RaysPerProbe + 7) / 8, (probeCount + 7) / 8, 1);
+				cmd.DrawIndexed(s_ProbeSphere->GetIndicesSize(), DDGIPass::GetProbeCount(), s_ProbeSphere->GetMyGlobalIndexOffset(), s_ProbeSphere->GetMyGlobalVertexOffset(), 0);
 			};
 		});
 	}

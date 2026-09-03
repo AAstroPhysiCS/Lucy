@@ -104,6 +104,7 @@ namespace Lucy {
 
 		[[nodiscard]] RenderDeviceTextureHandle BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<GraphicsPipeline>& pipeline, const Ref<Image>& image, uint32_t mip) final override;
 		[[nodiscard]] RenderDeviceTextureHandle BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<ComputePipeline>& pipeline, const Ref<Image>& image, uint32_t mip) final override;
+		[[nodiscard]] RenderDeviceTextureHandle BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<RayTracingPipeline>& pipeline, const Ref<Image>& image, uint32_t mip) final override;
 
 		void BindPushConstant(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline, const PipelineConstant& pushConstant) final override;
 		void BindPushConstant(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline, const PipelineConstant& pushConstant) final override;

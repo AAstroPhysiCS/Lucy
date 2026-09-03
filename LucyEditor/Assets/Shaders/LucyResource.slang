@@ -40,6 +40,14 @@ public struct GPUTextureResource {
     public float4 Sample2DTexture(float2 uv, float4 fallbackValue = FALLBACK_VALUE) {
         return !IsValid() ? fallbackValue : BindlessTable::Textures2D[NonUniformResourceIndex(TextureResource.Index)].Sample(BindlessTable::Samplers[NonUniformResourceIndex(SamplerResource.Index)], uv);
     }
+
+    public float4 Sample2DTextureLevel(float2 uv, float level, float4 fallbackValue = FALLBACK_VALUE) {
+        return !IsValid() ? fallbackValue : BindlessTable::Textures2D[NonUniformResourceIndex(TextureResource.Index)].SampleLevel(BindlessTable::Samplers[NonUniformResourceIndex(SamplerResource.Index)], uv, level);
+    }
+
+    public float2 Sample2DTextureLevel_Float2(float2 uv, float level, float2 fallbackValue = FALLBACK_VALUE.xy) {
+        return !IsValid() ? fallbackValue : BindlessTable::Textures2D_Float2[NonUniformResourceIndex(TextureResource.Index)].SampleLevel(BindlessTable::Samplers[NonUniformResourceIndex(SamplerResource.Index)], uv, level);
+    }
     
     public float2 Sample2DTexture_Float2(float2 uv, float2 fallbackValue = FALLBACK_VALUE.xy) {
         return !IsValid() ? fallbackValue : BindlessTable::Textures2D_Float2[NonUniformResourceIndex(TextureResource.Index)].Sample(BindlessTable::Samplers[NonUniformResourceIndex(SamplerResource.Index)], uv);
@@ -154,6 +162,54 @@ public struct PBRMaterial {
 
         if (MetallicMap.IsValid()) {
             float3 m = MetallicMap.Sample2DTexture(uv).xyz;
+            result.Metallic *= m.b;
+        }
+
+        return result;
+    }
+
+    PBRMaterialSample SampleLevel(float2 uv, float level) {
+        PBRMaterialSample result;
+        result.BaseColor = AlbedoMap.Sample2DTextureLevel(uv, level, BaseColor);
+        result.AO = ORME.x;
+        result.Roughness = ORME.y;
+        result.Metallic = ORME.z;
+
+        if (HasNormalMap()) {
+            float2 normalXY = NormalMap.Sample2DTextureLevel(uv, level).xy * 2.0f - 1.0f;
+            normalXY *= NormalStrength;
+            // basically x^2 + y^2 + z^2 = 1 -> z = sqrt(1 - x^2 - y^2)
+            // we need this for BC5 normals (bistro etc...)
+            float normalZ = sqrt(saturate(1.0f - dot(normalXY, normalXY)));
+            result.NormalTS = normalize(float3(normalXY, normalZ));
+        }
+
+        float3 emissive = EmissiveMap.Sample2DTextureLevel(uv, level, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+        result.EmissiveColorAndStrength = float4(emissive, ORME.w);
+        result.AlphaCutoff = AlphaCutoff;
+
+        if (ORMMap.IsValid()) {
+            float3 orm = ORMMap.Sample2DTextureLevel(uv, level, ORME).xyz;
+
+            result.AO = orm.r;
+            result.Roughness = orm.g;
+            result.Metallic = orm.b;
+
+            return result;
+        }
+
+        if (AOMap.IsValid()) {
+            float3 ao = AOMap.Sample2DTextureLevel(uv, level).xyz;
+            result.AO *= ao.r;
+        }
+
+        if (RoughnessMap.IsValid()) {
+            float3 r = RoughnessMap.Sample2DTextureLevel(uv, level).xyz;
+            result.Roughness *= r.g;
+        }
+
+        if (MetallicMap.IsValid()) {
+            float3 m = MetallicMap.Sample2DTextureLevel(uv, level).xyz;
             result.Metallic *= m.b;
         }
 

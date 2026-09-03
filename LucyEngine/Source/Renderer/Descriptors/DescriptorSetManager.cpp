@@ -70,6 +70,9 @@ namespace Lucy {
 		const auto& name = shader->GetName();
 
 		const auto CreateDescriptorSet = [&](auto& descriptorSets, const auto& descriptorPool, const auto& createInfo) {
+			if (descriptorSets.contains(createInfo.SetIndex))
+				return;
+
 			RenderDeviceResourceHandle descriptorSetHandle = m_RenderDevice->CreateDescriptorSet(createInfo);
 			const auto& descriptorSet = m_RenderDevice->AccessResource<VulkanDescriptorSet>(descriptorSetHandle);
 			descriptorSet->Bake(descriptorPool, m_RenderDevice);
@@ -87,7 +90,7 @@ namespace Lucy {
 				// include all supported shader stages here, otherwise the shared layout may be
 				// created with incomplete stage flags and later cause Vulkan validation errors
 				for (auto& variable : createInfo.ShaderVariables)
-					variable.StageFlag = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT;
+					variable.StageFlag = VK_SHADER_STAGE_ALL;
 				createInfo.Count = 1; //we only need one since its global bindless descriptor set.
 				CreateDescriptorSet(m_GlobalDescriptorSets, m_GlobalDescriptorPool, createInfo);
 				continue;
@@ -97,7 +100,7 @@ namespace Lucy {
 				continue;
 
 			for (auto& variable : createInfo.ShaderVariables)
-				variable.StageFlag |= VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+				variable.StageFlag = VK_SHADER_STAGE_ALL;
 			CreateDescriptorSet(m_DescriptorSetsPerShader, m_PerShaderDescriptorPool, createInfo);
 		}
 
