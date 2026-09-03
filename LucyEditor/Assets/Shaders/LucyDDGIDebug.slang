@@ -17,7 +17,6 @@ struct DDGIDebugData {
     float4 ProbeSpacing;
 
     uint4 ProbeCounts;
-    uint4 OutputSize;
 };
 
 [[vk::push_constant]]
@@ -28,10 +27,10 @@ void DDGIDebugMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
     uint rayIndex = dispatchThreadID.x;
     uint probeIndex = dispatchThreadID.y;
 
-    if (rayIndex >= PushConstants.Data.RaysPerProbe || rayIndex >= PushConstants.Data.OutputSize.x)
+    if (rayIndex >= PushConstants.Data.RaysPerProbe)
         return;
 
-    if (probeIndex >= PushConstants.Data.ProbeCount || probeIndex >= PushConstants.Data.OutputSize.y)
+    if (probeIndex >= PushConstants.Data.ProbeCount)
         return;
 
     uint resultIndex = probeIndex * PushConstants.Data.RaysPerProbe + rayIndex;

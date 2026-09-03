@@ -27,6 +27,7 @@ namespace Lucy {
         RenderDeviceBufferReference GetDeviceAddress() const override { return static_cast<RenderDeviceBufferReference>(m_DeviceAddress); }
 
         VkBuffer GetVulkanBufferHandle() const { return m_Buffer; }
+        VmaAllocation GetAllocation() const { return m_Allocation; }
         BufferUsage GetUsage() const { return GetCreateInfo().Usage; }
     private:
         void RTCreate(const Ref<RenderDevice>& device);

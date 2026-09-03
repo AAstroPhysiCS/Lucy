@@ -35,7 +35,7 @@ namespace Lucy {
 
 	class VulkanTransientCommandPool final : private VulkanCommandPool {
 	public:
-		VulkanTransientCommandPool(const Ref<VulkanRenderDevice>& vulkanDevice);
+		VulkanTransientCommandPool(TargetQueueFamily queueFamily, const Ref<VulkanRenderDevice>& vulkanDevice);
 		virtual ~VulkanTransientCommandPool() = default;
 
 		VulkanTransientCommandPool(const VulkanTransientCommandPool&) = delete;
@@ -45,6 +45,7 @@ namespace Lucy {
 
 		VkCommandBuffer BeginSingleTimeCommand(VkDevice logicalDevice);
 		void EndSingleTimeCommand();
+		void FreeSingleTimeCommand(VkDevice logicalDevice);
 		void Destroy();
 
 		inline VkCommandBuffer GetTransientCommandBuffer() const { return m_CommandBuffers[m_CommandBuffers.size() - 1]; }

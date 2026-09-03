@@ -60,7 +60,9 @@ namespace Lucy {
 		m_UploadManager = Memory::CreateUnique<VulkanRenderDeviceUploadManager>(shared_from_this()->As<VulkanRenderDevice>());
 		m_DeviceScene = Memory::CreateUnique<RenderDeviceScene>(this);
 
-		m_TransientCommandPool = Memory::CreateUnique<VulkanTransientCommandPool>(shared_from_this()->As<VulkanRenderDevice>());
+		m_TransientCommandPool = Memory::CreateUnique<VulkanTransientCommandPool>(TargetQueueFamily::Graphics, shared_from_this()->As<VulkanRenderDevice>());
+		m_TransientCommandPoolCompute = Memory::CreateUnique<VulkanTransientCommandPool>(TargetQueueFamily::Compute, shared_from_this()->As<VulkanRenderDevice>());
+		m_TransientCommandPoolTransfer = Memory::CreateUnique<VulkanTransientCommandPool>(TargetQueueFamily::Transfer, shared_from_this()->As<VulkanRenderDevice>());
 	}
 
 	void VulkanRenderDevice::CreateDeviceResources() {
@@ -569,6 +571,8 @@ namespace Lucy {
 		scene->RTDestroy();
 
 		m_TransientCommandPool->Destroy();
+		m_TransientCommandPoolCompute->Destroy();
+		m_TransientCommandPoolTransfer->Destroy();
 
 		m_DescriptorSetManager->RTDestroy();
 		m_UploadManager->Destroy(m_Allocator);
@@ -1008,12 +1012,16 @@ namespace Lucy {
 		m_DescriptorSetManager->RegisterShaderBindings(shader);
 	}
 
-	void VulkanRenderDevice::SubmitImmediateCommand(const std::function<void(VkCommandBuffer)>& func) {
-		VkCommandBuffer commandBuffer = m_TransientCommandPool->BeginSingleTimeCommand(m_LogicalDevice);
-		func(commandBuffer);
-		m_TransientCommandPool->EndSingleTimeCommand();
+	void VulkanRenderDevice::SubmitImmediateCommand(const std::function<void(VkCommandBuffer)>& func, TargetQueueFamily family) {
+		const auto& transientCommandPool = family == TargetQueueFamily::Graphics ? m_TransientCommandPool : family == TargetQueueFamily::Compute ? m_TransientCommandPoolCompute : m_TransientCommandPoolTransfer;
+		VkQueue queue = family == TargetQueueFamily::Graphics ? m_GraphicsQueue : family == TargetQueueFamily::Compute ? m_ComputeQueue : m_TransferQueue;
 
-		SubmitWorkToGPUImmediate(m_GraphicsQueue, 1, m_TransientCommandPool->GetTransientCommandBuffer());
+		VkCommandBuffer commandBuffer = transientCommandPool->BeginSingleTimeCommand(m_LogicalDevice);
+		func(commandBuffer);
+		transientCommandPool->EndSingleTimeCommand();
+
+		SubmitWorkToGPUImmediate(queue, 1, transientCommandPool->GetTransientCommandBuffer());
+		transientCommandPool->FreeSingleTimeCommand(m_LogicalDevice);
 	}
 
 	void VulkanRenderDevice::WaitForDevice() {

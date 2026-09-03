@@ -1046,7 +1046,7 @@ namespace Lucy {
 		const uint32_t probeCount = probeColumns * probeRows;
 		m_ProbeOrigin = -0.5f * glm::vec3(m_ProbeCounts - glm::vec3(1)) * m_ProbeSpacing;
 
-		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGITracePass", [probeColumns, probeRows, probeCount, this](RenderGraphBuilder& build) {
+		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGITracePass", [probeColumns, probeRows, probeCount, *this](RenderGraphBuilder& build) {
 			build.SetInFlightMode(true);
 
 			build.DeclareBuffer(RGResource(DDGIRayResults), {
@@ -1105,7 +1105,7 @@ namespace Lucy {
 			};
 		});
 
-		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGIProbeUpdatePass", [](RenderGraphBuilder& build) {
+		/*renderGraph->AddPass(TargetQueueFamily::Compute, "DDGIProbeUpdatePass", [](RenderGraphBuilder& build) {
 			build.ReadBuffer(RGResource(DDGIRayResults), RenderGraphResourceAccess::StorageRead);
 
 			build.WriteImage(RGResource(DDGIIrradianceAtlas), RenderGraphResourceAccess::StorageWrite);
@@ -1114,12 +1114,14 @@ namespace Lucy {
 			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
 
 			};
-		});
+		});*/
 
 		renderGraph->AddPass(TargetQueueFamily::Graphics, "DDGIProbeDebugPass", [probeColumns, probeRows, probeCount, 
 			width = m_Width, height = m_Height, origin = m_ProbeOrigin, spacing = m_ProbeSpacing, counts = m_ProbeCounts](RenderGraphBuilder& build) {
 			build.SetViewportArea(width, height);
 			build.SetInFlightMode(true);
+
+			build.ReadBuffer(RGResource(DDGIRayResults), RenderGraphResourceAccess::StorageRead);
 
 			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
 			build.ReadExternalBuffer(RGResource(GPUVerticesBuffer), RenderGraphResourceAccess::StorageRead);
@@ -1166,6 +1168,8 @@ namespace Lucy {
 		
 		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGIDebugPass", [probeColumns, probeRows, probeCount, 
 			width = m_Width, height = m_Height, origin = m_ProbeOrigin, spacing = m_ProbeSpacing, counts = m_ProbeCounts](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
 			struct DDGIDebugData {
 				RenderDeviceBufferReference RayResults;
 				uint32_t SceneColorTextureIndex;
@@ -1181,10 +1185,7 @@ namespace Lucy {
 				glm::vec4 ProbeSpacing;
 
 				glm::uvec4 ProbeCounts;
-				glm::uvec4 OutputSize;
 			};
-
-			build.ReadBuffer(RGResource(DDGIRayResults), RenderGraphResourceAccess::StorageRead);
 
 			build.DeclareImage(RGResource(DDGIRayDebugImage), {
 				.Width = s_RaysPerProbe,
@@ -1196,6 +1197,7 @@ namespace Lucy {
 				.ImGuiUsage = true,
 			}, RenderPassLoadStoreAttachments::ClearStore);
 
+			build.ReadBuffer(RGResource(DDGIRayResults), RenderGraphResourceAccess::StorageRead);
 			build.WriteImage(RGResource(DDGIRayDebugImage), RenderGraphResourceAccess::StorageWrite);
 
 			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
@@ -1218,8 +1220,7 @@ namespace Lucy {
 						.RayResultTextureIndex = rayResultIndex,
 						.ProbeOrigin = glm::vec4{ origin, 0.0f },
 						.ProbeSpacing = glm::vec4{ spacing, 0.0f },
-						.ProbeCounts = glm::uvec4{ counts, 0 },
-						.OutputSize = glm::uvec4{ probeColumns * irradianceTileSize, probeRows * irradianceTileSize, 0, 0 }
+						.ProbeCounts = glm::uvec4{ counts, 0 }
 					}
 				};
 
@@ -1459,7 +1460,7 @@ namespace Lucy {
 	PrefilterPass::PrefilterPass(Ref<Scene> scene, uint32_t cubemapSize)
 		: m_Scene(scene), m_CubemapSize(cubemapSize) {
 	}
-
+	
 	void PrefilterPass::AddPass(const Ref<RenderGraph>& renderGraph) {
 		renderGraph->AddPass(TargetQueueFamily::Compute, "PrefilterPass", [*this](RenderGraphBuilder& build) {
 			build.DeclareImage(RGResource(PrefilterImage), {

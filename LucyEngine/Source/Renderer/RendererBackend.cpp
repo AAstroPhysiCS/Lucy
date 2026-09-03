@@ -46,8 +46,7 @@ namespace Lucy {
 	}
 
 	void RendererBackend::EnqueueResourceDestroy(RenderDeviceResourceHandle handle) {
-		auto debugName = GetRenderDevice()->AccessResource<RenderDeviceResource>(handle)->GetDebugName();
-
+		const auto& debugName = GetRenderDevice()->AccessResource<RenderDeviceResource>(handle)->GetDebugName();
 		m_ResourceDeletionQueues[GetCurrentFrameIndex()].emplace_back([=](const Ref<RenderDevice>& device) mutable {
 			LUCY_INFO("Deleted Resource Name {0}", debugName);
 			device->RTDestroyResource(handle);

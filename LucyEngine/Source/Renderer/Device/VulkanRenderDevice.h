@@ -150,7 +150,7 @@ namespace Lucy {
 			VulkanSemaphore& renderFinishedSemaphore, VulkanSemaphore& frameTimelineSemaphore, uint64_t signalValue);
 		void SubmitWorkToGPUAsBatch(const RenderCommandList& renderCommandList, const ExecutionBatch& batch) final override;
 
-		void SubmitImmediateCommand(const std::function<void(VkCommandBuffer)>& func);
+		void SubmitImmediateCommand(const std::function<void(VkCommandBuffer)>& func, TargetQueueFamily family = TargetQueueFamily::Graphics);
 
 		void WaitForDevice() final override;
 		void WaitForQueue(TargetQueueFamily queueFamily) final override;
@@ -235,6 +235,8 @@ namespace Lucy {
 		VkFence m_ImmediateSubmitFence = VK_NULL_HANDLE;
 
 		Ref<VulkanTransientCommandPool> m_TransientCommandPool = nullptr;
+		Ref<VulkanTransientCommandPool> m_TransientCommandPoolCompute = nullptr;
+		Ref<VulkanTransientCommandPool> m_TransientCommandPoolTransfer = nullptr;
 
 		Unique<VulkanDescriptorSetManager> m_DescriptorSetManager = nullptr;
 		Unique<VulkanRenderDeviceUploadManager> m_UploadManager = nullptr;

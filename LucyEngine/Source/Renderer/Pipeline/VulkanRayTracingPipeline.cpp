@@ -569,13 +569,21 @@ namespace Lucy {
 		const auto& shaderBindingTable = vulkanDevice->AccessResource<VulkanDeviceAddressBuffer>(m_ShaderBindingTableHandle);
 		LUCY_ASSERT(shaderBindingTable->GetMappedData());
 
-		uint8_t* mappedData = static_cast<uint8_t*>(shaderBindingTable->GetMappedData());
-		memset(mappedData, 0, bufferSize);
-		memcpy(mappedData + rayGenOffset, shaderGroupHandles.data() + handleSize * 0, handleSize);
-		memcpy(mappedData + missOffset, shaderGroupHandles.data() + handleSize * 1, handleSize);
-		memcpy(mappedData + hitOffset, shaderGroupHandles.data() + handleSize * 2, handleSize);
+		void* mappedData = shaderBindingTable->GetMappedData();
 
-		const VkDeviceAddress shaderBindingTableAddress = shaderBindingTable->GetDeviceAddress();
+		auto& allocator = vulkanDevice->GetAllocator();
+		allocator.MapMemory(shaderBindingTable->GetAllocation(), mappedData);
+
+		uint8_t* dataInBytes = static_cast<uint8_t*>(mappedData);
+		memset(dataInBytes, 0, bufferSize);
+		memcpy(dataInBytes + rayGenOffset, shaderGroupHandles.data() + handleSize * 0, handleSize);
+		memcpy(dataInBytes + missOffset, shaderGroupHandles.data() + handleSize * 1, handleSize);
+		memcpy(dataInBytes + hitOffset, shaderGroupHandles.data() + handleSize * 2, handleSize);
+
+		allocator.UnmapMemory(shaderBindingTable->GetAllocation());
+		allocator.Flush(shaderBindingTable->GetAllocation(), 0, bufferSize);
+
+		VkDeviceAddress shaderBindingTableAddress = shaderBindingTable->GetDeviceAddress();
 		m_RayGenRegion.deviceAddress = shaderBindingTableAddress + rayGenOffset;
 		m_RayGenRegion.stride = handleSizeAligned;
 		m_RayGenRegion.size = handleSizeAligned;

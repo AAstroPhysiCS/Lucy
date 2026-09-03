@@ -58,10 +58,9 @@ namespace Lucy {
 		m_CommandBuffers.erase(m_CommandBuffers.begin() + commandBufferStartIndex, m_CommandBuffers.begin() + commandBufferStartIndex + commandBufferCount);
 	}
 
-	VulkanTransientCommandPool::VulkanTransientCommandPool(const Ref<VulkanRenderDevice>& vulkanDevice)
-		: VulkanCommandPool(CommandPoolCreateInfo{ .CommandBufferCount = 0, .Level = 0, .PoolFlags = 0, .RenderDevice = vulkanDevice}) {
-		VkCommandPoolCreateInfo createCommandPoolInfo = VulkanAPI::CommandPoolCreateInfo(m_CreateInfo.PoolFlags, 
-			m_CreateInfo.TargetQueueFamily == TargetQueueFamily::Graphics ? vulkanDevice->GetQueueFamilies().GraphicsFamily : vulkanDevice->GetQueueFamilies().ComputeFamily);
+	VulkanTransientCommandPool::VulkanTransientCommandPool(TargetQueueFamily queueFamily, const Ref<VulkanRenderDevice>& vulkanDevice)
+		: VulkanCommandPool(CommandPoolCreateInfo{ .CommandBufferCount = 0, .Level = 0, .PoolFlags = 0, .RenderDevice = vulkanDevice, .TargetQueueFamily = queueFamily }) {
+		VkCommandPoolCreateInfo createCommandPoolInfo = VulkanAPI::CommandPoolCreateInfo(m_CreateInfo.PoolFlags, vulkanDevice->GetQueue(m_CreateInfo.TargetQueueFamily).Family);
 		LUCY_VK_ASSERT(vkCreateCommandPool(vulkanDevice->GetLogicalDevice(), &createCommandPoolInfo, nullptr, &m_CommandPool));
 	}
 
@@ -80,6 +79,13 @@ namespace Lucy {
 
 	void VulkanTransientCommandPool::EndSingleTimeCommand() {
 		vkEndCommandBuffer(m_CommandBuffers[m_CommandBuffers.size() - 1]);
+	}
+
+	void VulkanTransientCommandPool::FreeSingleTimeCommand(VkDevice logicalDevice) {
+		LUCY_ASSERT(!m_CommandBuffers.empty());
+		VkCommandBuffer commandBuffer = m_CommandBuffers.back();
+		vkFreeCommandBuffers(logicalDevice, m_CommandPool, 1, &commandBuffer);
+		m_CommandBuffers.pop_back();
 	}
 
 	void VulkanTransientCommandPool::Destroy() {
