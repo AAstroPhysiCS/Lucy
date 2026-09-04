@@ -79,10 +79,11 @@ void RayGen() {
 
 [shader("miss")]
 void Miss(inout DDGIRayPayload payload) {
-    float3 rayDirection = normalize(WorldRayDirection());
-    rayDirection.xy *= -1.0f;
+    float3 rayDirection = normalize(-WorldRayDirection());
 
-    payload.Radiance = PushConstants.Data.EnvironmentMap.SampleCubeTextureLevel(rayDirection, 0.0f).rgb;
+    float environmentIntensity = PushConstants.Data.ProbeSpacing.w;
+
+    payload.Radiance = PushConstants.Data.EnvironmentMap.SampleCubeTextureLevel(rayDirection, 0.0f).rgb * environmentIntensity;
     payload.Distance = PushConstants.Data.ProbeOriginAndMaxDistance.w;
 }
 

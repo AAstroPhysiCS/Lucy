@@ -6,7 +6,7 @@ struct VertexOutput {
 };
 
 struct LocalPushConstant {
-    float3 u_Data; // x: environment map index, y: sampler index, z: mip level
+    float4 u_Data; // x: environment map index, y: sampler index, z: mip level, w: intensity
 };
 
 [vk::push_constant]
@@ -63,6 +63,8 @@ PixelOutput main(PixelInput input) {
 
     float3 envColor = BindlessTable::CubeTextures[uint(PushConstants.Data.u_Data.x)]
         .SampleLevel(BindlessTable::Samplers[uint(PushConstants.Data.u_Data.y)], input.a_PosOut, PushConstants.Data.u_Data.z).rgb;
+
+    envColor *= PushConstants.Data.u_Data.w;
 
     const float gamma = 2.2;
     envColor = pow(envColor, 1.0 / gamma);

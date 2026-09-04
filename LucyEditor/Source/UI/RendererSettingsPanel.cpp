@@ -20,6 +20,7 @@ namespace Lucy {
 		auto& settings = Renderer::GetRendererSettings();
 
 		ImGui::SliderFloat("Environment LOD", &settings.EnvironmentLOD, 0.0f, PrefilterPass::MAX_MIP_LEVELS);
+		ImGui::DragFloat("Environment Intensity", &settings.EnvironmentIntensity, 0.01f, 0.0f, 10.0f, "%.3f");
 		ImGui::SliderFloat("DDGI Strength", &settings.DDGIStrength, 1.0f, 5.0f);
 
 		ImGui::SeparatorText("GPU Culling");

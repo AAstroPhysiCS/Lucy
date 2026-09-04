@@ -216,9 +216,9 @@ PixelOutput main(PixelInput input) {
     float2 brdf = PushConstants.Data.u_PBRTextureResources[2].Sample2DTexture_Float2(float2(NdotV, materialSample.Roughness));
 
     // Indirect diffuse (ambient term) — AO affects only diffuse IBL
-    float3 diffuseIBL = PushConstants.Data.u_PBRTextureResources[3].SampleCubeTexture(normalsWS).rgb * materialSample.BaseColor.rgb * kD;
+    float3 diffuseIBL = PushConstants.Data.u_PBRTextureResources[3].SampleCubeTexture(normalsWS).rgb * materialSample.BaseColor.rgb * kD * PushConstants.Data.u_DDGI.Settings.y;
     // Indirect specular (prefiltered env map * BRDF LUT)
-    float3 specularIBL = prefilterColor * (F0 * brdf.x + brdf.y);
+    float3 specularIBL = prefilterColor * (F0 * brdf.x + brdf.y) * PushConstants.Data.u_DDGI.Settings.y;
 
     float3 ddgiIrradiance = SampleDDGIIrradiance(PushConstants.Data.u_DDGI, input.a_PosOutWS, normalsWS);
     float3 diffuseDDGI = ddgiIrradiance * materialSample.BaseColor.rgb * kD / PI;

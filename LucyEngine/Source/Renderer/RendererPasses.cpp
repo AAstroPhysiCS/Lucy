@@ -458,7 +458,7 @@ namespace Lucy {
 							},
 							.ProbeOriginAndMaxDistance = glm::vec4{ origin, DDGIPass::GetMaxRayDistance() },
 							.ProbeSpacingAndBias = glm::vec4{ spacing, 0.2f },
-							.Settings = glm::vec4{ settings.DDGIStrength, 0.0f, 0.0f, 0.0f },
+							.Settings = glm::vec4{ settings.DDGIStrength, settings.EnvironmentIntensity, 0.0f, 0.0f },
 							.ProbeCounts = counts
 						}
 					}
@@ -1108,6 +1108,7 @@ namespace Lucy {
 
 			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::DDGITracePass");
+				const auto& settings = Renderer::GetRendererSettings();
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<RayTracingPipeline>("DDGITracePipeline");
 				cmd.BindPipeline(pipeline);
 
@@ -1150,7 +1151,7 @@ namespace Lucy {
 							.SamplerIndex = cmd.GetLinearClampSampler().Index
 						},
 						.ProbeOriginAndMaxDistance = glm::vec4{ s_ProbeOrigin, s_MaxRayDistance },
-						.ProbeSpacing = glm::vec4{ s_ProbeSpacing, 0.0f },
+						.ProbeSpacing = glm::vec4{ s_ProbeSpacing, settings.EnvironmentIntensity },
 						.ProbeCountsAndRays = glm::uvec4{ s_ProbeCounts, s_RaysPerProbe },
 						.FrameNumber = static_cast<uint32_t>(Renderer::GetFrameNumber())
 					}
@@ -1351,12 +1352,12 @@ namespace Lucy {
 				}
 
 				struct LocalPushConstant {
-					glm::vec3 Data; // x: environment map index, y: sampler index, z: mip level
+					glm::vec4 Data; // x: environment map index, y: sampler index, z: mip level, w: intensity
 				};
 
 				GlobalPushConstant<LocalPushConstant> pushConstantData {
 					registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
-					{ .Data = { index, static_cast<float>(draw.GetLinearRepeatSampler().Index), settings.EnvironmentLOD}}
+					{ .Data = { index, static_cast<float>(draw.GetLinearRepeatSampler().Index), settings.EnvironmentLOD, settings.EnvironmentIntensity }}
 				};
 
 				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
