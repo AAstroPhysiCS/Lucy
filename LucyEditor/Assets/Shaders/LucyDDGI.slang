@@ -6,15 +6,17 @@
 RaytracingAccelerationStructure u_TLAS;
 
 struct DDGITraceData {
-	DDGIRayResult* RayResults;
+    DDGIRayResult* RayResults;
+    float4* ProbeOffsets;
+    uint* ProbeUpdateList;
 
     GPUTextureResource EnvironmentMap;
     GPUTextureResource IrradianceHistory;
     GPUTextureResource DepthHistory;
 
-	float4 ProbeOriginAndMaxDistance;
-	float4 ProbeSpacing;
-	uint4 ProbeCountsAndRays;
+    float4 ProbeOriginAndMaxDistance;
+    float4 ProbeSpacing;
+    uint4 ProbeCountsAndRays;
 
     uint FrameNumber;
 };
@@ -50,15 +52,24 @@ float GetDirectionalLightVisibility(float3 positionWS, float3 surfaceNormalWS, f
 void RayGen() {
     uint2 dispatchIndex = DispatchRaysIndex().xy;
     uint rayIndex = dispatchIndex.x;
-    uint probeIndex = dispatchIndex.y;
+    uint updateIndex = dispatchIndex.y;
+    uint probeIndex = PushConstants.Data.ProbeUpdateList[updateIndex];
 
     uint3 probeCounts = PushConstants.Data.ProbeCountsAndRays.xyz;
     uint raysPerProbe = PushConstants.Data.ProbeCountsAndRays.w;
 
     uint3 probeCoordinate = GetProbeCoordinate(probeIndex, probeCounts);
-    float3 probePosition = PushConstants.Data.ProbeOriginAndMaxDistance.xyz + float3(probeCoordinate) * PushConstants.Data.ProbeSpacing.xyz;
+    float3 probeOffset = float3(0.0f);
+    if (PushConstants.Data.FrameNumber > 0)
+        probeOffset = PushConstants.Data.ProbeOffsets[probeIndex].xyz;
+    float3 probePosition = PushConstants.Data.ProbeOriginAndMaxDistance.xyz + float3(probeCoordinate) * PushConstants.Data.ProbeSpacing.xyz + probeOffset;
 
-    float3 rayDirection = GetDDGIRayDirection(rayIndex, raysPerProbe, PushConstants.Data.FrameNumber);
+    float3 rayDirection;
+    if (rayIndex == 0 && length(probeOffset) > 0.0001f)
+        rayDirection = normalize(-probeOffset);
+    else
+        rayDirection = GetDDGIRayDirection(rayIndex, raysPerProbe, PushConstants.Data.FrameNumber);
+
     float maxRayDistance = PushConstants.Data.ProbeOriginAndMaxDistance.w;
 
     DDGIRayPayload payload;
@@ -121,10 +132,11 @@ void ClosestHit(inout DDGIRayPayload payload, BuiltInTriangleIntersectionAttribu
     if (PushConstants.Data.FrameNumber > 0) {
         DDGISamplingData ddgiData;
         ddgiData.IrradianceAtlas = PushConstants.Data.IrradianceHistory;
+        ddgiData.ProbeOffsets = PushConstants.Data.ProbeOffsets;
         ddgiData.DepthAtlas = PushConstants.Data.DepthHistory;
         ddgiData.ProbeOriginAndMaxDistance = PushConstants.Data.ProbeOriginAndMaxDistance;
         ddgiData.ProbeSpacingAndBias = PushConstants.Data.ProbeSpacing;
-        ddgiData.ProbeCounts = uint4(PushConstants.Data.ProbeCountsAndRays.xyz, 0);
+        ddgiData.ProbeCounts = PushConstants.Data.ProbeCountsAndRays.xyz;
 
         if (IsInsideDDGIVolume(ddgiData, surface.PositionWS)) {
             float3 previousIrradiance = SampleDDGIIrradiance(ddgiData, surface.PositionWS, normalWS);
@@ -135,9 +147,10 @@ void ClosestHit(inout DDGIRayPayload payload, BuiltInTriangleIntersectionAttribu
     }
 
     float3 emissive = materialSample.EmissiveColorAndStrength.rgb * materialSample.EmissiveColorAndStrength.a;
+    bool backfaceHit = dot(WorldRayDirection(), surface.GeometricNormalWS) > 0.0f;
 
     payload.Radiance = directLighting + multiBounceLighting + emissive;
-    payload.Distance = RayTCurrent();
+    payload.Distance = backfaceHit ? -RayTCurrent() : RayTCurrent();
 }
 
 [shader("anyhit")]

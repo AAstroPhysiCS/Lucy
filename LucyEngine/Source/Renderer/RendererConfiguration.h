@@ -25,6 +25,12 @@ namespace Lucy {
 		float EnvironmentIntensity = 1.0f;
 		float DDGIStrength = 1.0f;
 
+		bool DDGIAdaptiveUpdates = true;
+		float DDGIProbeUpdateFraction = 0.25f;
+		float DDGINearProbeRadius = 4.0f;
+		float DDGIMidProbeRadius = 10.0f;
+		uint32_t DDGIMaxProbeAge = 16;
+
 		uint32_t CullViewFlags = static_cast<uint32_t>(GPUCullViewFlags::EnableFrustumCulling) | static_cast<uint32_t>(GPUCullViewFlags::EnableConeCulling);
 		bool ShowProbeSpheres = false;
 	};

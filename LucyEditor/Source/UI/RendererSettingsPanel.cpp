@@ -21,7 +21,23 @@ namespace Lucy {
 
 		ImGui::SliderFloat("Environment LOD", &settings.EnvironmentLOD, 0.0f, PrefilterPass::MAX_MIP_LEVELS);
 		ImGui::DragFloat("Environment Intensity", &settings.EnvironmentIntensity, 0.01f, 0.0f, 10.0f, "%.3f");
-		ImGui::SliderFloat("DDGI Strength", &settings.DDGIStrength, 1.0f, 5.0f);
+		
+		ImGui::SeparatorText("DDGI");
+
+		ImGui::Checkbox("Adaptive Probe Updates", &settings.DDGIAdaptiveUpdates);
+
+		if (settings.DDGIAdaptiveUpdates) {
+			ImGui::SliderFloat("Probe Update Fraction", &settings.DDGIProbeUpdateFraction, 0.05f, 1.0f);
+			ImGui::DragFloat("Near Probe Radius", &settings.DDGINearProbeRadius, 0.1f, 1.0f, 20.0f);
+			ImGui::DragFloat("Mid Probe Radius", &settings.DDGIMidProbeRadius, 0.1f, 1.0f, 40.0f);
+
+			int maxProbeAge = static_cast<int>(settings.DDGIMaxProbeAge);
+
+			if (ImGui::SliderInt("Max Probe Age", &maxProbeAge, 1, 120))
+				settings.DDGIMaxProbeAge = static_cast<uint32_t>(maxProbeAge);
+		}
+
+		ImGui::Checkbox("Show probe spheres", &settings.ShowProbeSpheres);
 
 		ImGui::SeparatorText("GPU Culling");
 
@@ -46,8 +62,6 @@ namespace Lucy {
 			ImGui::TextColored({ 1.0f, 0.7f, 0.0f, 1.0f }, "Culling camera is frozen");
 
 		ImGui::Text("Flags: 0x%08X", settings.CullViewFlags);
-
-		ImGui::Checkbox("Show probe spheres", &settings.ShowProbeSpheres);
 
 		ImGui::SeparatorText("Shaders");
 

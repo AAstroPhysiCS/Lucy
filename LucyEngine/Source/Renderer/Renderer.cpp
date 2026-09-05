@@ -340,7 +340,7 @@ namespace Lucy {
 				},
 			};
 
-			constexpr size_t computePipelineCount = 16;
+			constexpr size_t computePipelineCount = 19;
 
 			constexpr const std::array<RenderGraphPipelineCreateInfo, computePipelineCount> computePipelineCreateInfos = {
 #if USE_COMPUTE_FOR_CUBEMAP_GEN
@@ -419,7 +419,22 @@ namespace Lucy {
 					.ShaderName = "LucyDDGIProbeUpdate",
 					.EntryPointName = "DDGIProbeUpdateMain",
 					.PipelineName = "DDGIProbeUpdatePipeline"
-				}
+				},
+				RenderGraphPipelineCreateInfo {
+					.ShaderName = "LucyDDGIProbeRelocation",
+					.EntryPointName = "DDGIProbeRelocationMain",
+					.PipelineName = "DDGIProbeRelocationPipeline"
+				},
+				RenderGraphPipelineCreateInfo {
+					.ShaderName = "LucyDDGIProbePriority",
+					.EntryPointName = "DDGIProbePriorityMain",
+					.PipelineName = "DDGIProbePriorityPipeline"
+				},
+				RenderGraphPipelineCreateInfo {
+					.ShaderName = "LucyDDGIProbeSelection",
+					.EntryPointName = "DDGIProbeSelectionMain",
+					.PipelineName = "DDGIProbeSelectionPipeline"
+				},
 			};
 
 			constexpr uint32_t rayTracingPipelineCount = 1;

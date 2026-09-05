@@ -2,6 +2,8 @@
 #include "LucyDDGICommon.slang"
 
 struct DDGIProbeDebugData {
+    float4* ProbeOffsets;
+
     uint3 IrradianceAtlasData; // x = texture index, y = interior texels, z = tile size
 
     float4 ProbeOriginAndRadius;
@@ -24,7 +26,9 @@ VertexOutput main(uint vertexIndex: SV_VulkanVertexID, uint instanceIndex: SV_Vu
     SceneCamera camera = PushConstants.Root->Camera;
 
     uint3 probeCoordinate = GetProbeCoordinate(instanceIndex, PushConstants.Data.ProbeCounts);
-    float3 probePosition = PushConstants.Data.ProbeOriginAndRadius.xyz + float3(probeCoordinate) * PushConstants.Data.ProbeSpacing;
+    float3 probeOffset = PushConstants.Data.ProbeOffsets[instanceIndex].xyz;
+    float3 probePosition = PushConstants.Data.ProbeOriginAndRadius.xyz + float3(probeCoordinate) * PushConstants.Data.ProbeSpacing + probeOffset;
+
     GPUVertex vertex = PushConstants.Root->Addresses.Vertices[vertexIndex];
 
     float radius = PushConstants.Data.ProbeOriginAndRadius.w;

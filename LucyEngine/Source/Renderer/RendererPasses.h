@@ -160,6 +160,8 @@ namespace Lucy {
 
 	struct RenderDeviceDDGITraceData {
 		RenderDeviceBufferReference RayResults = 0;
+		RenderDeviceBufferReference ProbeOffsets = 0;
+		RenderDeviceBufferReference ProbeUpdateList = 0;
 
 		RenderDeviceTextureResource EnvironmentMap{};
 		RenderDeviceTextureResource IrradianceHistory{};
@@ -191,6 +193,9 @@ namespace Lucy {
 		static constexpr uint32_t GetDepthTileSize() { return s_DepthTileSize; }
 
 		static constexpr float GetMaxRayDistance() { return s_MaxRayDistance; }
+
+		static constexpr float GetProbeBackfaceThreshold() { return s_ProbeBackfaceThreshold; }
+		static constexpr float GetProbeMinFrontfaceDistance() { return s_ProbeMinFrontfaceDistance; }
 	private:
 		static inline constexpr uint32_t s_RaysPerProbe = 64;
 
@@ -210,6 +215,9 @@ namespace Lucy {
 		static constexpr uint32_t s_ProbeRows = s_ProbeCounts.y;
 
 		static constexpr uint32_t s_ProbeCount = s_ProbeColumns * s_ProbeRows;
+
+		static inline constexpr float s_ProbeBackfaceThreshold = 0.25f;
+		static inline constexpr float s_ProbeMinFrontfaceDistance = 0.5f;
 
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;

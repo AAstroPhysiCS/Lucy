@@ -12,13 +12,15 @@ struct DDGIRayResult {
 };
 
 struct DDGISamplingData {
+    float4* ProbeOffsets;
+
     GPUTextureResource IrradianceAtlas;
     GPUTextureResource DepthAtlas;
 
     float4 ProbeOriginAndMaxDistance;
     float4 ProbeSpacingAndBias;
     float4 Settings;
-    uint4 ProbeCounts;
+    uint3 ProbeCounts;
 };
 
 struct DDGISurface {
@@ -27,6 +29,9 @@ struct DDGISurface {
     float2 UV;
 
     float3 NormalWS;
+    // we need the actual triangle normal for determining whether
+    // a DDGI ray hit the front or back side of geometry.
+    float3 GeometricNormalWS;
     float3 TangentWS;
     float3 BitangentWS;
 
@@ -62,6 +67,24 @@ float3 DDGIDecodeOctahedral(float2 oct) {
     return normalize(direction);
 }
 
+uint2 GetProbeInteriorTexel(uint2 localTexel, uint interiorTexelCount) {
+    uint tileSize = interiorTexelCount + 2;
+    uint lastTexel = tileSize - 1;
+
+    bool borderX = localTexel.x == 0 || localTexel.x == lastTexel;
+    bool borderY = localTexel.y == 0 || localTexel.y == lastTexel;
+
+    if (!borderX && !borderY)
+        return localTexel;
+
+    if (borderX && borderY)
+        return uint2(localTexel.x == lastTexel ? 1 : interiorTexelCount, localTexel.y == lastTexel ? 1 : interiorTexelCount);
+    if (borderY)
+        return uint2(lastTexel - localTexel.x, localTexel.y == 0 ? 1 : interiorTexelCount);
+
+    return uint2(localTexel.x == 0 ? 1 : interiorTexelCount, lastTexel - localTexel.y);
+}
+
 float3 GetProbeTexelDirection(uint2 localTexel, uint interiorTexelCount) {
     // localTexel includes the 1-pixel border:
     //
@@ -69,13 +92,10 @@ float3 GetProbeTexelDirection(uint2 localTexel, uint interiorTexelCount) {
     // 1..N          = actual octahedral data
     // N + 1         = border
 
-    float2 interiorCoordinate = float2(localTexel) - float2(1.0f, 1.0f);
+    uint2 interiorTexel = GetProbeInteriorTexel(localTexel, interiorTexelCount);
+    float2 interiorCoordinate = float2(interiorTexel) - float2(1.0f, 1.0f);
     float2 oct = ((interiorCoordinate + 0.5f) / float(interiorTexelCount)) * 2.0f - 1.0f;
 
-    // Border coordinates lie slightly outside [-1, 1].
-    // Fold those coordinates across the octahedral seam.
-    if (abs(oct.x) > 1.0f || abs(oct.y) > 1.0f)
-        oct = DDGIOctahedralWrap(oct);
     return DDGIDecodeOctahedral(oct);
 }
 
@@ -150,7 +170,7 @@ float3 SampleDDGIIrradiance(DDGISamplingData data, float3 positionWS, float3 nor
 
                 float weight = weightX * weightY * weightZ;
 
-                float3 probePosition = data.ProbeOriginAndMaxDistance.xyz + float3(probeCoordinate) * data.ProbeSpacingAndBias.xyz;
+                float3 probePosition = GetDDGIProbePosition(data, probeCoordinate);
                 float3 probeToPoint = biasedPosition - probePosition;
 
                 float distanceToProbe = length(probeToPoint);
@@ -200,7 +220,7 @@ float2 DDGIInterpolate(float2 a, float2 b, float2 c, float2 barycentrics) {
 DDGISurface GetDDGISurface(GPUScene *scene, BuiltInTriangleIntersectionAttributes attributes) {
     DDGISurface surface;
 
-    uint objectIndex = InstanceIndex();
+    uint objectIndex = InstanceID();
     GPUObject object = scene->Addresses.Objects[objectIndex];
 
     uint meshIndex = object.Data.x;
@@ -265,7 +285,14 @@ DDGISurface GetDDGISurface(GPUScene *scene, BuiltInTriangleIntersectionAttribute
     float handedness = dot(cross(normalWS, tangentWS), bitangentWS) < 0.0f ? -1.0f : 1.0f;
     bitangentWS = cross(normalWS, tangentWS) * handedness;
 
+    float3 position0WS = mul(modelMatrix, float4(vertex0.Position, 1.0f)).xyz;
+    float3 position1WS = mul(modelMatrix, float4(vertex1.Position, 1.0f)).xyz;
+    float3 position2WS = mul(modelMatrix, float4(vertex2.Position, 1.0f)).xyz;
+
+    float3 geometricNormalWS = normalize(cross(position1WS - position0WS, position2WS - position0WS));
+
     surface.NormalWS = normalWS;
+    surface.GeometricNormalWS = geometricNormalWS;
     surface.TangentWS = tangentWS;
     surface.BitangentWS = bitangentWS;
 
@@ -300,6 +327,17 @@ float3 GetFibonacciDirection(uint rayIndex, uint rayCount) {
     float phi = 2.0f * PI * frac(float(rayIndex) / GOLDEN_RATIO);
 
     return float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+}
+
+uint GetProbeIndex(uint3 probeCoordinate, uint3 probeCounts) {
+    return probeCoordinate.x + probeCoordinate.y * probeCounts.x + probeCoordinate.z * probeCounts.x * probeCounts.y;
+}
+
+float3 GetDDGIProbePosition(DDGISamplingData data, uint3 probeCoordinate) {
+    uint probeIndex = GetProbeIndex(probeCoordinate, data.ProbeCounts.xyz);
+    float3 probeOffset = data.ProbeOffsets[probeIndex].xyz;
+
+    return data.ProbeOriginAndMaxDistance.xyz + float3(probeCoordinate) * data.ProbeSpacingAndBias.xyz + probeOffset;
 }
 
 uint3 GetProbeCoordinate(uint probeIndex, uint3 probeCounts) {
@@ -344,8 +382,30 @@ float3 RotateVectorByQuaternion(float3 value, float4 quaternion) {
     return value + 2.0f * cross(q, cross(q, value) + quaternion.w * value);
 }
 
+static const uint DDGI_FIXED_RAY_COUNT = 16;
+
+float3 GetDDGIRayDirection(uint rayIndex, uint rayCount, uint frameNumber) {
+    uint fixedRayCount = min(DDGI_FIXED_RAY_COUNT, rayCount);
+
+    if (rayIndex < fixedRayCount)
+        return GetFibonacciDirection(rayIndex, fixedRayCount);
+
+    uint rotatingRayCount = rayCount - fixedRayCount;
+
+    if (rotatingRayCount == 0)
+        return GetFibonacciDirection(rayIndex, rayCount);
+
+    uint rotatingRayIndex = rayIndex - fixedRayCount;
+
+    float3 direction = GetFibonacciDirection(rotatingRayIndex, rotatingRayCount);
+    float4 rotation = GetDDGIRayRotation(frameNumber);
+
+    return normalize(RotateVectorByQuaternion(direction, rotation));
+}
+
+/*
 float3 GetDDGIRayDirection(uint rayIndex, uint rayCount, uint frameNumber) {
     float3 direction = GetFibonacciDirection(rayIndex, rayCount);
     float4 rotation = GetDDGIRayRotation(frameNumber);
     return normalize(RotateVectorByQuaternion(direction, rotation));
-}
+}*/

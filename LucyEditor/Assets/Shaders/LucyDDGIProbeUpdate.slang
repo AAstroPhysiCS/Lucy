@@ -3,6 +3,7 @@
 
 struct DDGIProbeUpdateData {
     DDGIRayResult* RayResults;
+    uint* ProbeUpdateMask;
 
     // x = current irradiance
     // y = current depth
@@ -37,7 +38,8 @@ float3 CalculateProbeIrradiance(uint probeIndex, float3 texelDirection) {
     uint raysPerProbe = PushConstants.Data.ProbeCountsAndRays.w;
     uint firstRayIndex = probeIndex * raysPerProbe;
 
-    float3 irradiance = float3(0.0f);
+    float3 weightedRadiance = float3(0.0f);
+    float weightSum = 0.0f;
 
     // Rays are uniformly distributed over the sphere.
     //
@@ -45,17 +47,19 @@ float3 CalculateProbeIrradiance(uint probeIndex, float3 texelDirection) {
     //
     // E(n) = 4*pi/N Sum{ Li * max(n dot wi, 0) }
 
-    for (uint rayIndex = 0; rayIndex < raysPerProbe; rayIndex++) {
+    for (uint rayIndex = 1; rayIndex < raysPerProbe; rayIndex++) {
         float3 rayDirection = GetDDGIRayDirection(rayIndex, raysPerProbe, PushConstants.Data.FrameNumber);
         
         float weight = max(dot(texelDirection, rayDirection), 0.0f);
-        
+
         float3 radiance = PushConstants.Data.RayResults[firstRayIndex + rayIndex].RadianceAndDistance.xyz;
-        irradiance += radiance * weight;
+        weightedRadiance += radiance * weight;
+        weightSum += weight;
     }
 
-    irradiance *= (4.0f * PI) / float(raysPerProbe);
-    return irradiance;
+    if (weightSum <= 0.000001f)
+        return float3(0.0f);
+    return weightedRadiance * (PI / weightSum);
 }
 
 // adaptive hysteresis
@@ -115,13 +119,13 @@ float2 CalculateProbeDepthMoments(uint probeIndex, float3 texelDirection) {
     float distanceSquaredSum = 0.0f;
     float weightSum = 0.0f;
 
-    for (uint rayIndex = 0; rayIndex < raysPerProbe; rayIndex++) {
+    for (uint rayIndex = 1; rayIndex < raysPerProbe; rayIndex++) {
         float3 rayDirection = GetDDGIRayDirection(rayIndex, raysPerProbe, PushConstants.Data.FrameNumber);
 
         float cosine = max(dot(texelDirection, rayDirection), 0.0f);
         float weight = pow(cosine, depthSharpness);
 
-        float distance = PushConstants.Data.RayResults[firstRayIndex + rayIndex].RadianceAndDistance.w;
+        float distance = abs(PushConstants.Data.RayResults[firstRayIndex + rayIndex].RadianceAndDistance.w);
 
         float normalizedDistance = saturate(distance / maxRayDistance);
         distanceSum += normalizedDistance * weight;
@@ -155,6 +159,22 @@ void DDGIProbeUpdateMain(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_Grou
     uint3 probeCoordinate = GetProbeCoordinate(probeIndex, probeCounts);
     uint2 atlasTile = GetDDGIProbeAtlasTile(probeCoordinate, probeCounts);
     uint2 localTexel = groupThreadID.xy;
+
+    if (PushConstants.Data.ProbeUpdateMask[probeIndex] == 0) {
+        if (localTexel.x < irradianceTileSize && localTexel.y < irradianceTileSize) {
+            uint2 atlasCoordinate = atlasTile * irradianceTileSize + localTexel;
+
+            float4 irradianceHistory = BindlessTable::Textures2D[NonUniformResourceIndex(PushConstants.Data.AtlasIndices.z)].Load(int3(atlasCoordinate, 0));
+            BindlessTable::StorageTextures2D[NonUniformResourceIndex(PushConstants.Data.AtlasIndices.x)][atlasCoordinate] = irradianceHistory;
+        }
+        if (localTexel.x < depthTileSize && localTexel.y < depthTileSize) {
+            uint2 atlasCoordinate = atlasTile * depthTileSize + localTexel;
+
+            float2 depthHistory = BindlessTable::Textures2D_Float2[NonUniformResourceIndex(PushConstants.Data.AtlasIndices.w)].Load(int3(atlasCoordinate, 0));
+            BindlessTable::StorageTextures2D_Float2[NonUniformResourceIndex(PushConstants.Data.AtlasIndices.y)][atlasCoordinate] = depthHistory;
+        }
+        return;
+    }
 
     // Irradiance atlas
     // 8x8 data + 1 pixel border on every side
