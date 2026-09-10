@@ -22,11 +22,6 @@ namespace Lucy {
 			createInfo.Format = ImageFormat::R8G8B8A8_UNORM;
 			createInfo.ImageType = ImageType::Type2D;
 			createInfo.ImageUsage = ImageUsage::AsColorTransferAttachment;
-			createInfo.Parameter.Mag = ImageFilterMode::LINEAR;
-			createInfo.Parameter.Min = ImageFilterMode::LINEAR;
-			createInfo.Parameter.U = ImageAddressMode::REPEAT;
-			createInfo.Parameter.V = ImageAddressMode::REPEAT;
-			createInfo.Parameter.W = ImageAddressMode::REPEAT;
 			createInfo.GenerateSampler = true;
 			createInfo.ImGuiUsage = true;
 
@@ -39,7 +34,7 @@ namespace Lucy {
 		
 		ImGui::Begin("Details", nullptr, ImGuiWindowFlags_NoBringToFrontOnFocus);
 
-		Entity& entityContext = SceneExplorerPanel::GetInstance().GetEntityContext();
+		Entity entityContext = SceneExplorerPanel::GetInstance().GetEntityContext();
 		if (!entityContext.IsValid()) {
 			ImGui::End();
 			return;
@@ -173,7 +168,7 @@ namespace Lucy {
 				ImGui::Text("Path");
 				ImGui::SameLine();
 				if (ImGui::InputText("##hideLabel MeshPath", buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
-					c.LoadMesh(buf);
+					c.LoadMesh(entityContext, buf);
 					entityContext.GetComponent<TagComponent>().SetTag(c.GetMesh()->GetName());
 				}
 
@@ -183,7 +178,7 @@ namespace Lucy {
 					std::string outPath;
 					Utils::OpenDialog(outPath, Utils::MeshFilterList, 1, "Assets/");
 					if (!outPath.empty()) {
-						c.LoadMesh(outPath);
+						c.LoadMesh(entityContext, outPath);
 						entityContext.GetComponent<TagComponent>().SetTag(c.GetMesh()->GetName());
 					}
 				}
@@ -212,7 +207,7 @@ namespace Lucy {
 							ImGui::ImageButton("", (ImTextureID)textureID, {64.0f, 64.0f}, {0.0f, 0.0f}, {1.0f, 1.0f});
 						ImGui::SameLine();
 
-						if (ImGui::BeginCombo("##hideLabel combo", std::to_string(materialID).c_str())) {
+						if (ImGui::BeginCombo("##hideLabel combo", std::to_string(materialID.Index).c_str())) {
 							for (uint32_t j = 0; j < mesh->GetSubmeshes().size(); j++) {
 								Submesh& submeshInner = mesh->GetSubmeshes()[i];
 
@@ -220,7 +215,7 @@ namespace Lucy {
 								Ref<Material> comboMaterial = materialManager->GetMaterialByID(submeshInner.MaterialID);
 								if (ImGui::Selectable(std::to_string(j).c_str())) {
 									selectedMaterial = j;
-									submeshInner.MaterialID = j;
+									submeshInner.MaterialID = mesh->GetSubmeshes()[j].MaterialID;
 								}
 								if (selectedMaterial == j)
 									ImGui::SetItemDefaultFocus();
@@ -229,10 +224,19 @@ namespace Lucy {
 							ImGui::EndCombo();
 						}
 
+						auto& color = material->GetAlbedoColor();
 						float& roughness = material->GetRoughnessValue();
 						float& metallic = material->GetMetallicValue();
 						float& ao = material->GetAOContribution();
+						float& normalStrength = material->GetNormalStrength();
 
+						ImGui::Text("Albedo");
+						ImGui::SameLine();
+						ImGui::ColorEdit3("##hidelabel colorpicker", (float*)&color, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel);
+
+						ImGui::Text("Normal Strength");
+						ImGui::SameLine();
+						ImGui::DragFloat("##hidelabel normal", &normalStrength, 0.001f, 0.0f, 5.0f, nullptr, 1.0f);
 						ImGui::Text("Roughness");
 						ImGui::SameLine();
 						ImGui::DragFloat("##hidelabel roughness", &roughness, 0.001f, 0.0f, 1.0f, nullptr, 1.0f);
@@ -251,21 +255,16 @@ namespace Lucy {
 		});
 
 		DrawComponentPanel<HDRCubemapComponent>(entityContext, [](HDRCubemapComponent& component) {
-			auto cubemapImage = component.GetCubemapImage();
+			const auto& path = component.GetPath();
 
 			if (ImGui::CollapsingHeader("Cubemap", ImGuiTreeNodeFlags_DefaultOpen)) {
-				char buf[1024];
-				memset(buf, 0, sizeof(buf));
-
-				if (cubemapImage) {
-					const std::string& path = cubemapImage->GetPath().string();
-					strncpy_s(buf, path.c_str(), sizeof(buf));
-				}
+				static std::string pathBuffer;
+				pathBuffer = path.empty() ? "" : path.string();
 
 				ImGui::Text("Path");
 				ImGui::SameLine();
-				if (ImGui::InputText("##hideLabel CubemapPath", buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
-					component.LoadCubemap(buf);
+				if (ImGui::InputText("##hideLabel CubemapPath", pathBuffer.data(), pathBuffer.size(), ImGuiInputTextFlags_EnterReturnsTrue)) {
+					component.LoadCubemap(pathBuffer);
 				}
 				ImGui::SameLine(0, 20);
 

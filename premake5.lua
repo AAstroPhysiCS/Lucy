@@ -1,7 +1,7 @@
 include "Libraries.lua"
 
 workspace "Lucy"
-    architecture "x64"
+    architecture "x86_64"
     startproject "LucyEditor"
 
     configurations {
@@ -9,13 +9,7 @@ workspace "Lucy"
         "Release"
     }
 
-    platforms {
-        "win64"
-    }
-
-    flags {
-        "MultiProcessorCompile"
-    }
+    multiprocessorcompile "On"
 
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 
@@ -24,6 +18,7 @@ group "Libraries"
     include "LucyEngine/ThirdParty/ImGui"
     include "LucyEngine/ThirdParty/glm"
     include "LucyEngine/ThirdParty/stb"
+    include "LucyEngine/ThirdParty/meshoptimizer"
     include "LucyEditor/ThirdParty/ImGuizmo"
 group ""
 include "LucyEngine"

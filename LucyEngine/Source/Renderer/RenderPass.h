@@ -2,9 +2,11 @@
 
 #include "vulkan/vulkan.h"
 
-#include "Renderer/Device/RenderResource.h"
+#include "Renderer/Device/RenderDeviceResource.h"
 
 namespace Lucy {
+
+	class RenderDevice;
 
 	enum class ImageFormat;
 
@@ -12,6 +14,10 @@ namespace Lucy {
 		float r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f;
 	};
 
+	/*	
+		Load = at the beginning of the renderpass 
+		Store = at the end of the renderpass
+	*/
 	enum class RenderPassLoadStoreAttachments : uint8_t {
 		NoneNone,
 		NoneDontCare,
@@ -65,16 +71,16 @@ namespace Lucy {
 				Bit mask that specifies which view rendering is broadcast to
 				For example; 0011 = Broadcast to first and second view (layer)
 			*/
-			uint32_t ViewMask = 0x7FFFFFFFu;
+			uint32_t ViewMask = 0u;
 
 			/*
 				Bit mask that specifies correlation between views
 				An implementation may use this for optimizations (concurrent render)
 			*/
-			uint32_t CorrelationMask = 0x7FFFFFFFu;
+			uint32_t CorrelationMask = 0u;
 
 			inline bool IsValid() const {
-				return ViewMask != 0x7FFFFFFFu && CorrelationMask != 0x7FFFFFFFu;
+				return ViewMask != 0;
 			}
 		};
 
@@ -83,15 +89,20 @@ namespace Lucy {
 		Multiview Multiview;
 	};
 
-	class RenderPass : public RenderResource {
+	class RenderPass : public RenderDeviceResource {
 	public:
-		virtual void RTRecreate() = 0;
+		RenderPass(const RenderPassCreateInfo& createInfo);
+		virtual ~RenderPass() = default;
+
+		RenderPass(const RenderPass& other) = delete;
+		RenderPass(RenderPass&& other) noexcept = delete;
+		RenderPass& operator=(const RenderPass& other) = delete;
+		RenderPass& operator=(RenderPass&& other) noexcept = delete;
+
+		virtual void RTRecreate(const Ref<RenderDevice>& device) = 0;
 
 		inline bool IsDepthBuffered() const { return m_DepthBuffered; }
 		inline const RenderPassLayout& GetLayout() const { return m_CreateInfo.Layout; }
-
-		RenderPass(const RenderPassCreateInfo& createInfo);
-		virtual ~RenderPass() = default;
 
 		inline ClearColor GetClearColor() { return m_CreateInfo.ClearColor; }
 	protected:

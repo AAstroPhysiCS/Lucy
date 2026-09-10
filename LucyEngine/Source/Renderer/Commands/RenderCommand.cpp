@@ -1,20 +1,29 @@
 #include "lypch.h"
 #include "RenderCommand.h"
 
-#include "Renderer/Device/RenderDevice.h"
-
 #include "Renderer/Commands/CommandPool.h"
 #include "Renderer/Mesh.h"
 
 #include "Renderer/Pipeline/GraphicsPipeline.h"
 #include "Renderer/Pipeline/ComputePipeline.h"
+#include "Renderer/Pipeline/RayTracingPipeline.h"
 
 #include "Renderer/Image/VulkanImage.h"
+#include "Renderer/Renderer.h"
+#include "Renderer/Device/RenderDeviceScene.h"
+
+#include "Renderer/Memory/Buffer/IndexBuffer.h"
+#include "Renderer/Memory/Buffer/VertexBuffer.h"
+#include "Renderer/Memory/Buffer/RenderDeviceBuffer.h"
 
 namespace Lucy {
 
-	RenderCommand::RenderCommand(const std::string& nameOfDraw, const Ref<RenderDevice>& renderDevice, const Ref<CommandPool>& primaryCmdPool)
-		: m_DebugName(nameOfDraw), m_RenderDevice(renderDevice), m_PrimaryCommandPool(primaryCmdPool) {
+	RenderCommand::RenderCommand(const Ref<RenderDevice>& renderDevice, const Ref<CommandPool>& primaryCmdPool)
+		: m_RenderDevice(renderDevice), m_PrimaryCommandPool(primaryCmdPool) {
+	}
+
+	RenderDeviceResourceHandle RenderCommand::GetGlobalIndexBufferHandle() const {
+		return m_RenderDevice->GetScene()->GetGlobalIndexBufferHandle();
 	}
 
 	void RenderCommand::BeginSecondaryRenderCommand() {
@@ -25,53 +34,72 @@ namespace Lucy {
 		//TODO:
 	}
 
-	void RenderCommand::BeginDebugMarker() {
-		m_RenderDevice->BeginDebugMarker(m_PrimaryCommandPool, m_DebugName.c_str());
-	}
-
-	void RenderCommand::EndDebugMarker() {
-		m_RenderDevice->EndDebugMarker(m_PrimaryCommandPool);
-	}
-
 	void RenderCommand::BeginTimestamp() {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::BeginTimestamp");
 		m_BeginTimestampIndex = m_RenderDevice->RTBeginTimestamp(m_PrimaryCommandPool);
 	}
 
 	void RenderCommand::EndTimestamp() {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::EndTimestamp");
 		m_EndTimestampIndex = m_RenderDevice->RTEndTimestamp(m_PrimaryCommandPool);
 	}
 
 	void RenderCommand::BeginPipelineStatistics() {
-		m_RenderDevice->RTBeginPipelineQuery(m_PrimaryCommandPool);
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::BeginPipelineStatistics");
+		m_BeginPipelineQueryIndex = m_RenderDevice->RTBeginPipelineQuery(m_PrimaryCommandPool);
 	}
 
 	void RenderCommand::EndPipelineStatistics() {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::EndPipelineStatistics");
 		if (!m_BoundedGraphicsPipeline)
 			return;
 		m_RenderDevice->RTEndPipelineQuery(m_PrimaryCommandPool);
-		m_BoundedGraphicsPipeline->Unbind(m_RenderDevice->GetQueryResults(RenderDeviceQueryType::Pipeline));
+		m_BoundedGraphicsPipeline->Unbind(m_RenderDevice->GetQueryResults(RenderDeviceQueryType::Pipeline, Renderer::GetCurrentFrameIndex()));
 	}
 
-	void RenderCommand::BindBuffers(Ref<Mesh> mesh) {
-		LUCY_ASSERT(m_BoundedGraphicsPipeline, "BindBuffers failed, bounded pipeline is nullptr.");
-		m_RenderDevice->BindBuffers(m_PrimaryCommandPool, mesh);
+	RenderDeviceTextureHandle RenderCommand::BindImageHandleTo(const std::string& imageBufferName, const Ref<Image>& image, uint32_t mip) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::BindImageHandleTo");
+		LUCY_ASSERT(m_BoundedGraphicsPipeline || m_BoundedComputePipeline || m_BoundedRayTracingPipeline, "BindGlobalImageHandleTo needs to be called after a BindPipeline call.");
+		if (m_BoundedGraphicsPipeline)
+			return m_RenderDevice->BindGlobalImageHandleTo(imageBufferName, m_BoundedGraphicsPipeline, image, mip);
+		if (m_BoundedComputePipeline)
+			return m_RenderDevice->BindGlobalImageHandleTo(imageBufferName, m_BoundedComputePipeline, image, mip);
+		return m_RenderDevice->BindGlobalImageHandleTo(imageBufferName, m_BoundedRayTracingPipeline, image, mip);
+	}
+
+	void RenderCommand::FillBuffer(Ref<RenderDeviceBuffer> buffer, size_t offset, size_t size, uint32_t value) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::FillBuffer");
+		m_RenderDevice->FillBuffer(m_PrimaryCommandPool, buffer, offset, size, value);
 	}
 
 	void RenderCommand::BindBuffers(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::BindBuffers");
 		LUCY_ASSERT(m_BoundedGraphicsPipeline, "BindBuffers failed, bounded pipeline is nullptr.");
 		m_RenderDevice->BindBuffers(m_PrimaryCommandPool, vertexBuffer, indexBuffer);
 	}
+	
+	void RenderCommand::BindBuffers(Ref<RenderDeviceBuffer> indexBuffer) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::BindBuffers");
+		LUCY_ASSERT(m_BoundedGraphicsPipeline, "BindBuffers failed, bounded pipeline is nullptr.");
+		m_RenderDevice->BindBuffers(m_PrimaryCommandPool, indexBuffer);
+	}
 
-	void RenderCommand::BindPushConstant(const VulkanPushConstant& pushConstant) {
-		LUCY_ASSERT(m_BoundedGraphicsPipeline || m_BoundedComputePipeline, "BindPushConstant failed, bounded pipeline is nullptr.");
+	void RenderCommand::BindPushConstant(const PipelineConstant& pushConstant) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::BindPushConstant");
+		LUCY_ASSERT(m_BoundedGraphicsPipeline || m_BoundedComputePipeline || m_BoundedRayTracingPipeline, "BindPushConstant failed, bounded pipeline is nullptr.");
 		if (m_BoundedGraphicsPipeline) {
 			m_RenderDevice->BindPushConstant(m_PrimaryCommandPool, m_BoundedGraphicsPipeline, pushConstant);
 			return;
 		}
-		m_RenderDevice->BindPushConstant(m_PrimaryCommandPool, m_BoundedComputePipeline, pushConstant);
+		if (m_BoundedComputePipeline) {
+			m_RenderDevice->BindPushConstant(m_PrimaryCommandPool, m_BoundedComputePipeline, pushConstant);
+			return;
+		}
+		m_RenderDevice->BindPushConstant(m_PrimaryCommandPool, m_BoundedRayTracingPipeline, pushConstant);
 	}
 
 	void RenderCommand::BindPipeline(const Ref<GraphicsPipeline>& pipeline) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::BindPipeline | Graphics");
 		LUCY_ASSERT(pipeline, "BindPipeline failed, pipeline is nullptr.");
 		m_RenderDevice->BindPipeline(m_PrimaryCommandPool, pipeline);
 		m_Shader = pipeline->GetShader();
@@ -80,123 +108,136 @@ namespace Lucy {
 	}
 
 	void RenderCommand::BindPipeline(const Ref<ComputePipeline>& pipeline) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::BindPipeline | Compute");
 		LUCY_ASSERT(pipeline, "BindPipeline failed, pipeline is nullptr.");
 		m_RenderDevice->BindPipeline(m_PrimaryCommandPool, pipeline);
 		m_Shader = pipeline->GetShader();
 		m_BoundedComputePipeline = pipeline;
 	}
+	
+	void RenderCommand::BindPipeline(const Ref<RayTracingPipeline>& pipeline) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::BindPipeline | RayTracing");
+		LUCY_ASSERT(pipeline, "BindPipeline failed, pipeline is nullptr.");
+		m_RenderDevice->BindPipeline(m_PrimaryCommandPool, pipeline);
+		m_Shader = pipeline->GetShader();
+		m_BoundedRayTracingPipeline = pipeline;
+	}
+
+	void RenderCommand::TraceRays(uint32_t width, uint32_t height, uint32_t depth) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::TraceRays");
+		LUCY_ASSERT(m_BoundedRayTracingPipeline, "TraceRays failed, pipeline is nullptr.");
+		m_RenderDevice->TraceRays(m_PrimaryCommandPool, m_BoundedRayTracingPipeline, width, height, depth);
+	}
 
 	void RenderCommand::UpdateDescriptorSets() {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::UpdateDescriptorSets");
 		if (m_BoundedGraphicsPipeline) {
 			m_RenderDevice->UpdateDescriptorSets(m_BoundedGraphicsPipeline);
 			return;
 		}
-		m_RenderDevice->UpdateDescriptorSets(m_BoundedComputePipeline);
+		if (m_BoundedComputePipeline) {
+			m_RenderDevice->UpdateDescriptorSets(m_BoundedComputePipeline);
+			return;
+		}
+	}
+
+	bool RenderCommand::UpdateDescriptorSets(const std::string& tlasName) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::UpdateDescriptorSets");
+		LUCY_ASSERT(m_BoundedRayTracingPipeline, "UpdateDescriptorSets failed, bounded pipeline is nullptr.");
+		const auto& scene = m_RenderDevice->GetScene();
+		const auto& tlasHandle = scene->GetCurrentTopLevelAccelerationStructureHandle();
+		if (!tlasHandle)
+			return false;
+		const auto& tlas = m_RenderDevice->AccessResource<AccelerationStructure>(tlasHandle);
+		m_RenderDevice->UpdateDescriptorSets(m_BoundedRayTracingPipeline, tlasName, tlas);
+		return true;
 	}
 
 	void RenderCommand::BindAllDescriptorSets() {
-		LUCY_ASSERT(m_BoundedGraphicsPipeline || m_BoundedComputePipeline, "BindAllDescriptorSets failed, bounded pipeline is nullptr.");
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::BindAllDescriptorSets");
+		LUCY_ASSERT(m_BoundedGraphicsPipeline || m_BoundedComputePipeline || m_BoundedRayTracingPipeline, "BindAllDescriptorSets failed, bounded pipeline is nullptr.");
 		if (m_BoundedGraphicsPipeline) {
 			m_RenderDevice->BindAllDescriptorSets(m_PrimaryCommandPool, m_BoundedGraphicsPipeline);
 			return;
 		}
-		m_RenderDevice->BindAllDescriptorSets(m_PrimaryCommandPool, m_BoundedComputePipeline);
+		if (m_BoundedComputePipeline) {
+			m_RenderDevice->BindAllDescriptorSets(m_PrimaryCommandPool, m_BoundedComputePipeline);
+			return;
+		}
+		m_RenderDevice->BindAllDescriptorSets(m_PrimaryCommandPool, m_BoundedRayTracingPipeline);
 	}
 
 	void RenderCommand::BindDescriptorSet(uint32_t setIndex) {
-		LUCY_ASSERT(m_BoundedGraphicsPipeline || m_BoundedComputePipeline, "BindDescriptorSet failed, bounded pipeline is nullptr.");
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::BindDescriptorSet");
+		LUCY_ASSERT(m_BoundedGraphicsPipeline || m_BoundedComputePipeline || m_BoundedRayTracingPipeline, "BindDescriptorSet failed, bounded pipeline is nullptr.");
 		if (m_BoundedGraphicsPipeline) {
 			m_RenderDevice->BindDescriptorSet(m_PrimaryCommandPool, m_BoundedGraphicsPipeline, setIndex);
 			return;
 		}
-		m_RenderDevice->BindDescriptorSet(m_PrimaryCommandPool, m_BoundedComputePipeline, setIndex);
-	}
-
-	void RenderCommand::DrawIndexedMesh(Ref<Mesh> mesh, const glm::mat4& meshTransform) {
-		LUCY_ASSERT(m_BoundedGraphicsPipeline, "DrawIndexedMeshWithMaterial failed, bounded pipeline is nullptr.");
-		LUCY_ASSERT(m_Shader, "DrawIndexedMeshWithMaterial failed, shader is nullptr.");
-
-		BindBuffers(mesh);
-
-		VulkanPushConstant& meshPushConstant = m_Shader->GetPushConstants("LocalPushConstant");
-
-		const auto& submeshes = mesh->GetSubmeshes();
-
-		for (uint32_t i = 0; i < submeshes.size(); i++) {
-			const Submesh& submesh = submeshes[i];
-
-			const glm::mat4& finalTransform = meshTransform * submesh.Transform;
-
-			ByteBuffer pushConstantData;
-			pushConstantData.Append((uint8_t*)&finalTransform, sizeof(finalTransform));
-
-			meshPushConstant.SetData(pushConstantData);
-
-			BindPushConstant(meshPushConstant);
-			DrawIndexed(submesh.IndexCount, 1, submesh.BaseIndexCount, submesh.BaseVertexCount, 0);
+		if (m_BoundedComputePipeline) {
+			m_RenderDevice->BindDescriptorSet(m_PrimaryCommandPool, m_BoundedComputePipeline, setIndex);
+			return;
 		}
+		m_RenderDevice->BindDescriptorSet(m_PrimaryCommandPool, m_BoundedRayTracingPipeline, setIndex);
 	}
 
-	void RenderCommand::DrawIndexedMeshWithMaterial(Ref<Mesh> mesh, const glm::mat4& meshTransform) {
-		LUCY_ASSERT(m_BoundedGraphicsPipeline, "DrawIndexedMeshWithMaterial failed, bounded pipeline is nullptr.");
-		LUCY_ASSERT(m_Shader, "DrawIndexedMeshWithMaterial failed, shader is nullptr.");
-		
-		BindBuffers(mesh);
-
-		VulkanPushConstant& meshPushConstant = m_Shader->GetPushConstants("LocalPushConstant");
-
-		const auto& submeshes = mesh->GetSubmeshes();
-
-		for (uint32_t i = 0; i < submeshes.size(); i++) {
-			const Submesh& submesh = submeshes[i];
-			MaterialID materialID = submesh.MaterialID;
-
-			const glm::mat4& finalTransform = meshTransform * submesh.Transform;
-
-			ByteBuffer pushConstantData;
-			pushConstantData.Append((uint8_t*)&finalTransform, sizeof(finalTransform));
-			pushConstantData.Append((uint8_t*)&materialID, sizeof(MaterialID));
-
-			meshPushConstant.SetData(pushConstantData);
-
-			BindPushConstant(meshPushConstant);
-			DrawIndexed(submesh.IndexCount, 1, submesh.BaseIndexCount, submesh.BaseVertexCount, 0);
-		}
-	}
-
-	void RenderCommand::DrawMesh(Ref<Mesh> mesh) {
+	void RenderCommand::DrawMesh(const Unique<Mesh>& mesh) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::DrawMesh");
 		LUCY_ASSERT(m_BoundedGraphicsPipeline, "DrawMesh failed, bounded pipeline is nullptr.");
-		BindBuffers(mesh);
-		m_RenderDevice->DrawIndexed(m_PrimaryCommandPool, (uint32_t)m_RenderDevice->AccessResource<IndexBuffer>(mesh->GetIndexBufferHandle())->GetSize(), 1, 0, 0, 0);
-	}
+		const auto& gpuScene = m_RenderDevice->GetScene();
 
-	void RenderCommand::DrawMeshWithPushConstant(Ref<Mesh> mesh) {
-		LUCY_ASSERT(m_BoundedGraphicsPipeline, "DrawMeshWithPushConstant failed, bounded pipeline is nullptr.");
+		auto globalIndexBuffer = m_RenderDevice->AccessResource<RenderDeviceBuffer>(gpuScene->GetGlobalIndexBufferHandle());
+		BindBuffers(globalIndexBuffer);
+
+		m_RenderDevice->DrawIndexed(m_PrimaryCommandPool, mesh->GetIndicesSize(), 1, 0, 0, 0);
 	}
 
 	void RenderCommand::DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::DrawIndexed");
 		m_RenderDevice->DrawIndexed(m_PrimaryCommandPool, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 	}
 
+	void RenderCommand::DrawIndexedIndirectCount(Ref<RenderDeviceBuffer> buffer, size_t offset, Ref<RenderDeviceBuffer> countBuffer, size_t countBufferOffset, uint32_t maxDrawCount, uint32_t stride) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::DrawIndexedIndirectCount");
+		m_RenderDevice->DrawIndexedIndirectCount(m_PrimaryCommandPool, buffer, offset, countBuffer, countBufferOffset, maxDrawCount, stride);
+	}
+
 	void RenderCommand::DispatchCompute(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::DispatchCompute");
 		LUCY_ASSERT(m_BoundedComputePipeline, "DispatchCompute failed, bounded pipeline is nullptr.");
 		m_RenderDevice->DispatchCompute(m_PrimaryCommandPool, m_BoundedComputePipeline, groupCountX, groupCountY, groupCountZ);
 	}
 
-	void RenderCommand::SetImageLayout(Ref<Image> image, uint32_t newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {
+	void RenderCommand::DispatchComputeIndirect(const Ref<RenderDeviceBuffer>& buffer, size_t offset) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::DispatchComputeIndirect");
+		m_RenderDevice->DispatchComputeIndirect(m_PrimaryCommandPool, buffer, offset);
+	}
+
+	/*void RenderCommand::SetImageLayout(Ref<Image> image, uint32_t newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {
 		if (Renderer::GetRenderArchitecture() != RenderArchitecture::Vulkan)
 			return;
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 		const auto& vulkanImage = image->As<VulkanImage>();
-		vulkanImage->SetLayout((VkCommandBuffer)m_PrimaryCommandPool->GetCurrentFrameCommandBuffer(),
+		vulkanImage->SetLayout((VkCommandBuffer)m_PrimaryCommandPool->GetCommandBuffer(frameIndex),
 			(VkImageLayout)newLayout, baseMipLevel, baseArrayLayer, levelCount, layerCount);
 	}
 
-	void RenderCommand::CopyImageToImage(Ref<Image> srcImage, Ref<Image> destImage, const std::vector<VkImageCopy>& regions) {
+	void RenderCommand::SetImageLayoutImmediate(Ref<Image> image, uint32_t newLayout, uint32_t baseMipLevel, uint32_t baseArrayLayer, uint32_t levelCount, uint32_t layerCount) {
 		if (Renderer::GetRenderArchitecture() != RenderArchitecture::Vulkan)
 			return;
+		const auto& vulkanImage = image->As<VulkanImage>();
+		vulkanImage->SetLayoutImmediate((VkImageLayout)newLayout, baseMipLevel, baseArrayLayer, levelCount, layerCount);
+	}*/
+
+	void RenderCommand::CopyImageToImage(Ref<Image> srcImage, Ref<Image> destImage, const std::vector<VkImageCopy>& regions) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::CopyImageToImage");
+		if (Renderer::GetRenderArchitecture() != RenderArchitecture::Vulkan)
+			return;
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+
 		const auto& srcVulkanImage = srcImage->As<VulkanImage>();
 		const auto& destVulkanImage = destImage->As<VulkanImage>();
-		srcVulkanImage->CopyImageToImage((VkCommandBuffer)m_PrimaryCommandPool->GetCurrentFrameCommandBuffer(), destVulkanImage, regions);
+		srcVulkanImage->CopyImageToImage((VkCommandBuffer)m_PrimaryCommandPool->GetCommandBuffer(frameIndex), destVulkanImage, regions);
 	}
 
 	void RenderCommand::CopyBufferToImage(Ref<ByteBuffer> srcBuffer, Ref<Image> destImage) {

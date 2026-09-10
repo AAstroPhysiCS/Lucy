@@ -2,71 +2,43 @@
 
 #include "Material.h"
 
+#include "Renderer/Device/RenderDeviceScene.h"
+
 #include <glm/fwd.hpp>
 
 namespace Lucy {
 
-	struct PBRMaterialData {
-		glm::vec3 Diffuse = glm::vec3();
-		float Metallic = 0.0f, Roughness = 0.0f, AOContribution = 1.0f;
-		std::vector<RenderResourceHandle> TextureHandles;
-
-		PBRMaterialData(glm::vec3 diffuse, float metallic, float roughness, float aoContribution)
-			: Diffuse(diffuse), Metallic(metallic), Roughness(roughness), AOContribution(aoContribution) {
-		}
-		PBRMaterialData() = default;
-	};
-
-	struct PBRMaterialShaderData {
-		float AlbedoSlot = -1.0f;
-		float NormalSlot = -1.0f;
-		float RoughnessSlot = -1.0f;
-		float MetallicSlot = -1.0f;
-
-		glm::vec4 BaseDiffuseColor = glm::vec4(0.0f);
-		float BaseRoughnessValue = 0.0f;
-		float BaseMetallicValue = 0.0f;
-		float BaseAOValue = 1.0f;
-		float AOSlot = -1.0f;
-	};
-
-	struct PBRMaterialImageType {
-		std::string Name;
-		uint32_t Index;
-	};
-
 	class PBRMaterial final : public Material {
 	public:
-		PBRMaterial(MaterialID materialID, const Ref<Shader>& shader, const PBRMaterialData& data);
+		PBRMaterial(const MaterialCreateInfo& createInfo);
 		virtual ~PBRMaterial() = default;
 
-		inline float& GetRoughnessValue() { return m_MaterialData.Roughness; }
-		inline float& GetMetallicValue() { return m_MaterialData.Metallic; }
-		inline float& GetAOContribution() { return m_MaterialData.AOContribution; }
+		PBRMaterial(const PBRMaterial&) = delete;
+		PBRMaterial& operator=(const PBRMaterial&) = delete;
+		PBRMaterial(PBRMaterial&&) = delete;
+		PBRMaterial& operator=(PBRMaterial&&) = delete;
 
-		inline Ref<Image> GetImage(const PBRMaterialImageType& type) const { 
-			return Renderer::AccessResource<Image>(m_MaterialData.TextureHandles[type.Index]); 
-		}
+		glm::vec4& GetAlbedoColor() { return m_MaterialData.BaseColor; }
+		float& GetAOContribution() { return m_MaterialData.ORME.r; }
+		float& GetRoughnessValue() { return m_MaterialData.ORME.g; }
+		float& GetMetallicValue() { return m_MaterialData.ORME.b; }
+		float& GetEmissiveValue() { return m_MaterialData.ORME.a; }
+		float& GetNormalStrength() { return m_MaterialData.NormalStrength; }
 
-		inline bool HasImage(const PBRMaterialImageType& type) const {
-			return !m_MaterialData.TextureHandles.empty() && 
-				m_MaterialData.TextureHandles.size() > type.Index && 
-				m_MaterialData.TextureHandles[type.Index] != InvalidRenderResourceHandle;
-		}
+		void SetTexture(const MaterialImageType& type, RenderDeviceResourceHandle textureHandle);
 
-		void Update() final override;
+		std::any BuildRenderData(const Ref<RenderDevice>& device) final override;
 		void RTDestroyResource() final override;
-		void AddTexture(RenderResourceHandle textureHandle);
 
-		static inline const PBRMaterialImageType ALBEDO_TYPE = { "Albedo", 0 };
-		static inline const PBRMaterialImageType NORMALS_TYPE = { "Normals", 1 };
-		static inline const PBRMaterialImageType METALLIC_TYPE = { "Metallic", 2 };
-		static inline const PBRMaterialImageType ROUGHNESS_TYPE = { "Roughness", 3 };
-		static inline const PBRMaterialImageType AO_TYPE = { "Ambient Occlusion", 4 };
+		static inline const MaterialImageType ALBEDO_TYPE = { "Albedo", 0 };
+		static inline const MaterialImageType NORMALS_TYPE = { "Normals", 1 };
+		static inline const MaterialImageType ORM_TYPE = { "ORM", 2 };
+		static inline const MaterialImageType AO_TYPE = { "AO", 3 };
+		static inline const MaterialImageType ROUGHNESS_TYPE = { "Roughness", 4 };
+		static inline const MaterialImageType METALLIC_TYPE = { "Metallic", 5 };
+		static inline const MaterialImageType EMISSIVE_TYPE = { "Emissive", 6 };
 	private:
-		Ref<Shader> m_PBRShader = nullptr;
 
-		PBRMaterialShaderData m_MaterialShaderData;
-		PBRMaterialData m_MaterialData;
+		RenderDevicePBRMaterialData m_MaterialData;
 	};
 }

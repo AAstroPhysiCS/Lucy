@@ -2,9 +2,11 @@
 
 #include "vma/vk_mem_alloc.h"
 
+#include "VulkanRenderDeviceUploadManager.h"
+
 namespace Lucy {
 
-	enum class VulkanBufferUsage {
+	enum class MemoryUsage {
 		/*
 		* Auto, with no additional flag
 		*/
@@ -15,6 +17,8 @@ namespace Lucy {
 		* Resides on the CPU Ram
 		*/
 		CPUOnly,
+
+		CPUToGPU,
 		
 		/*
 		* Any resources that you frequently write and read on GPU, e.g. images used as color attachments (aka "render targets"), 
@@ -31,14 +35,21 @@ namespace Lucy {
 
 	class VulkanAllocator {
 	public:
-		void CreateVulkanBufferVma(VulkanBufferUsage lucyBufferUsage, VkDeviceSize size,
-								   VkBufferUsageFlags usage, VkBuffer& bufferHandle, VmaAllocation& vmaAllocation);
+		VulkanAllocator(const VulkanAllocator&) = delete;
+		VulkanAllocator& operator=(const VulkanAllocator&) = delete;
+		VulkanAllocator(VulkanAllocator&&) = delete;
+		VulkanAllocator& operator=(VulkanAllocator&&) = delete;
 
-		void CreateVulkanImageVma(uint32_t width, uint32_t height, uint32_t mipLevel, VkFormat format, VkImageLayout currentLayout, VkImageUsageFlags usage, 
-								  VkImageType imageType, VkImage& imageHandle, VmaAllocation& allocationHandle, VkImageCreateFlags flags = 0, uint32_t arrayLayer = 1);
+		VmaAllocationInfo CreateVulkanBufferVma(MemoryUsage lucyBufferUsage, VkDeviceSize size, VkBufferUsageFlags usage,
+			bool persistentlyMapped, VkBuffer& bufferHandle, VmaAllocation& vmaAllocation, VkSharingMode sharingMode = VK_SHARING_MODE_EXCLUSIVE);
+
+		VmaAllocationInfo CreateVulkanImageVma(uint32_t width, uint32_t height, uint32_t mipLevel, VkFormat format, VkImageLayout currentLayout, VkImageUsageFlags usage,
+								  VkImageType imageType, VkImage& imageHandle, VmaAllocation& allocationHandle, VkImageCreateFlags flags = 0, uint32_t arrayLayer = 1, VkSharingMode sharingMode = VK_SHARING_MODE_EXCLUSIVE);
 
 		void MapMemory(VmaAllocation allocation, void*& mappedData);
 		void UnmapMemory(VmaAllocation allocation);
+
+		void Flush(VmaAllocation allocation, VkDeviceSize offset, VkDeviceSize size);
 
 		void DestroyBuffer(VkBuffer buffer, VmaAllocation allocation);
 		void DestroyImage(VkImage buffer, VmaAllocation allocation);
@@ -50,12 +61,12 @@ namespace Lucy {
 		void CreateVulkanBuffer(uint32_t size, VkBufferUsageFlags usage, VkSharingMode sharingMode, uint32_t memProperties, VkBuffer& bufferHandle, VkDeviceMemory& memory);
 		uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags propertyFlags);
 
-		void Init(VkInstance instance, VkDevice logicalDevice, VkPhysicalDevice physicalDevice, uint32_t apiVersion);
+		void Init(VkInstance instance, VulkanRenderDevice* device, uint32_t apiVersion);
 		void Destroy();
 
 		VmaAllocator m_Allocator;
-		VkDevice m_LogicalDevice = VK_NULL_HANDLE;
-		VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
+		
+		VulkanRenderDevice* m_RenderDevice = nullptr;
 
 		friend class VulkanRenderDevice;
 	};

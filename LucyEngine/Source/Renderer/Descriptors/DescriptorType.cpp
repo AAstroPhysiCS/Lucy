@@ -5,59 +5,131 @@
 
 namespace Lucy {
 
-	DescriptorType ConvertDescriptorType(uint32_t type) {
-		if (Renderer::GetRenderArchitecture() != RenderArchitecture::Vulkan) {
-			LUCY_ASSERT(false);
-			return DescriptorType::Undefined;
-		}
-		switch (type) {
-			case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
-				return DescriptorType::CombinedImageSampler;
-			case VK_DESCRIPTOR_TYPE_SAMPLER:
-				return DescriptorType::Sampler;
-			case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-				return DescriptorType::SampledImage;
-			case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
-				return DescriptorType::Buffer;
-			case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
-				return DescriptorType::DynamicBuffer;
-			case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
-				return DescriptorType::SSBO;
-			case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
-				return DescriptorType::SSBODynamic;
-			case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-				return DescriptorType::StorageImage;
-			default:
-				LUCY_ASSERT(false);
-				return DescriptorType::Undefined;
-		}
-	}
-
 	uint32_t ConvertDescriptorType(DescriptorType type) {
 		if (Renderer::GetRenderArchitecture() != RenderArchitecture::Vulkan) {
 			LUCY_ASSERT(false);
 			return -1;
 		}
-		switch (type) {
-			case DescriptorType::CombinedImageSampler:
-				return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			case DescriptorType::Sampler:
+
+		switch (type.Shape) {
+			// Basic sampler (separate from textures)
+			case DescriptorBaseShape::Sampler:
 				return VK_DESCRIPTOR_TYPE_SAMPLER;
-			case DescriptorType::SampledImage:
+			// Read-only texture without embedded sampler (used with separate sampler)
+			case DescriptorBaseShape::Texture2D:
+			case DescriptorBaseShape::Texture2DArray:
+			case DescriptorBaseShape::TextureCube:
+			case DescriptorBaseShape::TextureCubeArray:
+			case DescriptorBaseShape::Texture3D:
+			case DescriptorBaseShape::SampledImage:
+			case DescriptorBaseShape::SampledImageArray:
 				return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-			case DescriptorType::Buffer:
-				return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			case DescriptorType::DynamicBuffer:
-				return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-			case DescriptorType::SSBO:
-				return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-			case DescriptorType::SSBODynamic:
-				return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-			case DescriptorType::StorageImage:
+			// Storage images (read/write)
+			case DescriptorBaseShape::RWTexture2D:
+			case DescriptorBaseShape::RWTexture2DArray:
+			case DescriptorBaseShape::RWTexture3D:
 				return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+			// Uniform buffers
+			case DescriptorBaseShape::ConstantBuffer:
+				return type.isDynamic
+					? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC
+					: VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			// Storage buffers (read/write)
+			case DescriptorBaseShape::SharedStorageBuffer:
+			case DescriptorBaseShape::RWSharedStorageBuffer:
+				return type.isDynamic
+					? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC
+					: VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+			// Formatted buffer views
+			case DescriptorBaseShape::UniformTexelBuffer:
+				return VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+			case DescriptorBaseShape::StorageTexelBuffer:
+				return VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+			// Input attachments (framebuffer inputs)
+			case DescriptorBaseShape::InputAttachment:
+				return VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+			// Ray tracing types
+			case DescriptorBaseShape::AccelerationStructure:
+				return VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+			case DescriptorBaseShape::RayTracingScene:
+				return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE; // Or specialized RT type
 			default:
 				LUCY_ASSERT(false);
 				return VK_DESCRIPTOR_TYPE_MAX_ENUM;
+		}
+	}
+
+	DescriptorType ConvertSlangKindToDescriptorBlockType(slang::TypeReflection::Kind kind) {
+		if (Renderer::GetRenderArchitecture() != RenderArchitecture::Vulkan) {
+			LUCY_ASSERT(false);
+			return UndefinedDescriptorType;
+		}
+
+		switch (kind) {
+			case slang::TypeReflection::Kind::SamplerState:
+				return { DescriptorBaseShape::Sampler, false };
+			case slang::TypeReflection::Kind::ConstantBuffer:
+				return { DescriptorBaseShape::ConstantBuffer, false };
+			case slang::TypeReflection::Kind::ShaderStorageBuffer:
+				return { DescriptorBaseShape::SharedStorageBuffer, false };
+			// TextureBuffer maps to structured buffer in our system
+			case slang::TypeReflection::Kind::TextureBuffer:
+				return { DescriptorBaseShape::SharedStorageBuffer, false };
+			// ParameterBlocks are treated as constant buffers
+			case slang::TypeReflection::Kind::ParameterBlock:
+				return { DescriptorBaseShape::ConstantBuffer, false };
+			default:
+				return UndefinedDescriptorType;
+		}
+	}
+
+	DescriptorType ConvertSlangResourceShapeToDescriptorBlockType(SlangResourceShape shape, SlangResourceAccess access) {
+		if (Renderer::GetRenderArchitecture() != RenderArchitecture::Vulkan) {
+			LUCY_ASSERT(false);
+			return UndefinedDescriptorType;
+		}
+
+		switch (shape & SlangResourceShape::SLANG_RESOURCE_BASE_SHAPE_MASK) {
+			case SLANG_TEXTURE_1D:
+			case SLANG_TEXTURE_2D: {
+				return access == SLANG_RESOURCE_ACCESS_READ_WRITE
+					? DescriptorType{ DescriptorBaseShape::RWTexture2D, false } : DescriptorType{ DescriptorBaseShape::Texture2D, false };
+			}
+			case SLANG_TEXTURE_2D_ARRAY: {
+				return access == SLANG_RESOURCE_ACCESS_READ_WRITE
+					? DescriptorType{ DescriptorBaseShape::RWTexture2DArray, false } : DescriptorType{ DescriptorBaseShape::Texture2DArray, false };
+			}
+			case SLANG_TEXTURE_CUBE: {
+			// Cubemaps are typically read-only
+				return DescriptorType{ DescriptorBaseShape::TextureCube, false };
+			}
+			case SLANG_TEXTURE_CUBE_ARRAY: {
+			// Cubemaps are typically read-only
+				return DescriptorType{ DescriptorBaseShape::TextureCubeArray, false };
+			}
+			case SLANG_TEXTURE_3D: {
+				return access == SLANG_RESOURCE_ACCESS_READ_WRITE
+					? DescriptorType{ DescriptorBaseShape::RWTexture3D, false } : DescriptorType{ DescriptorBaseShape::Texture3D, false };
+			}
+			case SLANG_TEXTURE_BUFFER: {
+				// TBuffer<t> in HLSL
+				return DescriptorType{ DescriptorBaseShape::SharedStorageBuffer, false };
+			}
+			case SLANG_STRUCTURED_BUFFER: {
+				return access == SLANG_RESOURCE_ACCESS_READ_WRITE
+					? DescriptorType{ DescriptorBaseShape::RWSharedStorageBuffer, false } : DescriptorType{ DescriptorBaseShape::SharedStorageBuffer, false };
+			}
+			// Special types
+			/*case SLANG_BYTE_ADDRESS_BUFFER: {
+				return access == SLANG_RESOURCE_ACCESS_READ_WRITE
+					? DescriptorType{ DescriptorBaseShape::RWByteAddressBuffer, false }
+				: DescriptorType{ DescriptorBaseShape::ByteAddressBuffer, false };
+			}*/
+			case SLANG_ACCELERATION_STRUCTURE: {
+				return DescriptorType{ DescriptorBaseShape::AccelerationStructure, false };
+			}
+			default:
+				return UndefinedDescriptorType;
 		}
 	}
 }

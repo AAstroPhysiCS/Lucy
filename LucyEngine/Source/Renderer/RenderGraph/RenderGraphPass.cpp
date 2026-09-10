@@ -2,6 +2,7 @@
 
 #include "RenderGraphPass.h"
 #include "RenderGraphResource.h"
+#include "RenderGraphRegistry.h"
 
 namespace Lucy {
 
@@ -10,20 +11,39 @@ namespace Lucy {
 	}
 
 	void RenderGraphPass::Setup(RenderGraphBuilder& build) {
+		LUCY_PROFILE_NEW_EVENT("RenderGraphPass::Setup");
 		m_ExecuteFunc = std::move(m_CreateInfo.SetupFunc(build));
 	}
 
 	void RenderGraphPass::AddRenderTarget(const RenderGraphResource& renderTargetToAdd) {
+		LUCY_PROFILE_NEW_EVENT("RenderGraphPass::AddRenderTarget");
 		m_RenderTargets.push_back(renderTargetToAdd);
 	}
 
+	void RenderGraphPass::AddResourceRead(const RenderGraphResourceAddInfo& addInfo) {
+		LUCY_PROFILE_NEW_EVENT("RenderGraphPass::AddResourceRead");
+		m_ResourceReads.push_back(addInfo);
+	}
+
+	void RenderGraphPass::AddResourceWrite(const RenderGraphResourceAddInfo& addInfo) {
+		LUCY_PROFILE_NEW_EVENT("RenderGraphPass::AddResourceWrite");
+		m_ResourceWrites.push_back(addInfo);
+	}
+
 	void RenderGraphPass::OnViewportResize(uint32_t width, uint32_t height) {
+		LUCY_PROFILE_NEW_EVENT("RenderGraphPass::OnViewportResize");
 		SetViewportArea(width, height);
 	}
 
-	void RenderGraphPass::Execute(RenderCommandList& cmdList) {
+	void RenderGraphPass::Execute(RenderCommand& cmd) {
 		LUCY_PROFILE_NEW_EVENT("RenderGraphPass::Execute");
-		m_ExecuteFunc(m_CreateInfo.Registry, cmdList);
+		m_ExecuteFunc(m_CreateInfo.Registry, cmd);
+		for (const auto& resource : m_ResourceReads) {
+			if (!resource.IsExternal || !resource.IsTransient)
+				continue;
+			m_CreateInfo.Registry.RetireExternalTransientResource(resource.Resource);
+		}
+		SetState(RenderGraphPassState::Executed);
 	}
 
 	void RenderGraphPass::SetViewportArea(uint32_t width, uint32_t height) {
@@ -41,5 +61,9 @@ namespace Lucy {
 
 	void RenderGraphPass::SetClearColor(ClearColor clearColor) {
 		m_ClearColor = clearColor;
+	}
+
+	void RenderGraphPass::SetExecutionPolicy(RenderGraphExecutionPolicy policy) {
+		m_ExecutionPolicy = policy;
 	}
 }

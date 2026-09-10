@@ -2,231 +2,314 @@
 #include "ShaderReflect.h"
 #include "Shader.h"
 
-#include "Renderer/Renderer.h"
-#include "Core/FileSystem.h"
-
 namespace Lucy {
+
+	//----For debugging purposes only----
+	static void DebugInfo(ProgramLayout* layout) {
+		Slang::ComPtr<ISlangBlob> jblob;
+		layout->toJson(jblob.writeRef());
+		std::string_view view = { (const char*)jblob->getBufferPointer(), jblob->getBufferSize() };
+
+		Slang::ComPtr<ISlangBlob> jsonBlob;
+		layout->toJson(jsonBlob.writeRef());
+
+		std::string_view jsonView(
+			static_cast<const char*>(jsonBlob->getBufferPointer()),
+			jsonBlob->getBufferSize()
+		);
+
+		LUCY_INFO("Program Layout:\n{}", jsonView);
+
+		// Additionally, print entry point details
+		for (uint32_t i = 0; i < layout->getEntryPointCount(); i++) {
+			auto entryPoint = layout->getEntryPointByIndex(i);
+			LUCY_INFO("Entry Point {}: Name={}, Stage={}", i, entryPoint->getName(), ShaderStageToShaderString(SlangStageToShaderStage(entryPoint->getStage())));
+		}
+	}
 	
-	//TODO: Dynamic UBO and SSBO won't work, yet!
-	void ShaderReflect::Info(const std::filesystem::path& path, const std::vector<uint32_t>& data, VkShaderStageFlags stageFlag) {
-		//heap allocating it because of the compiler warning/stack size: "function uses X bytes of stack consider moving some data to heap"
-		spirv_cross::CompilerGLSL* compiler = new spirv_cross::CompilerGLSL(data);
+	void ShaderReflect::Info(const std::filesystem::path& path, const Slang::ComPtr<IComponentType>& linkedProgram, ShaderStageType stageFlag, std::string_view entryPointName) {
+		ProgramLayout* layout = linkedProgram->getLayout(0);
 
-		spirv_cross::CompilerGLSL::Options options;
-		if (Renderer::GetRenderArchitecture() == RenderArchitecture::Vulkan)
-			options.vulkan_semantics = true; //default is false
-		compiler->set_common_options(options);
+		DebugInfo(layout);
 
-		const spirv_cross::ShaderResources& resourcesShaderStage = compiler->get_shader_resources();
-
-		auto Reflect = [this, path](spirv_cross::CompilerGLSL* compiler, spirv_cross::ShaderResources resource,
-									ShaderStageInfo& stageInfo, VkShaderStageFlags stageFlag) {
-			stageInfo.UniformCount = resource.uniform_buffers.size();
-			stageInfo.SampledImagesCount = resource.sampled_images.size();
-			stageInfo.StorageImageCount = resource.storage_images.size();
-			stageInfo.PushConstantBufferCount = resource.push_constant_buffers.size();
-			stageInfo.StageInputCount = resource.stage_inputs.size();
-			stageInfo.StageOutputCount = resource.stage_outputs.size();
-			stageInfo.StorageBufferCount = resource.storage_buffers.size();
-
-			std::string shaderType = "Unknown";
-			switch (stageFlag) {
-				case VK_SHADER_STAGE_VERTEX_BIT:
-					shaderType = "Vertex";
-					break;
-				case VK_SHADER_STAGE_FRAGMENT_BIT:
-					shaderType = "Fragment";
-					break;
-				case VK_SHADER_STAGE_COMPUTE_BIT:
-					shaderType = "Compute";
-					break;
+		EntryPointReflection* entryPointRef = nullptr;
+		for (uint32_t i = 0; i < layout->getEntryPointCount(); i++) {
+			EntryPointReflection* currentEntryPoint = layout->getEntryPointByIndex(i);
+			if (entryPointName == currentEntryPoint->getName()) {
+				entryPointRef = currentEntryPoint;
+				break;
 			}
+		}
 
-			LUCY_INFO(std::format("------{0} Shader {1}------", shaderType, path.string()));
-			LUCY_INFO(std::format("{0} uniform buffers", stageInfo.UniformCount));
-			LUCY_INFO(std::format("{0} sampled images", stageInfo.SampledImagesCount));
-			LUCY_INFO(std::format("{0} storage images", stageInfo.StorageImageCount));
-			LUCY_INFO(std::format("{0} storage buffers", stageInfo.StorageBufferCount));
-			LUCY_INFO(std::format("{0} push constant buffers", stageInfo.PushConstantBufferCount));
-			LUCY_INFO(std::format("{0} stage inputs", stageInfo.StageInputCount));
-			LUCY_INFO(std::format("{0} stage outputs", stageInfo.StageOutputCount));
+		LUCY_ASSERT(entryPointRef, "Failed to find reflected entry point '{0}' in shader: {1}", entryPointName, path.string());
 
-			if (stageFlag == VK_SHADER_STAGE_VERTEX_BIT)
-				ParseShaderInput(compiler, resource.stage_inputs);
-
-			SearchFor(compiler, resource.uniform_buffers, stageFlag, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-			SearchFor(compiler, resource.sampled_images, stageFlag, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-			SearchFor(compiler, resource.storage_buffers, stageFlag, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-			SearchFor(compiler, resource.storage_images, stageFlag, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
-
-			SearchForPushConstants(compiler, resource, stageFlag);
+		const auto UnwrapArrayType = [](TypeReflection* type) {
+			while (type && type->getKind() == TypeReflection::Kind::Array) {
+				type = type->getElementType();
+			}
+			return type;
 		};
 
-		Reflect(compiler, resourcesShaderStage, m_ShaderStageInfo, stageFlag);
+		if (stageFlag == ShaderStageType::Vertex) {
+			for (uint32_t k = 0; k < layout->getParameterCount(); k++) {
+				auto parameters = entryPointRef->getParameterByIndex(k);
+				auto type = parameters->getTypeLayout();
 
-		delete compiler;
-	}
+				for (uint32_t l = 0; l < type->getFieldCount(); l++) {
+					auto field = type->getFieldByIndex(l);
+					auto fieldType = field->getType();
 
-	void ShaderReflect::ParseShaderInput(spirv_cross::CompilerGLSL* compiler, const spirv_cross::SmallVector<spirv_cross::Resource>& shaderInputs) {
-		for (const auto& shaderInput : shaderInputs) {
-			auto id = shaderInput.id;
+					VertexShaderLayoutElement element;
+					element.Name = field->getName();
+					element.Location = field->getBindingIndex();
+					element.Type = SlangScalarTypeToShaderMemberType(fieldType->getElementType()->getScalarType());
+					if (element.Type == ShaderMemberType::Unknown) {
+						element.Type = SlangScalarTypeToShaderMemberType(fieldType->getScalarType());
+					}
+					element.ShaderDataSize = ShaderMemberTypeToSize(element.Type);
+					element.ElementCount = fieldType->getElementCount();
 
-			VertexShaderLayoutElement element;
-			element.Name = shaderInput.name;
-			if (element.Name.empty() || element.Name.rfind("_", 0) == 0)
-				element.Name = compiler->get_fallback_name(id);
-			if (element.Name.empty() || element.Name.rfind("_", 0) == 0)
-				element.Name = compiler->get_name(shaderInput.base_type_id);
-
-			element.Location = compiler->get_decoration(id, spv::DecorationLocation);
-			element.Type = *(ShaderMemberType*)&compiler->get_type_from_variable(id).basetype;
-			element.ShaderDataSize = compiler->get_type_from_variable(id).vecsize;
-
-			m_VertexShaderLayout.push_back(element);
+					m_VertexShaderLayout.push_back(element);
+				}
+			}
 		}
-	}
 
-	void ShaderReflect::ParseStructMemberRecursive(spirv_cross::CompilerGLSL* compiler, spirv_cross::SPIRType parentType, std::vector<ShaderMemberVariable>& out) {
-		uint32_t index = 0;
-		for (auto id : parentType.member_types) {
-			auto& memberType = compiler->get_type(id);
+		for (uint32_t j = 0; j < layout->getParameterCount(); j++) {
+			auto parameter = layout->getParameterByIndex(j);
+			const char* name = parameter->getName();
+			uint32_t bindingIndex = parameter->getBindingIndex();
+			uint32_t setIndex = parameter->getBindingSpace();
 
-			ShaderMemberVariable variable;
-			variable.Name = compiler->get_fallback_member_name(index);
-			if (variable.Name.empty() || variable.Name.rfind("_", 0) == 0)
-				variable.Name = compiler->get_member_name(parentType.self, index);
+			bool isPushConstant = parameter->getCategory() == ParameterCategory::PushConstantBuffer;
+			bool isParameterBlock = parameter->getCategory() == ParameterCategory::SubElementRegisterSpace;
 
-			variable.Type = *(ShaderMemberType*)&memberType.basetype;
-			variable.Offset = compiler->type_struct_member_offset(parentType, index);
+			TypeLayoutReflection* typeLayRef = parameter->getTypeLayout();
+			VariableLayoutReflection* elementVariableLayout = typeLayRef->getElementVarLayout();
+			TypeLayoutReflection* elementTypeLayout = elementVariableLayout ? elementVariableLayout->getTypeLayout() : nullptr;
 
-			if (variable.Type == ShaderMemberType::Struct) {
-				variable.Size = (uint32_t)compiler->get_declared_struct_size(memberType);
-				//if the member is a struct or a block and if it has member variables
-				ParseStructMemberRecursive(compiler, memberType, variable.Children);
-			} else {
-				variable.Size = (uint32_t)compiler->get_declared_struct_member_size(parentType, index);
+			bool isSampler = UnwrapArrayType(typeLayRef->getType())->getKind() == TypeReflection::Kind::SamplerState;
+
+			ShaderVariable variable;
+			variable.Name = name;
+			variable.Binding = bindingIndex;
+			variable.StageFlag = ShaderStageToVkShaderStage(stageFlag);
+			variable.BufferSize = elementTypeLayout ? elementTypeLayout->getSize(ParameterCategory::Uniform) : typeLayRef->getSize(ParameterCategory::Uniform);
+			variable.ArraySize = typeLayRef->getElementCount();
+
+			variable.Type = ConvertSlangResourceShapeToDescriptorBlockType(parameter->getType()->getResourceShape(), parameter->getType()->getResourceAccess());
+
+			if (variable.Type == UndefinedDescriptorType)
+				variable.Type = ConvertSlangKindToDescriptorBlockType(typeLayRef->getKind());
+
+			if (variable.Type == UndefinedDescriptorType) {
+				TypeLayoutReflection* layoutWithMostInfo = elementTypeLayout ? elementTypeLayout : typeLayRef;
+				variable.Type = ConvertSlangResourceShapeToDescriptorBlockType(layoutWithMostInfo->getResourceShape(), layoutWithMostInfo->getResourceAccess());
 			}
 
-			out.push_back(variable);
-			index++;
-		}
-	}
+			if (isPushConstant)
+				variable.Type = { DescriptorBaseShape::PushConstant, false };
 
-	void ShaderReflect::SearchFor(spirv_cross::CompilerGLSL* compiler, const spirv_cross::SmallVector<spirv_cross::Resource>& resource,
-								  VkShaderStageFlags stageFlag, VkDescriptorType descriptorType) {
-		using namespace spirv_cross;
+			if (isParameterBlock)
+				variable.Type = ConvertSlangResourceShapeToDescriptorBlockType(parameter->getType()->getElementType()->getResourceShape(), parameter->getType()->getElementType()->getResourceAccess());
 
-		for (const auto& ub : resource) {
-			const auto& type = compiler->get_type(ub.base_type_id);
+			if (isSampler)
+				variable.Type = { DescriptorBaseShape::Sampler, false };
 
-			ShaderUniformBlock uniformBlock;
-			uniformBlock.Name = compiler->get_block_fallback_name(ub.id);
-			if (uniformBlock.Name.empty() || uniformBlock.Name.rfind("_", 0) == 0)
-				uniformBlock.Name = compiler->get_fallback_name(ub.id);
-			if (uniformBlock.Name.empty() || uniformBlock.Name.rfind("_", 0) == 0)
-				uniformBlock.Name = compiler->get_name(ub.base_type_id);
-			if (uniformBlock.Name.empty())
-				uniformBlock.Name = ub.name;
-
-			if (type.basetype == SPIRType::Struct)
-				ParseStructMemberRecursive(compiler, type, uniformBlock.Members);
-
-			uint32_t set = compiler->get_decoration(ub.id, spv::DecorationDescriptorSet);
-			uint32_t binding = compiler->get_decoration(ub.id, spv::DecorationBinding);
-			auto& arr = compiler->get_type(ub.type_id).array;
-			size_t dimension = arr.size();
-			size_t memberCount = type.member_types.size();
-
-			if (dimension) {
-				uniformBlock.ArraySize = arr[0];
-
-				if (uniformBlock.ArraySize == 0) //meaning it is a dynamically allocated ubo/ssbo
-					uniformBlock.DynamicallyAllocated = true;
+			switch (variable.Type.Shape) {
+				case DescriptorBaseShape::ConstantBuffer: {
+					m_ShaderStageInfo.ConstantBufferCount++;
+					break;
+				}
+				case DescriptorBaseShape::RWSharedStorageBuffer:
+				case DescriptorBaseShape::SharedStorageBuffer: {
+					m_ShaderStageInfo.StorageBufferCount++;
+					break;
+				}
+				case DescriptorBaseShape::Sampler: {
+					m_ShaderStageInfo.SamplerCount++;
+					break;
+				}
+				case DescriptorBaseShape::PushConstant: {
+					m_ShaderStageInfo.PushConstantCount++;
+					break;
+				}
+				case DescriptorBaseShape::SampledImage:
+				case DescriptorBaseShape::SampledImageArray:
+				case DescriptorBaseShape::Texture2D:
+				case DescriptorBaseShape::Texture2DArray:
+				case DescriptorBaseShape::TextureCube:
+				case DescriptorBaseShape::TextureCubeArray:
+				case DescriptorBaseShape::Texture3D: {
+					m_ShaderStageInfo.SampledImagesCount++;
+					break;
+				}
+				case DescriptorBaseShape::RWTexture2D:
+				case DescriptorBaseShape::RWTexture2DArray:
+				case DescriptorBaseShape::RWTexture3D: {
+					m_ShaderStageInfo.StorageImageCount++;
+					break;
+				}
+				case DescriptorBaseShape::AccelerationStructure: {
+					m_ShaderStageInfo.AccelerationStructureCount++;
+					break;
+				}
+				default: {
+					LUCY_CRITICAL("Unsupported descriptor shape in shader stage info: {0}", variable.Name);
+					break;
+				}
 			}
 
-			//excluding samplers, since they dont support "get_declared_struct_size", because they don't have a block of member variables for example
-			uint32_t bufferSize = 0;
-			if (type.basetype != SPIRType::SampledImage && type.basetype != SPIRType::Sampler && type.basetype != SPIRType::Image) {
-				bufferSize = (uint32_t)compiler->get_declared_struct_size(type);
+			variable.Layout = ParseShaderVariableLayout(parameter, variable.DeviceAddressMembers);
 
-				//if (bufferSize == 0 && descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) //means we are dealing with a dynamic ssbo
-					//descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+			if (typeLayRef->getKind() == TypeReflection::Kind::Array && typeLayRef->getElementCount() == 0)
+				variable.DynamicallyAllocated = true;
 
-				//if (bufferSize == 0 && descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) //means we are dealing with a dynamic ubo
-					//descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-			}
-
-			uniformBlock.Binding = binding;
-			uniformBlock.BufferSize = bufferSize;
-			uniformBlock.Type = ConvertDescriptorType(descriptorType);
-			uniformBlock.StageFlag = stageFlag;
-
-			if (!m_ShaderUniformBlockMap.contains(set)) {
-				std::vector<ShaderUniformBlock> buffer;
-				buffer.push_back(uniformBlock);
-				m_ShaderUniformBlockMap.emplace(set, buffer);
-			} else {
-				const auto& it = m_ShaderUniformBlockMap.find(set);
-				if (CheckIfAlreadyPresent(uniformBlock.Name, it->second))
+			if (isPushConstant) {
+				if (CheckIfAlreadyPresent(variable, m_ShaderPushConstants))
 					continue;
-				it->second.push_back(uniformBlock);
+				m_ShaderPushConstants.push_back(variable);
+				continue;
 			}
 
-			LUCY_INFO(std::format("Name = '{0}'", uniformBlock.Name));
-			LUCY_INFO(std::format("Set = {0}", set));
-			LUCY_INFO(std::format("IsArray = {0}", (bool)dimension));
-
-			if (dimension) {
-				LUCY_INFO(std::format("Array Size = {0}", arr[0]));
-				LUCY_INFO(std::format("Is Dynamically Allocated = {0}", uniformBlock.DynamicallyAllocated));
+			if (!m_ShaderVariableMap.contains(setIndex)) {
+				std::vector<ShaderVariable> buffer;
+				buffer.push_back(variable);
+				m_ShaderVariableMap.emplace(setIndex, buffer);
+			} else {
+				const auto& it = m_ShaderVariableMap.find(setIndex);
+				if (CheckIfAlreadyPresent(variable, it->second))
+					continue;
+				it->second.push_back(variable);
 			}
-
-			LUCY_INFO(std::format("Size = {0}", bufferSize));
-			LUCY_INFO(std::format("Binding = {0}", binding));
-			LUCY_INFO(std::format("Members = {0}", memberCount));
 		}
 	}
 
-	void ShaderReflect::SearchForPushConstants(spirv_cross::CompilerGLSL* compiler, const spirv_cross::ShaderResources& resource, VkShaderStageFlags stageFlag) {
-		for (const auto& ub : resource.push_constant_buffers) {
+	ShaderBlockLayoutElement ShaderReflect::ParseShaderVariableLayout(VariableLayoutReflection* variable, std::vector<ShaderDeviceAddressMember>& addressMembers) {
+		TypeLayoutReflection* typeLayout = variable->getTypeLayout();
+		VariableLayoutReflection* elementVariableLayout = typeLayout->getElementVarLayout();
+		TypeLayoutReflection* elementTypeLayout = elementVariableLayout ? elementVariableLayout->getTypeLayout() : nullptr;
 
-			ShaderUniformBlock uniformBlock;
-			uniformBlock.Name = compiler->get_block_fallback_name(ub.id);
-			if (uniformBlock.Name.empty() || uniformBlock.Name.rfind("_", 0) == 0)
-				uniformBlock.Name = compiler->get_fallback_name(ub.id);
-			if (uniformBlock.Name.empty() || uniformBlock.Name.rfind("_", 0) == 0)
-				uniformBlock.Name = compiler->get_name(ub.base_type_id);
-			if (uniformBlock.Name.empty())
-				uniformBlock.Name = ub.name;
+		ShaderBlockLayoutElement el;
+		el.Name = variable->getName();
 
-			if (CheckIfAlreadyPresent(uniformBlock.Name, m_ShaderPushConstants))
+		const auto ParseField = [this, &addressMembers](VariableLayoutReflection* variable, const auto& SelfFunc) -> ShaderMemberVariable {
+			TypeLayoutReflection* type = variable->getTypeLayout();
+			TypeLayoutReflection* elementTypeLayout = type->getElementTypeLayout();
+
+			ShaderMemberVariable memberVar;
+			memberVar.Name = variable->getName();
+			memberVar.Type = SlangScalarTypeToShaderMemberType(type->getScalarType());
+			memberVar.Offset = variable->getOffset();
+
+			if (type->getKind() == TypeReflection::Kind::Pointer) {
+				memberVar.Type = ShaderMemberType::DeviceAddress;
+				memberVar.Size = type->getSize();
+				LUCY_ASSERT(memberVar.Size == sizeof(RenderDeviceBufferReference), "Unexpected device-address size reflected by Slang.");
+			}
+
+			if (type->getKind() == TypeReflection::Kind::Pointer) {
+				addressMembers.push_back({
+					.Name = elementTypeLayout->getName(),
+					.Offset = memberVar.Offset,
+					.Size = elementTypeLayout->getSize()
+				});
+				return memberVar;
+			}
+
+			if (memberVar.Type == ShaderMemberType::Unknown && elementTypeLayout)
+				memberVar.Type = SlangScalarTypeToShaderMemberType(elementTypeLayout->getScalarType());
+
+			if (elementTypeLayout)
+				memberVar.Size = elementTypeLayout->getSize() * ShaderMemberTypeToSize(memberVar.Type);
+			else
+				memberVar.Size = type->getSize() * ShaderMemberTypeToSize(memberVar.Type);
+
+			for (uint32_t k = 0; k < type->getFieldCount(); k++) {
+				VariableLayoutReflection* variable = type->getFieldByIndex(k);
+				memberVar.Children.push_back(SelfFunc(variable, SelfFunc));
+			}
+
+			return memberVar;
+		};
+
+		const auto ParseChildren = [this, ParseField, &addressMembers](auto* reflection, ShaderBlockLayoutElement& el) {
+			TypeLayoutReflection* typeLayout = reflection->getTypeLayout();
+			TypeLayoutReflection* elementTypeLayout = typeLayout->getElementTypeLayout();
+
+			TypeReflection::Kind kindToCompare = TypeReflection::Kind::None;
+
+			if (elementTypeLayout)
+				kindToCompare = elementTypeLayout->getKind();
+			else
+				kindToCompare = typeLayout->getKind();
+
+			if (typeLayout->getKind() == TypeReflection::Kind::Pointer) {
+				addressMembers.push_back({
+					.Name = elementTypeLayout->getName(),
+					.Offset = reflection->getOffset(),
+					.Size = elementTypeLayout->getSize()
+				});
 				return;
+			}
 
-			const auto& type = compiler->get_type(ub.base_type_id);
+			switch (SlangKindToShaderBlockType(kindToCompare)) {
+				case ShaderBlockType::Struct:
+				case ShaderBlockType::ParameterBlock:
+				case ShaderBlockType::Array:
+					el.Children.push_back(ParseShaderVariableLayout(reflection, addressMembers));
+					break;
+				default:
+					//work with "type" not "typelayout"
+					//means we are dealing with a variable that is not a struct or array, but a basic type e.g. "u_ShadowMap"
+					el.Members.push_back(ParseField(reflection, ParseField));
+					break;
+			}
+		};
 
-			size_t memberCount = type.member_types.size();
-			uint32_t bufferSize = (uint32_t)compiler->get_declared_struct_size(type);
+		const auto GetContainedTypeLayout = [](TypeLayoutReflection* typeLayout) {
+			switch (typeLayout->getKind()) {
+				case TypeReflection::Kind::ConstantBuffer:
+				case TypeReflection::Kind::ParameterBlock:
+				case TypeReflection::Kind::ShaderStorageBuffer: {
+					VariableLayoutReflection* elementVariableLayout = typeLayout->getElementVarLayout();
+					if (elementVariableLayout)
+						return elementVariableLayout->getTypeLayout();
+					break;
+				}
+				default:
+					break;
+			}
 
-			LUCY_INFO(std::format("Name = '{0}'", uniformBlock.Name));
-			LUCY_INFO(std::format("Members = {0}", memberCount));
-			LUCY_INFO(std::format("Size = {0}", bufferSize));
+			return typeLayout;
+		};
 
-			uniformBlock.StageFlag = stageFlag;
-			uniformBlock.BufferSize = bufferSize;
+		TypeLayoutReflection* layoutWithMostInfo = GetContainedTypeLayout(typeLayout);
+		el.BufferSize = layoutWithMostInfo->getSize(ParameterCategory::Uniform);
+		el.Type = SlangKindToShaderBlockType(layoutWithMostInfo->getKind());
+		el.Offset = variable->getOffset(ParameterCategory::Uniform);
 
-			m_ShaderPushConstants.push_back(uniformBlock);
+		for (uint32_t k = 0; k < layoutWithMostInfo->getFieldCount(); k++) {
+			VariableLayoutReflection* child = layoutWithMostInfo->getFieldByIndex(k);
+			ParseChildren(child, el);
 		}
+		
+		return el;
 	}
 
-	//if there are multiple occurences between the 2 shader stages (vertex and fragment), dont add a another one but combine them together
-	bool ShaderReflect::CheckIfAlreadyPresent(std::string_view uniformBlockName, std::vector<ShaderUniformBlock>& buffer) {
-		auto result = std::find_if(buffer.begin(), buffer.end(), [uniformBlockName](const ShaderUniformBlock& uniformBlock) {
-			return uniformBlockName == uniformBlock.Name;
+	//if there are multiple occurences between the 2 shader stages, dont add a another one but combine them together
+	bool ShaderReflect::CheckIfAlreadyPresent(const ShaderVariable& variable, std::vector<ShaderVariable>& buffer) {
+		auto result = std::find_if(buffer.begin(), buffer.end(), [&variable](const ShaderVariable& element) {
+			return variable.Name == element.Name;
 		});
 
 		if (result != buffer.end()) {
-			size_t index = result - buffer.begin();
-			buffer[index].StageFlag = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+			result->StageFlag |= variable.StageFlag;
+
+			if (variable.BufferSize > result->BufferSize) {
+				result->BufferSize = variable.BufferSize;
+				result->Layout = variable.Layout;
+			}
+
 			return true;
 		}
 		return false;
@@ -234,7 +317,7 @@ namespace Lucy {
 
 	void ShaderReflect::DestroyCachedData() {
 		m_ShaderPushConstants.clear();
-		m_ShaderUniformBlockMap.clear();
+		m_ShaderVariableMap.clear();
 		m_VertexShaderLayout.clear();
 		m_ShaderStageInfo = {};
 	}

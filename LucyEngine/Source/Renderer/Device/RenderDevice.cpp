@@ -1,5 +1,6 @@
 #include "lypch.h"
 #include "RenderDevice.h"
+#include "RenderDeviceScene.h"
 #include "VulkanRenderDevice.h"
 
 #include "Renderer/Renderer.h"
@@ -7,6 +8,8 @@
 
 #include "Renderer/Pipeline/VulkanGraphicsPipeline.h"
 #include "Renderer/Pipeline/VulkanComputePipeline.h"
+#include "Renderer/Pipeline/RayTracingPipeline.h"
+#include "Renderer/Pipeline/VulkanRayTracingPipeline.h"
 
 #include "Renderer/Image/VulkanImageCube.h"
 #include "Renderer/Descriptors/VulkanDescriptorSet.h"
@@ -16,6 +19,7 @@
 #include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanUniformBuffer.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanSharedStorageBuffer.h"
+#include "Renderer/Memory/Buffer/Vulkan/VulkanDeviceAddressBuffer.h"
 
 namespace Lucy {
 
@@ -32,22 +36,66 @@ namespace Lucy {
 		return nullptr;
 	}
 
-	void RenderDevice::CreatePipelineDeviceQueries(size_t pipelineCount) {
+	void RenderDevice::CreateQueries(size_t pipelineCount, size_t passCount) {
 		LUCY_INFO("Creating pipeline queries. Pipeline count: {0}", pipelineCount);
 		m_RenderDevicePipelineQuery = RenderDeviceQuery::Create({
 			.Device = shared_from_this()->As<RenderDevice>(),
 			.QueryCount = (uint32_t)pipelineCount,
 			.QueryType = RenderDeviceQueryType::Pipeline
 		});
-	}
 
-	void RenderDevice::CreateTimestampDeviceQueries(size_t passCount) {
 		LUCY_INFO("Creating timestamp queries. Pass count: {0}", passCount);
-
 		m_RenderDeviceTimestampQuery = RenderDeviceQuery::Create({
 			.Device = shared_from_this()->As<RenderDevice>(),
 			.QueryCount = (uint32_t)passCount * 2,
 			.QueryType = RenderDeviceQueryType::Timestamp
+		});
+	}
+
+	void RenderDevice::CreateDeviceResources() {
+		LUCY_INFO("Creating samplers");
+		m_LinearRepeatSampler = CreateSampler(ImageSamplerCreateInfo{
+			.MipmapEnabled = true,
+			.Parameter = {
+				.U = ImageAddressMode::REPEAT,
+				.V = ImageAddressMode::REPEAT,
+				.W = ImageAddressMode::REPEAT,
+				.Min = ImageFilterMode::LINEAR,
+				.Mag = ImageFilterMode::LINEAR,
+			},
+		});
+
+		m_LinearClampSampler = CreateSampler(ImageSamplerCreateInfo{
+			.MipmapEnabled = true,
+			.Parameter = {
+				.U = ImageAddressMode::CLAMP_TO_EDGE,
+				.V = ImageAddressMode::CLAMP_TO_EDGE,
+				.W = ImageAddressMode::CLAMP_TO_EDGE,
+				.Min = ImageFilterMode::LINEAR,
+				.Mag = ImageFilterMode::LINEAR,
+			},
+		});
+
+		m_NearestRepeatSampler = CreateSampler(ImageSamplerCreateInfo{
+			.MipmapEnabled = true,
+			.Parameter = {
+				.U = ImageAddressMode::REPEAT,
+				.V = ImageAddressMode::REPEAT,
+				.W = ImageAddressMode::REPEAT,
+				.Min = ImageFilterMode::NEAREST,
+				.Mag = ImageFilterMode::NEAREST,
+			},
+		});
+
+		m_NearestClampSampler = CreateSampler(ImageSamplerCreateInfo{
+			.MipmapEnabled = true,
+			.Parameter = {
+				.U = ImageAddressMode::CLAMP_TO_EDGE,
+				.V = ImageAddressMode::CLAMP_TO_EDGE,
+				.W = ImageAddressMode::CLAMP_TO_EDGE,
+				.Min = ImageFilterMode::NEAREST,
+				.Mag = ImageFilterMode::NEAREST,
+			},
 		});
 	}
 
@@ -57,6 +105,14 @@ namespace Lucy {
 
 	void RenderDevice::RTResetTimestampQuery(Ref<CommandPool> commandPool) {
 		m_RenderDeviceTimestampQuery->RTResetPoolByIndex(commandPool, Renderer::GetCurrentFrameIndex());
+	}
+
+	void RenderDevice::ResetTimestampQuery(uint32_t frameIndex) {
+		m_RenderDeviceTimestampQuery->ResetPoolByIndex(frameIndex);
+	}
+
+	void RenderDevice::ResetPipelineQuery(uint32_t frameIndex) {
+		m_RenderDevicePipelineQuery->ResetPoolByIndex(frameIndex);
 	}
 
 	uint32_t RenderDevice::RTBeginTimestamp(Ref<CommandPool> cmdPool) {
@@ -75,24 +131,24 @@ namespace Lucy {
 		return m_RenderDevicePipelineQuery->RTEnd(cmdPool);
 	}
 
-	std::vector<uint64_t> RenderDevice::GetQueryResults(RenderDeviceQueryType type) {
+	std::vector<uint64_t> RenderDevice::GetQueryResults(RenderDeviceQueryType type, uint32_t frameIndex) {
 		switch (type) {
 			case RenderDeviceQueryType::Timestamp:
-				return m_RenderDeviceTimestampQuery->GetQueryResults();
+				return m_RenderDeviceTimestampQuery->GetQueryResults(frameIndex);
 			case RenderDeviceQueryType::Pipeline:
-				return m_RenderDevicePipelineQuery->GetQueryResults();
+				return m_RenderDevicePipelineQuery->GetQueryResults(frameIndex);
 			default:
 				LUCY_ASSERT(false, "Unimplemented device query type!");
 		};
 		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo) {
+	RenderDeviceResourceHandle RenderDevice::CreateGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo, const Ref<Shader>& shader) {
 		static std::mutex pipelineCreationMutex;
 
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
-				auto resource = Memory::CreateRef<VulkanGraphicsPipeline>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
+				auto resource = Memory::CreateRef<VulkanGraphicsPipeline>(createInfo, shader, shared_from_this()->As<VulkanRenderDevice>());
 
 				std::unique_lock<std::mutex> lock(pipelineCreationMutex);
 				auto handle = m_ResourceManager.PushResource(resource);
@@ -101,15 +157,15 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateComputePipeline(const ComputePipelineCreateInfo& createInfo) {
+	RenderDeviceResourceHandle RenderDevice::CreateComputePipeline(const ComputePipelineCreateInfo& createInfo, const Ref<Shader>& shader) {
 		static std::mutex pipelineCreationMutex;
 
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
-				auto resource = Memory::CreateRef<VulkanComputePipeline>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
+				auto resource = Memory::CreateRef<VulkanComputePipeline>(createInfo, shader, shared_from_this()->As<VulkanRenderDevice>());
 
 				std::unique_lock<std::mutex> lock(pipelineCreationMutex);
 				auto handle = m_ResourceManager.PushResource(resource);
@@ -118,10 +174,27 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateRenderPass(const RenderPassCreateInfo& createInfo) {
+	RenderDeviceResourceHandle RenderDevice::CreateRayTracingPipeline(const RayTracingPipelineCreateInfo& createInfo) {
+		static std::mutex pipelineCreationMutex;
+
+		switch (Renderer::GetRenderArchitecture()) {
+			case RenderArchitecture::Vulkan: {
+				auto resource = Memory::CreateRef<VulkanRayTracingPipeline>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
+
+				std::unique_lock<std::mutex> lock(pipelineCreationMutex);
+				auto handle = m_ResourceManager.PushResource(resource);
+				return handle;
+			}
+			default:
+				LUCY_ASSERT(false, "No suitable API found to create the resource!");
+		}
+		return {};
+	}
+
+	RenderDeviceResourceHandle RenderDevice::CreateRenderPass(const RenderPassCreateInfo& createInfo) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				auto resource = Memory::CreateRef<VulkanRenderPass>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
@@ -131,46 +204,46 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateImage(const ImageCreateInfo& createInfo) {
+	RenderDeviceResourceHandle RenderDevice::CreateImage(const ImageCreateInfo& createInfo, std::string_view debugName) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				if (createInfo.ImageType == ImageType::TypeCube) {
-					auto resource = Memory::CreateRef<VulkanImageCube>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
+					auto resource = Memory::CreateRef<VulkanImageCube>(createInfo, shared_from_this()->As<VulkanRenderDevice>(), debugName);
 					auto handle = m_ResourceManager.PushResource(resource);
 					return handle;
 				}
-				auto resource = Memory::CreateRef<VulkanImage2D>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
+				auto resource = Memory::CreateRef<VulkanImage2D>(createInfo, shared_from_this()->As<VulkanRenderDevice>(), debugName);
 				auto handle = m_ResourceManager.PushResource(resource);
 				return handle;
 			}
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateImage(const std::filesystem::path& path, ImageCreateInfo& createInfo) {
+	RenderDeviceResourceHandle RenderDevice::CreateImage(const std::filesystem::path& path, ImageCreateInfo& createInfo, std::string_view debugName) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				if (createInfo.ImageType == ImageType::TypeCube) {
-					auto resource = Memory::CreateRef<VulkanImageCube>(path, createInfo, shared_from_this()->As<VulkanRenderDevice>());
+					auto resource = Memory::CreateRef<VulkanImageCube>(path, createInfo, shared_from_this()->As<VulkanRenderDevice>(), debugName);
 					auto handle = m_ResourceManager.PushResource(resource);
 					return handle;
 				}
-				auto resource = Memory::CreateRef<VulkanImage2D>(path, createInfo, shared_from_this()->As<VulkanRenderDevice>());
+				auto resource = Memory::CreateRef<VulkanImage2D>(path, createInfo, shared_from_this()->As<VulkanRenderDevice>(), debugName);
 				auto handle = m_ResourceManager.PushResource(resource);
 				return handle;
 			}
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateImage(const Ref<VulkanImage2D>& other) {
+	RenderDeviceResourceHandle RenderDevice::CreateImage(const Ref<VulkanImage2D>& other) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				auto resource = Memory::CreateRef<VulkanImage2D>(other, shared_from_this()->As<VulkanRenderDevice>());
@@ -180,10 +253,10 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
-
-	RenderResourceHandle RenderDevice::CreateFrameBuffer(const FrameBufferCreateInfo& createInfo) {
+	
+	RenderDeviceResourceHandle RenderDevice::CreateFrameBuffer(const FrameBufferCreateInfo& createInfo) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				auto resource = Memory::CreateRef<VulkanFrameBuffer>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
@@ -193,10 +266,10 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateVertexBuffer(size_t size) {
+	RenderDeviceResourceHandle RenderDevice::CreateVertexBuffer(size_t size) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				auto resource = Memory::CreateRef<VulkanVertexBuffer>(size, shared_from_this()->As<VulkanRenderDevice>());
@@ -206,10 +279,10 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateIndexBuffer(size_t size) {
+	RenderDeviceResourceHandle RenderDevice::CreateIndexBuffer(size_t size) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				auto resource = Memory::CreateRef<VulkanIndexBuffer>(size, shared_from_this()->As<VulkanRenderDevice>());
@@ -219,10 +292,49 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateDescriptorSet(const DescriptorSetCreateInfo& createInfo) {
+	RenderDeviceResourceHandle RenderDevice::CreateDeviceAddressBuffer(const RenderDeviceBufferCreateInfo& createInfo) {
+		switch (Renderer::GetRenderArchitecture()) {
+			case RenderArchitecture::Vulkan: {
+				auto resource = Memory::CreateRef<VulkanDeviceAddressBuffer>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
+				auto handle = m_ResourceManager.PushResource(resource);
+				return handle;
+			}
+			default:
+				LUCY_ASSERT(false, "No suitable API found to create the resource!");
+		}
+		return {};
+	}
+
+	RenderDeviceResourceHandle RenderDevice::CreateBLAccelerationStructure(const BLAccelerationStructureCreateInfo& createInfo) {
+		switch (Renderer::GetRenderArchitecture()) {
+			case RenderArchitecture::Vulkan: {
+				auto resource = Memory::CreateRef<VulkanAccelerationStructure>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
+				auto handle = m_ResourceManager.PushResource(resource);
+				return handle;
+			}
+			default:
+				LUCY_ASSERT(false, "No suitable API found to create the resource!");
+		}
+		return {};
+	}
+
+	RenderDeviceResourceHandle RenderDevice::CreateTLAccelerationStructure(const TLAccelerationStructureCreateInfo& createInfo) {
+		switch (Renderer::GetRenderArchitecture()) {
+			case RenderArchitecture::Vulkan: {
+				auto resource = Memory::CreateRef<VulkanAccelerationStructure>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
+				auto handle = m_ResourceManager.PushResource(resource);
+				return handle;
+			}
+			default:
+				LUCY_ASSERT(false, "No suitable API found to create the resource!");
+		}
+		return {};
+	}
+
+	RenderDeviceResourceHandle RenderDevice::CreateDescriptorSet(const DescriptorSetCreateInfo& createInfo) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				auto resource = Memory::CreateRef<VulkanDescriptorSet>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
@@ -232,10 +344,23 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateSharedStorageBuffer(const SharedStorageBufferCreateInfo& createInfo) {
+	RenderDeviceResourceHandle RenderDevice::CreateSampler(const ImageSamplerCreateInfo& createInfo) {
+		switch (Renderer::GetRenderArchitecture()) {
+			case RenderArchitecture::Vulkan: {
+				auto resource = Memory::CreateRef<VulkanImageSampler>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
+				auto handle = m_ResourceManager.PushResource(resource);
+				return handle;
+			}
+			default:
+				LUCY_ASSERT(false, "No suitable API found to create the resource!");
+		}
+		return {};
+	}
+
+	RenderDeviceResourceHandle RenderDevice::CreateSharedStorageBuffer(const SharedStorageBufferCreateInfo& createInfo) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				auto resource = Memory::CreateRef<VulkanSharedStorageBuffer>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
@@ -245,10 +370,10 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	RenderResourceHandle RenderDevice::CreateUniformBuffer(const UniformBufferCreateInfo& createInfo) {
+	RenderDeviceResourceHandle RenderDevice::CreateUniformBuffer(const UniformBufferCreateInfo& createInfo) {
 		switch (Renderer::GetRenderArchitecture()) {
 			case RenderArchitecture::Vulkan: {
 				auto resource = Memory::CreateRef<VulkanUniformBuffer>(createInfo, shared_from_this()->As<VulkanRenderDevice>());
@@ -258,14 +383,26 @@ namespace Lucy {
 			default:
 				LUCY_ASSERT(false, "No suitable API found to create the resource!");
 		}
-		return InvalidRenderResourceHandle;
+		return {};
 	}
 
-	bool RenderDevice::IsValidResource(RenderResourceHandle handle) const {
+	bool RenderDevice::IsValidResource(RenderDeviceResourceHandle handle) const {
 		return m_ResourceManager.ResourceExists(handle);
 	}
 
-	void RenderDevice::RTDestroyResource(RenderResourceHandle& handle) {
+	void RenderDevice::RTDestroyResource(RenderDeviceResourceHandle& handle) {
 		m_ResourceManager.RTDestroyResource(handle);
+	}
+
+	void RenderDevice::Destroy() {
+		m_DeviceScene->RTDestroy();
+
+		m_RenderDeviceTimestampQuery->Destroy();
+		m_RenderDevicePipelineQuery->Destroy();
+
+		RTDestroyResource(m_LinearClampSampler);
+		RTDestroyResource(m_LinearRepeatSampler);
+		RTDestroyResource(m_NearestClampSampler);
+		RTDestroyResource(m_NearestRepeatSampler);
 	}
 }

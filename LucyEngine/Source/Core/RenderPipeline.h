@@ -1,13 +1,16 @@
 #pragma once
 
 #include "Core/Base.h"
-#include "Scene/Scene.h"
+#include "Core/RenderPipeline.h"
 
 #include "Renderer/RenderGraph/RenderGraph.h"
 
 namespace Lucy {
 
 	class Image;
+	class Scene;
+
+	struct Event;
 
 	enum class ViewMode : uint8_t {
 		Lit,
@@ -16,6 +19,7 @@ namespace Lucy {
 
 	struct RenderPipelineCreateInfo {
 		ViewMode ViewMode = ViewMode::Wireframe;
+		Ref<RenderDevice> RenderDevice = nullptr;
 		//TODO: Settings etc...
 	};
 
@@ -24,7 +28,12 @@ namespace Lucy {
 		RenderPipeline(const RenderPipelineCreateInfo& createInfo);
 		virtual ~RenderPipeline() = default;
 
-		virtual void BeginFrame() = 0;
+		RenderPipeline(const RenderPipeline&) = delete;
+		RenderPipeline& operator=(const RenderPipeline&) = delete;
+		RenderPipeline(RenderPipeline&&) = delete;
+		RenderPipeline& operator=(RenderPipeline&&) = delete;
+
+		virtual void BeginFrame(const Ref<RenderDevice>& device, Ref<Scene>& scene) = 0;
 		virtual void RenderFrame() = 0;
 		virtual void EndFrame() = 0;
 		virtual void OnEvent(Event& e);
@@ -37,19 +46,12 @@ namespace Lucy {
 			m_ViewportHeight = height; 
 		}
 
-		inline auto GetViewportArea() const {
-			struct Size { int32_t Width, Height; };
-			return Size{ m_ViewportWidth, m_ViewportHeight };
-		}
-
-		inline auto GetViewportMousePos() const {
-			struct Size { float Width, Height; };
-			return Size{ m_ViewportMouseX, m_ViewportMouseY };
+		std::pair<int32_t, int32_t> GetViewportArea() const {
+			return std::pair{ m_ViewportWidth, m_ViewportHeight };
 		}
 	private:
 		RenderPipelineCreateInfo m_CreateInfo;
 
 		int32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
-		float m_ViewportMouseX = 0, m_ViewportMouseY = 0;
 	};
 }

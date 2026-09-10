@@ -9,10 +9,16 @@ namespace Lucy {
 		RenderGraphResource(const std::string& name, size_t hash);
 		RenderGraphResource(const std::string& name);
 
-		inline const std::string& GetName() const { return m_Name; }
+		RenderGraphResource(const RenderGraphResource& other) = default;
+		RenderGraphResource(RenderGraphResource&& other) noexcept = default;
+		RenderGraphResource& operator=(const RenderGraphResource& other) = default;
+		RenderGraphResource& operator=(RenderGraphResource&& other) noexcept = default;
 
-		inline bool operator==(const RenderGraphResource& other) const { return m_Hash == other.m_Hash; }
-		inline auto operator<=>(const RenderGraphResource& other) const = default;
+		const std::string& GetName() const { return m_Name; }
+		size_t GetHash() const { return m_Hash; }
+
+		bool operator==(const RenderGraphResource& other) const { return m_Hash == other.m_Hash; }
+		auto operator<=>(const RenderGraphResource& other) const = default;
 	private:
 		std::string m_Name;
 		size_t m_Hash;
@@ -26,6 +32,6 @@ namespace Lucy {
 template <>
 struct std::hash<Lucy::RenderGraphResource> {
 	inline size_t operator()(const Lucy::RenderGraphResource& resource) const {
-		return std::hash<std::string>{}(resource.GetName());
+		return resource.GetHash();
 	}
 };

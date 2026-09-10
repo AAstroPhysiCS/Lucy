@@ -32,7 +32,7 @@ namespace Lucy {
 		CameraViewProjection mvp;
 		mvp.View = m_ViewMatrix;
 		mvp.Proj = m_Projection;
-		mvp.CamPos = glm::vec4(m_Position, 1.0f) * glm::vec4(-1.0f, 1.0f, -1.0f, 1.0f);
+		mvp.CamPos = glm::vec4(m_Position, 1.0f);
 
 		return mvp;
 	}
@@ -61,7 +61,7 @@ namespace Lucy {
 		m_Projection = glm::perspective(glm::radians(m_Fov), m_AspectRatio, m_NearPlane, m_FarPlane);
 	}
 
-	void PerspectiveCamera::Update() {
+	void PerspectiveCamera::Update(float deltaTime) {
 		UpdateView();
 		UpdateProjection();
 	}
@@ -78,7 +78,7 @@ namespace Lucy {
 		: Camera(nearPlane, farPlane), m_Left(left), m_Right(right), m_Bottom(bottom), m_Top(top) {
 	}
 
-	void OrthographicCamera::Update() {
+	void OrthographicCamera::Update(float deltaTime) {
 		UpdateView();
 		UpdateProjection();
 	}
@@ -100,7 +100,13 @@ namespace Lucy {
 		: PerspectiveCamera(nearPlane, farPlane, fov) {
 	}
 
-	void EditorCamera::UpdateMovement() {
+	void EditorCamera::Update(float deltaTime) {
+		UpdateMovement(deltaTime);
+		UpdateView();
+		UpdateProjection();
+	}
+
+	void EditorCamera::UpdateMovement(float deltaTime) {
 		auto x = Input::GetMouseX();
 		auto y = Input::GetMouseY();
 
@@ -123,24 +129,31 @@ namespace Lucy {
 		glm::vec3 right = glm::rotate(glm::inverse(m_Orientation), glm::vec3(1, 0, 0));
 		glm::vec3 up = glm::cross(forward, right);
 
+		float speed = m_CameraSpeed * deltaTime;
+
+		if (Input::IsKeyPressed(KeyCode::LeftControl))
+			speed *= 10.0f;
+
 		if (Input::IsKeyPressed(KeyCode::W))
-			m_Position -= forward * m_CameraSpeed;
+			m_Position -= forward * speed;
+
 		if (Input::IsKeyPressed(KeyCode::S))
-			m_Position += forward * m_CameraSpeed;
+			m_Position += forward * speed;
+
 		if (Input::IsKeyPressed(KeyCode::D))
-			m_Position += right * m_CameraSpeed;
+			m_Position += right * speed;
+
 		if (Input::IsKeyPressed(KeyCode::A))
-			m_Position -= right * m_CameraSpeed;
+			m_Position -= right * speed;
 
 		if (Input::IsKeyPressed(KeyCode::LeftShift))
-			m_Position -= up * m_CameraSpeed;
+			m_Position -= up * speed;
+
 		if (Input::IsKeyPressed(KeyCode::Space))
-			m_Position += up * m_CameraSpeed;
+			m_Position += up * speed;
 	}
 
 	void EditorCamera::UpdateView() {
-		UpdateMovement();
-
 		m_ViewMatrix = glm::mat4(1.0f);
 
 		glm::quat qPitch = glm::angleAxis(glm::radians(m_Rotation.y), glm::vec3(1, 0, 0));

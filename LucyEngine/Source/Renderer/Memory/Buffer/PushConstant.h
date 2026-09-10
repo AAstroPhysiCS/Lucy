@@ -4,11 +4,16 @@
 
 namespace Lucy {
 
-	class VulkanPushConstant : public ByteBuffer {
+	class PipelineConstant : public ByteBuffer {
 	public:
-		VulkanPushConstant() = default;
-		VulkanPushConstant(const std::string& name, uint32_t size, uint32_t offset, VkShaderStageFlags shaderStage);
-		virtual ~VulkanPushConstant() = default;
+		PipelineConstant() = default;
+		PipelineConstant(const std::string& name, uint32_t size, uint32_t offset, VkShaderStageFlags shaderStage);
+		virtual ~PipelineConstant() = default;
+
+		PipelineConstant(const PipelineConstant&) = delete;
+		PipelineConstant& operator=(const PipelineConstant&) = delete;
+		PipelineConstant(PipelineConstant&&) = default;
+		PipelineConstant& operator=(PipelineConstant&&) = default;
 
 		void RTBind(VkCommandBuffer commandBuffer, VkPipelineLayout layout) const;
 

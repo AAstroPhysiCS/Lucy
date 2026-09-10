@@ -1,18 +1,28 @@
 #include "lypch.h"
 #include "VulkanRenderDevice.h"
+#include "RenderDeviceScene.h"
+
 #include "Renderer/Context/VulkanContext.h"
 
 #include "Renderer/Pipeline/VulkanGraphicsPipeline.h"
 #include "Renderer/Pipeline/VulkanComputePipeline.h"
+#include "Renderer/Pipeline/VulkanRayTracingPipeline.h"
 
 #include "Renderer/Descriptors/VulkanDescriptorSet.h"
+
+#include "Renderer/ExecutionBatch.h"
+#include "Renderer/RenderGraph/RenderGraphPass.h"
 
 #include "Renderer/Commands/VulkanCommandPool.h"
 
 #include "Renderer/Memory/Buffer/Vulkan/VulkanVertexBuffer.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanIndexBuffer.h"
 #include "Renderer/Memory/Buffer/Vulkan/VulkanFrameBuffer.h"
+#include "Renderer/Memory/Buffer/Vulkan/VulkanDeviceAddressBuffer.h"
 #include "Renderer/Memory/VulkanAllocator.h"
+#include "Renderer/Memory/VulkanRenderDeviceUploadManager.h"
+
+#include "Renderer/Descriptors/DescriptorSetManager.h"
 
 #include "Renderer/Renderer.h"
 
@@ -40,82 +50,57 @@ namespace Lucy {
 		vkGetDeviceQueue(m_LogicalDevice, m_QueueFamilyIndices.ComputeFamily, 0, &m_ComputeQueue);
 		vkGetDeviceQueue(m_LogicalDevice, m_QueueFamilyIndices.TransferFamily, 0, &m_TransferQueue);
 
-		m_Allocator.Init(instance, m_LogicalDevice, m_PhysicalDevice, apiVersion);
+		m_Allocator.Init(instance, this, apiVersion);
 
-		m_ImmediateCommandFence = Memory::CreateUnique<Fence>(this);
+		VkFenceCreateInfo fenceCreateInfo{};
+		fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+		LUCY_VK_ASSERT(vkCreateFence(m_LogicalDevice, &fenceCreateInfo, nullptr, &m_ImmediateSubmitFence));
+
+		m_DescriptorSetManager = Memory::CreateUnique<VulkanDescriptorSetManager>(this);
+		m_UploadManager = Memory::CreateUnique<VulkanRenderDeviceUploadManager>(shared_from_this()->As<VulkanRenderDevice>());
+		m_DeviceScene = Memory::CreateUnique<RenderDeviceScene>(this);
+
+		m_TransientCommandPool = Memory::CreateUnique<VulkanTransientCommandPool>(TargetQueueFamily::Graphics, shared_from_this()->As<VulkanRenderDevice>());
+		m_TransientCommandPoolCompute = Memory::CreateUnique<VulkanTransientCommandPool>(TargetQueueFamily::Compute, shared_from_this()->As<VulkanRenderDevice>());
+		m_TransientCommandPoolTransfer = Memory::CreateUnique<VulkanTransientCommandPool>(TargetQueueFamily::Transfer, shared_from_this()->As<VulkanRenderDevice>());
+	}
+
+	void VulkanRenderDevice::CreateDeviceResources() {
+		RenderDevice::CreateDeviceResources();
+
+		const auto& globalDescriptorSet = AccessResource<VulkanDescriptorSet>(m_DescriptorSetManager->GetGlobalDescriptorSet(0));
+		globalDescriptorSet->RTUpdateSamplerDescriptors(this, m_LinearRepeatSampler);
+		globalDescriptorSet->RTUpdateSamplerDescriptors(this, m_LinearClampSampler);
+		globalDescriptorSet->RTUpdateSamplerDescriptors(this, m_NearestRepeatSampler);
+		globalDescriptorSet->RTUpdateSamplerDescriptors(this, m_NearestClampSampler);
 	}
 
 	void VulkanRenderDevice::PickDeviceByRanking(const std::vector<VkPhysicalDevice>& devices) {
-
 		LUCY_INFO("----------Available Devices----------");
+		for (const auto& device : devices) {
+			VulkanDeviceInfo deviceInfo = QueryDeviceInfo(device);
+
+			LUCY_INFO(std::format("Device Name: {0}", deviceInfo.Name));
+			LUCY_INFO(std::format("Device Driver Version: {0}", deviceInfo.DriverVersion));
+			LUCY_INFO(std::format("Device API Version: {0}", deviceInfo.ApiVersion));
+			LUCY_INFO("-------------------------------------");
+
+			bool isDeviceRequirementsCovered = CheckDeviceExtensionSupport(device) && CheckDeviceFormatSupport(device);
 #if USE_INTEGRATED_GRAPHICS
-		for (const auto& device : devices) {
-			VkPhysicalDeviceProperties properties;
-			vkGetPhysicalDeviceProperties(device, &properties);
-
-			VkPhysicalDeviceFeatures features;
-			vkGetPhysicalDeviceFeatures(device, &features);
-
-			if (properties.deviceType != VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
-				continue;
-
-			VulkanDeviceInfo deviceInfo = { properties.deviceName, properties.driverVersion, properties.apiVersion };
-			LUCY_INFO(std::format("Device Name: {0}", deviceInfo.Name));
-			LUCY_INFO(std::format("Device Driver Version: {0}", deviceInfo.DriverVersion));
-			LUCY_INFO(std::format("Device API Version: {0}", deviceInfo.ApiVersion));
-			LUCY_INFO("-------------------------------------");
-			deviceInfo.MinUniformBufferAlignment = (uint32_t)properties.limits.minUniformBufferOffsetAlignment;
-			deviceInfo.TimestampPeriod = properties.limits.timestampPeriod;
-
-			FindQueueFamilies(device);
-
-			bool isDeviceRequirementsCovered = CheckDeviceExtensionSupport(device) && CheckDeviceFormatSupport(device);
-
-			if (features.multiViewport
-				&& features.geometryShader
-				&& features.samplerAnisotropy
-				&& features.tessellationShader
-				&& m_QueueFamilyIndices.IsComplete()
-				&& isDeviceRequirementsCovered) {
-				m_DeviceInfo = deviceInfo;
-				m_PhysicalDevice = device;
-				return;
-			}
-		}
+			bool preferredDeviceType = deviceInfo.DeviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU;
 #else
-		for (const auto& device : devices) {
-			VkPhysicalDeviceProperties properties;
-			vkGetPhysicalDeviceProperties(device, &properties);
-
-			VkPhysicalDeviceFeatures features;
-			vkGetPhysicalDeviceFeatures(device, &features);
-
-			VulkanDeviceInfo deviceInfo = { properties.deviceName, properties.driverVersion, properties.apiVersion };
-			LUCY_INFO(std::format("Device Name: {0}", deviceInfo.Name));
-			LUCY_INFO(std::format("Device Driver Version: {0}", deviceInfo.DriverVersion));
-			LUCY_INFO(std::format("Device API Version: {0}", deviceInfo.ApiVersion));
-			LUCY_INFO("-------------------------------------");
-			deviceInfo.MinUniformBufferAlignment = (uint32_t)properties.limits.minUniformBufferOffsetAlignment;
-			deviceInfo.TimestampPeriod = properties.limits.timestampPeriod;
-
-			FindQueueFamilies(device);
-
-			bool isDeviceRequirementsCovered = CheckDeviceExtensionSupport(device) && CheckDeviceFormatSupport(device);
-
-			if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
-				&& features.multiViewport
-				&& features.geometryShader
-				&& features.samplerAnisotropy
-				&& features.tessellationShader
-				&& m_QueueFamilyIndices.IsComplete()
-				&& isDeviceRequirementsCovered) {
+			bool preferredDeviceType = deviceInfo.DeviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+#endif
+			if (preferredDeviceType && deviceInfo.SamplerAnisotropy && deviceInfo.GeometryShader && deviceInfo.TessellationShader && 
+				deviceInfo.MultiViewport && deviceInfo.DynamicRendering && deviceInfo.Synchronization2 && isDeviceRequirementsCovered) {
+				FindQueueFamilies(device);
+				if (!m_QueueFamilyIndices.IsComplete())
+					return;
 				m_DeviceInfo = deviceInfo;
 				m_PhysicalDevice = device;
 				return;
 			}
 		}
-#endif
-
 		LUCY_ASSERT(false, "No suitable device found!");
 	}
 
@@ -138,10 +123,17 @@ namespace Lucy {
 			queueCreateInfos.push_back(queueCreateInfo);
 		}
 
+		//For the slang shader not to give errors
+		VkPhysicalDeviceComputeShaderDerivativesFeaturesKHR derivativeFeatures{};
+		derivativeFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COMPUTE_SHADER_DERIVATIVES_FEATURES_KHR;
+		derivativeFeatures.computeDerivativeGroupLinear = VK_TRUE;
+		derivativeFeatures.computeDerivativeGroupQuads = VK_TRUE;
+
 		//For layered rendering (cubemaps for example)
 		VkPhysicalDeviceMultiviewFeatures multiViewFeatures{};
 		multiViewFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES;
 		multiViewFeatures.multiview = VK_TRUE;
+		multiViewFeatures.pNext = &derivativeFeatures;
 
 		VkPhysicalDeviceVulkan12Features vulkan12Features{};
 		vulkan12Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
@@ -149,8 +141,18 @@ namespace Lucy {
 		vulkan12Features.shaderOutputLayer = VK_TRUE;
 		//For bindless descriptor sets
 		vulkan12Features.descriptorBindingPartiallyBound = VK_TRUE;
+		vulkan12Features.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+		vulkan12Features.descriptorBindingStorageImageUpdateAfterBind = VK_TRUE;
 		vulkan12Features.descriptorBindingVariableDescriptorCount = VK_TRUE;
+		vulkan12Features.drawIndirectCount = VK_TRUE;
+		vulkan12Features.bufferDeviceAddress = VK_TRUE;
+		vulkan12Features.vulkanMemoryModel = VK_TRUE;
+		vulkan12Features.vulkanMemoryModelDeviceScope = VK_TRUE;
+		vulkan12Features.scalarBlockLayout = VK_TRUE;
+		vulkan12Features.descriptorIndexing = VK_TRUE;
 		vulkan12Features.runtimeDescriptorArray = VK_TRUE;
+		vulkan12Features.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+		vulkan12Features.timelineSemaphore = VK_TRUE;
 		//for query pool reset
 		vulkan12Features.hostQueryReset = VK_TRUE;
 		vulkan12Features.pNext = &multiViewFeatures;
@@ -162,31 +164,46 @@ namespace Lucy {
 		vulkan13Features.synchronization2 = VK_TRUE;
 		vulkan13Features.pNext = &vulkan12Features;
 
+		//For raytracing DDGI
+		VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeatures{};
+		rayQueryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+		rayQueryFeatures.rayQuery = VK_TRUE;
+		rayQueryFeatures.pNext = &vulkan13Features;
+
+		VkPhysicalDeviceRayTracingInvocationReorderFeaturesEXT rayTracingInvocationReorderFeatures{};
+		rayTracingInvocationReorderFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_INVOCATION_REORDER_FEATURES_EXT;
+		rayTracingInvocationReorderFeatures.rayTracingInvocationReorder = VK_TRUE;
+		rayTracingInvocationReorderFeatures.pNext = &rayQueryFeatures;
+
+		VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingPipelineFeatures{};
+		rayTracingPipelineFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+		rayTracingPipelineFeatures.rayTracingPipeline = VK_TRUE;
+		rayTracingPipelineFeatures.rayTracingPipelineTraceRaysIndirect = VK_TRUE;
+		rayTracingPipelineFeatures.pNext = &rayTracingInvocationReorderFeatures;
+
+		VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures{};
+		accelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+		accelerationStructureFeatures.accelerationStructure = VK_TRUE;
+		accelerationStructureFeatures.pNext = &rayTracingPipelineFeatures;
+
 		VkPhysicalDeviceFeatures2 features{};
 		features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 		vkGetPhysicalDeviceFeatures2(m_PhysicalDevice, &features);
 		features.features.samplerAnisotropy = VK_TRUE;
 		features.features.geometryShader = VK_TRUE;
 		features.features.multiViewport = VK_TRUE;
-		features.pNext = &vulkan13Features; //extending this structure
+		features.pNext = &accelerationStructureFeatures;
 
 		VkDeviceCreateInfo deviceCreateInfo{};
 		deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 		deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
 		deviceCreateInfo.queueCreateInfoCount = (uint32_t)queueCreateInfos.size();
-		//deviceCreateInfo.pEnabledFeatures = &features;
 		deviceCreateInfo.pNext = &features;
 
 		deviceCreateInfo.ppEnabledExtensionNames = m_DeviceExtensions.data();
 		deviceCreateInfo.enabledExtensionCount = (uint32_t)m_DeviceExtensions.size();
-
-#ifdef LUCY_DEBUG
-		deviceCreateInfo.enabledLayerCount = (uint32_t)enabledValidationLayers.size();
-		deviceCreateInfo.ppEnabledLayerNames = enabledValidationLayers.data();
-#else
 		deviceCreateInfo.enabledLayerCount = 0;
 		deviceCreateInfo.ppEnabledLayerNames = 0;
-#endif
 
 		LUCY_VK_ASSERT(vkCreateDevice(m_PhysicalDevice, &deviceCreateInfo, nullptr, &m_LogicalDevice));
 	}
@@ -243,6 +260,113 @@ namespace Lucy {
 		}
 	}
 
+	VulkanDeviceInfo VulkanRenderDevice::QueryDeviceInfo(VkPhysicalDevice device) const {
+		VkPhysicalDeviceProperties properties{};
+		vkGetPhysicalDeviceProperties(device, &properties);
+
+		VkPhysicalDeviceFeatures features{};
+		vkGetPhysicalDeviceFeatures(device, &features);
+
+		VkPhysicalDeviceDynamicRenderingFeatures dynamicRendering{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES
+		};
+
+		VkPhysicalDeviceSynchronization2Features synchronization2{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES
+		};
+
+		VkPhysicalDeviceTimelineSemaphoreFeatures timelineSemaphore{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES
+		};
+
+		VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAddress{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES
+		};
+
+		VkPhysicalDeviceDescriptorIndexingFeatures descriptorIndexing{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES
+		};
+
+		VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructure{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR
+		};
+
+		VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingPipeline{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR
+		};
+
+		dynamicRendering.pNext = &synchronization2;
+		synchronization2.pNext = &timelineSemaphore;
+		timelineSemaphore.pNext = &bufferDeviceAddress;
+		bufferDeviceAddress.pNext = &descriptorIndexing;
+		descriptorIndexing.pNext = &accelerationStructure;
+		accelerationStructure.pNext = &rayTracingPipeline;
+
+		VkPhysicalDeviceFeatures2 features2 {
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+			.pNext = &dynamicRendering
+		};
+
+		vkGetPhysicalDeviceFeatures2(device, &features2);
+
+		VkPhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingProperties {
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR
+		};
+
+		VkPhysicalDeviceProperties2 properties2 {
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+			.pNext = &rayTracingProperties
+		};
+
+		vkGetPhysicalDeviceProperties2(device, &properties2);
+
+		return VulkanDeviceInfo{
+			.Name = properties.deviceName,
+			.VendorId = properties.vendorID,
+			.DeviceId = properties.deviceID,
+			.DeviceType = properties.deviceType,
+			.DriverVersion = properties.driverVersion,
+			.ApiVersion = properties.apiVersion,
+			.MinUniformBufferAlignment = static_cast<uint32_t>(properties.limits.minUniformBufferOffsetAlignment),
+			.MinStorageBufferAlignment = static_cast<uint32_t>(properties.limits.minStorageBufferOffsetAlignment),
+			.MinTexelBufferOffsetAlignment = static_cast<uint32_t>(properties.limits.minTexelBufferOffsetAlignment),
+			.MaxImageDimension2D = properties.limits.maxImageDimension2D,
+			.MaxBoundDescriptorSets = properties.limits.maxBoundDescriptorSets,
+			.MaxPushConstantsSize = properties.limits.maxPushConstantsSize,
+			.MaxComputeWorkGroupInvocations = properties.limits.maxComputeWorkGroupInvocations,
+			.MaxComputeWorkGroupSize = {
+				properties.limits.maxComputeWorkGroupSize[0],
+				properties.limits.maxComputeWorkGroupSize[1],
+				properties.limits.maxComputeWorkGroupSize[2]
+			},
+			.MaxComputeWorkGroupCount = {
+				properties.limits.maxComputeWorkGroupCount[0],
+				properties.limits.maxComputeWorkGroupCount[1],
+				properties.limits.maxComputeWorkGroupCount[2]
+			},
+			.MaxSamplerAnisotropy = properties.limits.maxSamplerAnisotropy,
+			.TimestampPeriod = properties.limits.timestampPeriod,
+			.FramebufferColorSampleCounts = properties.limits.framebufferColorSampleCounts,
+			.FramebufferDepthSampleCounts = properties.limits.framebufferDepthSampleCounts,
+			.SamplerAnisotropy = static_cast<bool>(features.samplerAnisotropy),
+			.GeometryShader = static_cast<bool>(features.geometryShader),
+			.TessellationShader = static_cast<bool>(features.tessellationShader),
+			.MultiViewport = static_cast<bool>(features.multiViewport),
+			.DynamicRendering = static_cast<bool>(dynamicRendering.dynamicRendering),
+			.Synchronization2 = static_cast<bool>(synchronization2.synchronization2),
+			.TimelineSemaphore = static_cast<bool>(timelineSemaphore.timelineSemaphore),
+			.BufferDeviceAddress = static_cast<bool>(bufferDeviceAddress.bufferDeviceAddress),
+			.DescriptorIndexing = static_cast<bool>(descriptorIndexing.descriptorBindingPartiallyBound && descriptorIndexing.runtimeDescriptorArray),
+			.RayTracingPipeline = static_cast<bool>(rayTracingPipeline.rayTracingPipeline),
+			.AccelerationStructure = static_cast<bool>(accelerationStructure.accelerationStructure),
+			.ShaderGroupHandleSize = rayTracingProperties.shaderGroupHandleSize,
+			.ShaderGroupHandleAlignment = rayTracingProperties.shaderGroupHandleAlignment,
+			.ShaderGroupBaseAlignment = rayTracingProperties.shaderGroupBaseAlignment,
+			.MaxShaderGroupStride = rayTracingProperties.maxShaderGroupStride,
+			.MaxRayRecursionDepth = rayTracingProperties.maxRayRecursionDepth,
+		};
+	}
+
 	bool VulkanRenderDevice::CheckDeviceExtensionSupport(VkPhysicalDevice device) {
 		uint32_t extensionCount = 0;
 		vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
@@ -260,7 +384,7 @@ namespace Lucy {
 			LUCY_CRITICAL("Not available extensions");
 			uint32_t i = 0;
 			for (const auto& notAvailableExtensions : requiredExtensions) {
-				LUCY_CRITICAL(std::format("Index: {0}, Name: {1}", (i++), notAvailableExtensions));
+				LUCY_CRITICAL(std::format("Index: {0}, Name: {1}\n", (i++), notAvailableExtensions));
 			}
 			LUCY_ASSERT(false);
 		}
@@ -283,105 +407,156 @@ namespace Lucy {
 		return allFormatIsSupported;
 	}
 
-	void VulkanRenderDevice::SubmitWorkToGPU(VkQueue queueHandle, size_t commandBufferCount, VkCommandBuffer* commandBuffers, Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore, Semaphore* currentFrameSignalSemaphore) const {
+	void VulkanRenderDevice::SubmitWorkToGPU(const RenderCommandList& renderCommandList, const std::vector<VulkanQueueSubmitInfo>& waits, 
+		VulkanSemaphore& renderFinishedSemaphore, VulkanSemaphore& frameTimelineSemaphore, uint64_t signalValue) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::SubmitWorkToGPU");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		const auto& cmdPool = renderCommandList.GetPrimaryCommandPool();
 
-		VkPipelineStageFlags imageWaitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+		LUCY_ASSERT(cmdPool->GetState(frameIndex) == CommandBufferSlotState::Recorded);
 
-		if (queueHandle == m_ComputeQueue) {
-			imageWaitStages[0] = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+		VkCommandBuffer cmd = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
+
+		VkCommandBufferSubmitInfo cmdInfo{};
+		cmdInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+		cmdInfo.commandBuffer = cmd;
+		cmdInfo.deviceMask = 0;
+
+		std::vector<VkSemaphoreSubmitInfo> waitInfos;
+		waitInfos.reserve(waits.size());
+
+		for (const auto& wait : waits) {
+			auto& info = waitInfos.emplace_back();
+			info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+			info.semaphore = static_cast<VkSemaphore>(wait.Semaphore.GetHandle());
+			info.value = wait.Value;
+			info.stageMask = wait.StageMask;
+			info.deviceIndex = 0;
 		}
 
-		bool noWaiting = currentFrameWaitSemaphore == nullptr;
-		bool noSignaling = currentFrameSignalSemaphore == nullptr;
+		std::array<VkSemaphoreSubmitInfo, 2> signalInfos{};
 
-		bool noSyncNeeded = noWaiting && noSignaling;
+		signalInfos[0].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+		signalInfos[0].semaphore = (VkSemaphore)renderFinishedSemaphore.GetHandle();
+		signalInfos[0].value = 0;
+		signalInfos[0].stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+		signalInfos[0].deviceIndex = 0;
 
-		VkSubmitInfo submitInfo = VulkanAPI::QueueSubmitInfo((uint32_t)commandBufferCount, commandBuffers, noSyncNeeded ? 0 : 1, 
-			noSyncNeeded ? nullptr : &currentFrameWaitSemaphore->GetSemaphore(), imageWaitStages, noSyncNeeded ? 0 : 1,
-			noSyncNeeded ? nullptr : &currentFrameSignalSemaphore->GetSemaphore());
-		LUCY_VK_ASSERT(vkQueueSubmit(queueHandle, 1, &submitInfo, currentFrameFence->GetFence()));
+		signalInfos[1].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+		signalInfos[1].semaphore = (VkSemaphore)frameTimelineSemaphore.GetHandle();
+		signalInfos[1].value = signalValue;
+		signalInfos[1].stageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+		signalInfos[1].deviceIndex = 0;
+
+		VkSubmitInfo2 submitInfo{};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+		submitInfo.waitSemaphoreInfoCount = static_cast<uint32_t>(waitInfos.size());
+		submitInfo.pWaitSemaphoreInfos = waitInfos.data();
+		submitInfo.commandBufferInfoCount = 1;
+		submitInfo.pCommandBufferInfos = &cmdInfo;
+		submitInfo.signalSemaphoreInfoCount = static_cast<uint32_t>(signalInfos.size());
+		submitInfo.pSignalSemaphoreInfos = signalInfos.data();
+
+		LUCY_VK_ASSERT(vkQueueSubmit2(m_GraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE));
+		cmdPool->SetState(frameIndex, CommandBufferSlotState::Pending);
 	}
 
-	void VulkanRenderDevice::SubmitWorkToGPU(VkQueue queueHandle, VkCommandBuffer currentCommandBuffer, Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore, Semaphore* currentFrameSignalSemaphore) const {
-		SubmitWorkToGPU(queueHandle, 1, &currentCommandBuffer, currentFrameFence, currentFrameWaitSemaphore, currentFrameSignalSemaphore);
+	void VulkanRenderDevice::SubmitWorkToGPUAsBatch(const RenderCommandList& renderCommandList, const ExecutionBatch& batch) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::SubmitWorkToGPUAsBatch");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		const auto& vkBatch = batch.AsVulkanBatch();
+
+		auto queueFamily = vkBatch.Passes[0]->GetTargetQueueFamily();
+		const auto& waits = vkBatch.Waits;
+		const auto& signals = vkBatch.Signals;
+
+		const auto GetQueueHandle = [&](TargetQueueFamily family) -> VkQueue {
+			switch (family) {
+				case TargetQueueFamily::Graphics:
+					return m_GraphicsQueue;
+				case TargetQueueFamily::Compute:
+					return m_ComputeQueue;
+				case TargetQueueFamily::Transfer:
+					return m_TransferQueue;
+				default:
+					LUCY_ASSERT(false, "Invalid queue family!");
+					return VK_NULL_HANDLE;
+			}
+		}; 
+
+		VkQueue queueHandle = GetQueueHandle(queueFamily);
+
+		const auto& cmdPool = renderCommandList.GetPrimaryCommandPool();
+		LUCY_ASSERT(cmdPool->GetState(frameIndex) == CommandBufferSlotState::Recorded, "Trying to submit a command buffer that is not recorded!");
+
+		VkCommandBuffer cmd = static_cast<VkCommandBuffer>(cmdPool->GetCommandBuffer(frameIndex));
+
+		VkCommandBufferSubmitInfo info{};
+		info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+		info.commandBuffer = cmd;
+		info.deviceMask = 0;
+
+		/*cmdInfos.reserve(submitCmds.size());
+		for (VkCommandBuffer cmd : submitCmds) {
+			VkCommandBufferSubmitInfo info{};
+			info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+			info.commandBuffer = cmd;
+			info.deviceMask = 0;
+			cmdInfos.push_back(info);
+		}*/
+
+		std::vector<VkSemaphoreSubmitInfo> waitInfos;
+		waitInfos.reserve(waits.size());
+		for (const auto& wait : waits) {
+			VkSemaphoreSubmitInfo& info = waitInfos.emplace_back();
+			info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+			info.semaphore = static_cast<VkSemaphore>(wait.Semaphore.GetHandle());
+			info.value = wait.Value;
+			info.stageMask = wait.StageMask;
+		}
+
+		std::vector<VkSemaphoreSubmitInfo> signalInfos;
+		signalInfos.reserve(signals.size());
+		for (const auto& signal : signals) {
+			VkSemaphoreSubmitInfo& info = signalInfos.emplace_back();
+			info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+			info.semaphore = static_cast<VkSemaphore>(signal.Semaphore.GetHandle());
+			info.value = signal.Value;
+			info.stageMask = signal.StageMask;
+		}
+
+		VkSubmitInfo2 submitInfo{ VulkanAPI::QueueSubmitInfo2(1, &info,
+			static_cast<uint32_t>(waitInfos.size()), waitInfos.data(), static_cast<uint32_t>(signalInfos.size()), signalInfos.data()) };
+
+		LUCY_VK_ASSERT(vkQueueSubmit2(queueHandle, 1, &submitInfo, VK_NULL_HANDLE));
+		cmdPool->SetState(frameIndex, CommandBufferSlotState::Pending);
 	}
 
-	void VulkanRenderDevice::SubmitWorkToGPU(VkQueue queueHandle, size_t commandBufferCount, void* commandBufferHandles) const {
-		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::SubmitWorkToGPU");
-		LUCY_ASSERT(commandBufferCount != 0);
+	void VulkanRenderDevice::SubmitWorkToGPUImmediate(VkQueue queueHandle, size_t commandBufferCount, void* commandBufferHandles) const {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::SubmitWorkToGPUImmediate");
 
-		VkFence fenceHandle = m_ImmediateCommandFence->GetFence();
-		vkResetFences(m_LogicalDevice, 1, &fenceHandle);
+		LUCY_ASSERT(queueHandle != VK_NULL_HANDLE, "Cannot submit work to a null queue!");
+		LUCY_ASSERT(commandBufferCount > 0, "Cannot submit an empty command buffer list!");
+
+		std::vector<VkCommandBufferSubmitInfo> commandBufferInfos;
+		commandBufferInfos.reserve(commandBufferCount);
+
+		VkCommandBuffer* cmdBuffers = static_cast<VkCommandBuffer*>(commandBufferHandles);
+		for (size_t i = 0; i < commandBufferCount; ++i) {
+			VkCommandBuffer commandBuffer = cmdBuffers[i];
+			LUCY_ASSERT(commandBuffer != VK_NULL_HANDLE, "Cannot submit a null command buffer!");
+
+			VkCommandBufferSubmitInfo& commandBufferInfo = commandBufferInfos.emplace_back();
+			commandBufferInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+			commandBufferInfo.commandBuffer = commandBuffer;
+			commandBufferInfo.deviceMask = 0;
+		}
+
+		vkResetFences(m_LogicalDevice, 1, &m_ImmediateSubmitFence);
 
 		VkSubmitInfo submitInfo = VulkanAPI::QueueSubmitInfo(commandBufferCount, (VkCommandBuffer*)&commandBufferHandles, 0, nullptr, nullptr, 0, nullptr);
-		LUCY_VK_ASSERT(vkQueueSubmit(queueHandle, 1, &submitInfo, fenceHandle));
-		LUCY_VK_ASSERT(vkWaitForFences(m_LogicalDevice, 1, &fenceHandle, VK_TRUE, UINT64_MAX));
-	}
-
-	void VulkanRenderDevice::SubmitWorkToGPU(TargetQueueFamily queueFamily, Ref<CommandPool> cmdPool,
-											 Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore, Semaphore* currentFrameSignalSemaphore) {
-		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::SubmitWorkToGPU");
-		LUCY_ASSERT(cmdPool);
-
-		auto commandBuffer = (VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer();
-		switch (queueFamily) {
-			using enum Lucy::TargetQueueFamily;
-			case Graphics: {
-				SubmitWorkToGPU(m_GraphicsQueue, commandBuffer, currentFrameFence, currentFrameWaitSemaphore, currentFrameSignalSemaphore);
-				break;
-			}
-			case Compute: {
-				SubmitWorkToGPU(m_ComputeQueue, commandBuffer, currentFrameFence, currentFrameWaitSemaphore, currentFrameSignalSemaphore);
-				break;
-			}
-			case Transfer: {
-				SubmitWorkToGPU(m_TransferQueue, commandBuffer, currentFrameFence, currentFrameWaitSemaphore, currentFrameSignalSemaphore);
-				break;
-			}
-			default:
-				LUCY_ASSERT(false);
-		}
-	}
-
-	bool VulkanRenderDevice::SubmitWorkToGPU(TargetQueueFamily queueFamily, std::vector<Ref<CommandPool>>& cmdPools, 
-											Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore, Semaphore* currentFrameSignalSemaphore) {
-		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::SubmitWorkToGPU");
-		if (cmdPools.empty())
-			return false;
-
-		std::vector<VkCommandBuffer> cmdBufferHandles;
-		cmdBufferHandles.resize(cmdPools.size(), VK_NULL_HANDLE);
-		for (size_t i = 0; const Ref<CommandPool>& cmdPool : cmdPools)
-			cmdBufferHandles[i++] = (VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer();
-
-		if (cmdBufferHandles.empty())
-			return false;
-
-		switch (queueFamily) {
-			using enum Lucy::TargetQueueFamily;
-			case Graphics: {
-				SubmitWorkToGPU(m_GraphicsQueue, cmdBufferHandles.size(), cmdBufferHandles.data(), currentFrameFence, currentFrameWaitSemaphore, currentFrameSignalSemaphore);
-				break;
-			}
-			case Compute: {
-				SubmitWorkToGPU(m_ComputeQueue, cmdBufferHandles.size(), cmdBufferHandles.data(), currentFrameFence, currentFrameWaitSemaphore, currentFrameSignalSemaphore);
-				break;
-			}
-			case Transfer: {
-				SubmitWorkToGPU(m_TransferQueue, cmdBufferHandles.size(), cmdBufferHandles.data(), currentFrameFence, currentFrameWaitSemaphore, currentFrameSignalSemaphore);
-				break;
-			}
-			default:
-				LUCY_ASSERT(false);
-		}
-
-		return true;
-	}
-
-	void VulkanRenderDevice::SubmitWorkToGPU(TargetQueueFamily queueFamily, std::vector<Ref<CommandPool>>& cmdPools, 
-											Fence* currentFrameFence, Semaphore* currentFrameWaitSemaphore) {
-		SubmitWorkToGPU(queueFamily, cmdPools, currentFrameFence, currentFrameWaitSemaphore, nullptr);
+		LUCY_VK_ASSERT(vkQueueSubmit(queueHandle, 1, &submitInfo, m_ImmediateSubmitFence));
+		LUCY_VK_ASSERT(vkWaitForFences(m_LogicalDevice, 1, &m_ImmediateSubmitFence, VK_TRUE, UINT64_MAX));
 	}
 
 	void VulkanRenderDevice::PrintDeviceInfo() {
@@ -390,95 +565,310 @@ namespace Lucy {
 
 	void VulkanRenderDevice::Destroy() {
 		LUCY_PROFILE_DESTROY();
-		m_ImmediateCommandFence->Destroy(shared_from_this()->As<RenderDevice>());
+		RenderDevice::Destroy();
 
+		auto& scene = GetScene();
+		scene->RTDestroy();
+
+		m_TransientCommandPool->Destroy();
+		m_TransientCommandPoolCompute->Destroy();
+		m_TransientCommandPoolTransfer->Destroy();
+
+		m_DescriptorSetManager->RTDestroy();
+		m_UploadManager->Destroy(m_Allocator);
 		m_Allocator.Destroy();
+		vkDestroyFence(m_LogicalDevice, m_ImmediateSubmitFence, nullptr);
 		vkDestroyDevice(m_LogicalDevice, nullptr);
 	}
 
 	void VulkanRenderDevice::BeginCommandBuffer(Ref<CommandPool> cmdPool) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BeginCommandBuffer");
+
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		LUCY_ASSERT(cmdPool->GetState(frameIndex) == CommandBufferSlotState::Ready, "Current frame-slot command buffer is not ready!");
+
 		auto cmdBufferBeginInfo = VulkanAPI::CommandBufferBeginInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-		vkBeginCommandBuffer((VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer(), &cmdBufferBeginInfo);
+		vkBeginCommandBuffer((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex), &cmdBufferBeginInfo);
+
+		cmdPool->SetState(frameIndex, CommandBufferSlotState::Recording);
 	}
 
 	void VulkanRenderDevice::EndCommandBuffer(Ref<CommandPool> cmdPool) {
-		vkEndCommandBuffer((VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer());
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::EndCommandBuffer");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		LUCY_ASSERT(cmdPool->GetState(frameIndex) == CommandBufferSlotState::Recording, "Current frame-slot command buffer is not recording!");
+
+		vkEndCommandBuffer((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex));
+		cmdPool->SetState(frameIndex, CommandBufferSlotState::Recorded);
 	}
 
-	void VulkanRenderDevice::BindBuffers(Ref<CommandPool> cmdPool, Ref<Mesh> mesh) {
-		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindBuffers");
+	void VulkanRenderDevice::FillBuffer(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset, size_t size, uint32_t value) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::FillBuffer");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		vkCmdFillBuffer((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex), buffer->As<VulkanDeviceAddressBuffer>()->GetVulkanBufferHandle(), offset, size, value);
+	}
 
-		VulkanVertexBindInfo vertexInfo;
-		vertexInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer();
-		AccessResource<VulkanVertexBuffer>(mesh->GetVertexBufferHandle())->RTBind(vertexInfo);
+	void VulkanRenderDevice::CopyBuffer(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> srcBuffer, Ref<RenderDeviceBuffer> dstBuffer, size_t srcOffset, size_t dstOffset, size_t size) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::CopyBuffer");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(cmdPool->GetCommandBuffer(frameIndex));
 
-		VulkanIndexBindInfo indexInfo;
-		indexInfo.CommandBuffer = vertexInfo.CommandBuffer;
-		AccessResource<VulkanIndexBuffer>(mesh->GetIndexBufferHandle())->RTBind(indexInfo);
+		VkBufferCopy copyRegion{};
+		copyRegion.srcOffset = srcOffset;
+		copyRegion.dstOffset = dstOffset;
+		copyRegion.size = size;
+		vkCmdCopyBuffer(commandBuffer, srcBuffer->As<VulkanDeviceAddressBuffer>()->GetVulkanBufferHandle(), 
+			dstBuffer->As<VulkanDeviceAddressBuffer>()->GetVulkanBufferHandle(), 1, &copyRegion);
+	}
+
+	void VulkanRenderDevice::CopyBuffer(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> srcBuffer, Ref<RenderDeviceBuffer> dstBuffer, const std::vector<const void*>& regions) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::CopyBuffer");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(cmdPool->GetCommandBuffer(frameIndex));
+
+		vkCmdCopyBuffer(commandBuffer, srcBuffer->As<VulkanDeviceAddressBuffer>()->GetVulkanBufferHandle(), 
+			dstBuffer->As<VulkanDeviceAddressBuffer>()->GetVulkanBufferHandle(), regions.size(), reinterpret_cast<const VkBufferCopy*>(regions.data()));
 	}
 
 	void VulkanRenderDevice::BindBuffers(Ref<CommandPool> cmdPool, Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindBuffers");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 
 		VulkanVertexBindInfo vertexInfo;
-		vertexInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer();
+		vertexInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
 		vertexBuffer->As<VulkanVertexBuffer>()->RTBind(vertexInfo);
 
 		VulkanIndexBindInfo indexInfo;
 		indexInfo.CommandBuffer = vertexInfo.CommandBuffer;
 		indexBuffer->As<VulkanIndexBuffer>()->RTBind(indexInfo);
 	}
+	
+	void VulkanRenderDevice::BindBuffers(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> indexBuffer) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindBuffers");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		VkCommandBuffer commandBuffer = static_cast<VkCommandBuffer>(cmdPool->GetCommandBuffer(frameIndex));
 
-	void VulkanRenderDevice::BindPushConstant(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline, const VulkanPushConstant& pushConstant) {
-		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindPushConstant | Graphics");
-		pushConstant.RTBind((VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer(), pipeline->As<VulkanGraphicsPipeline>()->GetPipelineLayout());
+		auto vulkanIndexBuffer = indexBuffer->As<VulkanDeviceAddressBuffer>();
+		vkCmdBindIndexBuffer(commandBuffer, vulkanIndexBuffer->GetVulkanBufferHandle(), 0, VK_INDEX_TYPE_UINT32);
 	}
 
-	void VulkanRenderDevice::BindPushConstant(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline, const VulkanPushConstant& pushConstant) {
+	//TODO: Clean this up
+	RenderDeviceTextureHandle VulkanRenderDevice::BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<GraphicsPipeline>& pipeline, const Ref<Image>& image, uint32_t mip) {
+		const auto& descriptorSetHandle = pipeline->As<VulkanGraphicsPipeline>()->GetDescriptorSetHandles()[VulkanDescriptorSetManager::TEXTURE_BINDLESS_TABLE_SET_INDEX];
+		const auto& descriptorSet = AccessResource<VulkanDescriptorSet>(descriptorSetHandle);
+
+		if (auto imageSampler = descriptorSet->GetVulkanImageSampler(imageBufferName)) {
+			const auto& vulkanImage = image->As<VulkanImage>();
+			const auto& imageHandle = image->GetMyHandle();
+			VkImageView imageView = mip == static_cast<uint32_t>(-1) ? vulkanImage->GetImageView().GetVulkanHandle() : vulkanImage->GetImageView().GetMipViewVulkanHandle(mip);
+
+			for (uint32_t index = 0; const auto& slot : imageSampler->Images) {
+				if (!slot.Alive) {
+					index++;
+					continue;
+				}
+
+				if (slot.Data.ImageHandle == imageHandle && slot.Data.Mip == mip) {
+					return RenderDeviceTextureHandle{ .Index = index, .Generation = slot.Generation };
+				}
+
+				index++;
+			}
+
+			RenderDeviceTextureHandle handle = imageSampler->Images.Create(VulkanImageDescriptor{
+				.ImageHandle = imageHandle,
+				.Mip = mip,
+				.ImageInfo = VulkanAPI::DescriptorImageInfo(
+					vulkanImage->GetCurrentLayout(), 
+					imageView, 
+					AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle()
+				)}
+			);
+
+			descriptorSet->RTUpdateImageDescriptors(this, imageBufferName, handle);
+
+			return handle;
+		}
+
+		LUCY_ASSERT(false, "Graphics::BindGlobalImageHandleTo did not work for name: {0}", imageBufferName);
+		return {};
+	}
+	
+	//TODO: Clean this up
+	RenderDeviceTextureHandle VulkanRenderDevice::BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<ComputePipeline>& pipeline, const Ref<Image>& image, uint32_t mip) {
+		const auto& descriptorSetHandle = pipeline->As<VulkanComputePipeline>()->GetDescriptorSetHandles()[VulkanDescriptorSetManager::TEXTURE_BINDLESS_TABLE_SET_INDEX];
+		const auto& descriptorSet = AccessResource<VulkanDescriptorSet>(descriptorSetHandle);
+
+		if (auto imageSampler = descriptorSet->GetVulkanImageSampler(imageBufferName)) {
+			const auto& vulkanImage = image->As<VulkanImage>();
+			const auto& imageHandle = image->GetMyHandle();
+			VkImageView imageView = mip == static_cast<uint32_t>(-1) ? vulkanImage->GetImageView().GetVulkanHandle() : vulkanImage->GetImageView().GetMipViewVulkanHandle(mip);
+
+			for (uint32_t index = 0; const auto& slot : imageSampler->Images) {
+				if (!slot.Alive) {
+					index++;
+					continue;
+				}
+
+				if (slot.Data.ImageHandle == imageHandle && slot.Data.Mip == mip) {
+					return RenderDeviceTextureHandle{ .Index = index, .Generation = slot.Generation };
+				}
+
+				index++;
+			}
+
+			RenderDeviceTextureHandle handle = imageSampler->Images.Create(VulkanImageDescriptor{
+				.ImageHandle = imageHandle,
+				.Mip = mip,
+				.ImageInfo = VulkanAPI::DescriptorImageInfo(
+					vulkanImage->GetCurrentLayout(),
+					imageView,
+					AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle()
+				)}
+			);
+
+			descriptorSet->RTUpdateImageDescriptors(this, imageBufferName, handle);
+
+			return handle;
+		}
+
+		LUCY_ASSERT(false, "Compute::BindGlobalImageHandleTo did not work for name: {0}", imageBufferName);
+		return {};
+	}
+
+	RenderDeviceTextureHandle VulkanRenderDevice::BindGlobalImageHandleTo(const std::string& imageBufferName, const Ref<RayTracingPipeline>& pipeline, const Ref<Image>& image, uint32_t mip) {
+		//TODO: change immediately whenever you have time... its 1 bcs 0 is set 2 (the set for u_TLAS only), 1 is set 0...
+		const auto& descriptorSetHandle = pipeline->As<VulkanRayTracingPipeline>()->GetDescriptorSetHandles()[1];
+		const auto& descriptorSet = AccessResource<VulkanDescriptorSet>(descriptorSetHandle);
+
+		if (auto imageSampler = descriptorSet->GetVulkanImageSampler(imageBufferName)) {
+			const auto& vulkanImage = image->As<VulkanImage>();
+			const auto& imageHandle = image->GetMyHandle();
+			VkImageView imageView = mip == static_cast<uint32_t>(-1) ? vulkanImage->GetImageView().GetVulkanHandle() : vulkanImage->GetImageView().GetMipViewVulkanHandle(mip);
+
+			for (uint32_t index = 0; const auto& slot : imageSampler->Images) {
+				if (!slot.Alive) {
+					index++;
+					continue;
+				}
+
+				if (slot.Data.ImageHandle == imageHandle && slot.Data.Mip == mip) {
+					return RenderDeviceTextureHandle{ .Index = index, .Generation = slot.Generation };
+				}
+
+				index++;
+			}
+
+			RenderDeviceTextureHandle handle = imageSampler->Images.Create(VulkanImageDescriptor{
+				.ImageHandle = imageHandle,
+				.Mip = mip,
+				.ImageInfo = VulkanAPI::DescriptorImageInfo(
+					vulkanImage->GetCurrentLayout(),
+					imageView,
+					AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle()
+				)}
+			);
+
+			descriptorSet->RTUpdateImageDescriptors(this, imageBufferName, handle);
+
+			return handle;
+		}
+
+		LUCY_ASSERT(false, "RayTracing::BindGlobalImageHandleTo did not work for name: {0}", imageBufferName);
+		return {};
+	}
+	
+	void VulkanRenderDevice::BindPushConstant(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline, const PipelineConstant& pushConstant) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindPushConstant | Graphics");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		pushConstant.RTBind((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex), pipeline->As<VulkanGraphicsPipeline>()->GetPipelineLayout());
+	}
+
+	void VulkanRenderDevice::BindPushConstant(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline, const PipelineConstant& pushConstant) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindPushConstant | Compute");
-		pushConstant.RTBind((VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer(), pipeline->As<VulkanComputePipeline>()->GetPipelineLayout());
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		pushConstant.RTBind((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex), pipeline->As<VulkanComputePipeline>()->GetPipelineLayout());
+	}
+	
+	void VulkanRenderDevice::BindPushConstant(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline, const PipelineConstant& pushConstant) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindPushConstant | RayTracing");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		pushConstant.RTBind((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex), pipeline->As<VulkanRayTracingPipeline>()->GetPipelineLayout());
 	}
 
 	void VulkanRenderDevice::BindPipeline(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindPipeline | Graphics");
-		pipeline->RTBind(cmdPool->GetCurrentFrameCommandBuffer());
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		pipeline->RTBind(cmdPool->GetCommandBuffer(frameIndex));
 	}
 
 	void VulkanRenderDevice::BindPipeline(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindPipeline | Compute");
-		pipeline->RTBind(cmdPool->GetCurrentFrameCommandBuffer());
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		pipeline->RTBind(cmdPool->GetCommandBuffer(frameIndex));
+	}
+	
+	void VulkanRenderDevice::BindPipeline(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindPipeline | RayTracing");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		pipeline->RTBind(cmdPool->GetCommandBuffer(frameIndex));
+	}
+
+	void VulkanRenderDevice::TraceRays(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline, uint32_t width, uint32_t height, uint32_t depth) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::TraceRays");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		pipeline->RTTrace(cmdPool->GetCommandBuffer(frameIndex), width, height, depth);
 	}
 
 	void VulkanRenderDevice::UpdateDescriptorSets(Ref<GraphicsPipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::UpdateDescriptorSets | Graphics");
 		const auto& castedPipeline = pipeline->As<VulkanGraphicsPipeline>();
-		
-		for (auto handle : castedPipeline->GetShader()->GetDescriptorSetHandles()) {
+		const auto& descriptorSetHandles = castedPipeline->GetDescriptorSetHandles();
+
+		for (auto handle : descriptorSetHandles) {
 			Ref<VulkanDescriptorSet> vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
-			vulkanSet->RTUpdate();
+			vulkanSet->RTUpdate(this);
 		}
 	}
 	
 	void VulkanRenderDevice::UpdateDescriptorSets(Ref<ComputePipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::UpdateDescriptorSets | Compute");
 		const auto& castedPipeline = pipeline->As<VulkanComputePipeline>();
+		const auto& descriptorSetHandles = castedPipeline->GetDescriptorSetHandles();
 
-		for (auto handle : castedPipeline->GetShader()->GetDescriptorSetHandles()) {
+		for (auto handle : descriptorSetHandles) {
 			Ref<VulkanDescriptorSet> vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
-			vulkanSet->RTUpdate();
+			vulkanSet->RTUpdate(this);
 		}
+	}
+	
+	void VulkanRenderDevice::UpdateDescriptorSets(Ref<RayTracingPipeline> pipeline, const std::string& name, const Ref<AccelerationStructure>& accelerationStructure) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::UpdateDescriptorSets | RayTracing");
+		const auto& castedPipeline = pipeline->As<VulkanRayTracingPipeline>();
+		const auto& descriptorSetHandles = castedPipeline->GetDescriptorSetHandles();
+
+		for (const auto& handle : descriptorSetHandles) {
+			const auto& descriptorSet = AccessResource<VulkanDescriptorSet>(handle);
+			if (!descriptorSet->HasAccelerationStructureBinding(name))
+				continue;
+			descriptorSet->RTUpdateAccelerationStructure(this, name, accelerationStructure);
+			return;
+		}
+		LUCY_ASSERT(false, "Acceleration structure binding '{0}' does not exist", name);
 	}
 
 	void VulkanRenderDevice::BindAllDescriptorSets(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindAllDescriptorSets | Graphics");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 		const auto& castedPipeline = pipeline->As<VulkanGraphicsPipeline>();
+		const auto& descriptorSetHandles = castedPipeline->GetDescriptorSetHandles();
 
 		VulkanDescriptorSetBindInfo bindInfo;
-		bindInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer();
+		bindInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
 		bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		bindInfo.PipelineLayout = castedPipeline->GetPipelineLayout();
 
-		for (auto handle : castedPipeline->GetShader()->GetDescriptorSetHandles()) {
+		for (auto handle : descriptorSetHandles) {
 			Ref<VulkanDescriptorSet> vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
 			vulkanSet->RTBind(bindInfo);
 		}
@@ -486,14 +876,16 @@ namespace Lucy {
 
 	void VulkanRenderDevice::BindDescriptorSet(Ref<CommandPool> cmdPool, Ref<GraphicsPipeline> pipeline, uint32_t setIndex) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindDescriptorSet | Graphics");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 		const auto& castedPipeline = pipeline->As<VulkanGraphicsPipeline>();
+		const auto& descriptorSetHandles = castedPipeline->GetDescriptorSetHandles();
 
 		VulkanDescriptorSetBindInfo bindInfo;
-		bindInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer();
+		bindInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
 		bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		bindInfo.PipelineLayout = castedPipeline->GetPipelineLayout();
 
-		for (auto handle : castedPipeline->GetShader()->GetDescriptorSetHandles()) {
+		for (auto handle : descriptorSetHandles) {
 			const auto& vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
 			if (vulkanSet->GetSetIndex() == setIndex) {
 				vulkanSet->RTBind(bindInfo);
@@ -501,17 +893,19 @@ namespace Lucy {
 			}
 		}
 	}
-	
+
 	void VulkanRenderDevice::BindAllDescriptorSets(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindAllDescriptorSets | Compute");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 		const auto& castedPipeline = pipeline->As<VulkanComputePipeline>();
+		const auto& descriptorSetHandles = castedPipeline->GetDescriptorSetHandles();
 
 		VulkanDescriptorSetBindInfo bindInfo;
-		bindInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer();
+		bindInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
 		bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
 		bindInfo.PipelineLayout = castedPipeline->GetPipelineLayout();
 
-		for (auto handle : castedPipeline->GetShader()->GetDescriptorSetHandles()) {
+		for (auto handle : descriptorSetHandles) {
 			const auto& vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
 			vulkanSet->RTBind(bindInfo);
 		}
@@ -519,14 +913,16 @@ namespace Lucy {
 
 	void VulkanRenderDevice::BindDescriptorSet(Ref<CommandPool> cmdPool, Ref<ComputePipeline> pipeline, uint32_t setIndex) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindDescriptorSet | Compute");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 		const auto& castedPipeline = pipeline->As<VulkanComputePipeline>();
+		const auto& descriptorSetHandles = castedPipeline->GetDescriptorSetHandles();
 
 		VulkanDescriptorSetBindInfo bindInfo;
-		bindInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer();
+		bindInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
 		bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
 		bindInfo.PipelineLayout = castedPipeline->GetPipelineLayout();
 
-		for (auto handle : castedPipeline->GetShader()->GetDescriptorSetHandles()) {
+		for (auto handle : descriptorSetHandles) {
 			const auto& vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
 			if (vulkanSet->GetSetIndex() == setIndex) {
 				vulkanSet->RTBind(bindInfo);
@@ -535,27 +931,82 @@ namespace Lucy {
 		}
 	}
 
+	void VulkanRenderDevice::BindAllDescriptorSets(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindAllDescriptorSets | RayTracing");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		const auto& castedPipeline = pipeline->As<VulkanRayTracingPipeline>();
+		const auto& descriptorSetHandles = castedPipeline->GetDescriptorSetHandles();
+
+		VulkanDescriptorSetBindInfo bindInfo;
+		bindInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
+		bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
+		bindInfo.PipelineLayout = castedPipeline->GetPipelineLayout();
+
+		for (auto handle : descriptorSetHandles) {
+			const auto& vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
+			vulkanSet->RTBind(bindInfo);
+		}
+	}
+
+	void VulkanRenderDevice::BindDescriptorSet(Ref<CommandPool> cmdPool, Ref<RayTracingPipeline> pipeline, uint32_t setIndex) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BindDescriptorSet | RayTracing");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		const auto& castedPipeline = pipeline->As<VulkanRayTracingPipeline>();
+		const auto& descriptorSetHandles = castedPipeline->GetDescriptorSetHandles();
+
+		VulkanDescriptorSetBindInfo bindInfo;
+		bindInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
+		bindInfo.PipelineBindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
+		bindInfo.PipelineLayout = castedPipeline->GetPipelineLayout();
+
+		for (auto handle : descriptorSetHandles) {
+			const auto& vulkanSet = AccessResource<VulkanDescriptorSet>(handle);
+			if (vulkanSet->GetSetIndex() == setIndex) {
+				vulkanSet->RTBind(bindInfo);
+				break;
+			}
+		}
+	}
+
+	void VulkanRenderDevice::DrawIndexedIndirectCount(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset, Ref<RenderDeviceBuffer> countBuffer, size_t countBufferOffset, uint32_t maxDrawCount, uint32_t stride) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::DrawIndexedIndirectCount");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		vkCmdDrawIndexedIndirectCount((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex), buffer->As<VulkanDeviceAddressBuffer>()->GetVulkanBufferHandle(), offset, 
+			countBuffer->As<VulkanDeviceAddressBuffer>()->GetVulkanBufferHandle(), countBufferOffset, maxDrawCount, stride);
+	}
+
 	void VulkanRenderDevice::DrawIndexed(Ref<CommandPool> cmdPool, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {
-		vkCmdDrawIndexed((VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer(), indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::DrawIndexed");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		vkCmdDrawIndexed((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex), indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 	}
 
 	void VulkanRenderDevice::DispatchCompute(Ref<CommandPool> cmdPool, Ref<ComputePipeline> computePipeline, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) {
-		computePipeline->As<VulkanComputePipeline>()->RTDispatch(cmdPool->GetCurrentFrameCommandBuffer(), groupCountX, groupCountY, groupCountZ);
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::DispatchCompute");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		computePipeline->As<VulkanComputePipeline>()->RTDispatch(cmdPool->GetCommandBuffer(frameIndex), groupCountX, groupCountY, groupCountZ);
+	}
+
+	void VulkanRenderDevice::DispatchComputeIndirect(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::DispatchComputeIndirect");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		vkCmdDispatchIndirect((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex), buffer->As<VulkanDeviceAddressBuffer>()->GetVulkanBufferHandle(), offset);
 	}
 
 	void VulkanRenderDevice::BeginRenderPass(Ref<RenderPass> renderPass, Ref<FrameBuffer> frameBuffer, Ref<CommandPool> cmdPool) {
 		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::BeginRenderPass");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 
 		Ref<VulkanRenderPass> vulkanRenderPass = renderPass->As<VulkanRenderPass>();
 		Ref<VulkanFrameBuffer> vulkanFrameBuffer = frameBuffer->As<VulkanFrameBuffer>();
 
 		VulkanRenderPassBeginInfo renderPassBeginInfo;
-		renderPassBeginInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer();
+		renderPassBeginInfo.CommandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
 		renderPassBeginInfo.Width = frameBuffer->GetWidth();
 		renderPassBeginInfo.Height = frameBuffer->GetHeight();
 
 		if (vulkanFrameBuffer->IsInFlight())
-			renderPassBeginInfo.VulkanFrameBuffer = vulkanFrameBuffer->GetVulkanHandles()[Renderer::GetCurrentFrameIndex()];
+			renderPassBeginInfo.VulkanFrameBuffer = vulkanFrameBuffer->GetVulkanHandles()[frameIndex];
 		else
 			renderPassBeginInfo.VulkanFrameBuffer = vulkanFrameBuffer->GetVulkanHandles()[0];
 
@@ -568,26 +1019,51 @@ namespace Lucy {
 	}
 
 	void VulkanRenderDevice::BeginDebugMarker(Ref<CommandPool> cmdPool, const char* labelName) {
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 #if LUCY_DEBUG
 		VkDebugUtilsLabelEXT labelInfo{};
 		labelInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
 		labelInfo.pLabelName = labelName;
-		VulkanExternalFuncLinkage::vkCmdBeginDebugUtilsLabelEXT((VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer(), &labelInfo);
+		VulkanExternalFuncLinkage::vkCmdBeginDebugUtilsLabelEXT((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex), &labelInfo);
+#endif
+	}
+
+	void VulkanRenderDevice::BeginDebugMarker(VkCommandBuffer commandBuffer, const char* labelName) {
+#if LUCY_DEBUG
+		VkDebugUtilsLabelEXT labelInfo{};
+		labelInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+		labelInfo.pLabelName = labelName;
+		VulkanExternalFuncLinkage::vkCmdBeginDebugUtilsLabelEXT(commandBuffer, &labelInfo);
 #endif
 	}
 
 	void VulkanRenderDevice::EndDebugMarker(Ref<CommandPool> cmdPool) {
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
 #if LUCY_DEBUG
-		VulkanExternalFuncLinkage::vkCmdEndDebugUtilsLabelEXT((VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer());
+		VulkanExternalFuncLinkage::vkCmdEndDebugUtilsLabelEXT((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex));
 #endif
 	}
 
-	void VulkanRenderDevice::SubmitImmediateCommand(const std::function<void(VkCommandBuffer)>& func, const Ref<VulkanTransientCommandPool>& cmdPool) {
-		VkCommandBuffer commandBuffer = cmdPool->BeginSingleTimeCommand(m_LogicalDevice);
-		func(commandBuffer);
-		cmdPool->EndSingleTimeCommand();
+	void VulkanRenderDevice::EndDebugMarker(VkCommandBuffer commandBuffer) {
+#if LUCY_DEBUG
+		VulkanExternalFuncLinkage::vkCmdEndDebugUtilsLabelEXT(commandBuffer);
+#endif
+	}
 
-		SubmitWorkToGPU(m_GraphicsQueue, 1, cmdPool->GetTransientCommandBuffer());
+	void VulkanRenderDevice::RegisterShaderBindings(const Ref<Shader>& shader) {
+		m_DescriptorSetManager->RegisterShaderBindings(shader);
+	}
+
+	void VulkanRenderDevice::SubmitImmediateCommand(const std::function<void(VkCommandBuffer)>& func, TargetQueueFamily family) {
+		const auto& transientCommandPool = family == TargetQueueFamily::Graphics ? m_TransientCommandPool : family == TargetQueueFamily::Compute ? m_TransientCommandPoolCompute : m_TransientCommandPoolTransfer;
+		VkQueue queue = family == TargetQueueFamily::Graphics ? m_GraphicsQueue : family == TargetQueueFamily::Compute ? m_ComputeQueue : m_TransferQueue;
+
+		VkCommandBuffer commandBuffer = transientCommandPool->BeginSingleTimeCommand(m_LogicalDevice);
+		func(commandBuffer);
+		transientCommandPool->EndSingleTimeCommand();
+
+		SubmitWorkToGPUImmediate(queue, 1, transientCommandPool->GetTransientCommandBuffer());
+		transientCommandPool->FreeSingleTimeCommand(m_LogicalDevice);
 	}
 
 	void VulkanRenderDevice::WaitForDevice() {
@@ -599,19 +1075,26 @@ namespace Lucy {
 		switch (queueFamily) {
 			using enum Lucy::TargetQueueFamily;
 			case Graphics: {
+				LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::WaitForQueue::Graphics");
 				LUCY_VK_ASSERT(vkQueueWaitIdle(m_GraphicsQueue));
 				break;
 			}
 			case Compute: {
+				LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::WaitForQueue::Compute");
 				LUCY_VK_ASSERT(vkQueueWaitIdle(m_ComputeQueue));
 				break;
 			}
 			case Transfer: {
+				LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::WaitForQueue::Transfer");
 				LUCY_VK_ASSERT(vkQueueWaitIdle(m_TransferQueue));
 				break;
 			}
 			default:
 				LUCY_ASSERT(false);
 		}
+	}
+
+	std::vector<RenderDeviceResourceHandle> VulkanRenderDevice::GetResourceBindingHandles(const Ref<Shader>& shader) const {
+		return m_DescriptorSetManager->GetDescriptorSetHandles(shader);
 	}
 }

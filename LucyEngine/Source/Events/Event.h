@@ -23,6 +23,11 @@ namespace Lucy {
 		}
 		virtual ~Event() = default;
 
+		Event(const Event&) = delete;
+		Event& operator=(const Event&) = delete;
+		Event(Event&&) = delete;
+		Event& operator=(Event&&) = delete;
+
 		inline EventType GetEventType() const { return m_EventType; }
 	private:
 		EventType m_EventType = EventType::Unknown;

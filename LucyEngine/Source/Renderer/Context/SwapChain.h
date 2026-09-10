@@ -2,7 +2,11 @@
 
 #include "Renderer/Memory/Memory.h"
 
+#include "Renderer/RendererConfiguration.h"
+
 namespace Lucy {
+
+	class Semaphore;
 
 	class Window;
 	class RenderDevice;
@@ -16,8 +20,8 @@ namespace Lucy {
 
 		virtual void Init() = 0;
 		virtual void Recreate() = 0;
-		virtual RenderContextResultCodes AcquireNextImage(const Semaphore& currentFrameImageAvailSemaphore, uint32_t& imageIndex) = 0;
-		virtual RenderContextResultCodes Present(const Semaphore& signalSemaphore, uint32_t& imageIndex) = 0;
+		virtual RenderContextResultCodes AcquireNextImage(Semaphore* currentFrameImageAvailSemaphore, uint32_t& imageIndex) = 0;
+		virtual RenderContextResultCodes Present(Semaphore* signalSemaphore, uint32_t& imageIndex) = 0;
 
 		virtual void Destroy() = 0;
 

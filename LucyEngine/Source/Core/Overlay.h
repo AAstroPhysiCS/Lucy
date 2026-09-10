@@ -4,7 +4,9 @@ namespace Lucy {
 
 	class RenderPipeline;
 	class Scene;
+
 	class Window;
+	struct Event;
 
 	class Overlay {
 	public:
@@ -12,6 +14,11 @@ namespace Lucy {
 			: m_Scene(scene) {
 		}
 		virtual ~Overlay() = default;
+
+		Overlay(const Overlay&) = delete;
+		Overlay& operator=(const Overlay&) = delete;
+		Overlay(Overlay&&) = delete;
+		Overlay& operator=(Overlay&&) = delete;
 
 		inline void SetRenderPipeline(Ref<RenderPipeline> renderPipeline) { m_RenderPipeline = renderPipeline; }
 

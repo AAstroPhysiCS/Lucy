@@ -7,6 +7,9 @@ namespace Lucy {
 		using VecIterator = typename std::vector<T>::iterator;
 	public:
 		Buffer() = default;
+		Buffer(T* data, size_t size) {
+			SetData(data, size);
+		}
 
 		virtual ~Buffer() {
 			Clear();
@@ -16,10 +19,22 @@ namespace Lucy {
 			std::copy(other.m_Data.begin(), other.m_Data.end(), std::back_inserter(m_Data));
 		}
 
-		Buffer& operator=(const Buffer& other) { 
-			if (this != &other) {
+		Buffer(Buffer&& other) noexcept {
+			m_Data = std::move(other.m_Data);
+		}
+
+		Buffer& operator=(const Buffer& other) {
+			if (this != std::addressof(other)) {
 				Clear();
 				std::copy(other.m_Data.begin(), other.m_Data.end(), std::back_inserter(m_Data));
+			}
+			return *this;
+		}
+
+		Buffer& operator=(Buffer&& other) noexcept {
+			if (this != std::addressof(other)) {
+				Clear();
+				m_Data = std::move(other.m_Data);
 			}
 			return *this;
 		}
@@ -35,6 +50,7 @@ namespace Lucy {
 		}
 
 		void Resize(size_t size) {
+			LUCY_PROFILE_NEW_EVENT("Buffer::Resize");
 			m_Data.resize(size);
 		}
 
@@ -54,15 +70,19 @@ namespace Lucy {
 		}
 
 		void SetData(T* data, size_t size) {
+			LUCY_PROFILE_NEW_EVENT("Buffer::SetData");
 			Resize(size);
 			memcpy(m_Data.data(), data, size);
 		}
 
 		void SetData(const Buffer<T>& other) {
+			LUCY_PROFILE_NEW_EVENT("Buffer::SetData");
 			SetData(other.m_Data);
 		}
 
-		inline T* operator&() const { return m_Data.data(); }
+		inline T* operator&() { return m_Data.data(); }
+
+		inline const T* operator&() const { return m_Data.data(); }
 
 		inline void Append(const std::vector<T>& data) {
 			m_Data.insert(m_Data.end(), data.begin(), data.end());
@@ -73,6 +93,11 @@ namespace Lucy {
 		}
 
 		inline void Append(T* data, size_t size) {
+			InsertPadding(alignof(T));
+			m_Data.insert(m_Data.end(), data, data + size);
+		}
+		
+		inline void Append(const T* data, size_t size) {
 			InsertPadding(alignof(T));
 			m_Data.insert(m_Data.end(), data, data + size);
 		}
@@ -94,7 +119,6 @@ namespace Lucy {
 		inline size_t GetCapacity() const { return m_Data.capacity(); }
 	protected:
 		std::vector<T> m_Data;
-
 	private:
 		inline void InsertPadding(size_t alignment) {
 			size_t offset = m_Data.size();

@@ -8,6 +8,7 @@
 namespace Lucy {
 
 	class Entity;
+	struct Event;
 
 	template <typename TComponent>
 	concept IsComponent = requires(TComponent&& component) {
@@ -19,16 +20,24 @@ namespace Lucy {
 		Scene() = default;
 		~Scene() = default;
 
+		Scene(const Scene&) = delete;
+		Scene& operator=(const Scene&) = delete;
+		Scene(Scene&&) = delete;
+		Scene& operator=(Scene&&) = delete;
+
 		Entity CreateMesh(std::string& path);
 		Entity CreateMesh();
 		Entity CreateEntity();
 		void RemoveEntity(Entity& e);
-		Entity GetEntityByMeshID(const glm::vec3& meshID);
+		Entity GetEntityByMeshID(uint32_t meshID);
 
-		inline EditorCamera& GetEditorCamera() { return m_Camera; }
+		void SetEntityContext(Entity e);
+		Entity GetEntityContext();
+
+		EditorCamera& GetEditorCamera() { return m_Camera; }
 
 		void OnEvent(Event& e);
-		void Update();
+		void Update(float deltaTime);
 		void Destroy();
 
 		template <typename ... TComponents>
@@ -70,7 +79,8 @@ namespace Lucy {
 		void UpdateCamera(int32_t viewportWidth, int32_t viewportHeight);
 
 		entt::registry m_Registry;
-		EditorCamera m_Camera { 0.25f, 250.0f, 90.0f };
+		EditorCamera m_Camera { 0.01f, 1000.0f, 90.0f };
+		entt::entity m_EntityContext = static_cast<entt::entity>(std::numeric_limits<uint32_t>::max());
 
 		friend class Entity;
 	};

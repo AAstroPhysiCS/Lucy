@@ -1,24 +1,30 @@
 #pragma once
 
-#include "Renderer/RendererBackend.h"
+#include "RendererBackend.h"
+
+#include "Shader/ShaderManager.h"
+
+#include "RendererConfiguration.h"
 
 #include "Pipeline/PipelineManager.h"
 #include "Material/MaterialManager.h"
 
-#include "Device/RenderDeviceResourceManager.h"
 #include "Device/RenderDevice.h"
+#include "Device/RenderDeviceHandles.h"
 
-#include "Image/Image.h"
-#include "Memory/Buffer/IndexBuffer.h"
-#include "Renderer/Mesh.h"
+#include "RenderGraph/RenderGraphRegistry.h"
 
 namespace Lucy {
 
+	class MaterialManager;
+
+	class RenderThread;
 	class RenderPipeline;
+
+	class Mesh;
 
 	class RenderGraphPass;
 	class RenderGraphResource;
-
 	class RenderGraph;
 
 	template <typename TRendererPass>
@@ -27,71 +33,81 @@ namespace Lucy {
 	};
 
 	struct RenderFrameHandles {
-		RenderResourceHandle RenderPassHandle;
-		RenderResourceHandle FrameBufferHandle;
+		RenderDeviceResourceHandle RenderPassHandle{};
+		RenderDeviceResourceHandle FrameBufferHandle{};
 	};
 
 	class Renderer final {
-	public:
+	private:
 		Renderer() = delete;
 		~Renderer() = delete;
 
+		Renderer(const Renderer&) = delete;
+		Renderer& operator=(const Renderer&) = delete;
+		Renderer(Renderer&&) = delete;
+		Renderer& operator=(Renderer&&) = delete;
+	public:
 #pragma region RenderGraph
 		static void ExecuteRenderGraph();
 		static void CompileRenderGraph();
 		static void Flush();
 
-		static void ImportExternalRenderGraphResource(const RenderGraphResource& renderGraphResource, RenderResourceHandle renderResourceHandle);
-		static void ImportExternalRenderGraphTransientResource(const RenderGraphResource& renderGraphResource, RenderResourceHandle renderResourceHandle);
+		static void ImportExternalRenderGraphResource(const RenderGraphResource& renderGraphResource, RenderDeviceResourceHandle renderResourceHandle, RGResourceData data = {});
+		static void ImportExternalRenderGraphResource(const RenderGraphResource& renderGraphResource, 
+			const std::vector<RenderDeviceResourceHandle>& renderResourceHandles, RGResourceData data = {});
+		static void ImportExternalRenderGraphTransientResource(const RenderGraphResource& renderGraphResource, RenderDeviceResourceHandle renderResourceHandle);
 	public:
 		template <typename TRendererPass, typename ... TArgs> requires IsRendererPass<TRendererPass>
-		static inline void AddRendererPass(TArgs ... args) {
+		static void AddRendererPass(TArgs ... args) {
 			TRendererPass rendererPass(args...);
 			rendererPass.AddPass(s_RenderGraph);
 		}
 
-		static Ref<Image> GetOutputOfPass(const char* name);
+		static Ref<Image> GetFrameBufferOutputOfPass(const char* name);
 #pragma endregion RenderGraph
 
 #pragma region RenderDevice
 		template <typename TResource> requires IsRenderResource<TResource>
-		static inline Ref<TResource> AccessResource(RenderResourceHandle handle) {
-			if (handle == InvalidRenderResourceHandle)
+		static Ref<TResource> AccessResource(RenderDeviceResourceHandle handle) {
+			if (!handle)
 				return nullptr;
 			auto& device = GetRenderDevice();
 			return device->AccessResource<TResource>(handle);
 		}
 
-		static void RTDirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size);
 		static void SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func);
 
 		static void EnqueueToRenderCommandQueue(RenderCommandFunc&& func);
-		static void EnqueueResourceDestroy(RenderResourceHandle& handle);
+		static void EnqueueResourceDestroy(RenderDeviceResourceHandle& handle);
+		static void EnqueueResourceDestroy(RenderDeletionFunc&& func);
+		static void EnqueueResourceRecreate(RenderRecreateFunc&& func);
 #pragma endregion RenderDevice
 		static void InitializeImGui();
-		static void RenderImGui();
 
-		static bool IsValidRenderResource(RenderResourceHandle handle);
+		static bool IsValidRenderResource(RenderDeviceResourceHandle handle);
 
-		static inline uint32_t GetCurrentImageIndex() { return s_Backend->GetCurrentImageIndex(); }
-		static inline uint32_t GetCurrentFrameIndex() { return s_Backend->GetCurrentFrameIndex(); }
-		static inline uint32_t GetMaxFramesInFlight() { return s_Backend->GetMaxFramesInFlight(); }
+		static uint32_t GetCurrentImageIndex() { return s_Backend->GetCurrentImageIndex(); }
+		static uint32_t GetCurrentFrameIndex() { return s_Backend->GetCurrentFrameIndex(); }
+		static uint32_t GetMaxFramesInFlight() { return s_Backend->GetMaxFramesInFlight(); }
+		static uint64_t GetFrameNumber() { return s_Backend->GetFrameNumber(); }
 
-		static inline const RenderCommandQueueMetricsOutput& GetCommandQueueMetrics() { return s_Backend->GetCommandQueueMetrics(); }
+		static const RenderCommandQueueMetricsOutput& GetCommandQueueMetrics() { return s_Backend->GetCommandQueueMetrics(); }
 
 		static void ReloadShader(const std::string& name);
-		static inline const Ref<Shader>& GetShader(const std::string& name) { return s_Shaders[name]; }
-		static inline const std::unordered_map<std::string, Ref<Shader>>& GetAllShaders() { return s_Shaders; }
+		static const ShaderLibrary& GetShaderLibrary() { return s_ShaderManager.GetShaderLibrary(); }
 
-		static inline Unique<PipelineManager>& GetPipelineManager() { return s_PipelineManager; }
-		static inline Unique<MaterialManager>& GetMaterialManager() { return s_MaterialManager; }
+		static Unique<PipelineManager>& GetPipelineManager() { return s_PipelineManager; }
+		static Unique<MaterialManager>& GetMaterialManager();
 
-		static inline RenderArchitecture GetRenderArchitecture() { return s_Config.RenderArchitecture; }
+		static RenderArchitecture GetRenderArchitecture() { return s_Config.RenderArchitecture; }
+		static RendererSettings& GetRendererSettings() { return s_Config.Settings; }
 
-		static inline RenderResourceHandle GetBlankCubeImageHandle() { return s_BlankCubeHandle; }
-		static inline Ref<Image> GetBlankCubeImage() { return GetRenderDevice()->AccessResource<Image>(s_BlankCubeHandle); }
-		static inline const Ref<Mesh>& GetEnvCubeMesh() { return s_CubeMesh; }
-		static inline uint32_t GetEnvCubeMeshIndexCount() { return (uint32_t)GetRenderDevice()->AccessResource<IndexBuffer>(s_CubeMesh->GetIndexBufferHandle())->GetSize(); }
+		static RenderDeviceResourceHandle GetBlankCubeImageHandle() { return s_BlankCubeHandle; }
+		static Ref<Image> GetBlankCubeImage();
+		static Ref<Image> GetBlankArrayImage();
+
+		static const Unique<Mesh>& GetEnvCubeMesh() { return s_CubeMesh; }
+		static uint32_t GetEnvCubeMeshIndexCount();
 
 		static RenderContextResultCodes WaitAndPresent();
 
@@ -102,39 +118,37 @@ namespace Lucy {
 
 		static void OnEvent(Event& evt);
 	private:
-		static inline const Ref<RenderContext>& GetRenderContext() { return s_Backend->GetRenderContext(); }
-		static inline const Ref<RenderDevice>& GetRenderDevice() { return s_Backend->GetRenderDevice(); }
+		static const Ref<RenderContext>& GetRenderContext() { return s_Backend->GetRenderContext(); }
+		static const Ref<RenderDevice>& GetRenderDevice() { return s_Backend->GetRenderDevice(); }
 
 		static void Init(RendererConfiguration config, const Ref<Window>& window);
 		static void Destroy();
 
-		static void SubmitToRender(RenderGraphPass& pass);
+		static void SubmitToRender(std::vector<ExecutionBatch>& batches);
 
 		static void OnWindowResize();
 		static void OnViewportResize();
-		static glm::vec3 OnMousePicking(const EntityPickedEvent& e);
+		static uint32_t OnMousePicking(const EntityPickedEvent& e);
 
-		static void PushShader(Ref<Shader> shader);
 		static void DestroyAllShaders();
 
 		static inline RendererConfiguration s_Config;
 		static inline RenderThread* s_RenderThread = nullptr;
 		static inline Ref<RendererBackend> s_Backend = nullptr;
 		static inline Ref<RenderGraph> s_RenderGraph = nullptr;
-			
+
+		static inline ShaderManager s_ShaderManager;
+
 		static inline std::unordered_map<std::string, RenderFrameHandles> s_RenderFrameHandleMap;
 
-		static inline Unique<PipelineManager> s_PipelineManager;
-		static inline Unique<MaterialManager> s_MaterialManager;
+		static inline Unique<PipelineManager> s_PipelineManager = nullptr;
+		static inline Unique<MaterialManager> s_MaterialManager = nullptr;
 
-		static inline std::unordered_map<std::string, Ref<Shader>> s_Shaders;
-
-		static inline RenderResourceHandle s_BlankCubeHandle = InvalidRenderResourceHandle;
-		static inline Ref<Mesh> s_CubeMesh = nullptr;
+		static inline RenderDeviceResourceHandle s_BlankCubeHandle{};
+		static inline RenderDeviceResourceHandle s_BlankArrayHandle{};
+		static inline Unique<Mesh> s_CubeMesh = nullptr;
 
 		friend class Application; //for Init etc.
-		friend class RenderGraph; //for CreateImage etc.
-
-		friend class CustomShaderIncluder; //for ShaderIncluder
+		friend class MaterialManager; //for creating materials TODO: change this
 	};
 }

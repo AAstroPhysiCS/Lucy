@@ -1,10 +1,67 @@
 #pragma once
 
-#include "Scene/Scene.h"
+#include "Scene/Camera.h"
 
-#include "RenderGraph/RenderGraph.h"
+#include "Memory/Buffer/RenderDeviceBuffer.h"
+#include "Device/RenderDeviceHandles.h"
+#include "Device/RenderDeviceSceneData.h"
 
 namespace Lucy {
+
+	class Scene;
+	class RenderGraph;
+	class RenderGraphRegistry;
+
+#pragma region GPUDrivenRendererPasses
+
+	enum RenderBin : uint32_t {
+		Opaque = 0,
+		OpaqueDoubleSided, //TODO:
+		AlphaTest, //TODO:
+		AlphaTestDoubleSided, //TODO:
+		Count
+	};
+
+	struct RenderDeviceGPUCullData {
+		RenderDeviceBufferReference VisibleObjects = 0;
+		RenderDeviceBufferReference VisibleObjectCount = 0;
+		
+		RenderDeviceBufferReference VisibleSubmeshes = 0;
+		RenderDeviceBufferReference VisibleSubmeshCount = 0;
+
+		RenderDeviceBufferReference SubmeshDispatchIndirect = 0;
+		RenderDeviceBufferReference MeshletDispatchIndirect = 0;
+
+		RenderDeviceBufferReference VisibleDraws = 0;
+		RenderDeviceBufferReference IndirectCommands = 0;
+		RenderDeviceBufferReference DrawCounts = 0;
+
+		uint32_t ObjectCapacity = 0;
+		uint32_t SubmeshCapacity = 0;
+		uint32_t CommandCapacityPerBin = 0;
+		uint32_t ViewIndex = 0;
+		uint32_t RenderBinCount = RenderBin::Count;
+	};
+
+	struct GPUDrivenRendererPass final {
+		GPUDrivenRendererPass(Ref<RenderDevice> device);
+		~GPUDrivenRendererPass() = default;
+
+		void AddPass(const Ref<RenderGraph>& renderGraph);
+	private:
+		static void AddHiZPass(const Ref<RenderGraph>& renderGraph);
+		static void AddSubmeshDispatchBuildPass(const Ref<RenderGraph>& renderGraph);
+		static void AddSubmeshCullPass(const Ref<RenderGraph>& renderGraph);
+		static void AddMeshletDispatchBuildPass(const Ref<RenderGraph>& renderGraph);
+		static void AddObjectCullPass(const Ref<RenderGraph>& renderGraph);
+		static void AddMeshletCullPass(const Ref<RenderGraph>& renderGraph);
+
+		static GlobalPushConstant<RenderDeviceGPUCullData> CreateGPUCullPushConstant(const RenderGraphRegistry& registry, uint32_t viewIndex, uint32_t frameIndex);
+
+		static inline std::vector<GlobalPushConstant<RenderDeviceGPUCullData>> s_GPUCullPushConstants;
+	};
+
+#pragma endregion GPUDrivenRendererPasses
 
 #pragma region GeometryPass
 
@@ -31,8 +88,12 @@ namespace Lucy {
 
 		inline float GetCascadeSplitDepth() const { return m_CascadeSplitDepth; }
 
-		inline static constexpr float GetNearPlaneFactor() { return s_NearPlaneFactor; }
-		inline static constexpr float GetFarPlaneFactor() { return s_FarPlaneFactor; }
+		static inline constexpr const float GetNearPlaneFactor() { return s_NearPlaneFactor; }
+		static inline constexpr const float GetFarPlaneFactor() { return s_FarPlaneFactor; }
+
+		uint32_t GetShadowMapSize() const { return m_ShadowMapSize; }
+		void CreateCullView(const Ref<RenderDevice>& device);
+		const RenderDeviceObjectHandle& GetCullViewHandle() const { return m_CullViewHandle; }
 
 		static void ResetSplit();
 	private:
@@ -42,30 +103,143 @@ namespace Lucy {
 		float m_CascadeSplit = 0.0f;
 		float m_CascadeSplitDepth = 0.0f;
 
-		inline static float s_LastSplitDist = 0.0f;
+		static inline float s_LastSplitDist = 0.0f;
 
-		inline static constexpr float s_NearPlaneFactor = 1.0f;
-		inline static constexpr float s_FarPlaneFactor = 1.0f;
+		static inline constexpr const float s_NearPlaneFactor = 1.0f;
+		static inline constexpr const float s_FarPlaneFactor = 1.0f;
+
+		RenderDeviceObjectHandle m_CullViewHandle;
+	};
+
+	struct RenderDeviceGPUShadowCullData {
+		RenderDeviceBufferReference VisibleObjects = 0;
+		RenderDeviceBufferReference VisibleObjectCount = 0;
+
+		RenderDeviceBufferReference VisibleSubmeshes = 0;
+		RenderDeviceBufferReference VisibleSubmeshCount = 0;
+
+		RenderDeviceBufferReference SubmeshDispatchIndirect = 0;
+		RenderDeviceBufferReference MeshletDispatchIndirect = 0;
+
+		RenderDeviceBufferReference VisibleDraws = 0;
+		RenderDeviceBufferReference IndirectCommands = 0;
+		RenderDeviceBufferReference DrawCount = 0;
+
+		glm::uvec4 ViewIndices{0};
+		glm::uvec4 Data{0}; // x = object capacity, y = command capacity, z = cascade count, w = cascade count
 	};
 
 	struct ShadowPass final {
-		static constexpr const uint32_t NUM_CASCADES = 4;
-
-		ShadowPass(Ref<Scene> scene, uint32_t size);
+		ShadowPass(Ref<RenderDevice> device, Ref<Scene> scene, uint32_t size);
 		~ShadowPass() = default;
 
 		void AddPass(const Ref<RenderGraph>& renderGraph);
 
 		static inline std::vector<ShadowCamera>& GetShadowCameras() { return s_ShadowCameras; }
 	private:
-		void InitializeShadowCameras(uint32_t size, const EditorCamera& editorCamera) const;
+		static GlobalPushConstant<RenderDeviceGPUShadowCullData> CreateGPUCullPushConstant(const RenderGraphRegistry& registry, uint32_t frameIndex);
 		
-		static inline std::vector<ShadowCamera> s_ShadowCameras;
+		void InitializeShadowCameras(uint32_t size, const EditorCamera& editorCamera) const;
 
+		static inline std::vector<ShadowCamera> s_ShadowCameras;
+		static inline std::vector<GlobalPushConstant<RenderDeviceGPUShadowCullData>> s_ShadowCullPushConstants;
+
+		Ref<RenderDevice> m_Device;
 		Ref<Scene> m_Scene;
 		uint32_t m_ShadowMapSize;
 	};
 #pragma endregion ShadowPass
+
+#pragma region DDGIPass
+
+	class Mesh;
+
+	struct RenderDeviceDDGIRayResult {
+		glm::vec4 RadianceAndDistance{ 0.0f };
+	};
+
+	struct RenderDeviceDDGITraceData {
+		RenderDeviceBufferReference RayResults = 0;
+		RenderDeviceBufferReference ProbeOffsets = 0;
+		RenderDeviceBufferReference ProbeUpdateList = 0;
+
+		RenderDeviceTextureResource EnvironmentMap{};
+		RenderDeviceTextureResource IrradianceHistory{};
+		RenderDeviceTextureResource DepthHistory{};
+
+		glm::vec4 ProbeOriginAndMaxDistance{ 0.0f };
+		glm::vec4 ProbeSpacing{ 0.0f };
+		glm::uvec4 ProbeCountsAndRays{ 0 };
+		uint32_t FrameNumber = 0;
+	};
+
+	struct DDGIPass final {
+		DDGIPass(const Ref<Scene>& scene, uint32_t width, uint32_t height);
+		~DDGIPass() = default;
+
+		void AddPass(const Ref<RenderGraph>& renderGraph);
+
+		static const glm::vec3& GetProbeCounts() { return s_ProbeCounts; }
+		static const glm::vec3& GetProbeOrigin() { return s_ProbeOrigin; }
+		static const glm::vec3& GetProbeSpacing() { return s_ProbeSpacing; }
+
+		static constexpr uint32_t GetRaysPerProbe() { return s_RaysPerProbe; }
+		static constexpr uint32_t GetProbeCount() { return s_ProbeCount; }
+
+		static constexpr uint32_t GetIrradianceTexels() { return s_IrradianceTexels; }
+		static constexpr uint32_t GetIrradianceTileSize() { return s_IrradianceTileSize; }
+
+		static constexpr uint32_t GetDepthTexels() { return s_DepthTexels; }
+		static constexpr uint32_t GetDepthTileSize() { return s_DepthTileSize; }
+
+		static constexpr float GetMaxRayDistance() { return s_MaxRayDistance; }
+
+		static constexpr float GetProbeBackfaceThreshold() { return s_ProbeBackfaceThreshold; }
+		static constexpr float GetProbeMinFrontfaceDistance() { return s_ProbeMinFrontfaceDistance; }
+	private:
+		static inline constexpr uint32_t s_RaysPerProbe = 64;
+
+		static inline constexpr glm::vec3 s_ProbeCounts{ 32, 16, 32 };
+		static inline constexpr glm::vec3 s_ProbeSpacing{ 2.5f };
+		static inline constexpr glm::vec3 s_ProbeOrigin = -0.5f * glm::vec3(s_ProbeCounts - glm::vec3(1)) * s_ProbeSpacing;
+
+		static inline float s_MaxRayDistance = glm::length(glm::vec3(s_ProbeCounts - glm::vec3(1)) * s_ProbeSpacing);
+
+		static constexpr uint32_t s_IrradianceTexels = 8;
+		static constexpr uint32_t s_IrradianceTileSize = s_IrradianceTexels + 2;
+
+		static constexpr uint32_t s_DepthTexels = 16;
+		static constexpr uint32_t s_DepthTileSize = s_DepthTexels + 2;
+
+		static constexpr uint32_t s_ProbeColumns = s_ProbeCounts.x * s_ProbeCounts.z;
+		static constexpr uint32_t s_ProbeRows = s_ProbeCounts.y;
+
+		static constexpr uint32_t s_ProbeCount = s_ProbeColumns * s_ProbeRows;
+
+		static inline constexpr float s_ProbeBackfaceThreshold = 0.25f;
+		static inline constexpr float s_ProbeMinFrontfaceDistance = 0.5f;
+
+		uint32_t m_Width = 0;
+		uint32_t m_Height = 0;
+
+		Ref<Scene> m_Scene;
+	};
+
+	struct DDGIProbeDebugPass final {
+		DDGIProbeDebugPass(const Ref<Scene>& scene, uint32_t width, uint32_t height);
+		~DDGIProbeDebugPass() = default;
+
+		void AddPass(const Ref<RenderGraph>& renderGraph);
+	private:
+		uint32_t m_Width = 0;
+		uint32_t m_Height = 0;
+
+		Ref<Scene> m_Scene;
+
+		static inline Unique<Mesh> s_ProbeSphere;
+	};
+
+#pragma endregion DDGIPass
 
 #pragma region CubemapPass
 
@@ -77,14 +251,11 @@ namespace Lucy {
 
 		//the resolution of the hdr image. its an arbitrary number (increase it, if necessary)
 #if USE_INTEGRATED_GRAPHICS && USE_COMPUTE_FOR_CUBEMAP_GEN
-		static inline constexpr const uint32_t HDRImageWidth = 256;
-		static inline constexpr const uint32_t HDRImageHeight = 256;
+		static inline constexpr const uint32_t HDRImageSize = 256;
 #elif USE_INTEGRATED_GRAPHICS
-		static inline constexpr const uint32_t HDRImageWidth = 128;
-		static inline constexpr const uint32_t HDRImageHeight = 128;
+		static inline constexpr const uint32_t HDRImageSize = 128;
 #else
-		static inline constexpr const uint32_t HDRImageWidth = 1024;
-		static inline constexpr const uint32_t HDRImageHeight = 1024;
+		static inline constexpr const uint32_t HDRImageSize = 1024;
 #endif
 	private:
 		Ref<Scene> m_Scene;
@@ -93,7 +264,44 @@ namespace Lucy {
 	};
 #pragma endregion CubemapPass
 
-#pragma region BRDFPass
-	//TODO:
-#pragma endregion BRDFPass
+#pragma region IrradiancePass
+
+	struct IrradiancePass final {
+		IrradiancePass(Ref<Scene> scene, uint32_t size);
+		~IrradiancePass() = default;
+		
+		void AddPass(const Ref<RenderGraph>& renderGraph);
+	private:
+		Ref<Scene> m_Scene;
+		uint32_t m_Size = 0;
+	};
+#pragma endregion IrradiancePass
+
+#pragma region PrefilterPass
+	
+	struct PrefilterPass final {
+		static constexpr inline uint32_t MAX_MIP_LEVELS = 5;
+
+		PrefilterPass(Ref<Scene> scene, uint32_t size);
+		~PrefilterPass() = default;
+		
+		void AddPass(const Ref<RenderGraph>& renderGraph);
+	private:
+		Ref<Scene> m_Scene;
+		uint32_t m_CubemapSize = 0;
+	};
+#pragma endregion PrefilterPass
+
+#pragma region BRDFLutPass
+
+	struct BRDFLutPass final {
+		BRDFLutPass(uint32_t size);
+		~BRDFLutPass() = default;
+
+		void AddPass(const Ref<RenderGraph>& renderGraph);
+	private:
+		Ref<Scene> m_Scene;
+		uint32_t m_Size = 0;
+	};
+#pragma endregion BRDFLutPass
 }

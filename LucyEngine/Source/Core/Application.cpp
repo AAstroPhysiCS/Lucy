@@ -12,7 +12,7 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/RenderThread.h"
 
-#include "Core/ViewportRenderPipeline.h"
+#include "Core/GPUDrivenRenderPipeline.h"
 
 namespace Lucy {
 
@@ -22,7 +22,6 @@ namespace Lucy {
 
 	Application::~Application() {
 		FileSystem::Destroy();
-
 		Renderer::WaitForDevice();
 
 		m_Scene->Destroy();
@@ -32,7 +31,6 @@ namespace Lucy {
 		Renderer::Destroy();
 
 		m_Window->Destroy();
-
 		delete s_TaskScheduler;
 	}
 
@@ -43,9 +41,12 @@ namespace Lucy {
 
 		m_Window = Window::Create(m_CreateInfo.WindowCreateInfo);
 		m_Window->Init(m_CreateInfo.RendererConfiguration.RenderArchitecture);
-		m_Window->SetEventCallback(LUCY_BIND_FUNC(&Application::OnEvent, this, std::placeholders::_1));
 
-		EventHandler::Init(this, m_Window->Raw());
+		m_Window->SetEventCallback([](std::unique_ptr<Event> event) {
+			EventHandler::s_EventQueue->Push(std::move(event));
+		});
+
+		Input::Init(m_Window->Raw());
 		FileSystem::Init();
 
 #ifdef LUCY_DEBUG
@@ -62,8 +63,9 @@ namespace Lucy {
 			case RenderType::Rasterizer: {
 				RenderPipelineCreateInfo createInfo = {
 					.ViewMode = ViewMode::Lit,
+					.RenderDevice = Renderer::GetRenderDevice()
 				};
-				m_RenderPipeline = Memory::CreateRef<ViewportRenderPipeline>(createInfo, m_Scene);
+				m_RenderPipeline = Memory::CreateRef<GPUDrivenRenderPipeline>(createInfo, m_Scene);
 				break;
 			}
 			default:
@@ -78,19 +80,35 @@ namespace Lucy {
 
 		for (const auto& overlay : m_Overlays) {
 			overlay->SetRenderPipeline(m_RenderPipeline);
-			overlay->OnRendererInit(m_Window);
 		}
 		
 		Renderer::InitializeImGui();
+
+		for (const auto& overlay : m_Overlays) {
+			overlay->OnRendererInit(m_Window);
+		}
+
+		double lastFrameTime = glfwGetTime();
 
 		while (!glfwWindowShouldClose(m_Window->Raw())) {
 			LUCY_PROFILE_NEW_FRAME("Lucy");
 
 			m_Window->PollEvents();
 
-			m_Scene->Update();
+			EventHandler::s_EventQueue->Drain([this](Event& event) {
+				OnEvent(event);
+			});
+			
+			m_Window->WaitEventsIfMinimized();
 
-			m_RenderPipeline->BeginFrame();
+			const double currentFrameTime = glfwGetTime();
+
+			float deltaTime = static_cast<float>(currentFrameTime - lastFrameTime);
+			lastFrameTime = currentFrameTime;
+
+			m_Scene->Update(deltaTime);
+
+			m_RenderPipeline->BeginFrame(Renderer::GetRenderDevice(), m_Scene);
 			m_RenderPipeline->RenderFrame();
 			m_RenderPipeline->EndFrame();
 
@@ -105,7 +123,7 @@ namespace Lucy {
 				if (result == RenderContextResultCodes::ERROR_OUT_OF_DATE_KHR || 
 					result == RenderContextResultCodes::SUBOPTIMAL_KHR || 
 					result == RenderContextResultCodes::NOT_READY) {
-					EventHandler::DispatchImmediateEvent<SwapChainResizeEvent>();
+					EventHandler::Submit<SwapChainResizeEvent>();
 				}
 			} else {
 				std::unique_lock<std::mutex> lock(s_MainThreadReadyMutex);
@@ -116,25 +134,26 @@ namespace Lucy {
 			Renderer::Flush();
 
 			LUCY_PROFILE_NEW_EVENT("Metrics::Update");
-			s_Metrics.Update();
+			s_Metrics.Update(deltaTime);
 		}
 	}
 
 	void Application::OnEvent(Event& e) {
-		m_Window->WaitEventsIfMinimized();
-
 		EventHandler::AddListener<KeyEvent>(e, [&](const KeyEvent& e) {
 			if (e == KeyCode::Escape) {
 				glfwSetWindowShouldClose(m_Window->Raw(), true);
+				return true;
 			}
+			return false;
 		});
 
 		m_RenderPipeline->OnEvent(e);
 		m_Scene->OnEvent(e);
 		Renderer::OnEvent(e);
 
-		for (const auto& overlay : m_Overlays)
-			overlay->OnEvent(e);
+		for (auto it = m_Overlays.rbegin(); it != m_Overlays.rend(); ++it) {
+			(*it)->OnEvent(e);
+		}
 	}
 
 	void Application::SetMainThreadReady(bool val) {

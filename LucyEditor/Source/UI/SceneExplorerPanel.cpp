@@ -17,14 +17,9 @@ namespace Lucy {
 
 			if (e == MouseCode::Button0) {
 				Entity entity{};
-				EventHandler::DispatchImmediateEvent<EntityPickedEvent>(entity, m_Scene.get(), viewportPanel.GetViewportMouseX(), viewportPanel.GetViewportMouseY());
-				SetEntityContext(entity);
+				EventHandler::Submit<EntityPickedEvent>(entity, m_Scene.get(), viewportPanel.GetViewportMouseX(), viewportPanel.GetViewportMouseY());
 			}
 		});
-	}
-
-	void SceneExplorerPanel::SetEntityContext(Entity e) {
-		m_EntityContext = e;
 	}
 
 	void SceneExplorerPanel::SetScene(Ref<Scene> scene) {
@@ -50,7 +45,7 @@ namespace Lucy {
 				ImGui::TreePop();
 			}
 			if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
-				m_EntityContext = e;
+				m_Scene->SetEntityContext(e);
 			}
 			ImGui::PopID();
 

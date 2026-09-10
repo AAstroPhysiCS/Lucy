@@ -9,13 +9,11 @@ namespace Lucy {
 
 #define NOW() duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch()).count()
 
-	void ApplicationMetrics::Update() {
+	void ApplicationMetrics::Update(float deltaTime) {
 		static auto startTime = NOW();
 		static double localFrames = 0.0;
-		static double oldDeltaTime = 0.0;
 
-		m_DeltaTime = glfwGetTime() - oldDeltaTime;
-		oldDeltaTime = m_DeltaTime;
+		m_DeltaTime = deltaTime;
 
 		localFrames++;
 

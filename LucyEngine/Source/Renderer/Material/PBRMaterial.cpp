@@ -2,49 +2,57 @@
 #include "PBRMaterial.h"
 
 #include "Renderer/Renderer.h"
+#include "Renderer/Image/Image.h"
 
 namespace Lucy {
 
-	PBRMaterial::PBRMaterial(MaterialID materialID, const Ref<Shader>& shader, const PBRMaterialData& data) 
-		: Material(materialID), m_PBRShader(shader), m_MaterialData(data) {
+	PBRMaterial::PBRMaterial(const MaterialCreateInfo& createInfo) 
+		: Material(createInfo) {
 	}
 
-	void PBRMaterial::Update() {
-		LUCY_PROFILE_NEW_EVENT("Material::Update");
+	void PBRMaterial::SetTexture(const MaterialImageType& type, RenderDeviceResourceHandle textureHandle) {
+		AddTexture(type.Index, textureHandle);
+	}
 
-		if (HasImage(PBRMaterial::ALBEDO_TYPE)) {
-			uint32_t pos = m_PBRShader->BindImageHandleTo("u_Textures", GetImage(PBRMaterial::ALBEDO_TYPE));
-			m_MaterialShaderData.AlbedoSlot = pos;
-		} else if (HasImage(PBRMaterial::NORMALS_TYPE)) {
-			uint32_t pos = m_PBRShader->BindImageHandleTo("u_Textures", GetImage(PBRMaterial::NORMALS_TYPE));
-			m_MaterialShaderData.NormalSlot = pos;
-		} else if (HasImage(PBRMaterial::METALLIC_TYPE)) {
-			uint32_t pos = m_PBRShader->BindImageHandleTo("u_Textures", GetImage(PBRMaterial::METALLIC_TYPE));
-			m_MaterialShaderData.MetallicSlot = pos;
-		} else if (HasImage(PBRMaterial::ROUGHNESS_TYPE)) {
-			uint32_t pos = m_PBRShader->BindImageHandleTo("u_Textures", GetImage(PBRMaterial::ROUGHNESS_TYPE));
-			m_MaterialShaderData.RoughnessSlot = pos;
-		} else if (HasImage(PBRMaterial::AO_TYPE)) {
-			uint32_t pos = m_PBRShader->BindImageHandleTo("u_Textures", GetImage(PBRMaterial::AO_TYPE));
-			m_MaterialShaderData.AOSlot = pos;
+	std::any PBRMaterial::BuildRenderData(const Ref<RenderDevice>& device) {
+		LUCY_PROFILE_NEW_EVENT("PBRMaterial::BuildRenderData");
+
+		const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("PBRGeometryPipeline");
+
+		const auto& albedo = HasImage(PBRMaterial::ALBEDO_TYPE) ? GetImage(PBRMaterial::ALBEDO_TYPE) : nullptr;
+		const auto& normals = HasImage(PBRMaterial::NORMALS_TYPE) ? GetImage(PBRMaterial::NORMALS_TYPE) : nullptr;
+		const auto& orm = HasImage(PBRMaterial::ORM_TYPE) ? GetImage(PBRMaterial::ORM_TYPE) : nullptr;
+
+		const auto BindTexture = [&](const Ref<Image>& image, RenderDeviceTextureResource& resource) {
+			if (!image) {
+				resource.TextureIndex = INVALID_INDEX;
+				resource.SamplerIndex = INVALID_INDEX;
+				return false;
+			}
+
+			resource.TextureIndex = device->BindGlobalImageHandleTo("Textures2D", pipeline, image, -1);
+			resource.SamplerIndex = image->GetSamplerHandle();
+			return true;
+		};
+
+		BindTexture(albedo, m_MaterialData.AlbedoMap);
+		BindTexture(normals, m_MaterialData.NormalMap);
+		bool ormBound = BindTexture(orm, m_MaterialData.ORMMap);
+		if (!ormBound) {
+			const auto& metallic = HasImage(PBRMaterial::METALLIC_TYPE) ? GetImage(PBRMaterial::METALLIC_TYPE) : nullptr;
+			const auto& roughness = HasImage(PBRMaterial::ROUGHNESS_TYPE) ? GetImage(PBRMaterial::ROUGHNESS_TYPE) : nullptr;
+			const auto& ao = HasImage(PBRMaterial::AO_TYPE) ? GetImage(PBRMaterial::AO_TYPE) : nullptr;
+
+			BindTexture(metallic, m_MaterialData.MetallicMap);
+			BindTexture(roughness, m_MaterialData.RoughnessMap);
+			BindTexture(ao, m_MaterialData.AOMap);
 		}
 
-		//TODO: Change diffuse color to vec4
-		m_MaterialShaderData.BaseDiffuseColor = glm::vec4(m_MaterialData.Diffuse, 1.0f);
-		m_MaterialShaderData.BaseMetallicValue = m_MaterialData.Metallic;
-		m_MaterialShaderData.BaseRoughnessValue = m_MaterialData.Roughness;
-		m_MaterialShaderData.BaseAOValue = m_MaterialData.AOContribution;
-
-		auto ssboMaterialAttributes = m_PBRShader->GetSharedStorageBufferIfExists("LucyMaterialAttributes");
-		ssboMaterialAttributes->Append((uint8_t*)&m_MaterialShaderData, sizeof(m_MaterialShaderData));
+		return m_MaterialData;
 	}
 
-	void PBRMaterial::AddTexture(RenderResourceHandle textureHandle) {
-		m_MaterialData.TextureHandles.push_back(textureHandle);
-	}
-
-	void PBRMaterial::RTDestroyResource() {
-		for (RenderResourceHandle imageHandle : m_MaterialData.TextureHandles)
+    void PBRMaterial::RTDestroyResource() {
+		for (RenderDeviceResourceHandle& imageHandle : GetAllTextureHandles())
 			Renderer::EnqueueResourceDestroy(imageHandle);
 	}
 }

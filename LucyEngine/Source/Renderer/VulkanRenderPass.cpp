@@ -3,17 +3,19 @@
 
 #include "Renderer/Renderer.h"
 #include "Device/VulkanRenderDevice.h"
+
 #include "Context/VulkanSwapChain.h"
+#include "Context/VulkanContext.h"
 
 namespace Lucy {
 
 	VulkanRenderPass::VulkanRenderPass(const RenderPassCreateInfo& createInfo, const Ref<VulkanRenderDevice>& vulkanDevice)
-		: RenderPass(createInfo), m_VulkanDevice(vulkanDevice) {
+		: RenderPass(createInfo) {
 		m_DepthBuffered = m_CreateInfo.Layout.DepthAttachment.IsValid();
-		RTCreate();
+		RTCreate(vulkanDevice);
 	}
 
-	void VulkanRenderPass::RTCreate() {
+	void VulkanRenderPass::RTCreate(const Ref<VulkanRenderDevice>& vulkanDevice) {
 		const std::vector<RenderPassLayout::Attachment>& colorAttachments = m_CreateInfo.Layout.ColorAttachments;
 		const RenderPassLayout::Attachment& depthAttachment = m_CreateInfo.Layout.DepthAttachment;
 
@@ -75,12 +77,27 @@ namespace Lucy {
 																			(uint32_t)subpassDependencies.size(), subpassDependencies.data());
 		m_AttachmentCount = createInfo.attachmentCount;
 		m_ColorAttachmentCount = (uint32_t)colorAttachments.size();
+		m_ColorAttachmentFormats = colorAttachments | std::views::transform([](const RenderPassLayout::Attachment& attachment) { return attachment.Format; }) | 
+			std::ranges::to<std::vector<ImageFormat>>();
 
 		VkRenderPassMultiviewCreateInfo renderPassMultiview = VulkanAPI::RenderPassMultiviewCreateInfo(createInfo.subpassCount, &m_CreateInfo.Multiview.ViewMask, 1, &m_CreateInfo.Multiview.CorrelationMask);
 		if (m_CreateInfo.Multiview.IsValid())
 			createInfo.pNext = &renderPassMultiview;
 
-		LUCY_VK_ASSERT(vkCreateRenderPass(m_VulkanDevice->GetLogicalDevice(), &createInfo, nullptr, &m_RenderPass));
+		VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
+		LUCY_VK_ASSERT(vkCreateRenderPass(logicalDevice, &createInfo, nullptr, &m_RenderPass));
+
+#ifdef LUCY_DEBUG
+		std::string objectName = std::format("{0} Render Pass", GetDebugName());
+
+		VkDebugUtilsObjectNameInfoEXT nameInfo{};
+		nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+		nameInfo.objectType = VK_OBJECT_TYPE_RENDER_PASS;
+		nameInfo.objectHandle = reinterpret_cast<uint64_t>(m_RenderPass);
+		nameInfo.pObjectName = objectName.c_str();
+
+		VulkanExternalFuncLinkage::vkSetDebugUtilsObjectNameEXT(logicalDevice, &nameInfo);
+#endif
 	}
 
 	void VulkanRenderPass::RTBegin(VulkanRenderPassBeginInfo& info) {
@@ -121,13 +138,13 @@ namespace Lucy {
 		vkCmdEndRenderPass(m_BoundedCommandBuffer);
 	}
 
-	void VulkanRenderPass::RTRecreate() {
-		RTDestroyResource();
-		RTCreate();
+	void VulkanRenderPass::RTRecreate(const Ref<RenderDevice>& device) {
+		Renderer::EnqueueResourceDestroy(GetMyHandle());
+		RTCreate(device->As<VulkanRenderDevice>());
 	}
 
-	void VulkanRenderPass::RTDestroyResource() {
-		vkDestroyRenderPass(m_VulkanDevice->GetLogicalDevice(), m_RenderPass, nullptr);
+	void VulkanRenderPass::RTDestroyResource(RenderDevice* device) {
+		vkDestroyRenderPass(reinterpret_cast<VulkanRenderDevice*>(device)->GetLogicalDevice(), m_RenderPass, nullptr);
 		m_RenderPass = VK_NULL_HANDLE;
 	}
 }

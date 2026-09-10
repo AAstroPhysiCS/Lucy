@@ -11,10 +11,18 @@ namespace Lucy {
 		VulkanCommandPool(const CommandPoolCreateInfo& createInfo);
 		virtual ~VulkanCommandPool() = default;
 
-		inline void* GetCurrentFrameCommandBuffer() { return m_CommandBuffers[Renderer::GetCurrentFrameIndex()]; }
+		VulkanCommandPool(const VulkanCommandPool&) = delete;
+		VulkanCommandPool& operator=(const VulkanCommandPool&) = delete;
+		VulkanCommandPool(VulkanCommandPool&&) = delete;
+		VulkanCommandPool& operator=(VulkanCommandPool&&) = delete;
+
+		inline void* GetCommandBuffer(uint32_t frameIndex) final override { return m_CommandBuffers.at(frameIndex); }
+		inline const std::vector<VkCommandBuffer>& GetCommandBuffers() { return m_CommandBuffers; }
 
 		void Destroy();
+		void Reset() final override;
 		void Recreate() final override;
+		void ResetCommandBuffer(uint32_t frameIndex) final override;
 	protected:
 		void FreeCommandBuffers(uint32_t commandBufferCount, size_t commandBufferStartIndex);
 
@@ -27,11 +35,17 @@ namespace Lucy {
 
 	class VulkanTransientCommandPool final : private VulkanCommandPool {
 	public:
-		VulkanTransientCommandPool(const Ref<VulkanRenderDevice>& vulkanDevice);
+		VulkanTransientCommandPool(TargetQueueFamily queueFamily, const Ref<VulkanRenderDevice>& vulkanDevice);
 		virtual ~VulkanTransientCommandPool() = default;
+
+		VulkanTransientCommandPool(const VulkanTransientCommandPool&) = delete;
+		VulkanTransientCommandPool& operator=(const VulkanTransientCommandPool&) = delete;
+		VulkanTransientCommandPool(VulkanTransientCommandPool&&) = delete;
+		VulkanTransientCommandPool& operator=(VulkanTransientCommandPool&&) = delete;
 
 		VkCommandBuffer BeginSingleTimeCommand(VkDevice logicalDevice);
 		void EndSingleTimeCommand();
+		void FreeSingleTimeCommand(VkDevice logicalDevice);
 		void Destroy();
 
 		inline VkCommandBuffer GetTransientCommandBuffer() const { return m_CommandBuffers[m_CommandBuffers.size() - 1]; }

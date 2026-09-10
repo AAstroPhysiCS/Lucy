@@ -13,12 +13,11 @@ namespace Lucy {
 
 		const auto& vulkanDevice = createInfo.RenderDevice->As<VulkanRenderDevice>();
 
-		VkCommandPoolCreateInfo createCommandPoolInfo = VulkanAPI::CommandPoolCreateInfo(m_CreateInfo.PoolFlags, 
-			m_CreateInfo.TargetQueueFamily == TargetQueueFamily::Graphics ? vulkanDevice->GetQueueFamilies().GraphicsFamily : vulkanDevice->GetQueueFamilies().ComputeFamily);
+		VkCommandPoolCreateInfo createCommandPoolInfo = VulkanAPI::CommandPoolCreateInfo(m_CreateInfo.PoolFlags, vulkanDevice->GetQueue(m_CreateInfo.TargetQueueFamily).Family);
 		LUCY_VK_ASSERT(vkCreateCommandPool(vulkanDevice->GetLogicalDevice(), &createCommandPoolInfo, nullptr, &m_CommandPool));
 
 		m_CommandBuffers.resize(m_CreateInfo.CommandBufferCount);
-
+		
 		VkCommandBufferAllocateInfo createAllocInfo = VulkanAPI::CommandBufferAllocateInfo(m_CommandPool, m_CreateInfo.Level, m_CreateInfo.CommandBufferCount);
 		LUCY_VK_ASSERT(vkAllocateCommandBuffers(vulkanDevice->GetLogicalDevice(), &createAllocInfo, m_CommandBuffers.data()));
 	}
@@ -26,6 +25,12 @@ namespace Lucy {
 	void VulkanCommandPool::Destroy() {
 		const auto& vulkanDevice = m_CreateInfo.RenderDevice->As<VulkanRenderDevice>();
 		vkDestroyCommandPool(vulkanDevice->GetLogicalDevice(), m_CommandPool, nullptr);
+	}
+
+	void VulkanCommandPool::Reset() {
+		const auto& vulkanDevice = m_CreateInfo.RenderDevice->As<VulkanRenderDevice>();
+		LUCY_VK_ASSERT(vkResetCommandPool(vulkanDevice->GetLogicalDevice(), m_CommandPool, 0));
+		SetAllState(CommandBufferSlotState::Ready);
 	}
 
 	void VulkanCommandPool::Recreate() {
@@ -37,6 +42,15 @@ namespace Lucy {
 		LUCY_VK_ASSERT(vkAllocateCommandBuffers(vulkanDevice->GetLogicalDevice(), &createAllocInfo, m_CommandBuffers.data()));
 	}
 
+	void VulkanCommandPool::ResetCommandBuffer(uint32_t frameIndex) {
+		const auto& vulkanDevice = m_CreateInfo.RenderDevice->As<VulkanRenderDevice>();
+
+		LUCY_ASSERT(frameIndex < m_CommandBuffers.size(), "Invalid frame slot!");
+		LUCY_VK_ASSERT(vkResetCommandBuffer(m_CommandBuffers[frameIndex], 0));
+
+		SetState(frameIndex, CommandBufferSlotState::Ready);
+	}
+
 	void VulkanCommandPool::FreeCommandBuffers(uint32_t commandBufferCount, size_t commandBufferStartIndex) {
 		const auto& vulkanDevice = m_CreateInfo.RenderDevice->As<VulkanRenderDevice>();
 
@@ -44,10 +58,9 @@ namespace Lucy {
 		m_CommandBuffers.erase(m_CommandBuffers.begin() + commandBufferStartIndex, m_CommandBuffers.begin() + commandBufferStartIndex + commandBufferCount);
 	}
 
-	VulkanTransientCommandPool::VulkanTransientCommandPool(const Ref<VulkanRenderDevice>& vulkanDevice)
-		: VulkanCommandPool(CommandPoolCreateInfo{ .CommandBufferCount = 0, .Level = 0, .PoolFlags = 0, .RenderDevice = vulkanDevice}) {
-		VkCommandPoolCreateInfo createCommandPoolInfo = VulkanAPI::CommandPoolCreateInfo(m_CreateInfo.PoolFlags, 
-			m_CreateInfo.TargetQueueFamily == TargetQueueFamily::Graphics ? vulkanDevice->GetQueueFamilies().GraphicsFamily : vulkanDevice->GetQueueFamilies().ComputeFamily);
+	VulkanTransientCommandPool::VulkanTransientCommandPool(TargetQueueFamily queueFamily, const Ref<VulkanRenderDevice>& vulkanDevice)
+		: VulkanCommandPool(CommandPoolCreateInfo{ .CommandBufferCount = 0, .Level = 0, .PoolFlags = 0, .RenderDevice = vulkanDevice, .TargetQueueFamily = queueFamily }) {
+		VkCommandPoolCreateInfo createCommandPoolInfo = VulkanAPI::CommandPoolCreateInfo(m_CreateInfo.PoolFlags, vulkanDevice->GetQueue(m_CreateInfo.TargetQueueFamily).Family);
 		LUCY_VK_ASSERT(vkCreateCommandPool(vulkanDevice->GetLogicalDevice(), &createCommandPoolInfo, nullptr, &m_CommandPool));
 	}
 
@@ -66,6 +79,13 @@ namespace Lucy {
 
 	void VulkanTransientCommandPool::EndSingleTimeCommand() {
 		vkEndCommandBuffer(m_CommandBuffers[m_CommandBuffers.size() - 1]);
+	}
+
+	void VulkanTransientCommandPool::FreeSingleTimeCommand(VkDevice logicalDevice) {
+		LUCY_ASSERT(!m_CommandBuffers.empty());
+		VkCommandBuffer commandBuffer = m_CommandBuffers.back();
+		vkFreeCommandBuffers(logicalDevice, m_CommandPool, 1, &commandBuffer);
+		m_CommandBuffers.pop_back();
 	}
 
 	void VulkanTransientCommandPool::Destroy() {

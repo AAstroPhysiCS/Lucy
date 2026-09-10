@@ -69,7 +69,7 @@ namespace Lucy {
 
 		auto [w, h] = m_RenderPipeline->GetViewportArea();
 		if (w != m_Size.x || h != m_Size.y)
-			EventHandler::DispatchImmediateEvent<ViewportAreaResizeEvent>((uint32_t)m_Size.x, (uint32_t)m_Size.y);
+			EventHandler::Submit<ViewportAreaResizeEvent>((uint32_t)m_Size.x, (uint32_t)m_Size.y);
 
 		const ImVec2& mousePos = ImGui::GetMousePos();
 		const ImVec2& offset = ImGui::GetCursorPos();
@@ -77,12 +77,11 @@ namespace Lucy {
 
 		m_ViewportMouseX = mousePos.x - windowPos.x - offset.x;
 		m_ViewportMouseY = mousePos.y - windowPos.y;
-		EventHandler::DispatchImmediateEvent<CursorPosEvent>(nullptr, m_ViewportMouseX, m_ViewportMouseY);
 
 		ImGuizmo::SetDrawlist();
 		ImGuizmo::SetRect(windowPos.x, windowPos.y, ImGui::GetWindowWidth(), ImGui::GetWindowHeight());
 
-		Entity& e = SceneExplorerPanel::GetInstance().GetEntityContext();
+		Entity e = SceneExplorerPanel::GetInstance().GetEntityContext();
 		if (e.IsValid()) {
 			const auto& scene = SceneExplorerPanel::GetInstance().GetActiveScene();
 			TransformComponent& t = e.GetComponent<TransformComponent>();
@@ -92,11 +91,14 @@ namespace Lucy {
 			const auto& editorCamera = scene->GetEditorCamera();
 			ImGuizmo::Manipulate(glm::value_ptr(editorCamera.GetViewMatrix()), glm::value_ptr(editorCamera.GetProjectionMatrix()),
 								 CurrentGizmoOperation, ImGuizmo::MODE::LOCAL, glm::value_ptr(t.GetMatrix()), nullptr, UseSnap ? &SnapValue : nullptr, nullptr, nullptr);
-			ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(t.GetMatrix()), matrixTranslation, matrixRotation, matrixScale);
 
-			t.GetPosition().x = matrixTranslation[0]; t.GetPosition().y = matrixTranslation[1]; t.GetPosition().z = matrixTranslation[2];
-			t.GetRotation().x = matrixRotation[0]; t.GetRotation().y = matrixRotation[1]; t.GetRotation().z = matrixRotation[2];
-			t.GetScale().x = matrixScale[0]; t.GetScale().y = matrixScale[1]; t.GetScale().z = matrixScale[2];
+			if (ImGuizmo::IsUsing()) {
+				ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(t.GetMatrix()), matrixTranslation, matrixRotation, matrixScale);
+
+				t.GetPosition().x = matrixTranslation[0]; t.GetPosition().y = matrixTranslation[1]; t.GetPosition().z = matrixTranslation[2];
+				t.GetRotation().x = matrixRotation[0]; t.GetRotation().y = matrixRotation[1]; t.GetRotation().z = matrixRotation[2];
+				t.GetScale().x = matrixScale[0]; t.GetScale().y = matrixScale[1]; t.GetScale().z = matrixScale[2];
+			}
 		}
 
 		ImGui::End();

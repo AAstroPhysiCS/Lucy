@@ -3,6 +3,9 @@
 #include "Entity.h"
 #include "Scene.h"
 #include "Components.h"
+
+#include "Renderer/Device/RenderDeviceScene.h"
+
 #include "Events/EventHandler.h"
 
 namespace Lucy {
@@ -10,7 +13,24 @@ namespace Lucy {
 	Entity Scene::CreateMesh(std::string& path) {
 		Entity e = CreateEntity();
 		e.AddComponent<MeshComponent>(path);
+
+		Renderer::EnqueueToRenderCommandQueue([this, e](const Ref<RenderDevice>& device) mutable {
+			auto& component = e.GetComponent<MeshComponent>();
+			const auto& mesh = component.GetMesh();
+			const auto& transform = e.GetComponent<TransformComponent>().GetMatrix();
+			auto objectHandle = device->GetScene()->RTRegisterObject(mesh->GetRenderDeviceMeshHandle(), transform, RenderDeviceObjectFlags::None);
+			component.SetObjectHandle(objectHandle);
+		});
+
 		return e;
+	}
+
+	void Scene::SetEntityContext(Entity e) {
+		m_EntityContext = e.m_Entity;
+	}
+	
+	Entity Scene::GetEntityContext() {
+		return Entity{ this, m_EntityContext };
 	}
 
 	Entity Scene::CreateMesh() {
@@ -35,7 +55,7 @@ namespace Lucy {
 		m_Registry.destroy(e.m_Entity);
 	}
 
-	Entity Scene::GetEntityByMeshID(const glm::vec3& meshID) {
+	Entity Scene::GetEntityByMeshID(uint32_t meshID) {
 		auto view = m_Registry.view<MeshComponent>();
 		for (auto entity : view) {
 			Entity e{ this, entity };
@@ -43,7 +63,7 @@ namespace Lucy {
 			const Ref<Mesh>& mesh = meshComponent.GetMesh();
 			if (!mesh)
 				continue;
-			const glm::vec3& meshIDValue = mesh->GetMeshID();
+			uint32_t meshIDValue = meshComponent.GetRenderDeviceObjectHandle().Index + 1;
 
 			if (meshIDValue == meshID)
 				return e;
@@ -52,33 +72,24 @@ namespace Lucy {
 		return {};
 	}
 
-	void Scene::Update() {
+	void Scene::Update(float deltaTime) {
 		LUCY_PROFILE_NEW_EVENT("Scene::Update");
-		m_Camera.Update();
+		m_Camera.Update(deltaTime);
 	}
 
 	void Scene::UpdateCamera(int32_t viewportWidth, int32_t viewportHeight) {
 		m_Camera.SetAspectRatio((float)viewportWidth / viewportHeight);
-		m_Camera.Update();
 	}
 
 	void Scene::OnEvent(Event& e) {
 		EventHandler::AddListener<ViewportAreaResizeEvent>(e, [this](const ViewportAreaResizeEvent& evt) {
 			UpdateCamera(evt.GetWidth(), evt.GetHeight());
 		});
-
-		EventHandler::AddListener<CursorPosEvent>(e, [this](const CursorPosEvent& evt) {
-			m_Camera.Update();
-		});
 	}
 
 	void Scene::Destroy() {
 		ViewForEach<MeshComponent>([](MeshComponent& meshComponent) {
 			meshComponent.GetMesh()->Destroy();
-		});
-
-		ViewForEach<HDRCubemapComponent>([&](HDRCubemapComponent& cubemapComponent) {
-			cubemapComponent.Destroy();
 		});
 	}
 }

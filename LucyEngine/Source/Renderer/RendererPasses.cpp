@@ -1,29 +1,321 @@
 #include "lypch.h"
 #include "RendererPasses.h"
 
+#include "Scene/Scene.h"
+
 #include "Renderer.h"
+
+#include "Mesh.h"
+#include "MeshFactory.h"
+
+#include "RenderGraph/RenderGraph.h"
 #include "RenderGraph/RenderGraphBuilder.h"
 #include "RenderGraph/RenderGraphRegistry.h"
+
+#include "Device/RenderDeviceScene.h"
+
+#include "Image/Image.h"
 
 #include "Memory/Buffer/Buffer.h"
 #include "Memory/Buffer/PushConstant.h"
 
 #include "Pipeline/ComputePipeline.h"
+#include "Pipeline/RayTracingPipeline.h"
 
 #include "Scene/Components.h"
 
-#include "glm/gtx/euler_angles.hpp"
-
 namespace Lucy {
 
-	/*
-	TODO:
-		Material should indicate which shader we gonna render on to
-		Group meshes by material / shader. And loop it through.
-		with that we can bind image handle to accordingly and with no performance drop
+#pragma region GPUDrivenRendererPasses
 
-		we have to separate mesh and materials. materials should set each thing
-	*/
+	GPUDrivenRendererPass::GPUDrivenRendererPass(Ref<RenderDevice> device) {
+		const auto& scene = device->GetScene();
+
+		Renderer::ImportExternalRenderGraphResource(RGResource(GPUVerticesBuffer), scene->GetGlobalVertexBufferHandle(), RGBufferData{ .InFlightMode = false });
+		Renderer::ImportExternalRenderGraphResource(RGResource(GPUIndicesBuffer), scene->GetGlobalIndexBufferHandle(), RGBufferData{ .InFlightMode = false });
+		Renderer::ImportExternalRenderGraphResource(RGResource(GPUSceneBuffer), scene->GetCurrentFrameBufferHandles("GPUScene"), RGBufferData { .InFlightMode = true });
+		Renderer::ImportExternalRenderGraphResource(RGResource(GPUObjectsBuffer), scene->GetCurrentFrameBufferHandles("GPUObjects"), RGBufferData{ .InFlightMode = true });
+		Renderer::ImportExternalRenderGraphResource(RGResource(GPUMeshesBuffer), scene->GetCurrentFrameBufferHandles("GPUMeshes"), RGBufferData{ .InFlightMode = true });
+		Renderer::ImportExternalRenderGraphResource(RGResource(GPUMeshLODsBuffer), scene->GetCurrentFrameBufferHandles("GPUMeshLODs"), RGBufferData{ .InFlightMode = true });
+		Renderer::ImportExternalRenderGraphResource(RGResource(GPUSubmeshesBuffer), scene->GetCurrentFrameBufferHandles("GPUSubmeshes"), RGBufferData{ .InFlightMode = true });
+		Renderer::ImportExternalRenderGraphResource(RGResource(GPUMeshletsBuffer), scene->GetCurrentFrameBufferHandles("GPUMeshlets"), RGBufferData{ .InFlightMode = true });
+		Renderer::ImportExternalRenderGraphResource(RGResource(GPUCullViewsBuffer), scene->GetCurrentFrameBufferHandles("GPUCullViews"), RGBufferData{ .InFlightMode = true });
+	}
+
+	void GPUDrivenRendererPass::AddPass(const Ref<RenderGraph>& renderGraph) {
+		AddObjectCullPass(renderGraph);
+		AddSubmeshDispatchBuildPass(renderGraph);
+		AddSubmeshCullPass(renderGraph);
+		AddMeshletDispatchBuildPass(renderGraph);
+		AddMeshletCullPass(renderGraph);
+		AddHiZPass(renderGraph);
+
+		s_GPUCullPushConstants.resize(Renderer::GetMaxFramesInFlight());
+		for (uint32_t frameIndex = 0; frameIndex < Renderer::GetMaxFramesInFlight(); frameIndex++) {
+			s_GPUCullPushConstants[frameIndex] = CreateGPUCullPushConstant(renderGraph->GetRegistry(), 0, frameIndex);
+		}
+	}
+
+	GlobalPushConstant<RenderDeviceGPUCullData> GPUDrivenRendererPass::CreateGPUCullPushConstant(const RenderGraphRegistry& registry, uint32_t viewIndex, uint32_t frameIndex) {
+		GlobalPushConstant<RenderDeviceGPUCullData> pushConstantData{
+			.Root = registry.GetBuffer(RGResource(GPUSceneBuffer), frameIndex)->GetDeviceAddress(),
+			.Data = {
+				.VisibleObjects = registry.GetBuffer(RGResource(VisibleObjects), frameIndex)->GetDeviceAddress(),
+				.VisibleObjectCount = registry.GetBuffer(RGResource(VisibleObjectsCount), frameIndex)->GetDeviceAddress(),
+				.VisibleSubmeshes = registry.GetBuffer(RGResource(VisibleSubmeshes), frameIndex)->GetDeviceAddress(),
+				.VisibleSubmeshCount = registry.GetBuffer(RGResource(VisibleSubmeshesCount), frameIndex)->GetDeviceAddress(),
+				.SubmeshDispatchIndirect = registry.GetBuffer(RGResource(SubmeshDispatch), frameIndex)->GetDeviceAddress(),
+				.MeshletDispatchIndirect = registry.GetBuffer(RGResource(MeshletDispatch), frameIndex)->GetDeviceAddress(),
+				.VisibleDraws = registry.GetBuffer(RGResource(VisibleDraws), frameIndex)->GetDeviceAddress(),
+				.IndirectCommands = registry.GetBuffer(RGResource(IndirectCommands), frameIndex)->GetDeviceAddress(),
+				.DrawCounts = registry.GetBuffer(RGResource(DrawCounts), frameIndex)->GetDeviceAddress(),
+				.ObjectCapacity = static_cast<uint32_t>(RenderDeviceScene::GetObjectCapacity()),
+				.SubmeshCapacity = static_cast<uint32_t>(RenderDeviceScene::GetSubmeshCapacity()),
+				.CommandCapacityPerBin = static_cast<uint32_t>(RenderDeviceScene::GetMeshletCapacity()),
+				.ViewIndex = viewIndex,
+				.RenderBinCount = RenderBin::Count
+			}
+		};
+
+		return pushConstantData;
+	}
+
+	// Idea from: https://medium.com/@mil_kru/two-pass-occlusion-culling-4100edcad501
+	void GPUDrivenRendererPass::AddHiZPass(const Ref<RenderGraph>& renderGraph) {
+		/*renderGraph->AddPass(TargetQueueFamily::Compute, "HiZPass", [=](RenderGraphBuilder& build) {
+			build.DeclareImage(RGResource(HiZImage), {
+				.Width = 2048,
+				.Height = 2048,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
+				.Format = ImageFormat::R32_SFLOAT,
+				.GenerateSampler = true,
+				.ImGuiUsage = true,
+			}, RenderPassLoadStoreAttachments::ClearStore);
+
+			build.WriteImage(RGResource(HiZImage), RenderGraphResourceAccess::StorageWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+
+			};
+		});*/
+	}
+
+	void GPUDrivenRendererPass::AddSubmeshDispatchBuildPass(const Ref<RenderGraph>& renderGraph) {
+		renderGraph->AddPass(TargetQueueFamily::Compute, "SubmeshDispatchBuildPass", [=](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.DeclareBuffer(RGResource(SubmeshDispatch), {
+				.DebugName = "SubmeshDispatch",
+				.Size = sizeof(VkDispatchIndirectCommand),
+				.Usage = BufferUsage::Storage | BufferUsage::Indirect
+			});
+
+			build.ReadBuffer(RGResource(VisibleObjectsCount), RenderGraphResourceAccess::StorageRead);
+			build.WriteBuffer(RGResource(SubmeshDispatch), RenderGraphResourceAccess::StorageWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::SubmeshDispatchBuildPass");
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUBuildSubmeshDispatchPipeline");
+
+				command.BindPipeline(pipeline);	
+
+				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				auto& pushConstantData = s_GPUCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				command.BindPushConstant(pushConstant);
+				command.DispatchCompute(1, 1, 1);
+			};
+		});
+	}
+
+	void GPUDrivenRendererPass::AddSubmeshCullPass(const Ref<RenderGraph>& renderGraph) {
+		renderGraph->AddPass(TargetQueueFamily::Compute, "SubmeshCullPass", [=](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.DeclareBuffer(RGResource(VisibleSubmeshes), {
+				.DebugName = "VisibleSubmeshes",
+				.Size = RenderDeviceScene::GetSubmeshCapacity() * sizeof(RenderDeviceVisibleSubmeshData),
+				.Usage = BufferUsage::Storage
+			});
+
+			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUObjectsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUMeshesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUMeshLODsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUSubmeshesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUCullViewsBuffer), RenderGraphResourceAccess::StorageRead);
+
+			build.ReadBuffer(RGResource(VisibleObjects), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(VisibleObjectsCount), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(SubmeshDispatch), RenderGraphResourceAccess::IndirectRead);
+
+			build.WriteBuffer(RGResource(VisibleSubmeshes), RenderGraphResourceAccess::StorageWrite);
+			build.WriteBuffer(RGResource(VisibleSubmeshesCount), RenderGraphResourceAccess::StorageReadWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::SubmeshCullPass");
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUCullSubmeshesPipeline");
+				command.BindPipeline(pipeline);
+
+				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				auto& pushConstantData = s_GPUCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				command.BindPushConstant(pushConstant);
+				command.DispatchComputeIndirect(registry.GetBuffer(RGResource(SubmeshDispatch)), 0);
+			};
+		});
+	}
+
+	void GPUDrivenRendererPass::AddMeshletDispatchBuildPass(const Ref<RenderGraph>& renderGraph) {
+		renderGraph->AddPass(TargetQueueFamily::Compute, "MeshletDispatchBuildPass", [=](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.DeclareBuffer(RGResource(MeshletDispatch), {
+				.DebugName = "MeshletDispatch",
+				.Size = sizeof(VkDispatchIndirectCommand),
+				.Usage = BufferUsage::Storage | BufferUsage::Indirect
+			});
+
+			build.ReadBuffer(RGResource(VisibleSubmeshesCount), RenderGraphResourceAccess::StorageRead);
+			build.WriteBuffer(RGResource(MeshletDispatch), RenderGraphResourceAccess::StorageWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::MeshletDispatchBuildPass");
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUBuildMeshletDispatchPipeline");
+/**/
+				command.BindPipeline(pipeline);
+
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				auto& pushConstantData = s_GPUCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				command.BindPushConstant(pushConstant);
+				command.DispatchCompute(1, 1, 1);
+			};
+		});
+	}
+
+	void GPUDrivenRendererPass::AddObjectCullPass(const Ref<RenderGraph>& renderGraph) {
+		renderGraph->AddPass(TargetQueueFamily::Compute, "ResetPass", [=](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.DeclareBuffer(RGResource(VisibleObjectsCount), {
+				.DebugName = "VisibleObjectsCount",
+				.Size = sizeof(uint32_t),
+				.Usage = BufferUsage::Storage | BufferUsage::TransferDestination,
+			});
+
+			build.DeclareBuffer(RGResource(VisibleSubmeshesCount), {
+				.DebugName = "VisibleSubmeshesCount",
+				.Size = sizeof(uint32_t),
+				.Usage = BufferUsage::Storage | BufferUsage::TransferDestination
+			});
+
+			build.DeclareBuffer(RGResource(DrawCounts), {
+				.DebugName = "DrawCounts",
+				.Size = RenderBin::Count * sizeof(uint32_t),
+				.Usage = BufferUsage::Storage | BufferUsage::TransferDestination | BufferUsage::Indirect
+			});
+
+			build.WriteBuffer(RGResource(VisibleObjectsCount), RenderGraphResourceAccess::TransferWrite);
+			build.WriteBuffer(RGResource(VisibleSubmeshesCount), RenderGraphResourceAccess::TransferWrite);
+			build.WriteBuffer(RGResource(DrawCounts), RenderGraphResourceAccess::TransferWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::ResetPass");
+				command.FillBuffer(registry.GetBuffer(RGResource(VisibleObjectsCount)), 0, sizeof(uint32_t), 0);
+				command.FillBuffer(registry.GetBuffer(RGResource(VisibleSubmeshesCount)), 0, sizeof(uint32_t), 0);
+				command.FillBuffer(registry.GetBuffer(RGResource(DrawCounts)), 0, RenderBin::Count * sizeof(uint32_t), 0);
+			};
+		});
+
+		renderGraph->AddPass(TargetQueueFamily::Compute, "ObjectCullPass", [=](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.DeclareBuffer(RGResource(VisibleObjects), {
+				.DebugName = "VisibleObjects",
+				.Size = RenderDeviceScene::GetObjectCapacity() * sizeof(RenderDeviceVisibleObjectData),
+				.Usage = BufferUsage::Storage
+			});
+
+			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUObjectsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUMeshesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUMeshLODsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUCullViewsBuffer), RenderGraphResourceAccess::StorageRead);
+
+			build.ReadBuffer(RGResource(VisibleObjectsCount), RenderGraphResourceAccess::StorageRead);
+
+			build.WriteBuffer(RGResource(VisibleObjects), RenderGraphResourceAccess::StorageWrite);
+			build.WriteBuffer(RGResource(VisibleObjectsCount), RenderGraphResourceAccess::StorageReadWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::ObjectCullPass");
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUCullObjectsPipeline");
+
+				command.BindPipeline(pipeline);
+
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				auto& pushConstantData = s_GPUCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				command.BindPushConstant(pushConstant);
+				command.DispatchCompute((RenderDeviceScene::GetObjectCapacity() + 63) / 64, 1, 1);
+			};
+		});
+	}
+
+	void GPUDrivenRendererPass::AddMeshletCullPass(const Ref<RenderGraph>& renderGraph) {
+		renderGraph->AddPass(TargetQueueFamily::Compute, "MeshletCullPass", [=](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+			
+			build.DeclareBuffer(RGResource(VisibleDraws), {
+				.DebugName = "VisibleDraws",
+				.Size = RenderBin::Count * RenderDeviceScene::GetMeshletCapacity() * sizeof(RenderDeviceVisibleDrawData),
+				.Usage = BufferUsage::Storage | BufferUsage::TransferDestination
+			});
+
+			build.DeclareBuffer(RGResource(IndirectCommands), {
+				.DebugName = "IndirectCommands",
+				.Size = RenderBin::Count * RenderDeviceScene::GetMeshletCapacity() * sizeof(VkDrawIndexedIndirectCommand),
+				.Usage = BufferUsage::Storage | BufferUsage::TransferDestination | BufferUsage::Indirect
+			});
+
+			build.ReadExternalBuffer(RGResource(GPUObjectsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUSubmeshesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUMeshletsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUCullViewsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUMeshLODsBuffer), RenderGraphResourceAccess::StorageRead);
+
+			build.ReadBuffer(RGResource(VisibleSubmeshes), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(VisibleSubmeshesCount), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(MeshletDispatch), RenderGraphResourceAccess::IndirectRead);
+
+			build.WriteBuffer(RGResource(VisibleDraws), RenderGraphResourceAccess::StorageWrite);
+			build.WriteBuffer(RGResource(IndirectCommands), RenderGraphResourceAccess::StorageWrite);
+			build.WriteBuffer(RGResource(DrawCounts), RenderGraphResourceAccess::StorageReadWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::MeshletCullPass");
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUCullMeshletsPipeline");
+
+				command.BindPipeline(pipeline);
+
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				auto& pushConstantData = s_GPUCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				command.BindAllDescriptorSets();
+				command.BindPushConstant(pushConstant);
+				command.DispatchComputeIndirect(registry.GetBuffer(RGResource(MeshletDispatch)), 0);
+			};
+		});
+	}
+
+#pragma endregion GPUDrivenRendererPasses
 
 #pragma region ForwardPBRPass
 
@@ -41,128 +333,155 @@ namespace Lucy {
 				.Width = m_Width,
 				.Height = m_Height,
 				.ImageType = ImageType::Type2D,
-				.ImageUsage = ImageUsage::AsColorAttachment,
+				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
 				.Format = ImageFormat::R8G8B8A8_UNORM,
 				.GenerateSampler = true,
 				.ImGuiUsage = true,
-			}, RenderPassLoadStoreAttachments::ClearStore,
-			RGResource(GeometryDepthImage), {
-				.Width = m_Width,
-				.Height = m_Height,
-				.ImageType = ImageType::Type2D,
-				.ImageUsage = ImageUsage::AsDepthAttachment,
-				.Format = ImageFormat::D32_SFLOAT,
-				.GenerateSampler = true,
-			}, RenderPassLoadStoreAttachments::ClearStore);
+				}, RenderPassLoadStoreAttachments::ClearStore,
+				RGResource(GeometryDepthImage), {
+					.Width = m_Width,
+					.Height = m_Height,
+					.ImageType = ImageType::Type2D,
+					.ImageUsage = ImageUsage::AsDepthAttachment,
+					.Format = ImageFormat::D32_SFLOAT,
+					.GenerateSampler = true,
+				}, RenderPassLoadStoreAttachments::ClearStore
+			);
 
-			build.ReadImage(RGResource(ShadowImages));
-
-			build.BindRenderTarget(RGResource(GeometryImage), RGResource(GeometryDepthImage));
-
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
-				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("PBRGeometryPipeline");
-				const auto& shader = pipeline->GetShader();
-
-				m_Scene->ViewForEach<DirectionalLightComponent>([&, pbrShader = shader](DirectionalLightComponent& lightComponent) {
-					const auto& lightningAttributes = pbrShader->GetUniformBufferIfExists("LucyLightningValues");
-					lightningAttributes->SetData((uint8_t*)&lightComponent, sizeof(DirectionalLightComponent));
-
-					glm::vec4 shadowCameraFarPlanes;
-
-					ShadowCamera::ResetSplit();
-
-					auto& shadowCameras = ShadowPass::GetShadowCameras();
-					for (size_t i = 0; ShadowCamera& shadowCamera : shadowCameras) {
-						shadowCamera.SetRotation(lightComponent.GetDirection());
-
-						shadowCameraFarPlanes[i++] = shadowCamera.GetCascadeSplitDepth();
-
-						const auto& vp = shadowCamera.GetCameraViewProjection();
-						glm::mat4 shadowCameraMatrix = vp.Proj * vp.View;
-						lightningAttributes->Append((uint8_t*)&shadowCameraMatrix, sizeof(glm::mat4));
-					}
-
-					lightningAttributes->Append((uint8_t*)&shadowCameraFarPlanes, sizeof(glm::vec4));
-				});
-
-				shader->BindImageHandleTo("u_ShadowMap", registry.GetImage(RGResource(ShadowImages)));
-
-				bool imageBound = false;
-
-				m_Scene->ViewForEach<HDRCubemapComponent>([pbrShader = shader, &registry, &imageBound](const HDRCubemapComponent& hdrComponent) {
-					if (!hdrComponent.IsPrimary || imageBound)
-						return;
-#if USE_COMPUTE_FOR_CUBEMAP_GEN
-					pbrShader->BindImageHandleTo("u_IrradianceMap", hdrComponent.GetIrradianceImage());
-#else
-					pbrShader->BindImageHandleTo("u_IrradianceMap", registry.GetImage(RGResource(IrradianceImage)));
-#endif
-					imageBound = true;
-				});
-
-				if (!shader->HasImageHandleBoundTo("u_IrradianceMap"))
-					shader->BindImageHandleTo("u_IrradianceMap", Renderer::GetBlankCubeImage());
-
-				if (auto cameraBuffer = shader->GetUniformBufferIfExists("LucyCamera")) {
-					auto vp = m_Scene->GetEditorCamera().GetCameraViewProjection();
-					cameraBuffer->SetData((uint8_t*)&vp, sizeof(vp));
-				}
-
-				RenderCommand& draw = cmdList.BeginRenderCommand("PBRForwardPass");
-				draw.BindPipeline(pipeline);
-				draw.UpdateDescriptorSets();
-				draw.BindAllDescriptorSets();
-
-				m_Scene->ViewRForEach<MeshComponent, TransformComponent>([&](MeshComponent& meshComponent, TransformComponent& transformComponent) {
-					draw.DrawIndexedMeshWithMaterial(meshComponent.GetMesh(), transformComponent.GetMatrix());
-				});
-
-				cmdList.EndRenderCommand();
-			};
-		});
-
-		renderGraph->AddPass(TargetQueueFamily::Graphics, "IDPass", [=, *this](RenderGraphBuilder& build) {
-			build.SetViewportArea(m_Width, m_Height);
-			build.SetInFlightMode(true);
-
-			build.DeclareImage(RGResource(IDPassImage), {
+			build.DeclareImage(RGResource(ObjectIDImage), {
 				.Width = m_Width,
 				.Height = m_Height,
 				.ImageType = ImageType::Type2D,
 				.ImageUsage = ImageUsage::AsColorTransferAttachment,
-				.Format = ImageFormat::R8G8B8A8_UNORM,
-				.GenerateSampler = true
-			}, RenderPassLoadStoreAttachments::ClearStore,
-				RGResource(IDPassDepthImage), {
-				.Width = m_Width,
-				.Height = m_Height,
-				.ImageType = ImageType::Type2D,
-				.ImageUsage = ImageUsage::AsDepthAttachment,
-				.Format = ImageFormat::D32_SFLOAT,
-				.GenerateSampler = true,
+				.Format = ImageFormat::R32_UINT,
+				.GenerateSampler = false
 			}, RenderPassLoadStoreAttachments::ClearStore);
 
-			build.BindRenderTarget(RGResource(IDPassImage), RGResource(IDPassDepthImage));
+			build.ReadImage(RGResource(ShadowImagesFinal), RenderGraphResourceAccess::ShaderSampledRead);
+			build.ReadExternalImage(RGResource(BRDFLutImage), RenderGraphResourceAccess::ShaderSampledRead);
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
-				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("IDPipeline");
-				const auto& shader = pipeline->GetShader();
+			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUObjectsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUSubmeshesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUVerticesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUIndicesBuffer), RenderGraphResourceAccess::IndexRead);
 
-				if (auto cameraBuffer = shader->GetUniformBufferIfExists("LucyCamera")) {
-					auto vp = m_Scene->GetEditorCamera().GetCameraViewProjection();
-					cameraBuffer->SetData((uint8_t*)&vp, sizeof(vp));
-				}
+			build.ReadBuffer(RGResource(VisibleDraws), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(IndirectCommands), RenderGraphResourceAccess::IndirectRead);
+			build.ReadBuffer(RGResource(DrawCounts), RenderGraphResourceAccess::IndirectRead);
 
-				RenderCommand& draw = cmdList.BeginRenderCommand("IDPass");
+			build.ReadImage(RGResource(DDGIIrradianceAtlas), RenderGraphResourceAccess::ShaderSampledRead);
+			build.ReadImage(RGResource(DDGIDepthAtlas), RenderGraphResourceAccess::ShaderSampledRead);
+			build.ReadBuffer(RGResource(DDGIProbeOffsets), RenderGraphResourceAccess::StorageRead);
+
+			build.BindRenderTarget(RGResource(GeometryImage), RGResource(GeometryDepthImage));
+			build.BindRenderTarget(RGResource(ObjectIDImage));
+
+			struct RenderDeviceDDGISamplingData {
+				RenderDeviceBufferReference ProbeOffsets;
+				RenderDeviceTextureResource IrradianceAtlas;
+				RenderDeviceTextureResource DepthAtlas;
+
+				glm::vec4 ProbeOriginAndMaxDistance;
+				glm::vec4 ProbeSpacingAndBias;
+				glm::vec4 Settings;
+				glm::uvec3 ProbeCounts;
+			};
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::PBRGeometryPass");
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("PBRGeometryPipeline");
+				const auto& settings = Renderer::GetRendererSettings();
+
 				draw.BindPipeline(pipeline);
+
+				uint32_t shadowImagesIndex = draw.BindImageHandleTo("TextureArrays2D_Float2", registry.GetImage(RGResource(ShadowImagesFinal)));
+				uint32_t brdfImageIndex = draw.BindImageHandleTo("Textures2D_Float2", registry.GetImage(RGResource(BRDFLutImage)));
+
+				uint32_t irradianceIndex = INVALID_INDEX;
+
+				bool imageBound = false;
+
+				m_Scene->ViewForEach<HDRCubemapComponent>([&draw, &registry, &irradianceIndex, &imageBound, &settings](const HDRCubemapComponent& hdrComponent) {
+					if (!hdrComponent.IsPrimary || imageBound)
+						return;
+#if USE_COMPUTE_FOR_CUBEMAP_GEN
+					irradianceIndex = draw.BindImageHandleTo("CubeTextures", hdrComponent.GetIrradianceImage());
+#else
+					irradianceIndex = draw.BindImageHandleTo("CubeTextures", registry.GetImage(RGResource(IrradianceImage)));
+#endif
+					imageBound = true;
+				});
+
+				uint32_t prefilterIndex = draw.BindImageHandleTo("CubeTextures", registry.GetImage(RGResource(PrefilterImage)));
+
+				if (prefilterIndex == INVALID_INDEX)
+					prefilterIndex = draw.BindImageHandleTo("CubeTextures", Renderer::GetBlankCubeImage());
+				if (irradianceIndex == INVALID_INDEX)
+					irradianceIndex = draw.BindImageHandleTo("CubeTextures", Renderer::GetBlankCubeImage());
+
+				uint32_t currentFrameIndex = Renderer::GetCurrentFrameIndex();
+
+				uint32_t ddgiIrradianceIndex = draw.BindImageHandleTo("Textures2D", registry.GetImage(RGResource(DDGIIrradianceAtlas), currentFrameIndex));
+				uint32_t ddgiDepthIndex = draw.BindImageHandleTo("Textures2D_Float2", registry.GetImage(RGResource(DDGIDepthAtlas), currentFrameIndex));
+
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
 
-				m_Scene->ViewRForEach<MeshComponent, TransformComponent>([&](MeshComponent& meshComponent, TransformComponent& transformComponent) {
-					draw.DrawIndexedMeshWithMaterial(meshComponent.GetMesh(), transformComponent.GetMatrix());
-				});
+				struct LocalPushConstant {
+					RenderDeviceBufferReference VisibleDraws = 0;
+					RenderDeviceTextureResource PBRTextureResources[4];
 
-				cmdList.EndRenderCommand();
+					RenderDeviceDDGISamplingData DDGI;
+				};
+
+				const auto& origin = DDGIPass::GetProbeOrigin();
+				const auto& spacing = DDGIPass::GetProbeSpacing();
+				const auto& counts = DDGIPass::GetProbeCounts();
+
+				GlobalPushConstant<LocalPushConstant> pushConstantData{
+					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+					.Data = {
+						.VisibleDraws = registry.GetBuffer(RGResource(VisibleDraws))->GetDeviceAddress(),
+						.PBRTextureResources = {
+							{ .TextureIndex = shadowImagesIndex, .SamplerIndex = draw.GetLinearRepeatSampler() },
+							{ .TextureIndex = prefilterIndex, .SamplerIndex = draw.GetLinearRepeatSampler() },
+							{ .TextureIndex = brdfImageIndex, .SamplerIndex = draw.GetLinearRepeatSampler() },
+							{ .TextureIndex = irradianceIndex, .SamplerIndex = draw.GetLinearRepeatSampler() },
+						},
+						.DDGI = {
+							.ProbeOffsets = registry.GetBuffer(RGResource(DDGIProbeOffsets), currentFrameIndex)->GetDeviceAddress(),
+							.IrradianceAtlas = {
+								.TextureIndex = ddgiIrradianceIndex,
+								.SamplerIndex = draw.GetLinearClampSampler()
+							},
+							.DepthAtlas = {
+								.TextureIndex = ddgiDepthIndex,
+								.SamplerIndex = draw.GetLinearClampSampler()
+							},
+							.ProbeOriginAndMaxDistance = glm::vec4{ origin, DDGIPass::GetMaxRayDistance() },
+							.ProbeSpacingAndBias = glm::vec4{ spacing, 0.2f },
+							.Settings = glm::vec4{ settings.DDGIStrength, settings.EnvironmentIntensity, 0.0f, 0.0f },
+							.ProbeCounts = counts
+						}
+					}
+				};
+
+				const uint32_t commandCapacityPerBin = RenderDeviceScene::GetMeshletCapacity();
+
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				draw.BindPushConstant(pushConstant);
+				draw.BindBuffers(registry.GetBuffer(RGResource(GPUIndicesBuffer)));
+
+				for (uint32_t renderBin = 0; renderBin < RenderBin::Count; renderBin++) {
+					uint64_t commandOffset = static_cast<uint64_t>(renderBin) * commandCapacityPerBin * sizeof(VkDrawIndexedIndirectCommand);
+					uint64_t countOffset = static_cast<uint64_t>(renderBin) * sizeof(uint32_t);
+
+					draw.DrawIndexedIndirectCount(registry.GetBuffer(RGResource(IndirectCommands)), commandOffset, 
+						registry.GetBuffer(RGResource(DrawCounts)), countOffset, commandCapacityPerBin, sizeof(VkDrawIndexedIndirectCommand));
+				}
 			};
 		});
 	}
@@ -171,104 +490,438 @@ namespace Lucy {
 
 #pragma region ShadowPass
 
-	ShadowPass::ShadowPass(Ref<Scene> scene, uint32_t size)
-		: m_Scene(scene), m_ShadowMapSize(size) {
+	ShadowPass::ShadowPass(Ref<RenderDevice> device, Ref<Scene> scene, uint32_t size)
+		: m_Device(device), m_Scene(scene), m_ShadowMapSize(size) {
+		ShadowCamera::ResetSplit();
+		InitializeShadowCameras(m_ShadowMapSize, m_Scene->GetEditorCamera());
+		for (ShadowCamera& shadowCamera : s_ShadowCameras)
+			shadowCamera.CreateCullView(m_Device);
+	}
+
+	GlobalPushConstant<RenderDeviceGPUShadowCullData> ShadowPass::CreateGPUCullPushConstant(const RenderGraphRegistry& registry, uint32_t frameIndex) {
+		return {
+			.Root = registry.GetBuffer(RGResource(GPUSceneBuffer), frameIndex)->GetDeviceAddress(),
+			.Data = {
+				.VisibleObjects = registry.GetBuffer(RGResource(ShadowVisibleObjects), frameIndex)->GetDeviceAddress(),
+				.VisibleObjectCount = registry.GetBuffer(RGResource(ShadowVisibleObjectCount), frameIndex)->GetDeviceAddress(),
+				.VisibleSubmeshes = registry.GetBuffer(RGResource(ShadowVisibleSubmeshes), frameIndex)->GetDeviceAddress(),
+				.VisibleSubmeshCount = registry.GetBuffer(RGResource(ShadowVisibleSubmeshCount), frameIndex)->GetDeviceAddress(),
+				.SubmeshDispatchIndirect = registry.GetBuffer(RGResource(ShadowSubmeshDispatches), frameIndex)->GetDeviceAddress(),
+				.MeshletDispatchIndirect = registry.GetBuffer(RGResource(ShadowMeshletDispatches), frameIndex)->GetDeviceAddress(),
+				.VisibleDraws = registry.GetBuffer(RGResource(ShadowVisibleDraws), frameIndex)->GetDeviceAddress(),
+				.IndirectCommands = registry.GetBuffer(RGResource(ShadowIndirectCommands), frameIndex)->GetDeviceAddress(),
+				.DrawCount = registry.GetBuffer(RGResource(ShadowDrawCounts), frameIndex)->GetDeviceAddress(),
+				.ViewIndices = {
+					s_ShadowCameras[0].GetCullViewHandle().Index,
+					s_ShadowCameras[1].GetCullViewHandle().Index,
+					s_ShadowCameras[2].GetCullViewHandle().Index,
+					s_ShadowCameras[3].GetCullViewHandle().Index
+				},
+				.Data = {
+					static_cast<uint32_t>(RenderDeviceScene::GetObjectCapacity()),
+					static_cast<uint32_t>(RenderDeviceScene::GetMeshletCapacity()),
+					static_cast<uint32_t>(RenderDeviceScene::GetSubmeshCapacity()),
+					RenderDeviceSceneGlobalData::NUM_CASCADES
+				}
+			}
+		};
 	}
 
 	void ShadowPass::AddPass(const Ref<RenderGraph>& renderGraph) {
+		uint32_t objectCapacity = RenderDeviceScene::GetObjectCapacity();
+		uint32_t commandCapacity = RenderDeviceScene::GetMeshletCapacity();
+		uint64_t submeshCapacity = RenderDeviceScene::GetSubmeshCapacity();
 
-		renderGraph->AddPass(TargetQueueFamily::Graphics, "VSMPass", [=, *this](RenderGraphBuilder& build) {
+		renderGraph->AddPass(TargetQueueFamily::Compute, "ShadowResetPass", [=](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.DeclareBuffer(RGResource(ShadowVisibleObjects), {
+				.DebugName = "ShadowVisibleObjects",
+				.Size = objectCapacity * sizeof(RenderDeviceVisibleObjectData),
+				.Usage = BufferUsage::Storage
+			});
+
+			build.DeclareBuffer(RGResource(ShadowVisibleObjectCount), {
+				.DebugName = "ShadowVisibleObjectCount",
+				.Size = sizeof(uint32_t),
+				.Usage = BufferUsage::Storage | BufferUsage::TransferDestination
+			});
+
+			build.DeclareBuffer(RGResource(ShadowVisibleSubmeshes), {
+				.DebugName = "ShadowVisibleSubmeshes",
+				.Size = submeshCapacity * sizeof(RenderDeviceVisibleSubmeshData),
+				.Usage = BufferUsage::Storage
+			});
+
+			build.DeclareBuffer(RGResource(ShadowVisibleSubmeshCount), {
+				.DebugName = "ShadowVisibleSubmeshCount",
+				.Size = sizeof(uint32_t),
+				.Usage = BufferUsage::Storage | BufferUsage::TransferDestination
+			});
+
+			build.DeclareBuffer(RGResource(ShadowSubmeshDispatches), {
+				.DebugName = "ShadowSubmeshDispatches",
+				.Size = sizeof(VkDispatchIndirectCommand),
+				.Usage = BufferUsage::Storage | BufferUsage::Indirect
+			});
+
+			build.DeclareBuffer(RGResource(ShadowMeshletDispatches), {
+				.DebugName = "ShadowMeshletDispatches",
+				.Size = sizeof(VkDispatchIndirectCommand),
+				.Usage = BufferUsage::Storage | BufferUsage::Indirect
+			});
+
+			build.DeclareBuffer(RGResource(ShadowVisibleDraws), {
+				.DebugName = "ShadowVisibleDraws",
+				.Size = commandCapacity * sizeof(RenderDeviceVisibleDrawData),
+				.Usage = BufferUsage::Storage
+			});
+
+			build.DeclareBuffer(RGResource(ShadowIndirectCommands), {
+				.DebugName = "ShadowIndirectCommands",
+				.Size = commandCapacity * sizeof(VkDrawIndexedIndirectCommand),
+				.Usage = BufferUsage::Storage | BufferUsage::Indirect
+			});
+
+			build.DeclareBuffer(RGResource(ShadowDrawCounts), {
+				.DebugName = "ShadowDrawCounts",
+				.Size = sizeof(uint32_t),
+				.Usage = BufferUsage::Storage | BufferUsage::TransferDestination | BufferUsage::Indirect
+			});
+
+			build.WriteBuffer(RGResource(ShadowVisibleObjectCount), RenderGraphResourceAccess::TransferWrite);
+			build.WriteBuffer(RGResource(ShadowVisibleSubmeshCount), RenderGraphResourceAccess::TransferWrite);
+			build.WriteBuffer(RGResource(ShadowDrawCounts), RenderGraphResourceAccess::TransferWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::ShadowResetPass");
+				command.FillBuffer(registry.GetBuffer(RGResource(ShadowVisibleObjectCount)), 0, sizeof(uint32_t), 0);
+				command.FillBuffer(registry.GetBuffer(RGResource(ShadowVisibleSubmeshCount)), 0, sizeof(uint32_t), 0);
+				command.FillBuffer(registry.GetBuffer(RGResource(ShadowDrawCounts)), 0, sizeof(uint32_t), 0);
+
+				s_ShadowCullPushConstants.resize(Renderer::GetMaxFramesInFlight());
+				for (uint32_t frameIndex = 0; frameIndex < Renderer::GetMaxFramesInFlight(); frameIndex++) {
+					s_ShadowCullPushConstants[frameIndex] = CreateGPUCullPushConstant(renderGraph->GetRegistry(), frameIndex);
+				}
+			};
+		});
+
+		renderGraph->AddPass(TargetQueueFamily::Compute, "ShadowObjectCullPass", [=, *this](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUObjectsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUMeshesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUCullViewsBuffer), RenderGraphResourceAccess::StorageRead);
+
+			build.ReadBuffer(RGResource(ShadowVisibleObjectCount), RenderGraphResourceAccess::StorageReadWrite);
+
+			build.WriteBuffer(RGResource(ShadowVisibleObjects), RenderGraphResourceAccess::StorageWrite);
+			build.WriteBuffer(RGResource(ShadowVisibleObjectCount), RenderGraphResourceAccess::StorageReadWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::ShadowObjectCullPass");
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUCullShadowObjectsPipeline");
+
+				command.BindPipeline(pipeline);
+
+				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				auto& pushConstantData = s_ShadowCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				command.BindPushConstant(pushConstant);
+				command.DispatchCompute((objectCapacity + 63) / 64, 1, 1);
+			};
+		});
+
+		renderGraph->AddPass(TargetQueueFamily::Compute, "ShadowSubmeshDispatchBuildPass", [=, *this](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.ReadBuffer(RGResource(ShadowVisibleObjectCount), RenderGraphResourceAccess::StorageRead);
+			build.WriteBuffer(RGResource(ShadowSubmeshDispatches), RenderGraphResourceAccess::StorageWrite);
+
+			return [=, *this](RenderGraphRegistry& registry, RenderCommand& command) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::ShadowSubmeshDispatchBuildPass");
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUBuildShadowSubmeshDispatchPipeline");
+
+				command.BindPipeline(pipeline);
+
+				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				auto& pushConstantData = s_ShadowCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				command.BindPushConstant(pushConstant);
+				command.DispatchCompute(1, 1, 1);
+			};
+		});
+
+		renderGraph->AddPass(TargetQueueFamily::Compute, "ShadowSubmeshCullPass", [=, *this](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUObjectsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUMeshesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUCullViewsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUMeshLODsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUSubmeshesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUCullViewsBuffer), RenderGraphResourceAccess::StorageRead);
+
+			build.ReadBuffer(RGResource(ShadowVisibleObjects), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(ShadowVisibleObjectCount), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(ShadowSubmeshDispatches), RenderGraphResourceAccess::IndirectRead);
+
+			build.WriteBuffer(RGResource(ShadowVisibleSubmeshes), RenderGraphResourceAccess::StorageWrite);
+			build.WriteBuffer(RGResource(ShadowVisibleSubmeshCount), RenderGraphResourceAccess::StorageReadWrite);
+
+			return [=, *this](RenderGraphRegistry& registry, RenderCommand& command) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::ShadowSubmeshCullPass");
+
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUCullShadowSubmeshesPipeline");
+				command.BindPipeline(pipeline);
+
+				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				auto& pushConstantData = s_ShadowCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				command.BindPushConstant(pushConstant);
+				command.DispatchComputeIndirect(registry.GetBuffer(RGResource(ShadowSubmeshDispatches)), 0);
+			};
+		});
+
+		renderGraph->AddPass(TargetQueueFamily::Compute, "ShadowMeshletDispatchBuildPass", [=, *this](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.ReadBuffer(RGResource(ShadowVisibleSubmeshCount), RenderGraphResourceAccess::StorageRead);
+
+			build.WriteBuffer(RGResource(ShadowMeshletDispatches), RenderGraphResourceAccess::StorageWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::ShadowMeshletDispatchBuildPass");
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUBuildShadowMeshletDispatchPipeline");
+				command.BindPipeline(pipeline);
+
+				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				auto& pushConstantData = s_ShadowCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				command.BindPushConstant(pushConstant);
+				command.DispatchCompute(1, 1, 1);
+			};
+		});
+
+		renderGraph->AddPass(TargetQueueFamily::Compute, "ShadowMeshletCullPass", [=, *this](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUObjectsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUMeshesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUMeshLODsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUSubmeshesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUMeshletsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUCullViewsBuffer), RenderGraphResourceAccess::StorageRead);
+
+			build.ReadBuffer(RGResource(ShadowVisibleSubmeshes), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(ShadowVisibleSubmeshCount), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(ShadowMeshletDispatches), RenderGraphResourceAccess::IndirectRead);
+
+			build.WriteBuffer(RGResource(ShadowVisibleDraws), RenderGraphResourceAccess::StorageWrite);
+			build.WriteBuffer(RGResource(ShadowIndirectCommands), RenderGraphResourceAccess::StorageWrite);
+			build.WriteBuffer(RGResource(ShadowDrawCounts), RenderGraphResourceAccess::StorageReadWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& command) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::ShadowMeshletCullPass");
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("GPUCullShadowMeshletsPipeline");
+				command.BindPipeline(pipeline);
+				command.BindAllDescriptorSets();
+
+				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				auto& pushConstantData = s_ShadowCullPushConstants[Renderer::GetCurrentFrameIndex()];
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				command.BindPushConstant(pushConstant);
+				command.DispatchComputeIndirect(registry.GetBuffer(RGResource(ShadowMeshletDispatches)), 0);
+			};
+		});
+
+		renderGraph->AddPass(TargetQueueFamily::Graphics, "ShadowDrawPass", [=](RenderGraphBuilder& build) {
 			build.SetViewportArea(m_ShadowMapSize, m_ShadowMapSize);
+
+			build.SetInFlightMode(true);
 			build.SetClearColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 
 			build.DeclareImage(RGResource(ShadowImages), {
 				.Width = m_ShadowMapSize,
 				.Height = m_ShadowMapSize,
 				.ImageType = ImageType::Type2D,
-				.ImageUsage = ImageUsage::AsColorAttachment,
-				.Format = ImageFormat::R16G16_SFLOAT,
-				.Layers = ShadowPass::NUM_CASCADES,
-				.GenerateSampler = true,
-			}, RenderPassLoadStoreAttachments::ClearStore, 
+				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
+				.Layers = RenderDeviceSceneGlobalData::NUM_CASCADES,
+				.Format = ImageFormat::R32G32_SFLOAT,
+				.GenerateSampler = true
+				}, RenderPassLoadStoreAttachments::ClearStore,
 				RGResource(VSMDepth), {
-				.Width = m_ShadowMapSize,
-				.Height = m_ShadowMapSize,
-				.ImageType = ImageType::Type2D,
-				.ImageUsage = ImageUsage::AsDepthAttachment,
-				.Format = ImageFormat::D32_SFLOAT,
-				.Layers = ShadowPass::NUM_CASCADES,
-				.GenerateSampler = true,
-			}, RenderPassLoadStoreAttachments::ClearStore);
+					.Width = m_ShadowMapSize,
+					.Height = m_ShadowMapSize,
+					.ImageType = ImageType::Type2D,
+					.ImageUsage = ImageUsage::AsDepthAttachment,
+					.Layers = RenderDeviceSceneGlobalData::NUM_CASCADES,
+					.Format = ImageFormat::D32_SFLOAT
+				}, RenderPassLoadStoreAttachments::ClearStore
+			);
+
+			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUObjectsBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUSubmeshesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUVerticesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUIndicesBuffer), RenderGraphResourceAccess::IndexRead);
+
+			build.ReadBuffer(RGResource(ShadowVisibleDraws), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(ShadowIndirectCommands), RenderGraphResourceAccess::IndirectRead);
+			build.ReadBuffer(RGResource(ShadowDrawCounts), RenderGraphResourceAccess::IndirectRead);
 
 			build.BindRenderTarget(RGResource(ShadowImages), RGResource(VSMDepth));
 
-			const auto& editorCamera = m_Scene->GetEditorCamera();
-			InitializeShadowCameras(m_ShadowMapSize, editorCamera);
-
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::ShadowDrawPass");
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("VSMPipeline");
-				const auto& depthShader = pipeline->GetShader();
-				
-				if (auto cameraBuffer = depthShader->GetUniformBufferIfExists("LucyCamera")) {
-					ShadowCamera::ResetSplit();
-					for (ShadowCamera& shadowCamera : s_ShadowCameras) {
-						shadowCamera.Update();
-						
-						const auto& vp = shadowCamera.GetCameraViewProjection();
-						cameraBuffer->Append((uint8_t*)&vp, sizeof(vp));
-					}
-				}
-
-				RenderCommand& draw = cmdList.BeginRenderCommand("VSM Draw");
 				draw.BindPipeline(pipeline);
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
+				draw.BindBuffers(registry.GetBuffer(RGResource(GPUIndicesBuffer)));
 
-				m_Scene->ViewRForEach<MeshComponent, TransformComponent>([&](MeshComponent& meshComponent, TransformComponent& transformComponent) {
-					draw.DrawIndexedMesh(meshComponent.GetMesh(), transformComponent.GetMatrix());
-				});
+				struct LocalPushConstant {
+					RenderDeviceBufferReference VisibleDraws;
+				};
 
-				cmdList.EndRenderCommand();
+				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+
+				uint64_t visibleDrawStride = static_cast<uint64_t>(commandCapacity) * sizeof(RenderDeviceVisibleDrawData);
+				uint64_t indirectCommandStride = static_cast<uint64_t>(commandCapacity) * sizeof(VkDrawIndexedIndirectCommand);
+
+				GlobalPushConstant<LocalPushConstant> pushConstantData{
+					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+					.Data = {
+						.VisibleDraws = registry.GetBuffer(RGResource(ShadowVisibleDraws))->GetDeviceAddress(),
+					}
+				};
+
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+				draw.BindPushConstant(pushConstant);
+
+				draw.DrawIndexedIndirectCount(registry.GetBuffer(RGResource(ShadowIndirectCommands)), 0,
+					registry.GetBuffer(RGResource(ShadowDrawCounts)), 0, commandCapacity, sizeof(VkDrawIndexedIndirectCommand));
 			};
 		});
 
-		/*
-		renderGraph->AddPass("VSMBlurCompute", [=, *this](RenderGraphBuilder& build) {
+		enum class GaussianBlurDirection : uint8_t {
+			Horizontal,
+			Vertical
+		};
 
-			build.BindRenderTarget(RGResource(ShadowImages), RGResource(VSMDepth));
+		const auto ExecuteGaussianBlur = [=](RenderGraphRegistry& registry, RenderCommand& cmd, GaussianBlurDirection direction) {
+			LUCY_PROFILE_NEW_EVENT("RendererPasses::ExecuteGaussianBlur");
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
-				const auto& horPipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("VSMBlurHorizontalComputePipeline");
-				const auto& verPipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("VSMBlurHorizontalComputePipeline");
+			const auto& shadowImages = registry.GetImage(RGResource(ShadowImages));
+			const auto& shadowImagesBlurred = registry.GetImage(RGResource(ShadowImagesBlurred));
+			const auto& shadowImagesFinal = registry.GetImage(RGResource(ShadowImagesFinal));
 
-				Ref<Image> shadowImages = registry.GetImage(RGResource(ShadowImages));
-				RenderCommand& horCmd = cmdList.BeginRenderCommand("VSMBlurHorizontalCompute");
-				//draw.DownsampleImage(shadowImages, 8.0f);
+			auto width = shadowImages->GetWidth();
+			auto height = shadowImages->GetHeight();
 
-				horCmd.BindPipeline(horPipeline);
+			const auto& blurPipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>(direction == GaussianBlurDirection::Horizontal 
+				? "VSMHorizontalBlurComputePipeline" : "VSMVerticalBlurComputePipeline");
+			auto& pushConstant = blurPipeline->GetPipelineConstants("PushConstants");
 
-				horCmd.UpdateDescriptorSets();
-				horCmd.BindAllDescriptorSets();
-				//horCmd.DispatchCompute();
+			cmd.BindPipeline(blurPipeline);
 
-				cmdList.EndRenderCommand();
-
-				RenderCommand& verCmd = cmdList.BeginRenderCommand("VSMBlurVerticalCompute");
-
-				verCmd.BindPipeline(verPipeline);
-
-				//verCmd.UpsampleImage(shadowImages, 8.0f);
-				cmdList.EndRenderCommand();
+			struct BlurData {
+				int32_t BlurData[4];            // x, y, width, height
+				uint32_t TextureIndicesData[4]; // x: input texture index, y: output texture index, z: sampler index, w: unused
 			};
+
+			if (direction == GaussianBlurDirection::Horizontal) {
+				uint32_t inputIndex = cmd.BindImageHandleTo("TextureArrays2D_Float2", shadowImages);
+				uint32_t outputIndex = cmd.BindImageHandleTo("StorageTextureArrays2D_Float2", shadowImagesBlurred);
+				uint32_t samplerIndex = cmd.GetLinearRepeatSampler();
+
+				BlurData data = {
+					.BlurData = { 1, 0, width, height },
+					.TextureIndicesData = { inputIndex, outputIndex, samplerIndex, 0 }
+				};
+
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&data), sizeof(data));
+			} else {
+				uint32_t inputIndex = cmd.BindImageHandleTo("TextureArrays2D_Float2", shadowImagesBlurred);
+				uint32_t outputIndex = cmd.BindImageHandleTo("StorageTextureArrays2D_Float2", shadowImagesFinal);
+				uint32_t samplerIndex = cmd.GetLinearRepeatSampler();
+
+				BlurData data = {
+					.BlurData = { 0, 1, width, height },
+					.TextureIndicesData = { inputIndex, outputIndex, samplerIndex, 0 }
+				};
+
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&data), sizeof(data));
+			}
+
+			cmd.UpdateDescriptorSets();
+			cmd.BindAllDescriptorSets();
+			cmd.BindPushConstant(pushConstant);
+			cmd.DispatchCompute((width + 7) / 8, (height + 7) / 8, RenderDeviceSceneGlobalData::NUM_CASCADES);
+		};
+
+		renderGraph->AddPass(TargetQueueFamily::Compute, "VSMHorizontalBlurCompute", [=, *this](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.DeclareImage(RGResource(ShadowImagesBlurred), {
+				.Width = m_ShadowMapSize,
+				.Height = m_ShadowMapSize,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
+				.Layers = RenderDeviceSceneGlobalData::NUM_CASCADES,
+				.Format = ImageFormat::R32G32_SFLOAT,
+				.GenerateSampler = true,
+			}, RenderPassLoadStoreAttachments::ClearDontCare);
+
+			build.ReadImage(RGResource(ShadowImages), RenderGraphResourceAccess::ShaderSampledRead);
+			build.WriteImage(RGResource(ShadowImagesBlurred), RenderGraphResourceAccess::StorageWrite);
+
+			return std::bind(
+				ExecuteGaussianBlur,
+				std::placeholders::_1,
+				std::placeholders::_2,
+				GaussianBlurDirection::Horizontal
+			);
 		});
-		*/
+
+		renderGraph->AddPass(TargetQueueFamily::Compute, "VSMVerticalBlurCompute", [=, *this](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.DeclareImage(RGResource(ShadowImagesFinal), {
+				.Width = m_ShadowMapSize,
+				.Height = m_ShadowMapSize,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
+				.Layers = RenderDeviceSceneGlobalData::NUM_CASCADES,
+				.Format = ImageFormat::R32G32_SFLOAT,
+				.GenerateSampler = true,
+			}, RenderPassLoadStoreAttachments::ClearDontCare);
+			
+			build.ReadImage(RGResource(ShadowImagesBlurred), RenderGraphResourceAccess::ShaderSampledRead);
+			build.WriteImage(RGResource(ShadowImagesFinal), RenderGraphResourceAccess::StorageWrite);
+
+			return std::bind(
+				ExecuteGaussianBlur,
+				std::placeholders::_1,
+				std::placeholders::_2,
+				GaussianBlurDirection::Vertical
+			);
+		});
 	}
 
 	// The method is explained well here
 	// https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-10-parallel-split-shadow-maps-programmable-gpus
 	void ShadowPass::InitializeShadowCameras(uint32_t size, const EditorCamera& editorCamera) const {
-		static constexpr float lambda = 1.0f;
-		static float cascadeSplits[NUM_CASCADES];
+		static constexpr float lambda = 0.95f;
+		static float cascadeSplits[RenderDeviceSceneGlobalData::NUM_CASCADES];
 
 		float n = editorCamera.GetNearPlane() * ShadowCamera::GetNearPlaneFactor();
 		float f = editorCamera.GetFarPlane() * ShadowCamera::GetFarPlaneFactor();
@@ -280,15 +933,18 @@ namespace Lucy {
 		float range = maxZ - minZ;
 		float ratio = maxZ / minZ;
 
-		for (uint32_t i = 0; i < NUM_CASCADES; i++) {
-			float iDivM = (i + 1) / (float)NUM_CASCADES;
-			float C_iLog = n * std::pow(ratio, iDivM);
+		for (uint32_t i = 0; i < RenderDeviceSceneGlobalData::NUM_CASCADES; i++) {
+			float iDivM = (i + 1) / (float)RenderDeviceSceneGlobalData::NUM_CASCADES;
+			float C_iLog = minZ * std::pow(ratio, iDivM);
 			float C_iUniform = minZ + range * iDivM;
 			float C_i = lambda * (C_iLog - C_iUniform) + C_iUniform;
 			cascadeSplits[i] = (C_i - n) / clipRange;
 		}
 
-		for (uint32_t i = 0; i < NUM_CASCADES; i++)
+		s_ShadowCameras.clear();
+		s_ShadowCameras.reserve(RenderDeviceSceneGlobalData::NUM_CASCADES);
+
+		for (uint32_t i = 0; i < RenderDeviceSceneGlobalData::NUM_CASCADES; i++)
 			s_ShadowCameras.emplace_back(size, editorCamera, cascadeSplits[i]);
 	}
 
@@ -303,7 +959,7 @@ namespace Lucy {
 		m_CascadeSplitDepth = n + m_CascadeSplit * clipRange;
 	}
 
-	ShadowCamera::ShadowCamera(uint32_t size, const EditorCamera& editorCamera, float cascadeSplit) 
+	ShadowCamera::ShadowCamera(uint32_t size, const EditorCamera& editorCamera, float cascadeSplit)
 		: OrthographicCamera(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f), m_ShadowMapSize(size), m_EditorCamera(editorCamera), m_CascadeSplit(cascadeSplit) {
 		UpdateView();
 
@@ -352,19 +1008,19 @@ namespace Lucy {
 
 		// Calculating the frustum based on this method, which incorpartes a circle to approximate the bounds of each frustum.
 		// https://johanmedestrom.wordpress.com/2016/03/18/opengl-cascaded-shadow-maps/
-		//float radius = 0.0f;
-		//for (uint32_t i = 0; i < frustumCornerCount; i++) {
-		//	float distance = glm::length(frustumCornersWS[i] - frustumCenter);
-		//	radius = glm::max(radius, distance);
-		//}
-		//radius = std::ceil(radius * 16.0f) / 16.0f;
-		//
-		//glm::vec3 maxExtents = glm::vec3(radius, radius, radius);
-		//glm::vec3 minExtents = -maxExtents;
+		float radius = 0.0f;
+		for (uint32_t i = 0; i < frustumCornerCount; i++) {
+			float distance = glm::length(frustumCornersWS[i] - frustumCenter);
+			radius = glm::max(radius, distance);
+		}
+		radius = std::ceil(radius * 16.0f) / 16.0f;
+		
+		glm::vec3 maxExtents = glm::vec3(radius, radius, radius);
+		glm::vec3 minExtents = -maxExtents;
 
 		const auto& lightDir = GetRotation();
 
-		float radiusDistWS = std::ceil((frustumCornersWS[0] - frustumCornersWS[6]).length() * 16.0f) / 2.0f;
+		float radiusDistWS = std::ceil(glm::length(frustumCornersWS[0] - frustumCornersWS[6]) * 16.0f) / 16.0f;
 
 		float texelsPerUnitWS = m_ShadowMapSize / (radiusDistWS * 2.0f);
 
@@ -380,18 +1036,29 @@ namespace Lucy {
 		glm::vec3 snappedCenter = glm::inverse(scaledLightLookAt) * scaledCenter;
 
 		glm::vec3 eye = snappedCenter - (lightDir * radiusDistWS * 2.0f);
-		
+
 		m_ViewMatrix = glm::mat4(1.0f);
 		m_ViewMatrix = glm::lookAt(eye, snappedCenter, s_UpDir);
 
-		m_Left = -radiusDistWS;
-		m_Right = radiusDistWS;
-		m_Bottom = -radiusDistWS;
-		m_Top = radiusDistWS;
-		m_NearPlane = -radiusDistWS * 6.0f;
-		m_FarPlane = radiusDistWS * 6.0f;
+		m_Left = minExtents.x;
+		m_Right = maxExtents.x;
+		m_Bottom = minExtents.y;
+		m_Top = maxExtents.y;
+		m_NearPlane = minExtents.z * 6.0f;
+		m_FarPlane = maxExtents.z * 6.0f;
+
+		UpdateProjection();
 
 		s_LastSplitDist = m_CascadeSplit;
+	}
+
+	void ShadowCamera::CreateCullView(const Ref<RenderDevice>& device) {
+		m_CullViewHandle = device->GetScene()->RegisterCullView({
+			.Data = {
+				INVALID_INDEX, INVALID_INDEX, 0,
+				static_cast<uint32_t>(GPUCullViewFlags::EnableFrustumCulling) | static_cast<uint32_t>(GPUCullViewFlags::Orthographic)
+			}
+		});
 	}
 
 	void ShadowCamera::ResetSplit() {
@@ -399,6 +1066,504 @@ namespace Lucy {
 	}
 
 #pragma endregion ShadowPass
+
+#pragma region DDGI
+
+	DDGIPass::DDGIPass(const Ref<Scene>& scene, uint32_t width, uint32_t height) 
+		: m_Scene(scene), m_Width(width), m_Height(height) {
+	}
+
+	void DDGIPass::AddPass(const Ref<RenderGraph>& renderGraph) {
+
+		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGIProbePriorityPass", [](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.DeclareBuffer(RGResource(DDGIProbePriorities), {
+				.DebugName = "DDGIProbePriorities",
+				.Size = s_ProbeCount * sizeof(uint32_t),
+				.Usage = BufferUsage::Storage
+			});
+
+			build.DeclareBuffer(RGResource(DDGIProbeUpdateList), {
+				.DebugName = "DDGIProbeUpdateList",
+				.Size = s_ProbeCount * sizeof(uint32_t),
+				.Usage = BufferUsage::Storage
+			});
+
+			build.DeclareBuffer(RGResource(DDGIProbeUpdateMask), {
+				.DebugName = "DDGIProbeUpdateMask",
+				.Size = s_ProbeCount * sizeof(uint32_t),
+				.Usage = BufferUsage::Storage
+			});
+
+			build.DeclareBuffer(RGResource(DDGIProbeSelectionCounter), {
+				.DebugName = "DDGIProbeSelectionCounter",
+				.Size = sizeof(uint32_t),
+				.Usage = BufferUsage::Storage
+			});
+
+			build.DeclareBuffer(RGResource(DDGIProbeLastUpdateFrames), {
+				.DebugName = "DDGIProbeLastUpdateFrames",
+				.Size = s_ProbeCount * sizeof(uint32_t),
+				.Usage = BufferUsage::Storage
+			});
+
+			build.ReadBuffer(RGResource(DDGIProbeOffsets), RenderGraphResourceAccess::StorageRead);
+
+			build.WriteBuffer(RGResource(DDGIProbePriorities), RenderGraphResourceAccess::StorageWrite);
+			build.WriteBuffer(RGResource(DDGIProbeUpdateMask), RenderGraphResourceAccess::StorageWrite);
+			build.WriteBuffer(RGResource(DDGIProbeLastUpdateFrames), RenderGraphResourceAccess::StorageWrite);
+
+			struct DDGIProbePriorityData {
+				RenderDeviceBufferReference ProbePriorities;
+				RenderDeviceBufferReference ProbeUpdateMask;
+
+				RenderDeviceBufferReference LastUpdateFrames;
+				RenderDeviceBufferReference LastUpdateFrameHistory;
+
+				RenderDeviceBufferReference ProbeOffsetHistory;
+
+				glm::vec4 ProbeOriginAndMaxDistance;
+				glm::vec4 ProbeSpacingAndNearDistance;
+				glm::vec4 SchedulingData;
+
+				glm::uvec4 ProbeCountsAndFrame;
+			};
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::DDGIProbePriorityPass");
+
+				const auto& settings = Renderer::GetRendererSettings();
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("DDGIProbePriorityPipeline");
+
+				cmd.BindPipeline(pipeline);
+
+				uint32_t currentFrameIndex = Renderer::GetCurrentFrameIndex();
+				uint32_t maxFramesInFlight = Renderer::GetMaxFramesInFlight();
+				uint32_t previousFrameIndex = (currentFrameIndex + maxFramesInFlight - 1) % maxFramesInFlight;
+
+				float minProbeSpacing = glm::min(s_ProbeSpacing.x, glm::min(s_ProbeSpacing.y, s_ProbeSpacing.z));
+
+				float nearDistance = minProbeSpacing * settings.DDGINearProbeRadius;
+				float midDistance = minProbeSpacing * settings.DDGIMidProbeRadius;
+
+				GlobalPushConstant<DDGIProbePriorityData> pushConstantData{
+					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+					.Data = {
+						.ProbePriorities = registry.GetBuffer(RGResource(DDGIProbePriorities), currentFrameIndex)->GetDeviceAddress(),
+						.ProbeUpdateMask = registry.GetBuffer(RGResource(DDGIProbeUpdateMask), currentFrameIndex)->GetDeviceAddress(),
+						.LastUpdateFrames = registry.GetBuffer(RGResource(DDGIProbeLastUpdateFrames), currentFrameIndex)->GetDeviceAddress(),
+						.LastUpdateFrameHistory = registry.GetBuffer(RGResource(DDGIProbeLastUpdateFrames), previousFrameIndex)->GetDeviceAddress(),
+						.ProbeOffsetHistory = registry.GetBuffer(RGResource(DDGIProbeOffsets), previousFrameIndex)->GetDeviceAddress(),
+						.ProbeOriginAndMaxDistance = glm::vec4{ s_ProbeOrigin, s_MaxRayDistance },
+						.ProbeSpacingAndNearDistance = glm::vec4{ s_ProbeSpacing, nearDistance },
+						.SchedulingData = glm::vec4{ midDistance, static_cast<float>(settings.DDGIMaxProbeAge), 0.0f, 0.0f },
+						.ProbeCountsAndFrame = glm::uvec4{ s_ProbeCounts, static_cast<uint32_t>(Renderer::GetFrameNumber()) }
+					}
+				};
+
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				cmd.BindPushConstant(pushConstant);
+				cmd.BindAllDescriptorSets();
+
+				cmd.DispatchCompute((s_ProbeCount + 63) / 64, 1, 1);
+			};
+		});
+
+		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGIProbeSelectionResetPass", [](RenderGraphBuilder& build) {
+			build.WriteBuffer(RGResource(DDGIProbeSelectionCounter), RenderGraphResourceAccess::TransferWrite);
+			return [](RenderGraphRegistry& registry, RenderCommand& cmd) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::DDGIProbeSelectionResetPass");
+				cmd.FillBuffer(registry.GetBuffer(RGResource(DDGIProbeSelectionCounter)), 0, sizeof(uint32_t), 0);
+			};
+		});
+
+		const auto AddProbeSelectionPass = [renderGraph](const char* passName, uint32_t priorityLevel) {
+			renderGraph->AddPass(TargetQueueFamily::Compute, passName, [priorityLevel](RenderGraphBuilder& build) {
+				build.SetInFlightMode(true);
+
+				build.ReadBuffer(RGResource(DDGIProbePriorities), RenderGraphResourceAccess::StorageRead);
+
+				build.WriteBuffer(RGResource(DDGIProbeUpdateList), RenderGraphResourceAccess::StorageWrite);
+				build.WriteBuffer(RGResource(DDGIProbeUpdateMask), RenderGraphResourceAccess::StorageReadWrite);
+				build.WriteBuffer(RGResource(DDGIProbeSelectionCounter), RenderGraphResourceAccess::StorageReadWrite);
+				build.WriteBuffer(RGResource(DDGIProbeLastUpdateFrames), RenderGraphResourceAccess::StorageReadWrite);
+
+				struct DDGIProbeSelectionData {
+					RenderDeviceBufferReference ProbePriorities;
+
+					RenderDeviceBufferReference ProbeUpdateList;
+					RenderDeviceBufferReference ProbeUpdateMask;
+
+					RenderDeviceBufferReference SelectionCounter;
+					RenderDeviceBufferReference LastUpdateFrames;
+
+					glm::uvec4 SelectionData;
+				};
+
+				return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
+					LUCY_PROFILE_NEW_EVENT("RendererPasses::DDGIProbeSelectionPass");
+
+					const auto& settings = Renderer::GetRendererSettings();
+					const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("DDGIProbeSelectionPipeline");
+
+					cmd.BindPipeline(pipeline);
+
+					uint32_t probeUpdateCount = s_ProbeCount;
+
+					if (settings.DDGIAdaptiveUpdates && Renderer::GetFrameNumber() > 0) {
+						probeUpdateCount = static_cast<uint32_t>(std::ceil(static_cast<float>(s_ProbeCount) * settings.DDGIProbeUpdateFraction));
+						probeUpdateCount = std::clamp(probeUpdateCount, 1u, s_ProbeCount);
+					}
+
+					GlobalPushConstant<DDGIProbeSelectionData> pushConstantData{
+						.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+						.Data = {
+							.ProbePriorities = registry.GetBuffer(RGResource(DDGIProbePriorities))->GetDeviceAddress(),
+							.ProbeUpdateList = registry.GetBuffer(RGResource(DDGIProbeUpdateList))->GetDeviceAddress(),
+							.ProbeUpdateMask = registry.GetBuffer(RGResource(DDGIProbeUpdateMask))->GetDeviceAddress(),
+							.SelectionCounter = registry.GetBuffer(RGResource(DDGIProbeSelectionCounter))->GetDeviceAddress(),
+							.LastUpdateFrames = registry.GetBuffer(RGResource(DDGIProbeLastUpdateFrames))->GetDeviceAddress(),
+							.SelectionData = glm::uvec4{ s_ProbeCount, probeUpdateCount, priorityLevel, static_cast<uint32_t>(Renderer::GetFrameNumber()) }
+						}
+					};
+
+					PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+					pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+					cmd.BindPushConstant(pushConstant);
+					cmd.BindAllDescriptorSets();
+
+					cmd.DispatchCompute((s_ProbeCount + 63) / 64, 1, 1);
+				};
+			});
+		};
+		
+		AddProbeSelectionPass("DDGIProbeSelectionPriority3Pass", 3);
+		AddProbeSelectionPass("DDGIProbeSelectionPriority2Pass", 2);
+		AddProbeSelectionPass("DDGIProbeSelectionPriority1Pass", 1);
+		AddProbeSelectionPass("DDGIProbeSelectionPriority0Pass", 0);
+
+		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGITracePass", [*this](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.DeclareBuffer(RGResource(DDGIRayResults), {
+				.DebugName = "DDGIRayResults",
+				.Size = s_ProbeCount * s_RaysPerProbe * sizeof(RenderDeviceDDGIRayResult),
+				.Usage = BufferUsage::Storage
+			});
+
+			build.DeclareBuffer(RGResource(DDGIProbeOffsets), {
+				.DebugName = "DDGIProbeOffsets",
+				.Size = s_ProbeCount * sizeof(glm::vec4),
+				.Usage = BufferUsage::Storage
+			});
+
+			build.DeclareImage(RGResource(DDGIIrradianceAtlas), {
+				.Width = s_ProbeColumns * s_IrradianceTileSize,
+				.Height = s_ProbeRows * s_IrradianceTileSize,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
+				.Format = ImageFormat::R16G16B16A16_SFLOAT,
+				.GenerateSampler = true,
+				.ImGuiUsage = true,
+			}, RenderPassLoadStoreAttachments::ClearStore);
+
+			build.DeclareImage(RGResource(DDGIDepthAtlas), {
+				.Width = s_ProbeColumns * s_DepthTileSize,
+				.Height = s_ProbeRows * s_DepthTileSize,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
+				.Format = ImageFormat::R16G16_SFLOAT,
+				.GenerateSampler = true,
+				.ImGuiUsage = true,
+			}, RenderPassLoadStoreAttachments::ClearStore);
+
+			build.ReadImage(RGResource(DDGIIrradianceAtlas), RenderGraphResourceAccess::ShaderSampledRead);
+			build.ReadImage(RGResource(DDGIDepthAtlas), RenderGraphResourceAccess::ShaderSampledRead);
+
+			build.ReadBuffer(RGResource(DDGIProbeUpdateList), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(DDGIProbeOffsets), RenderGraphResourceAccess::StorageRead);
+
+			build.WriteBuffer(RGResource(DDGIRayResults), RenderGraphResourceAccess::StorageWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::DDGITracePass");
+				const auto& settings = Renderer::GetRendererSettings();
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<RayTracingPipeline>("DDGITracePipeline");
+				cmd.BindPipeline(pipeline);
+
+				uint32_t prefilterImageIndex = INVALID_INDEX;
+				bool imageBound = false;
+
+				m_Scene->ViewForEach<HDRCubemapComponent>([&imageBound, &prefilterImageIndex, &cmd, &registry](const HDRCubemapComponent& hdrComponent) {
+					if (!hdrComponent.IsPrimary || imageBound)
+						return;
+					prefilterImageIndex = cmd.BindImageHandleTo("CubeTextures", registry.GetImage(RGResource(PrefilterImage)));
+					imageBound = true;
+				});
+
+				if (!imageBound)
+					prefilterImageIndex = cmd.BindImageHandleTo("CubeTextures", Renderer::GetBlankCubeImage());
+
+				uint32_t currentFrameIndex = Renderer::GetCurrentFrameIndex();
+				uint32_t previousFrameIndex = (currentFrameIndex + Renderer::GetMaxFramesInFlight() - 1) % Renderer::GetMaxFramesInFlight();
+
+				const auto& irradianceHistory = registry.GetImage(RGResource(DDGIIrradianceAtlas), previousFrameIndex);
+				const auto& depthHistory = registry.GetImage(RGResource(DDGIDepthAtlas), previousFrameIndex);
+				const auto& probeOffsetHistory = registry.GetBuffer(RGResource(DDGIProbeOffsets), previousFrameIndex);
+
+				uint32_t irradianceHistoryIndex = cmd.BindImageHandleTo("Textures2D", irradianceHistory);
+				uint32_t depthHistoryIndex = cmd.BindImageHandleTo("Textures2D_Float2", depthHistory);
+
+				GlobalPushConstant<RenderDeviceDDGITraceData> pushConstantData{
+					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+					.Data = {
+						.RayResults = registry.GetBuffer(RGResource(DDGIRayResults))->GetDeviceAddress(),
+						.ProbeOffsets = probeOffsetHistory->GetDeviceAddress(),
+						.ProbeUpdateList = registry.GetBuffer(RGResource(DDGIProbeUpdateList))->GetDeviceAddress(),
+						.EnvironmentMap = {
+							.TextureIndex = prefilterImageIndex,
+							.SamplerIndex = cmd.GetLinearClampSampler().Index
+						},
+						.IrradianceHistory = {
+							.TextureIndex = irradianceHistoryIndex,
+							.SamplerIndex = cmd.GetLinearClampSampler().Index
+						},
+						.DepthHistory = {
+							.TextureIndex = depthHistoryIndex,
+							.SamplerIndex = cmd.GetLinearClampSampler().Index
+						},
+						.ProbeOriginAndMaxDistance = glm::vec4{ s_ProbeOrigin, s_MaxRayDistance },
+						.ProbeSpacing = glm::vec4{ s_ProbeSpacing, settings.EnvironmentIntensity },
+						.ProbeCountsAndRays = glm::uvec4{ s_ProbeCounts, s_RaysPerProbe },
+						.FrameNumber = static_cast<uint32_t>(Renderer::GetFrameNumber())
+					}
+				};
+
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				cmd.BindPushConstant(pushConstant);
+				bool tlasExists = cmd.UpdateDescriptorSets("u_TLAS");
+				if (!tlasExists)
+					return;
+				cmd.BindAllDescriptorSets();
+
+				uint32_t probeUpdateCount = s_ProbeCount;
+				if (settings.DDGIAdaptiveUpdates && Renderer::GetFrameNumber() > 0) {
+					probeUpdateCount = static_cast<uint32_t>(std::ceil(static_cast<float>(s_ProbeCount) * settings.DDGIProbeUpdateFraction));
+					probeUpdateCount = std::clamp(probeUpdateCount, 1u, s_ProbeCount);
+				}
+				cmd.TraceRays(s_RaysPerProbe, probeUpdateCount, 1);
+			};
+		});
+
+		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGIProbeRelocationPass", [](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.ReadBuffer(RGResource(DDGIProbeUpdateMask), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(DDGIRayResults), RenderGraphResourceAccess::StorageRead);
+
+			build.WriteBuffer(RGResource(DDGIProbeOffsets), RenderGraphResourceAccess::StorageReadWrite);
+
+			struct DDGIProbeRelocationData {
+				RenderDeviceBufferReference RayResults;
+				RenderDeviceBufferReference ProbeOffsets;
+				RenderDeviceBufferReference ProbeOffsetHistory;
+				RenderDeviceBufferReference ProbeUpdateMask;
+
+				glm::vec4 ProbeSpacingAndMinFrontfaceDistance;
+				glm::uvec4 ProbeCountsAndRays;
+
+				glm::vec4 RelocationData;
+
+				uint32_t FrameNumber;
+			};
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::DDGIProbeRelocationPass");
+
+				uint32_t currentFrameIndex = Renderer::GetCurrentFrameIndex();
+				uint32_t previousFrameIndex = (currentFrameIndex + Renderer::GetMaxFramesInFlight() - 1) % Renderer::GetMaxFramesInFlight();
+
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("DDGIProbeRelocationPipeline");
+
+				cmd.BindPipeline(pipeline);
+
+				GlobalPushConstant<DDGIProbeRelocationData> pushConstantData{
+					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+					.Data = {
+						.RayResults = registry.GetBuffer(RGResource(DDGIRayResults), currentFrameIndex)->GetDeviceAddress(),
+						.ProbeOffsets = registry.GetBuffer(RGResource(DDGIProbeOffsets), currentFrameIndex)->GetDeviceAddress(),
+						.ProbeOffsetHistory = registry.GetBuffer(RGResource(DDGIProbeOffsets), previousFrameIndex)->GetDeviceAddress(),
+						.ProbeUpdateMask = registry.GetBuffer(RGResource(DDGIProbeUpdateMask))->GetDeviceAddress(),
+						.ProbeSpacingAndMinFrontfaceDistance = glm::vec4{ DDGIPass::GetProbeSpacing(), DDGIPass::GetProbeMinFrontfaceDistance() },
+						.ProbeCountsAndRays = glm::uvec4{ DDGIPass::GetProbeCounts(), DDGIPass::GetRaysPerProbe() },
+						.RelocationData = glm::vec4{ DDGIPass::GetProbeBackfaceThreshold(), DDGIPass::GetMaxRayDistance(), 0.02f, 0.20f },
+						.FrameNumber = static_cast<uint32_t>(Renderer::GetFrameNumber())
+					}
+				};
+
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				cmd.BindPushConstant(pushConstant);
+				cmd.BindAllDescriptorSets();
+
+				cmd.DispatchCompute((DDGIPass::GetProbeCount() + 63) / 64, 1, 1);
+			};
+		});
+
+		renderGraph->AddPass(TargetQueueFamily::Compute, "DDGIProbeUpdatePass", [](RenderGraphBuilder& build) {
+			build.SetInFlightMode(true);
+
+			build.ReadBuffer(RGResource(DDGIRayResults), RenderGraphResourceAccess::StorageRead);
+			build.ReadBuffer(RGResource(DDGIProbeUpdateMask), RenderGraphResourceAccess::StorageRead);
+
+			build.WriteImage(RGResource(DDGIIrradianceAtlas), RenderGraphResourceAccess::StorageWrite);
+			build.WriteImage(RGResource(DDGIDepthAtlas), RenderGraphResourceAccess::StorageWrite);
+
+			struct DDGIProbeUpdateData {
+				RenderDeviceBufferReference RayResults;
+				RenderDeviceBufferReference ProbeUpdateMask;
+
+				glm::uvec4 AtlasIndices;
+
+				glm::uvec4 ProbeCountsAndRays;
+				glm::uvec4 AtlasTexelData;
+
+				glm::vec2 DistanceData;
+
+				// x = irradiance hysteresis
+				// y = depth hysteresis
+				// z = history valid
+				glm::vec3 TemporalData;
+
+				uint32_t FrameNumber;
+			};
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::DDGIProbeUpdatePass");
+
+				uint32_t currentFrameIndex = Renderer::GetCurrentFrameIndex();
+				uint32_t maxFramesInFlight = Renderer::GetMaxFramesInFlight();
+				uint32_t previousFrameIndex = (currentFrameIndex + maxFramesInFlight - 1) % maxFramesInFlight;
+
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("DDGIProbeUpdatePipeline");
+
+				cmd.BindPipeline(pipeline);
+
+				const auto& irradianceAtlas = registry.GetImage(RGResource(DDGIIrradianceAtlas), currentFrameIndex);
+				const auto& depthAtlas = registry.GetImage(RGResource(DDGIDepthAtlas), currentFrameIndex);
+				const auto& irradianceHistory = registry.GetImage(RGResource(DDGIIrradianceAtlas), previousFrameIndex);
+				const auto& depthHistory = registry.GetImage(RGResource(DDGIDepthAtlas), previousFrameIndex);
+
+				uint32_t irradianceAtlasIndex = cmd.BindImageHandleTo("StorageTextures2D", irradianceAtlas);
+				uint32_t depthAtlasIndex = cmd.BindImageHandleTo("StorageTextures2D_Float2", depthAtlas);
+				uint32_t irradianceHistoryIndex = cmd.BindImageHandleTo("Textures2D", irradianceHistory);
+				uint32_t depthHistoryIndex = cmd.BindImageHandleTo("Textures2D_Float2", depthHistory);
+
+				bool historyValid = Renderer::GetFrameNumber() > 0;
+				GlobalPushConstant<DDGIProbeUpdateData> pushConstantData{
+					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+					.Data = {
+						.RayResults = registry.GetBuffer(RGResource(DDGIRayResults))->GetDeviceAddress(),
+						.ProbeUpdateMask = registry.GetBuffer(RGResource(DDGIProbeUpdateMask))->GetDeviceAddress(),
+						.AtlasIndices = glm::uvec4{ irradianceAtlasIndex, depthAtlasIndex, irradianceHistoryIndex, depthHistoryIndex },
+						.ProbeCountsAndRays = glm::uvec4{ s_ProbeCounts, s_RaysPerProbe },
+						.AtlasTexelData = glm::uvec4{ s_IrradianceTexels, s_IrradianceTileSize, s_DepthTexels, s_DepthTileSize },
+						.DistanceData = glm::vec2{ DDGIPass::GetMaxRayDistance(), 32.0f },
+						.TemporalData = glm::vec3{ 0.99f, 0.99f, historyValid ? 1.0f : 0.0f },
+						.FrameNumber = static_cast<uint32_t>(Renderer::GetFrameNumber())
+					}
+				};
+
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				cmd.BindPushConstant(pushConstant);
+				cmd.BindAllDescriptorSets();
+
+				// One workgroup per probe.
+				// numthreads(18,18,1)
+				cmd.DispatchCompute(s_ProbeCount, 1, 1);
+			};
+		});
+	}
+
+	DDGIProbeDebugPass::DDGIProbeDebugPass(const Ref<Scene>& scene, uint32_t width, uint32_t height) 
+		: m_Scene(scene), m_Width(width), m_Height(height) {
+		s_ProbeSphere = MeshFactory::CreateSphere(8, 12);
+	}
+
+	void DDGIProbeDebugPass::AddPass(const Ref<RenderGraph>& renderGraph) {
+		renderGraph->AddPass(TargetQueueFamily::Graphics, "DDGIProbeDebugPass", [width = m_Width, height = m_Height, *this](RenderGraphBuilder& build) {
+			build.SetViewportArea(width, height);
+			build.SetInFlightMode(true);
+
+			build.ReadImage(RGResource(DDGIIrradianceAtlas), RenderGraphResourceAccess::ShaderSampledRead);
+
+			build.ReadExternalBuffer(RGResource(GPUSceneBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUVerticesBuffer), RenderGraphResourceAccess::StorageRead);
+			build.ReadExternalBuffer(RGResource(GPUIndicesBuffer), RenderGraphResourceAccess::IndexRead);
+
+			build.ReadImage(RGResource(GeometryImage), RenderGraphResourceAccess::ColorAttachmentWrite);
+			build.ReadImage(RGResource(ObjectIDImage), RenderGraphResourceAccess::ColorAttachmentWrite);
+			build.ReadImage(RGResource(GeometryDepthImage), RenderGraphResourceAccess::DepthAttachmentWrite);
+
+			build.ReadBuffer(RGResource(DDGIProbeOffsets), RenderGraphResourceAccess::StorageRead);
+
+			build.BindRenderTarget(RGResource(GeometryImage), RGResource(GeometryDepthImage));
+			build.BindRenderTarget(RGResource(ObjectIDImage));
+
+			struct DDGIProbeDebugData {
+				RenderDeviceBufferReference ProbeOffsets;
+
+				glm::uvec3 IrradianceAtlasData;
+
+				glm::vec4 ProbeOriginAndRadius;
+				glm::vec3 ProbeSpacing;
+				glm::uvec3 ProbeCounts;
+			};
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
+				const auto& settings = Renderer::GetRendererSettings();
+				if (!settings.ShowProbeSpheres)
+					return;
+
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::DDGIProbeDebugPass");
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("DDGIProbeDebugPipeline");
+				cmd.BindPipeline(pipeline);
+
+				uint32_t currentFrameIndex = Renderer::GetCurrentFrameIndex();
+				auto irradianceAtlasHandle = cmd.BindImageHandleTo("Textures2D", registry.GetImage(RGResource(DDGIIrradianceAtlas), currentFrameIndex));
+
+				GlobalPushConstant<DDGIProbeDebugData> pushConstantData{
+					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+					.Data = {
+						.ProbeOffsets = registry.GetBuffer(RGResource(DDGIProbeOffsets), currentFrameIndex)->GetDeviceAddress(),
+						.IrradianceAtlasData = glm::uvec3{ irradianceAtlasHandle.Index, DDGIPass::GetIrradianceTexels(), DDGIPass::GetIrradianceTileSize() },
+						.ProbeOriginAndRadius = glm::vec4{ DDGIPass::GetProbeOrigin(), 0.08f},
+						.ProbeSpacing = DDGIPass::GetProbeSpacing(),
+						.ProbeCounts = DDGIPass::GetProbeCounts(),
+					}
+				};
+
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+				cmd.BindAllDescriptorSets();
+				cmd.BindPushConstant(pushConstant);
+				cmd.BindBuffers(registry.GetBuffer(RGResource(GPUIndicesBuffer)));
+
+				cmd.DrawIndexed(s_ProbeSphere->GetIndicesSize(), DDGIPass::GetProbeCount(), s_ProbeSphere->GetMyGlobalIndexOffset(), s_ProbeSphere->GetMyGlobalVertexOffset(), 0);
+			};
+		});
+	}
+
+#pragma endregion DDGI
 
 #pragma region CubemapPass
 
@@ -412,275 +1577,336 @@ namespace Lucy {
 			build.SetViewportArea(m_Width, m_Height);
 			build.SetInFlightMode(true);
 
-			build.ReadImage(RGResource(GeometryImage));
-			build.ReadImage(RGResource(GeometryDepthImage));
-			build.BindRenderTarget(RGResource(GeometryImage), RGResource(GeometryDepthImage));
+			build.ReadImage(RGResource(GeometryImage), RenderGraphResourceAccess::ColorAttachmentWrite);
+			build.ReadImage(RGResource(ObjectIDImage), RenderGraphResourceAccess::ColorAttachmentWrite);
+			build.ReadImage(RGResource(GeometryDepthImage), RenderGraphResourceAccess::DepthAttachmentWrite);
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			build.BindRenderTarget(RGResource(GeometryImage), RGResource(GeometryDepthImage));
+			build.BindRenderTarget(RGResource(ObjectIDImage));
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::CubemapPass");
+				
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("SkyboxPipeline");
-				const auto& hdrSkyboxShader = pipeline->GetShader();
+				const auto& settings = Renderer::GetRendererSettings();
 
 				bool imageBound = false;
+				const Unique<Mesh>& cubeMesh = Renderer::GetEnvCubeMesh();
 
-				m_Scene->ViewForEach<HDRCubemapComponent>([shader = hdrSkyboxShader, &imageBound](const HDRCubemapComponent& hdrComponent) {
+				draw.BindPipeline(pipeline);
+
+				uint32_t index = INVALID_INDEX;
+
+				m_Scene->ViewForEach<HDRCubemapComponent>([&imageBound, &index, &draw, &registry](const HDRCubemapComponent& hdrComponent) {
 					if (!hdrComponent.IsPrimary || imageBound)
 						return;
-					shader->BindImageHandleTo("u_EnvironmentMap", hdrComponent.GetCubemapImage());
+					index = draw.BindImageHandleTo("CubeTextures", registry.GetImage(RGResource(PrefilterImage)));
 					imageBound = true;
 				});
 
-				if (!hdrSkyboxShader->HasImageHandleBoundTo("u_EnvironmentMap"))
+				if (!imageBound) {
 					return;
-
-				if (auto cameraBuffer = hdrSkyboxShader->GetUniformBufferIfExists("LucyCamera")) {
-					const auto& vp = m_Scene->GetEditorCamera().GetCameraViewProjection();
-					cameraBuffer->SetData((uint8_t*)&vp, sizeof(vp));
 				}
 
-				const Ref<Mesh>& cubeMesh = Renderer::GetEnvCubeMesh();
-				RenderCommand& draw = cmdList.BeginRenderCommand("Skybox Draw");
+				struct LocalPushConstant {
+					glm::vec4 Data; // x: environment map index, y: sampler index, z: mip level, w: intensity
+				};
 
-				draw.BindPipeline(pipeline);
+				GlobalPushConstant<LocalPushConstant> pushConstantData {
+					registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+					{ .Data = { index, static_cast<float>(draw.GetLinearRepeatSampler().Index), settings.EnvironmentLOD, settings.EnvironmentIntensity }}
+				};
+
+				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
+				draw.BindPushConstant(pushConstant);
 				draw.DrawMesh(cubeMesh);
-
-				cmdList.EndRenderCommand();
 			};
 		});
 
 		renderGraph->AddPass(TargetQueueFamily::Graphics, "HDRImageToLayeredImage", [*this](RenderGraphBuilder& build) {
-			build.SetViewportArea(HDRImageWidth, HDRImageHeight);
+			build.SetViewportArea(HDRImageSize, HDRImageSize);
 
-			build.ReadExternalTransientImage(RGResource(OriginalHDRImage));
+			build.ReadExternalTransientImage(RGResource(OriginalHDRImage), RenderGraphResourceAccess::ShaderSampledRead);
 
 			build.DeclareImage(RGResource(HDRLayeredImage), {
-				.Width = HDRImageWidth,
-				.Height = HDRImageHeight,
-				.ImageType = ImageType::Type2D,
+				.Width = HDRImageSize,
+				.Height = HDRImageSize,
+				.ImageType = ImageType::TypeCube,
 				.ImageUsage = ImageUsage::AsColorTransferAttachment,
 				.Format = ImageFormat::R32G32B32A32_SFLOAT,
-				.Layers = 6,
 				.GenerateSampler = true,
-			}, RenderPassLoadStoreAttachments::DontCareDontCare);
+			}, RenderPassLoadStoreAttachments::DontCareStore);
 
 			build.BindRenderTarget(RGResource(HDRLayeredImage));
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
-				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("HDRImageToLayeredImageConvertPipeline");
-				const auto& shader = pipeline->GetShader();
+			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::HDRImageToLayeredImage");
+				static const glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
 
-				shader->BindImageHandleTo("u_EquirectangularMap", registry.GetExternalImage(RGResource(OriginalHDRImage)));
+				struct LocalPushConstant {
+					glm::mat4 CaptureProjection;
+					glm::uvec2 Data;
+				};
+
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("HDRImageToLayeredImageConvertPipeline");
 
 				const auto& cubeMesh = Renderer::GetEnvCubeMesh();
 				const uint32_t cubeMeshIndexCount = Renderer::GetEnvCubeMeshIndexCount();
-
-				RenderCommand& draw = cmdList.BeginRenderCommand("Cubemap Prep Draw");
 				draw.BindPipeline(pipeline);
+
+				uint32_t originalHDRImageIndex = draw.BindImageHandleTo("Textures2D", registry.GetImage(RGResource(OriginalHDRImage)));
+
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
-				draw.BindBuffers(cubeMesh);
+				draw.BindBuffers(registry.GetBuffer(RGResource(GPUIndicesBuffer)));
 
-				static const glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+				GlobalPushConstant<LocalPushConstant> localPushConstant{
+					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+					.Data = {
+						.CaptureProjection = captureProjection, 
+						.Data = { originalHDRImageIndex, draw.GetLinearRepeatSampler() } 
+					}
+				};
 
-				VulkanPushConstant& pushConstant = shader->GetPushConstants("LucyCameraPushConstants");
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
 
 				ByteBuffer pushConstantData;
-				pushConstantData.SetData((uint8_t*)&captureProjection, sizeof(captureProjection));
+				pushConstantData.SetData((uint8_t*)&localPushConstant, sizeof(localPushConstant));
 				pushConstant.SetData(pushConstantData);
 
-				for (uint32_t i = 0; i < 6; i++) {
-					draw.BindPushConstant(pushConstant);
-					draw.DrawIndexed(cubeMeshIndexCount, 1, 0, 0, 0);
-				}
-
-				cmdList.EndRenderCommand();
+				draw.BindPushConstant(pushConstant);
+				draw.DrawIndexed(cubeMeshIndexCount, 1, 0, 0, 0);
 			};
 		});
+	}
 
-		renderGraph->AddPass(TargetQueueFamily::Compute, "CopyToSampler2DCube", [*this](RenderGraphBuilder& build) {
-			build.ReadImage(RGResource(HDRLayeredImage));
-			build.WriteExternalImage(RGResource(HDRCubeImage));
+#pragma endregion CubemapPass
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
-				const Ref<Image>& preparedImage = registry.GetImage(RGResource(HDRLayeredImage));
-				const Ref<Image>& cubeImage = registry.GetExternalImage(RGResource(HDRCubeImage));
+#pragma region IrradiancePass
 
-				static constexpr uint32_t layerCount = 6;
+	IrradiancePass::IrradiancePass(Ref<Scene> scene, uint32_t size)
+		: m_Scene(scene), m_Size(size) {
+	}
 
-				RenderCommand& cmd = cmdList.BeginRenderCommand("CopyToSampler2DCube");
-				cmd.SetImageLayout(preparedImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 0, 0, 1, layerCount);
-				cmd.SetImageLayout(cubeImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0, 1, layerCount);
-
-				std::vector<VkImageCopy> regions;
-				regions.reserve(layerCount);
-
-				//copying the layered color attachment, to a sampler2DCube
-				for (uint32_t face = 0; face < layerCount; face++) {
-					VkImageCopy region = {
-						.srcSubresource = {
-							.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-							.mipLevel = 0,
-							.baseArrayLayer = face,
-							.layerCount = 1
-						},
-						.srcOffset = { 0, 0, 0 },
-						.dstSubresource = {
-							.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-							.mipLevel = 0,
-							.baseArrayLayer = face,
-							.layerCount = 1
-						},
-						.dstOffset = { 0, 0, 0 },
-						.extent = {
-							.width = HDRImageWidth,
-							.height = HDRImageHeight,
-							.depth = 1
-						},
-					};
-					regions.push_back(region);
-				}
-				cmd.CopyImageToImage(preparedImage, cubeImage, regions);
-
-				//cmd.SetImageLayout(preparedImage, VK_IMAGE_LAYOUT_GENERAL, 0, 0, 1, layerCount);
-
-				cmdList.EndRenderCommand();
-			};
-		});
-
-#pragma region Irradiance
+	void IrradiancePass::AddPass(const Ref<RenderGraph>&renderGraph) {
 #if USE_COMPUTE_FOR_CUBEMAP_GEN
 		renderGraph->AddPass(TargetQueueFamily::Compute, "IrradiancePass", [*this](RenderGraphBuilder& build) {
-			build.ReadExternalImage(RGResource(HDRCubeImage));
-			build.ReadExternalImage(RGResource(IrradianceImage));
-			build.WriteImage(RGResource(IrradianceImage));
+			build.ReadImage(RGResource(HDRLayeredImage), RenderGraphResourceAccess::StorageRead);
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			build.ReadExternalImage(RGResource(IrradianceImage), RenderGraphResourceAccess::StorageRead);
+			build.WriteImage(RGResource(IrradianceImage), RenderGraphResourceAccess::StorageWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::IrradiancePass");
+				static const glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+				
 				static constexpr const uint32_t layerCount = 6;
 				static constexpr const uint32_t workGroupSize = 8;
 
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("IrradianceComputePipeline");
-				const auto& shader = pipeline->GetShader();
 
-				const auto& cubeImage = registry.GetExternalImage(RGResource(HDRCubeImage));
-				const auto& irradianceImage = registry.GetExternalImage(RGResource(IrradianceImage));
-
-				RenderCommand& draw = cmdList.BeginRenderCommand("Irradiance Draw Compute");
-
-				draw.SetImageLayout(cubeImage, VK_IMAGE_LAYOUT_GENERAL, 0, 0, 1, layerCount);
-				draw.SetImageLayout(irradianceImage, VK_IMAGE_LAYOUT_GENERAL, 0, 0, 1, layerCount);
-
-				shader->BindImageHandleTo("u_EnvironmentMap", cubeImage);
-				shader->BindImageHandleTo("u_EnvironmentIrradianceMap", irradianceImage);
+				const auto& cubeImage = registry.GetImage(RGResource(HDRLayeredImage));
+				const auto& irradianceImage = registry.GetImage(RGResource(IrradianceImage));
 
 				draw.BindPipeline(pipeline);
+
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+
+				uint32_t layeredImageIndex = draw.BindImageHandleTo("CubeTextures", cubeImage);
+				uint32_t irradianceImageIndex = draw.BindImageHandleTo("StorageTextureArrays2D", irradianceImage);
+
+				struct LocalPushConstant {
+					glm::mat4 ProjMatrix;
+					glm::vec4 Data; // x: size, y: sampler index, z: environment map index, w: environment irradiance compute index
+				};
+
+				GlobalPushConstant<LocalPushConstant> pushConstantData{
+					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+					.Data = {
+						.ProjMatrix = captureProjection,
+						.Data = { m_Size, static_cast<float>(draw.GetLinearClampSampler().Index), layeredImageIndex, irradianceImageIndex }
+					}
+				};
+
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				//draw.SetImageLayout(cubeImage, VK_IMAGE_LAYOUT_GENERAL, 0, 0, 1, layerCount);
+				//draw.SetImageLayout(irradianceImage, VK_IMAGE_LAYOUT_GENERAL, 0, 0, 1, layerCount);
+
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
-				draw.DispatchCompute(HDRImageWidth / workGroupSize, HDRImageHeight / workGroupSize, layerCount);
+				draw.BindPushConstant(pushConstant);
+				draw.DispatchCompute(m_Size / workGroupSize, m_Size / workGroupSize, layerCount);
 
-				cmdList.EndRenderCommand();
+				//draw.SetImageLayout(cubeImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, 1, layerCount);
+				//draw.SetImageLayout(irradianceImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0, 1, layerCount);
 			};
 		});
 #else
 		renderGraph->AddPass(TargetQueueFamily::Graphics, "IrradiancePass", [*this](RenderGraphBuilder& build) {
-			build.SetViewportArea(HDRImageWidth, HDRImageHeight);
+			build.SetViewportArea(m_Size, m_Size);
 
-			build.ReadExternalImage(RGResource(HDRCubeImage));
+			build.ReadImage(RGResource(HDRLayeredImage));
 
 			build.DeclareImage(RGResource(IrradianceImage), {
-				.Width = HDRImageWidth,
-				.Height = HDRImageHeight,
+				.Width = m_Size,
+				.Height = m_Size,
 				.ImageType = ImageType::TypeCube,
 				.ImageUsage = ImageUsage::AsColorAttachment,
 				.Format = ImageFormat::R16G16B16A16_SFLOAT,
 				.GenerateSampler = true,
-				.GenerateMipmap = false,
+				.GenerateMipmap = MipmapCreateInfo::NoMipmap(),
 				.ImGuiUsage = false,
 			}, RenderPassLoadStoreAttachments::ClearDontCare);
-			
+
 			build.BindRenderTarget(RGResource(IrradianceImage));
 
-			return [=](RenderGraphRegistry& registry, RenderCommandList& cmdList) {
+			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("IrradiancePipeline");
-				const auto& shader = pipeline->GetShader();
-
 				const auto& mesh = Renderer::GetEnvCubeMesh();
 
-				RenderCommand& draw = cmdList.BeginRenderCommand("Irradiance Draw");
-				const auto& irradianceImage = registry.GetImage(RGResource(IrradianceImage));
-				const auto& environmentMap = registry.GetExternalImage(RGResource(HDRCubeImage));
+				const auto& environmentMap = registry.GetImage(RGResource(HDRLayeredImage));
 
-				draw.SetImageLayout(environmentMap, VK_IMAGE_LAYOUT_GENERAL, 0, 0, 1, 6);
-
-				shader->BindImageHandleTo("u_EnvironmentMap", environmentMap);
+				pipeline->BindGlobalImageHandleTo("u_EnvironmentMap", environmentMap);
 
 				draw.BindPipeline(pipeline);
 				draw.UpdateDescriptorSets();
 				draw.BindAllDescriptorSets();
 				draw.BindBuffers(mesh);
 				draw.DrawIndexed(36, 1, 0, 0, 0);
-
-				cmdList.EndRenderCommand();
 			};
 		});
 #endif
-#pragma endregion Irradiance
-
-#if 0
-		renderGraph->AddPass("PrefilterPass", prefilterShader, [this](RenderGraphBuilder& build) {
-			return [=](RenderGraphRegistry& registry, const Ref<RenderDevice>& renderDevice, RenderCommandList& cmdList) {
-				CubeRenderCommand* environmentRenderCommand = (CubeRenderCommand*)command;
-
-				static glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
-
-				const Ref<Mesh>& cubeMesh = environmentRenderCommand->CubeMesh;
-
-				Renderer::BindPipeline(commandBuffer, pipeline);
-				Renderer::BindAllDescriptorSets(commandBuffer, pipeline);
-				Renderer::BindBuffers(commandBuffer, cubeMesh);
-
-				VulkanPushConstant& pushConstant = pipeline->GetPushConstants("LucyCameraPushConstants");
-
-				CubePushConstantData pushConstantData;
-				pushConstantData.Proj = captureProjection;
-				pushConstant.SetData((uint8_t*)&pushConstantData, sizeof(CubePushConstantData));
-
-				Renderer::BindPushConstant(commandBuffer, pipeline, pushConstant);
-				Renderer::DrawIndexed(commandBuffer, cubeMesh->GetIndexBufferHandle()->GetSize(), 1, 0, 0, 0);
-			};
-		});
-#endif
-#if 0
-		ComputeDispatchCommand* dispatchCommand = (ComputeDispatchCommand*)command;
-
-		//TODO: Make this dynamic
-		constexpr uint32_t maxMip = 5;
-		constexpr uint32_t cubemapSize = 1024u;
-
-		Renderer::BindPipeline(commandBuffer, pipeline);
-		Renderer::BindAllDescriptorSets(commandBuffer, pipeline);
-
-		VulkanPushConstant& pushConstant = pipeline->GetPushConstants("LucyPrefilterParams");
-		const auto& environmentPrefilterMap = pipeline->GetUniformBuffers<VulkanUniformImageBuffer>("u_EnvironmentPrefilterMap");
-
-		/*
-		for (uint32_t mip = 0; mip < maxMip; mip++) {
-			glm::vec4 prefilterParams = glm::vec4(cubemapSize >> mip, cubemapSize >> mip, mip / (maxMip - 1), 1.0f);
-			pushConstant.SetData((uint8_t*)&prefilterParams, sizeof(glm::vec4));
-
-			environmentPrefilterMap->BindImage(m_PrefilterImageView.GetVulkanHandle(), m_CurrentLayout, m_PrefilterImageView.GetSampler());
-
-			Renderer::UpdateDescriptorSets(m_PrefilterComputePipeline);
-
-			Renderer::BindPushConstant(commandBuffer, pipeline, pushConstant);
-			Renderer::DispatchCompute(commandBuffer, pipeline->As<ComputePipeline>(), dispatchCommand->GetGroupCountX(), dispatchCommand->GetGroupCountY(), dispatchCommand->GetGroupCountZ());
-		}
-		*/
-#endif
-#pragma endregion CubemapPass
-
-#pragma region BRDFPass
-		//TODO:
-#pragma endregion BRDFPass
 	}
+#pragma endregion IrradiancePass
+
+#pragma region PrefilterPass
+
+	PrefilterPass::PrefilterPass(Ref<Scene> scene, uint32_t cubemapSize)
+		: m_Scene(scene), m_CubemapSize(cubemapSize) {
+	}
+	
+	void PrefilterPass::AddPass(const Ref<RenderGraph>& renderGraph) {
+		renderGraph->AddPass(TargetQueueFamily::Compute, "PrefilterPass", [*this](RenderGraphBuilder& build) {
+			build.DeclareImage(RGResource(PrefilterImage), {
+				.Width = m_CubemapSize,
+				.Height = m_CubemapSize,
+				.ImageType = ImageType::TypeCube,
+				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
+				.Format = ImageFormat::R32G32B32A32_SFLOAT,
+				.GenerateSampler = true,
+				.GenerateMipmap = MipmapCreateInfo::FromLevel(MAX_MIP_LEVELS, true),
+			}, RenderPassLoadStoreAttachments::ClearDontCare);
+
+			build.ReadImage(RGResource(HDRLayeredImage), RenderGraphResourceAccess::StorageRead);
+			build.WriteImage(RGResource(PrefilterImage), RenderGraphResourceAccess::StorageWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::PrefilterPass");
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("PrefilterComputePipeline");
+
+				static constexpr uint32_t workGroupSize = 8;
+				
+				struct LocalPushConstant {
+					glm::vec4 PrefilterParams; // x: sizeX, y: sizeY, z: roughness, w: mip
+					glm::uvec3 TextureData;    // x: environment map index, y: prefilter map index, z: sampler index
+				};
+
+				cmd.BindPipeline(pipeline);
+
+				uint32_t layeredImageIndex = cmd.BindImageHandleTo("CubeTextures", registry.GetImage(RGResource(HDRLayeredImage)));
+
+				std::array<uint32_t, MAX_MIP_LEVELS> prefilterImageIndices{};
+				for (uint32_t mip = 0; mip < MAX_MIP_LEVELS; mip++) {
+					prefilterImageIndices[mip] = cmd.BindImageHandleTo("StorageTextureArrays2D", registry.GetImage(RGResource(PrefilterImage)), mip);
+				}
+
+				cmd.UpdateDescriptorSets();
+				cmd.BindAllDescriptorSets();
+
+				PipelineConstant& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				for (uint32_t mip = 0; mip < MAX_MIP_LEVELS; mip++) {
+					const uint32_t mipSize = std::max(1u, m_CubemapSize >> mip);
+
+					GlobalPushConstant<LocalPushConstant> params{
+						.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
+						.Data = {
+							.PrefilterParams = glm::vec4(mipSize, mipSize, mip / float(MAX_MIP_LEVELS - 1), mip),
+							.TextureData = { layeredImageIndex, prefilterImageIndices[mip], cmd.GetLinearClampSampler() }
+						}
+					};
+
+					pushConstant.SetData((uint8_t*)&params, sizeof(params));
+
+					const uint32_t groupsX = (mipSize + workGroupSize - 1) / workGroupSize;
+					const uint32_t groupsY = (mipSize + workGroupSize - 1) / workGroupSize;
+
+					cmd.BindPushConstant(pushConstant);
+					cmd.DispatchCompute(groupsX, groupsY, 6);
+				}
+			};
+		});
+	}
+#pragma endregion PrefilterPass
+
+#pragma region BRDFLutPass
+
+	BRDFLutPass::BRDFLutPass(uint32_t size) 
+		: m_Size(size) {
+	}
+
+	void BRDFLutPass::AddPass(const Ref<RenderGraph>& renderGraph) {
+		renderGraph->AddPass(TargetQueueFamily::Compute, "BRDFLutPass", [*this](RenderGraphBuilder& build) {
+			build.SetExecutionPolicy(RenderGraphExecutionPolicy::Once);
+
+			build.ReadExternalImage(RGResource(BRDFLutImage), RenderGraphResourceAccess::StorageRead);
+			build.WriteExternalImage(RGResource(BRDFLutImage), RenderGraphResourceAccess::StorageWrite);
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::BRDFLutPass");
+				static constexpr uint32_t workGroupSize = 8;
+
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("BRDFLutComputePipeline");
+				const auto& brdfLutImage = registry.GetImage(RGResource(BRDFLutImage));
+
+				draw.BindPipeline(pipeline);
+
+				struct LocalPushConstant {
+					glm::uvec4 u_BRDFData;           // x: width, y: height, z: input texture index, w: unused
+				};
+
+				uint32_t brdfIndex = draw.BindImageHandleTo("StorageTextures2D_Float2", brdfLutImage);
+
+				LocalPushConstant pushConstantData {
+					{ m_Size, m_Size, brdfIndex, 0 }
+				};
+
+				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				draw.BindPushConstant(pushConstant);
+				draw.UpdateDescriptorSets();
+				draw.BindAllDescriptorSets();
+				draw.DispatchCompute(m_Size / workGroupSize, m_Size / workGroupSize, 1);
+			};
+		});
+
+		Renderer::EnqueueToRenderCommandQueue([width = m_Size, height = m_Size](const Ref<RenderDevice>& device) {
+			auto imageHandle = device->CreateImage({
+				.Width = width,
+				.Height = height,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
+				.Format = ImageFormat::R16G16_SFLOAT,
+				.GenerateSampler = true,
+			}, "BRDFLutImage");
+
+			Renderer::ImportExternalRenderGraphResource(RGResource(BRDFLutImage), imageHandle);
+		});
+	}
+#pragma endregion BRDFLutPass
 }

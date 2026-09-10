@@ -21,7 +21,7 @@ namespace Lucy::VulkanAPI {
 															VkPipelineLayout pipelineLayout,
 															const Ref<VulkanGraphicsShader>& shader, const Ref<VulkanRenderPass>& renderPass);
 	VkComputePipelineCreateInfo ComputePipelineCreateInfo(VkPipelineLayout pipelineLayout, VkPipelineShaderStageCreateInfo stage);
-	VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo(uint32_t setLayoutCount, const VkDescriptorSetLayout* const descriptorSetLayouts, uint32_t pushConstantRangeCount, const VkPushConstantRange* const pushConstantRanges);
+	VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo(uint32_t setLayoutCount, const VkDescriptorSetLayout* const descriptorSetLayouts, uint32_t pushConstantRangeCount, const VkPushConstantRange* const pushConstantRanges, VkPipelineLayoutCreateFlags flags = 0);
 	VkPipelineViewportStateCreateInfo PipelineViewportStateCreateInfo(uint32_t viewportCount, const VkViewport* const viewports, uint32_t scissorCount, const VkRect2D* const scissors);
 	VkPipelineRasterizationDepthClipStateCreateInfoEXT PipelineRasterizationDepthClipStateCreateInfo(VkBool32 depthClipEnable, VkPipelineRasterizationDepthClipStateCreateFlagsEXT flags = 0);
 	VkPipelineRasterizationStateCreateInfo PipelineRasterizationStateCreateInfo(VkFrontFace frontFace, float lineWidth,
@@ -60,7 +60,7 @@ namespace Lucy::VulkanAPI {
 	VkWriteDescriptorSet WriteDescriptorSet(VkDescriptorSet dstSet, uint32_t dstArrayElement, uint32_t dstBinding, uint32_t descriptorCount, VkDescriptorType type,
 											const VkDescriptorBufferInfo* const bufferInfo = nullptr, const VkDescriptorImageInfo* const imageInfo = nullptr, const VkBufferView* const texelBufferView = nullptr);
 
-	VkDescriptorSetLayoutCreateInfo DescriptorSetCreateInfo(uint32_t bindingCount, const VkDescriptorSetLayoutBinding* const layoutBindings);
+	VkDescriptorSetLayoutCreateInfo DescriptorSetCreateInfo(uint32_t bindingCount, const VkDescriptorSetLayoutBinding* const layoutBindings, VkDescriptorSetLayoutCreateFlags flags);
 	VkDescriptorSetLayoutBinding DescriptorSetLayoutBinding(uint32_t binding, uint32_t descriptorCount, DescriptorType type, VkShaderStageFlags stageFlag);
 	VkDescriptorSetLayoutBindingFlagsCreateInfo DescriptorSetLayoutBindingFlagsCreateInfo(uint32_t bindingCount, const VkDescriptorBindingFlags* const bindlessDescriptorFlags);
 
@@ -73,7 +73,7 @@ namespace Lucy::VulkanAPI {
 
 	VkImageCreateInfo ImageCreateInfo(VkImageType imageType, VkExtent3D extent, uint32_t mipLevels, uint32_t arrayLayers,
 									  VkFormat format, VkImageTiling tiling, VkImageLayout initialLayout, VkImageUsageFlags usage,
-									  VkSharingMode sharingMode, VkSampleCountFlagBits samples, VkImageCreateFlags flags);
+									  VkSharingMode sharingMode, VkSampleCountFlagBits samples, uint32_t queueFamilyIndexCount = 0, const uint32_t* const pQueueFamilyIndices = nullptr, VkImageCreateFlags flags = 0);
 	VkImageViewCreateInfo ImageViewCreateInfo(VkImage image, VkImageViewType viewType, VkFormat format, VkImageSubresourceRange subresourceRange, VkComponentMapping components);
 	VkImageBlit ImageBlit(VkImageSubresourceLayers srcSubresource, VkOffset3D srcOffsets[2], VkImageSubresourceLayers dstSubresource, VkOffset3D dstOffsets[2]);
 	VkImageSubresourceLayers ImageSubresourceLayers(VkImageAspectFlags aspectMask, uint32_t mipLevel, uint32_t baseArrayLayer, uint32_t layerCount);
@@ -88,11 +88,13 @@ namespace Lucy::VulkanAPI {
 	VkShaderModuleCreateInfo ShaderModuleCreateInfo(size_t codeSize, const uint32_t* const code);
 	VkPipelineShaderStageCreateInfo PipelineShaderStageCreateInfo(VkShaderStageFlagBits stage, VkShaderModule module, const char* name, const VkSpecializationInfo* const specializationInfo = nullptr, VkPipelineShaderStageCreateFlags flags = 0);
 
-	VkSemaphoreCreateInfo SemaphoreCreateInfo();
+	VkSemaphoreCreateInfo SemaphoreCreateInfo(VkSemaphoreCreateFlags flags, const void* pNext);
 	VkFenceCreateInfo FenceCreateInfo(VkFenceCreateFlags flags);
-	VkImageMemoryBarrier ImageMemoryBarrier(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkImageSubresourceRange subresourceRange,
-											VkAccessFlags srcAccessMask = VK_ACCESS_NONE_KHR, VkAccessFlags dstAccessMask = VK_ACCESS_NONE_KHR,
+	VkImageMemoryBarrier2 VulkanPipelineBarrier(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkImageSubresourceRange subresourceRange,
+		VkPipelineStageFlags2 srcStageMask, VkPipelineStageFlags2 dstStageMask, VkAccessFlags2 srcAccessMask = VK_ACCESS_2_NONE, VkAccessFlags2 dstAccessMask = VK_ACCESS_2_NONE,
 											uint32_t srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, uint32_t dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED);
+	VkBufferMemoryBarrier2 VulkanPipelineBarrier(VkBuffer buffer, VkPipelineStageFlags2 srcStageMask, VkPipelineStageFlags2 dstStageMask,
+		VkAccessFlags2 srcAccessMask, VkAccessFlags2 dstAccessMask, VkDeviceSize offset = 0, VkDeviceSize size = VK_WHOLE_SIZE, uint32_t srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, uint32_t dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED);
 
 	VkRenderPassCreateInfo RenderPassCreateInfo(uint32_t attachmentCount, const VkAttachmentDescription* const attachments,
 												uint32_t subpassCount, const VkSubpassDescription* const subpasses,
@@ -109,10 +111,11 @@ namespace Lucy::VulkanAPI {
 											const VkAttachmentReference* const resolveAttachments = nullptr);
 	VkSubpassDependency SubpassDependency(uint32_t srcSubpass, uint32_t dstSubpass, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask,
 										  VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask, VkDependencyFlags dependencyFlags);
-
-
 	VkQueryPoolCreateInfo QueryPoolCreateInfo(uint32_t queryCount, VkQueryType queryType, VkQueryPipelineStatisticFlags pipelineStatistics);
 	VkSubmitInfo QueueSubmitInfo(uint32_t commandBufferCount, const VkCommandBuffer* const commandBuffers,
 								 uint32_t waitSemaphoreCount, const VkSemaphore* const waitSemaphores, VkPipelineStageFlags* waitDstStageMask,
 								 uint32_t signalSemaphoreCount, const VkSemaphore* const signalSemaphores);
+	VkSubmitInfo2 QueueSubmitInfo2(uint32_t commandBufferInfoCount, const VkCommandBufferSubmitInfo* const commandBufferInfos,
+		uint32_t waitSemaphoreInfoCount, const VkSemaphoreSubmitInfo* const waitSemaphoreInfos,
+		uint32_t signalSemaphoreInfoCount, const VkSemaphoreSubmitInfo* const signalSemaphoreInfos);
 }

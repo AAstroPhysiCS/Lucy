@@ -5,56 +5,76 @@
 #include "Renderer/Device/VulkanRenderDevice.h"
 #include "Renderer/Descriptors/VulkanDescriptorSet.h"
 
+#include "../Context/VulkanContext.h"
+
 #include "Renderer/Shader/VulkanComputeShader.h"
 #include "Renderer/Memory/Buffer/PushConstant.h"
 
 namespace Lucy {
 
-	VulkanComputePipeline::VulkanComputePipeline(const ComputePipelineCreateInfo& createInfo, const Ref<VulkanRenderDevice>& vulkanDevice)
-		: ComputePipeline(createInfo) {
-		Renderer::EnqueueToRenderCommandQueue([&](const auto& device) {
+	VulkanComputePipeline::VulkanComputePipeline(const ComputePipelineCreateInfo& createInfo, const Ref<Shader>& shader, const Ref<VulkanRenderDevice>& vulkanDevice)
+		: ComputePipeline(createInfo, shader) {
+		Renderer::EnqueueToRenderCommandQueue([=](const auto& device) {
 			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
 			Create(vulkanDevice);
 		});
 	}
 
 	void VulkanComputePipeline::Create(const Ref<VulkanRenderDevice>& vulkanDevice) {
-		const std::vector<VkDescriptorPoolSize> poolSizes = {
-			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 10 },
-			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10 },
-			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10 }
-		};
+		VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
 
-		VulkanDescriptorPoolCreateInfo poolCreateInfo;
-		poolCreateInfo.PoolSizesVector = poolSizes;
-		poolCreateInfo.MaxSet = 100;
-		poolCreateInfo.PoolFlags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
-		poolCreateInfo.LogicalDevice = vulkanDevice->GetLogicalDevice();
-		m_DescriptorPool = Memory::CreateRef<VulkanDescriptorPool>(poolCreateInfo);
+		const auto& shader = GetShader();
 
-		m_CreateInfo.Shader->RTLoadDescriptors(vulkanDevice, m_DescriptorPool);
-		const auto& descriptorSetsHandles = m_CreateInfo.Shader->GetDescriptorSetHandles();
-		const auto& pushConstants = m_CreateInfo.Shader->GetPushConstants();
+		const auto& reflectPushConstants = shader->GetShaderPushConstants();
+		for (auto& pc : reflectPushConstants)
+			AddPushConstant(pc);
+
+		m_DescriptorSetHandles = vulkanDevice->GetResourceBindingHandles(shader);
+		const auto& pushConstants = GetPipelineConstants();
 
 		std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
-		descriptorSetLayouts.reserve(descriptorSetsHandles.size());
-		for (auto handle : descriptorSetsHandles) {
+
+		uint32_t highestSetIndex = 0;
+
+		for (RenderDeviceResourceHandle handle : m_DescriptorSetHandles) {
 			const auto& descriptorSet = vulkanDevice->AccessResource<VulkanDescriptorSet>(handle);
-			descriptorSetLayouts.emplace_back(descriptorSet->GetDescriptorSetLayout());
+			highestSetIndex = std::max(highestSetIndex, descriptorSet->GetSetIndex());
 		}
 
+		descriptorSetLayouts.resize(highestSetIndex + 1, VK_NULL_HANDLE);
+
+		for (RenderDeviceResourceHandle handle : m_DescriptorSetHandles) {
+			const auto& descriptorSet = vulkanDevice->AccessResource<VulkanDescriptorSet>(handle);
+
+			const uint32_t setIndex = descriptorSet->GetSetIndex();
+			descriptorSetLayouts[setIndex] = descriptorSet->GetDescriptorSetLayout();
+		}
+
+		for (uint32_t i = 0; i < descriptorSetLayouts.size(); i++)
+			LUCY_ASSERT(descriptorSetLayouts[i] != VK_NULL_HANDLE, "Missing descriptor set layout for set index {0}", i);
+
 		std::vector<VkPushConstantRange> pushConstantRanges;
-		for (const VulkanPushConstant& pc : pushConstants)
+		for (const PipelineConstant& pc : pushConstants)
 			pushConstantRanges.push_back(pc.GetHandle());
 		
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo = VulkanAPI::PipelineLayoutCreateInfo((uint32_t)descriptorSetLayouts.size(), descriptorSetLayouts.data(), (uint32_t)pushConstantRanges.size(), pushConstantRanges.data());
 
-		LUCY_VK_ASSERT(vkCreatePipelineLayout(vulkanDevice->GetLogicalDevice(), &pipelineLayoutInfo, nullptr, &m_PipelineLayoutHandle));
+		LUCY_VK_ASSERT(vkCreatePipelineLayout(logicalDevice, &pipelineLayoutInfo, nullptr, &m_PipelineLayoutHandle));
 
-		VkComputePipelineCreateInfo pipelineInfo = VulkanAPI::ComputePipelineCreateInfo(m_PipelineLayoutHandle, m_CreateInfo.Shader->As<VulkanComputeShader>()->GetShaderStageInfo());
-		LUCY_VK_ASSERT(vkCreateComputePipelines(vulkanDevice->GetLogicalDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_PipelineHandle));
+		VkComputePipelineCreateInfo pipelineInfo = VulkanAPI::ComputePipelineCreateInfo(m_PipelineLayoutHandle, shader->As<VulkanComputeShader>()->GetShaderInfo());
+		LUCY_VK_ASSERT(vkCreateComputePipelines(logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_PipelineHandle));
+		LUCY_INFO("Vulkan compute pipeline '{0}' created successfully!", shader->GetName());
 #ifdef LUCY_DEBUG
-		LUCY_INFO("Vulkan compute pipeline '{0}' created successfully!", m_CreateInfo.Shader->GetName());
+		
+		std::string objectName = std::format("{0} Compute Pipeline", GetDebugName());
+
+		VkDebugUtilsObjectNameInfoEXT nameInfo{};
+		nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+		nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE;
+		nameInfo.objectHandle = reinterpret_cast<uint64_t>(m_PipelineHandle);
+		nameInfo.pObjectName = objectName.c_str();
+
+		VulkanExternalFuncLinkage::vkSetDebugUtilsObjectNameEXT(logicalDevice, &nameInfo);
 #endif
 	}
 
@@ -66,22 +86,27 @@ namespace Lucy {
 		vkCmdDispatch((VkCommandBuffer)commandBufferHandle, groupCountX, groupCountY, groupCountZ);
 	}
 
-	void VulkanComputePipeline::RTRecreate() {
-		RTDestroyResource();
-		Renderer::EnqueueToRenderCommandQueue([&](const auto& device) {
-			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
-			Create(vulkanDevice);
+	void VulkanComputePipeline::RTRecreate(Ref<Shader> newShader) {
+		Renderer::EnqueueResourceRecreate([this, newShader](const Ref<RenderDevice>& device) -> RenderDeletionFunc {
+			VkPipeline oldPipelineHandle = std::exchange(m_PipelineHandle, VK_NULL_HANDLE);
+			VkPipelineLayout oldPipelineLayoutHandle = std::exchange(m_PipelineLayoutHandle, VK_NULL_HANDLE);
+
+			SetShader(newShader);
+			Create(device->As<VulkanRenderDevice>());
+
+			return [this, oldPipelineHandle, oldPipelineLayoutHandle](const Ref<RenderDevice>& device) {
+				vkDestroyPipelineLayout(device->As<VulkanRenderDevice>()->GetLogicalDevice(), oldPipelineLayoutHandle, nullptr);
+				vkDestroyPipeline(device->As<VulkanRenderDevice>()->GetLogicalDevice(), oldPipelineHandle, nullptr);
+			};
 		});
 	}
 
-	void VulkanComputePipeline::RTDestroyResource() {
-		Renderer::EnqueueToRenderCommandQueue([=](const auto& device) {
-			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+	void VulkanComputePipeline::RTDestroyResource(RenderDevice* device) {
+		Pipeline::RTDestroyResource(device);
 
-			m_DescriptorPool->RTDestroyResource();
-			m_DescriptorPool = nullptr;
-			vkDestroyPipelineLayout(vulkanDevice->GetLogicalDevice(), m_PipelineLayoutHandle, nullptr);
-			vkDestroyPipeline(vulkanDevice->GetLogicalDevice(), m_PipelineHandle, nullptr);
-		});
+		const auto& vulkanDevice = reinterpret_cast<VulkanRenderDevice*>(device);
+
+		vkDestroyPipelineLayout(vulkanDevice->GetLogicalDevice(), m_PipelineLayoutHandle, nullptr);
+		vkDestroyPipeline(vulkanDevice->GetLogicalDevice(), m_PipelineHandle, nullptr);
 	}
 }

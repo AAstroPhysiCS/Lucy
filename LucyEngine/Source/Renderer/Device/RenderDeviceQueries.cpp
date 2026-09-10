@@ -3,6 +3,8 @@
 
 #include "VulkanRenderDevice.h"
 
+#include "Renderer/Renderer.h"
+
 namespace Lucy {
 	
 	Ref<RenderDeviceQuery> RenderDeviceQuery::Create(const RenderDeviceQueryCreateInfo& createInfo) {
@@ -57,11 +59,11 @@ namespace Lucy {
 	}
 
 	uint32_t VulkanRenderDeviceQuery::RTBegin(Ref<CommandPool> cmdPool) {
-		size_t frameIndex = Renderer::GetCurrentFrameIndex();
-		VkCommandBuffer commandBuffer = (VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer();
+		uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		VkCommandBuffer commandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
 
 		const auto BeginQuery = [&]() { vkCmdBeginQuery(commandBuffer, m_QueryPools[frameIndex], m_ActiveQueryIndex[frameIndex], 0); };
-		const auto BeginTimestamp = [&]() { vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_QueryPools[frameIndex], m_ActiveQueryIndex[frameIndex]); };
+		const auto BeginTimestamp = [&]() { vkCmdWriteTimestamp2(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, m_QueryPools[frameIndex], m_ActiveQueryIndex[frameIndex]); };
 
 		switch (GetCreateInfo().QueryType) {
 			case RenderDeviceQueryType::Timestamp:
@@ -77,11 +79,11 @@ namespace Lucy {
 	}
 
 	uint32_t VulkanRenderDeviceQuery::RTEnd(Ref<CommandPool> cmdPool) {
-		size_t frameIndex = Renderer::GetCurrentFrameIndex();
-		VkCommandBuffer commandBuffer = (VkCommandBuffer)cmdPool->GetCurrentFrameCommandBuffer();
+		uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		VkCommandBuffer commandBuffer = (VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex);
 
 		const auto EndQuery = [&]() { vkCmdEndQuery(commandBuffer, m_QueryPools[frameIndex], m_ActiveQueryIndex[frameIndex]); };
-		const auto EndTimestamp = [&]() { vkCmdWriteTimestamp(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_QueryPools[frameIndex], m_ActiveQueryIndex[frameIndex]); };
+		const auto EndTimestamp = [&]() { vkCmdWriteTimestamp2(commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, m_QueryPools[frameIndex], m_ActiveQueryIndex[frameIndex]); };
 
 		switch (GetCreateInfo().QueryType) {
 			case RenderDeviceQueryType::Timestamp:
@@ -96,38 +98,34 @@ namespace Lucy {
 		return m_ActiveQueryIndex[frameIndex]++;
 	}
 
-	void VulkanRenderDeviceQuery::ResetPoolByIndex(size_t index) {
-		size_t frameIndex = Renderer::GetCurrentFrameIndex();
+	void VulkanRenderDeviceQuery::ResetPoolByIndex(uint32_t frameIndex) {
 		m_ActiveQueryIndex[frameIndex] = 0;
 
 		VkDevice logicalDevice = GetCreateInfo().Device->As<VulkanRenderDevice>()->GetLogicalDevice();
-		vkResetQueryPool(logicalDevice, m_QueryPools[index], 0, GetCreateInfo().QueryCount);
+		vkResetQueryPool(logicalDevice, m_QueryPools[frameIndex], 0, GetCreateInfo().QueryCount);
 	}
 
-	void VulkanRenderDeviceQuery::RTResetPoolByIndex(Ref<CommandPool> commandPool, size_t index) {
-		size_t frameIndex = Renderer::GetCurrentFrameIndex();
+	void VulkanRenderDeviceQuery::RTResetPoolByIndex(Ref<CommandPool> commandPool, uint32_t frameIndex) {
 		m_ActiveQueryIndex[frameIndex] = 0;
 
-		vkCmdResetQueryPool((VkCommandBuffer)commandPool->GetCurrentFrameCommandBuffer(), m_QueryPools[index], 0, GetCreateInfo().QueryCount);
+		vkCmdResetQueryPool((VkCommandBuffer)commandPool->GetCommandBuffer(frameIndex), m_QueryPools[frameIndex], 0, GetCreateInfo().QueryCount);
 	}
 
-	std::vector<uint64_t> VulkanRenderDeviceQuery::GetQueryResults() {
-		size_t frameIndex = Renderer::GetCurrentFrameIndex();
-		
+	std::vector<uint64_t> VulkanRenderDeviceQuery::GetQueryResults(uint32_t frameIndex) {
 		uint32_t beginStageOfQuery = 0;
 		uint32_t endStageOfQuery = GetCreateInfo().QueryCount;
-
-		LUCY_ASSERT(m_ActiveQueryIndex[frameIndex] / 2 <= endStageOfQuery, "Active device query is ongoing!");
 
 		VkDevice logicalDevice = GetCreateInfo().Device->As<VulkanRenderDevice>()->GetLogicalDevice();
 
 		const auto GetTimestampResults = [&]() {
-			std::vector<uint64_t> timestampDatas;
-			timestampDatas.resize(GetCreateInfo().QueryCount);
+			uint32_t queryCount = m_ActiveQueryIndex[frameIndex];
 
-			vkGetQueryPoolResults(logicalDevice, m_QueryPools[Renderer::GetCurrentFrameIndex()], beginStageOfQuery, 
-				endStageOfQuery - beginStageOfQuery, timestampDatas.size() * sizeof(uint64_t), timestampDatas.data(), sizeof(timestampDatas[0]), VK_QUERY_RESULT_64_BIT);
-			LUCY_ASSERT(timestampDatas.size() % 2 == 0, "Querying the pool result indicated that there is a data mismatch between Begin and End functions");
+			std::vector<uint64_t> timestampDatas(queryCount);
+
+			auto result = vkGetQueryPoolResults(logicalDevice, m_QueryPools[frameIndex], 0,
+				queryCount, timestampDatas.size() * sizeof(uint64_t), timestampDatas.data(), sizeof(timestampDatas[0]), VK_QUERY_RESULT_64_BIT);
+
+			LUCY_ASSERT(result == VK_SUCCESS, "Timestamp query results are not ready!");
 
 			return timestampDatas;
 		};

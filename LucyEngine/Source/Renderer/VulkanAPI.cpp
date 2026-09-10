@@ -29,9 +29,11 @@ namespace Lucy::VulkanAPI {
 		pipelineCreateInfo.pDepthStencilState = depthStencilCreateInfo;
 		pipelineCreateInfo.pColorBlendState = colorBlending;
 		pipelineCreateInfo.pDynamicState = dynamicState;
+		pipelineCreateInfo.pTessellationState = NULL;
 		pipelineCreateInfo.layout = pipelineLayout;
 		pipelineCreateInfo.renderPass = renderPass->GetVulkanHandle();
 		pipelineCreateInfo.subpass = 0;
+		pipelineCreateInfo.flags = 0;
 
 		//not that relevant for now
 		pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
@@ -49,13 +51,14 @@ namespace Lucy::VulkanAPI {
 		return pipelineInfo;
 	}
 
-	VkPipelineLayoutCreateInfo VulkanAPI::PipelineLayoutCreateInfo(uint32_t setLayoutCount, const VkDescriptorSetLayout* const descriptorSetLayouts, uint32_t pushConstantRangeCount, const VkPushConstantRange* const pushConstantRanges) {
+	VkPipelineLayoutCreateInfo VulkanAPI::PipelineLayoutCreateInfo(uint32_t setLayoutCount, const VkDescriptorSetLayout* const descriptorSetLayouts, uint32_t pushConstantRangeCount, const VkPushConstantRange* const pushConstantRanges, VkPipelineLayoutCreateFlags flags) {
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		pipelineLayoutInfo.setLayoutCount = setLayoutCount;
 		pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts;
 		pipelineLayoutInfo.pushConstantRangeCount = pushConstantRangeCount;
 		pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges;
+		pipelineLayoutInfo.flags = flags;
 
 		return pipelineLayoutInfo;
 	}
@@ -76,7 +79,7 @@ namespace Lucy::VulkanAPI {
 		clipState.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_DEPTH_CLIP_STATE_CREATE_INFO_EXT;
 		clipState.depthClipEnable = depthClipEnable;
 		clipState.flags = flags;
-		clipState.pNext = VK_NULL_HANDLE;
+		clipState.pNext = nullptr;
 
 		return clipState;
 	}
@@ -365,12 +368,13 @@ namespace Lucy::VulkanAPI {
 		return setWrite;
 	}
 
-	VkDescriptorSetLayoutCreateInfo VulkanAPI::DescriptorSetCreateInfo(uint32_t bindingCount, const VkDescriptorSetLayoutBinding* const layoutBindings) {
+	VkDescriptorSetLayoutCreateInfo VulkanAPI::DescriptorSetCreateInfo(uint32_t bindingCount, const VkDescriptorSetLayoutBinding* const layoutBindings, VkDescriptorSetLayoutCreateFlags flags) {
 		VkDescriptorSetLayoutCreateInfo descriptorLayoutInfo{};
 		descriptorLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		descriptorLayoutInfo.bindingCount = bindingCount;
 		descriptorLayoutInfo.pBindings = layoutBindings;
 		descriptorLayoutInfo.pNext = nullptr;
+		descriptorLayoutInfo.flags = flags;
 
 		return descriptorLayoutInfo;
 	}
@@ -440,8 +444,8 @@ namespace Lucy::VulkanAPI {
 	}
 
 	VkImageCreateInfo VulkanAPI::ImageCreateInfo(VkImageType imageType, VkExtent3D extent, uint32_t mipLevels, uint32_t arrayLayers,
-												 VkFormat format, VkImageTiling tiling, VkImageLayout initialLayout, VkImageUsageFlags usage,
-												 VkSharingMode sharingMode, VkSampleCountFlagBits samples, VkImageCreateFlags flags) {
+												VkFormat format, VkImageTiling tiling, VkImageLayout initialLayout, VkImageUsageFlags usage, VkSharingMode sharingMode, 
+												VkSampleCountFlagBits samples, uint32_t queueFamilyIndexCount, const uint32_t* pQueueFamilyIndices, VkImageCreateFlags flags) {
 		VkImageCreateInfo imageCreateInfo{};
 		imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		imageCreateInfo.imageType = imageType;
@@ -455,6 +459,8 @@ namespace Lucy::VulkanAPI {
 		imageCreateInfo.flags = flags;
 		imageCreateInfo.sharingMode = sharingMode;
 		imageCreateInfo.samples = samples;
+		imageCreateInfo.queueFamilyIndexCount = queueFamilyIndexCount;
+		imageCreateInfo.pQueueFamilyIndices = pQueueFamilyIndices;
 
 		return imageCreateInfo;
 	}
@@ -561,9 +567,11 @@ namespace Lucy::VulkanAPI {
 		return createInfo;
 	}
 
-	VkSemaphoreCreateInfo VulkanAPI::SemaphoreCreateInfo() {
+	VkSemaphoreCreateInfo VulkanAPI::SemaphoreCreateInfo(VkSemaphoreCreateFlags flags, const void* pNext) {
 		VkSemaphoreCreateInfo createInfo{};
 		createInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+		createInfo.flags = flags;
+		createInfo.pNext = pNext;
 
 		return createInfo;
 	}
@@ -576,19 +584,37 @@ namespace Lucy::VulkanAPI {
 		return createInfo;
 	}
 
-	VkImageMemoryBarrier VulkanAPI::ImageMemoryBarrier(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkImageSubresourceRange subresourceRange,
-													   VkAccessFlags srcAccessMask, VkAccessFlags dstAccessMask, uint32_t srcQueueFamilyIndex, uint32_t dstQueueFamilyIndex) {
-		VkImageMemoryBarrier barrier{};
-		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	VkImageMemoryBarrier2 VulkanAPI::VulkanPipelineBarrier(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, VkImageSubresourceRange subresourceRange,
+		VkPipelineStageFlags2 srcStageMask, VkPipelineStageFlags2 dstStageMask, VkAccessFlags2 srcAccessMask, VkAccessFlags2 dstAccessMask, uint32_t srcQueueFamilyIndex, uint32_t dstQueueFamilyIndex) {
+		VkImageMemoryBarrier2 barrier{};
+		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
 		barrier.image = image;
 		barrier.oldLayout = oldLayout;
 		barrier.newLayout = newLayout;
 		barrier.subresourceRange = subresourceRange;
 		barrier.srcAccessMask = srcAccessMask;
+		barrier.srcStageMask = srcStageMask;
 		barrier.dstAccessMask = dstAccessMask;
-		barrier.srcQueueFamilyIndex = srcQueueFamilyIndex; //TODO: Investigate and support queue ownership transfer
+		barrier.dstStageMask = dstStageMask;
+		barrier.srcQueueFamilyIndex = srcQueueFamilyIndex;
 		barrier.dstQueueFamilyIndex = dstQueueFamilyIndex;
 
+		return barrier;
+	}
+
+	VkBufferMemoryBarrier2 VulkanAPI::VulkanPipelineBarrier(VkBuffer buffer, VkPipelineStageFlags2 srcStageMask, VkPipelineStageFlags2 dstStageMask,
+		VkAccessFlags2 srcAccessMask, VkAccessFlags2 dstAccessMask, VkDeviceSize offset, VkDeviceSize size, uint32_t srcQueueFamilyIndex, uint32_t dstQueueFamilyIndex) {
+		VkBufferMemoryBarrier2 barrier{};
+		barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+		barrier.buffer = buffer;
+		barrier.offset = offset;
+		barrier.size = size;
+		barrier.srcAccessMask = srcAccessMask;
+		barrier.srcStageMask = srcStageMask;
+		barrier.dstAccessMask = dstAccessMask;
+		barrier.dstStageMask = dstStageMask;
+		barrier.srcQueueFamilyIndex = srcQueueFamilyIndex;
+		barrier.dstQueueFamilyIndex = dstQueueFamilyIndex;
 		return barrier;
 	}
 
@@ -710,6 +736,20 @@ namespace Lucy::VulkanAPI {
 		submitInfo.signalSemaphoreCount = signalSemaphoreCount;
 		submitInfo.pSignalSemaphores = signalSemaphores;
 
+		return submitInfo;
+	}
+
+	VkSubmitInfo2 VulkanAPI::QueueSubmitInfo2(uint32_t commandBufferInfoCount, const VkCommandBufferSubmitInfo* const commandBufferInfos,
+											uint32_t waitSemaphoreInfoCount, const VkSemaphoreSubmitInfo* const waitSemaphoreInfos,
+											uint32_t signalSemaphoreInfoCount, const VkSemaphoreSubmitInfo* const signalSemaphoreInfos) {
+		VkSubmitInfo2 submitInfo{};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+		submitInfo.waitSemaphoreInfoCount = waitSemaphoreInfoCount;
+		submitInfo.pWaitSemaphoreInfos = waitSemaphoreInfos;
+		submitInfo.commandBufferInfoCount = commandBufferInfoCount;
+		submitInfo.pCommandBufferInfos = commandBufferInfos;
+		submitInfo.signalSemaphoreInfoCount = signalSemaphoreInfoCount;
+		submitInfo.pSignalSemaphoreInfos = signalSemaphoreInfos;
 		return submitInfo;
 	}
 }

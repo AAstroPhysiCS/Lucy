@@ -6,6 +6,8 @@ namespace Lucy {
 		glm::mat4 View;
 		glm::mat4 Proj;
 		glm::vec4 CamPos;
+
+		auto operator<=>(const CameraViewProjection&) const = default;
 	};
 
 	class Camera {
@@ -34,7 +36,7 @@ namespace Lucy {
 
 		CameraViewProjection GetCameraViewProjection() const;
 
-		virtual void Update() = 0;
+		virtual void Update(float deltaTime) = 0;
 	protected:
 		virtual void UpdateView() = 0;
 
@@ -58,13 +60,12 @@ namespace Lucy {
 
 		void SetAspectRatio(float aspectRatio);
 
-		void Update() final override;
-
+		void Update(float deltaTime) override;
 	protected:
-		glm::quat m_Orientation;
-	private:
-		void UpdateProjection();
+		glm::quat m_Orientation{};
 
+		void UpdateProjection();
+	private:
 		float m_AspectRatio = 0.0f;
 		float m_Fov = 0.0f;
 	};
@@ -76,10 +77,10 @@ namespace Lucy {
 		OrthographicCamera(float left, float right, float bottom, float top, float nearPlane, float farPlane);
 		virtual ~OrthographicCamera() = default;
 
-		void Update() final override;
+		void Update(float deltaTime) final override;
 	protected:
 		float m_Left = 0.0f, m_Right = 0.0f, m_Bottom = 0.0f, m_Top = 0.0f;
-	private:
+
 		void UpdateProjection();
 	};
 
@@ -89,11 +90,13 @@ namespace Lucy {
 		EditorCamera(const glm::vec3& position, float nearPlane, float farPlane, float fov);
 		EditorCamera(float nearPlane, float farPlane, float fov);
 		virtual ~EditorCamera() = default;
+
+		void Update(float deltaTime) final override;
 	private:
-		float m_CameraSpeed = 0.025f;
+		float m_CameraSpeed = 3.5f;
 		float m_Sensivity = 0.3f;
 
-		void UpdateMovement();
+		void UpdateMovement(float deltaTime);
 		void UpdateView() final override;
 	};
 }

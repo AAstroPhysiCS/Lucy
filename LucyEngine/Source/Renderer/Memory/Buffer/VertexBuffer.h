@@ -3,18 +3,25 @@
 #include "Core/Base.h"
 #include "Buffer.h"
 
-#include "Renderer/Device/RenderResource.h"
+#include "Renderer/Device/RenderDeviceResource.h"
+
+#include "Renderer/Mesh.h"
 
 namespace Lucy {
 
-	class VertexBuffer : public FloatBuffer, public RenderResource {
+	class VertexBuffer : public Buffer<Vertex>, public RenderDeviceResource {
 	public:
 		virtual ~VertexBuffer() = default;
 
-		virtual void RTLoadToDevice() = 0;
+		VertexBuffer(const VertexBuffer&) = delete;
+		VertexBuffer& operator=(const VertexBuffer&) = delete;
+		VertexBuffer(VertexBuffer&&) = delete;
+		VertexBuffer& operator=(VertexBuffer&&) = delete;
+
+		virtual void RTLoadToDevice(const Ref<RenderDevice>& device) = 0;
 	protected:
 		VertexBuffer(size_t size) 
-			: RenderResource("Vertex Buffer") {
+			: RenderDeviceResource("Vertex Buffer") {
 			Resize(size); //internal std::vector allocation
 		}
 	};

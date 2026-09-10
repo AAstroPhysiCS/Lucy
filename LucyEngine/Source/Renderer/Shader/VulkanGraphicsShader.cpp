@@ -6,12 +6,13 @@
 
 namespace Lucy {
 
-	VulkanGraphicsShader::VulkanGraphicsShader(const std::string& name, const std::filesystem::path& path, Ref<RenderDevice> device)
-		: GraphicsShader(name, path) {
-		RTLoad(device);
+	VulkanGraphicsShader::VulkanGraphicsShader(const std::string& name, const std::filesystem::path& path, const std::string& shaderEntryPointName, Ref<RenderDevice> device, 
+		const std::span<const uint32_t>& dataVertex, const std::span<const uint32_t>& dataFragment)
+		: GraphicsShader(name, path, shaderEntryPointName) {
+		RTLoad(device, { dataVertex, dataFragment });
 	}
 
-	void VulkanGraphicsShader::LoadInternal(const Ref<RenderDevice>& device, const std::vector<uint32_t>& dataVertex, const std::vector<uint32_t>& dataFragment) {
+	void VulkanGraphicsShader::LoadInternal(const Ref<RenderDevice>& device, const std::span<const uint32_t>& dataVertex, const std::span<const uint32_t>& dataFragment) {
 		VkShaderModuleCreateInfo vertexCreateInfo = VulkanAPI::ShaderModuleCreateInfo(dataVertex.size() * sizeof(uint32_t), dataVertex.data());
 		VkShaderModuleCreateInfo fragmentCreateInfo = VulkanAPI::ShaderModuleCreateInfo(dataFragment.size() * sizeof(uint32_t), dataFragment.data());
 
@@ -19,8 +20,8 @@ namespace Lucy {
 		LUCY_VK_ASSERT(vkCreateShaderModule(vulkanDevice->GetLogicalDevice(), &vertexCreateInfo, nullptr, &m_VertexShaderModule));
 		LUCY_VK_ASSERT(vkCreateShaderModule(vulkanDevice->GetLogicalDevice(), &fragmentCreateInfo, nullptr, &m_FragmentShaderModule));
 
-		m_ShaderStageInfos[0] = VulkanAPI::PipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, m_VertexShaderModule, "main");
-		m_ShaderStageInfos[1] = VulkanAPI::PipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, m_FragmentShaderModule, "main");
+		m_ShaderStageInfos[0] = VulkanAPI::PipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, m_VertexShaderModule, GetEntryPointName().c_str());
+		m_ShaderStageInfos[1] = VulkanAPI::PipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, m_FragmentShaderModule, GetEntryPointName().c_str());
 	}
 
 	void VulkanGraphicsShader::RTDestroyResource(const Ref<RenderDevice>& device) {

@@ -2,7 +2,7 @@ project "LucyEditor"
     location "."
     kind "ConsoleApp"
     language "C++"
-    cppdialect "C++20"
+    cppdialect "C++23"
     staticruntime "off"
 
     targetdir ("../bin/" .. outputdir .. "/%{prj.name}")
@@ -35,7 +35,7 @@ project "LucyEditor"
         "LucyEngine"
     }
 
-    filter "platforms:win64"
+    filter "system:windows"
         systemversion "latest"
 
         defines {
@@ -43,7 +43,6 @@ project "LucyEditor"
         }
 
         postbuildcommands {
-            "{COPY} %{LibraryPath.assimp}/assimp-vc143-mt.dll ../bin/" .. outputdir .. "/%{prj.name}",
             "{COPY} %{LibraryPath.nativefiledialog}/nfd.lib ../bin/" .. outputdir .. "/%{prj.name}"
         }
     
@@ -53,6 +52,9 @@ project "LucyEditor"
             "GLFW_INCLUDE_NONE",
             "TRACY_ENABLE"
         }
+        postbuildcommands {
+            "{COPY} %{LibraryPath.assimp}/assimp-vc143-mtd.dll ../bin/" .. outputdir .. "/%{prj.name}",
+        }
         symbols "On"
         runtime "Debug"
 
@@ -60,6 +62,9 @@ project "LucyEditor"
         defines {
             "LUCY_RELEASE",
             "GLFW_INCLUDE_NONE"
+        }
+        postbuildcommands {
+            "{COPY} %{LibraryPath.assimp}/assimp-vc143-mt.dll ../bin/" .. outputdir .. "/%{prj.name}",
         }
         symbols "On"
         optimize "On"

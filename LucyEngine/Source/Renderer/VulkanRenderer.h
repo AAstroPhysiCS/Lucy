@@ -2,7 +2,8 @@
 
 #include "RendererBackend.h"
 #include "Context/VulkanSwapChain.h"
-#include "Synchronization/VulkanSyncItems.h"
+
+#include "Semaphore.h"
 
 #include "Memory/VulkanAllocator.h"
 
@@ -17,22 +18,23 @@ namespace Lucy {
 		VulkanRenderer(RendererConfiguration config, const Ref<Window>& window);
 		virtual ~VulkanRenderer() = default;
 
-		RenderContextResultCodes WaitAndPresent() final override;
+		VulkanRenderer(const VulkanRenderer& other) = delete;
+		VulkanRenderer(VulkanRenderer&& other) noexcept = delete;
+		VulkanRenderer& operator=(const VulkanRenderer& other) = delete;
+		VulkanRenderer& operator=(VulkanRenderer&& other) noexcept = delete;
 
-		void ExecuteBarrier(void* commandBufferHandle, Ref<Image> image) final override;
-		void ExecuteBarrier(void* commandBufferHandle, void* imageHandle, uint32_t imageLayout, uint32_t layerCount, uint32_t mipCount) final override;
+		void SubmitBatchesToRender(std::vector<ExecutionBatch>& batches, const std::unordered_map<std::string, RenderFrameHandles>& renderFrameHandleMap) final override;
+		RenderContextResultCodes WaitAndPresent() final override;
 
 		void Destroy() final override;
 
-		void RTDirectCopyBuffer(VkBuffer& stagingBuffer, VkBuffer& buffer, VkDeviceSize size);
 		void SubmitImmediateCommand(std::function<void(VkCommandBuffer)>&& func);
 
 		void OnWindowResize() final override;
 		void OnViewportResize() final override;
-		glm::vec3 OnMousePicking(const EntityPickedEvent& e, const Ref<Image>& currentFrameBufferImage) final override;
+		uint32_t OnMousePicking(const EntityPickedEvent& e, const Ref<Image>& currentFrameBufferImage) final override;
 
 		void InitializeImGui() final override;
-		void RTRenderImGui() final override;
 	private:
 		void Init() final override;
 
@@ -42,21 +44,33 @@ namespace Lucy {
 
 		void FlushDeletionQueue() final override;
 
-		std::vector<Semaphore> m_WaitSemaphores;
-		std::vector<Semaphore> m_SignalSemaphores;
-		std::vector<Fence> m_InFlightFences;
+		void ProcessQueryResults();
 
-		std::vector<Semaphore> m_WaitSemaphoresCompute;
-		std::vector<Semaphore> m_SignalSemaphoresCompute;
-		std::vector<Fence> m_InFlightFencesCompute;
+		void InternalImGuiPass(uint64_t signalValue, bool hasSceneWork);
 
-		bool m_UseComputeSemaphore = false;
+		void LinkBatches(RenderSubmitQueue& submitQueue);
+		void ExecuteVulkanBatchBarrier(VkCommandBuffer cmdBuffer, const VulkanBatchBarrier& barrier);
+
+		/*
+		* imageAvailable[frame] -> from acquire, waited by first GPU submit of the frame
+		* sceneFinished[frame] -> signaled by last scene batch, waited by ImGui
+		* renderFinished[image] -> signaled by ImGui, waited by present
+		* frameFence[frame] timeline -> signaled by ImGui, waited next reuse of that frame slot
+		*/
+
+		std::vector<VulkanSemaphore> m_ImageAvailableSemaphores;
+		std::vector<VulkanSemaphore> m_RenderFinishedSemaphores;
+		std::vector<VulkanSemaphore> m_InFlightFences;
+
+		std::array<VulkanSemaphore, static_cast<size_t>(TargetQueueFamily::Count)> m_QueueSemaphores;
+		std::array<uint64_t, static_cast<size_t>(TargetQueueFamily::Count)> m_QueueSemaphoreValues{};
+
+		std::vector<uint64_t> m_FrameFenceValues;
 
 		RenderContextResultCodes m_LastSwapChainResult = RenderContextResultCodes::SUCCESS;
 
-		Ref<VulkanTransientCommandPool> m_TransientCommandPool = nullptr;
-
-		ImGuiVulkanImpl m_ImGuiPass;
+		ImGuiVulkanImpl m_ImGuiPassImpl;
+		Unique<RenderCommandList> m_ImGuiRenderCommandList;
 
 		static inline VkBuffer s_IDBuffer = VK_NULL_HANDLE;
 		static inline VmaAllocation s_IDBufferVma = VK_NULL_HANDLE;

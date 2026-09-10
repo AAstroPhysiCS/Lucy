@@ -14,29 +14,33 @@ namespace Lucy {
 	public:
 		VulkanFrameBuffer(const FrameBufferCreateInfo& createInfo, const Ref<VulkanRenderDevice>& device);
 		virtual ~VulkanFrameBuffer() = default;
+
+		VulkanFrameBuffer(const VulkanFrameBuffer&) = delete;
+		VulkanFrameBuffer& operator=(const VulkanFrameBuffer&) = delete;
+		VulkanFrameBuffer(VulkanFrameBuffer&&) = delete;
+		VulkanFrameBuffer& operator=(VulkanFrameBuffer&&) = delete;
 		
 		inline const std::vector<VkFramebuffer>& GetVulkanHandles() const { return m_FrameBufferHandles; }
-		inline const std::vector<RenderResourceHandle>& GetImageHandles() const { return m_ImageHandles; }
+		
+		inline const std::vector<std::vector<RenderDeviceResourceHandle>>& GetImageHandles() const { return m_ImageHandles; }
+		inline const std::vector<RenderDeviceResourceHandle>& GetImageHandles(uint32_t frameIndex) const { return m_ImageHandles[frameIndex]; }
+
 		inline bool IsInFlight() const { return m_CreateInfo.IsInFlight; }
 
 		void RTRecreate(uint32_t width, uint32_t height) final override;
 	private:
-		void RTCreate();
-		void RTDestroyResource() final override;
-		void DestroyHandles();
+		void RTCreate(const Ref<VulkanRenderDevice>& vulkanDevice);
+		void RTDestroyResource(RenderDevice* device) final override;
+		void DestroyHandles(VulkanRenderDevice* device);
 
 		//Helper functions
-		Ref<VulkanImage> GetImage(uint32_t index);
-		Ref<VulkanImage> GetDepthImage();
+		Ref<VulkanImage> GetImage(uint32_t frameIndex, uint32_t attachmentIndex);
+		Ref<VulkanImage> GetDepthImage(uint32_t index);
 		Ref<VulkanRenderPass> GetRenderPass();
 
 		std::vector<VkFramebuffer> m_FrameBufferHandles;
-		std::vector<RenderResourceHandle> m_ImageHandles;
-		RenderResourceHandle m_DepthImageHandle = InvalidRenderResourceHandle;
-
-		bool m_CreatedInFlightFrameBufferImages = false;
-
-		Ref<VulkanRenderDevice> m_VulkanDevice = nullptr;
+		std::vector<std::vector<RenderDeviceResourceHandle>> m_ImageHandles;
+		std::vector<RenderDeviceResourceHandle> m_DepthImageHandles;
 	};
 
 	class VulkanSwapChainFrameBuffer : private FrameBuffer {
@@ -49,9 +53,9 @@ namespace Lucy {
 		inline uint32_t GetWidth() const { return m_CreateInfo.Width; }
 		inline uint32_t GetHeight() const { return m_CreateInfo.Height; }
 
-		void RTDestroyResource() final override;
+		void RTDestroyResource(RenderDevice* device) final override;
 	private:
-		void CreateForSwapChain();
+		void CreateForSwapChain(const Ref<VulkanRenderDevice>& vulkanDevice);
 
 		void RTRecreate(uint32_t width, uint32_t height) final override;
 
@@ -61,7 +65,6 @@ namespace Lucy {
 		const Ref<VulkanRenderPass>& m_RenderPass = nullptr;
 
 		std::vector<VkFramebuffer> m_FrameBufferHandles;
-		Ref<VulkanRenderDevice> m_VulkanDevice = nullptr;
 
 		friend class VulkanSwapChain;
 	};

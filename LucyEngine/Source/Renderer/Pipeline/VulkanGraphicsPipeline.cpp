@@ -1,19 +1,23 @@
 #include "lypch.h"
 #include "VulkanGraphicsPipeline.h"
+#include "VulkanImageSamplerBindingInfo.h"
 
 #include "Renderer/Shader/VulkanGraphicsShader.h"
 
 #include "../VulkanRenderPass.h"
 
+#include "../Context/VulkanContext.h"
+
 #include "Renderer/Descriptors/VulkanDescriptorSet.h"
 #include "Renderer/Device/VulkanRenderDevice.h"
-
 #include "Renderer/Memory/Buffer/PushConstant.h"
+#include "Renderer/Mesh.h"
+#include "Renderer/Renderer.h"
 
 namespace Lucy {
 
-	VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo, const Ref<VulkanRenderDevice>& vulkanDevice)
-		: GraphicsPipeline(createInfo) {
+	VulkanGraphicsPipeline::VulkanGraphicsPipeline(const GraphicsPipelineCreateInfo& createInfo, const Ref<Shader>& shader, const Ref<VulkanRenderDevice>& vulkanDevice)
+		: GraphicsPipeline(createInfo, shader) {
 		Renderer::EnqueueToRenderCommandQueue([&](const auto& device) {
 			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
 			Create(vulkanDevice);
@@ -21,39 +25,16 @@ namespace Lucy {
 	}
 
 	void VulkanGraphicsPipeline::Create(const Ref<VulkanRenderDevice>& vulkanDevice) {
+		VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
+		
 		const auto& renderPass = vulkanDevice->AccessResource<RenderPass>(m_CreateInfo.RenderPassHandle)->As<VulkanRenderPass>();
-
-		if (!m_DescriptorPool) {
-#if USE_INTEGRATED_GRAPHICS
-			const std::vector<VkDescriptorPoolSize> poolSizes = {
-				{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100 },
-				{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100 },
-				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 100 }
-			};
-#else
-			const std::vector<VkDescriptorPoolSize> poolSizes = {
-				{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100 },
-				{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100 },
-				{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 100 }
-			};
-#endif
-			VulkanDescriptorPoolCreateInfo poolCreateInfo;
-			poolCreateInfo.PoolSizesVector = poolSizes;
-#if USE_INTEGRATED_GRAPHICS
-			poolCreateInfo.MaxSet = 100;
-#else
-			poolCreateInfo.MaxSet = 100;
-#endif
-			poolCreateInfo.PoolFlags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
-			poolCreateInfo.LogicalDevice = vulkanDevice->GetLogicalDevice();
-			m_DescriptorPool = Memory::CreateRef<VulkanDescriptorPool>(poolCreateInfo);
-		}
 
 		const auto& bindingDescriptor = CreateBindingDescription();
 		const auto& attributeDescriptor = CreateAttributeDescription(bindingDescriptor.binding);
 
 		VkPipelineVertexInputStateCreateInfo vertexInputInfo = VulkanAPI::PipelineVertexInputStateCreateInfo((uint32_t)attributeDescriptor.size(), attributeDescriptor.data(), 1, &bindingDescriptor);
 		VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo = VulkanAPI::PipelineInputAssemblyStateCreateInfo(m_CreateInfo.Topology);
+
 		VkPipelineViewportStateCreateInfo viewportState = VulkanAPI::PipelineViewportStateCreateInfo(1, nullptr, 1, nullptr);
 		VkPipelineRasterizationDepthClipStateCreateInfoEXT rasterizationDepthClipStateCreateInfo = VulkanAPI::PipelineRasterizationDepthClipStateCreateInfo(m_CreateInfo.DepthConfiguration.DepthClipEnable);
 		VkPipelineRasterizationStateCreateInfo rasterizationCreateInfo = VulkanAPI::PipelineRasterizationStateCreateInfo(
@@ -63,12 +44,22 @@ namespace Lucy {
 
 		VkPipelineMultisampleStateCreateInfo multisamplingCreateInfo = VulkanAPI::PipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT);
 
-		VkPipelineColorBlendAttachmentState colorBlendAttachment = 
-			VulkanAPI::PipelineColorBlendAttachmentState(m_CreateInfo.BlendConfiguration.BlendEnable,
-			m_CreateInfo.BlendConfiguration.SrcColorBlendFactor, m_CreateInfo.BlendConfiguration.DstColorBlendFactor, m_CreateInfo.BlendConfiguration.ColorBlendOp,
-			m_CreateInfo.BlendConfiguration.SrcAlphaBlendFactor, m_CreateInfo.BlendConfiguration.DstAlphaBlendFactor, m_CreateInfo.BlendConfiguration.AlphaBlendOp);
+		std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments;
+		colorBlendAttachments.reserve(renderPass->GetColorAttachmentCount());
 
-		std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments(renderPass->GetColorAttachmentCount(), colorBlendAttachment);
+		for (uint32_t attachmentIndex = 0; attachmentIndex < renderPass->GetColorAttachmentCount(); attachmentIndex++) {
+			ImageFormat format = renderPass->GetColorAttachmentFormats()[attachmentIndex];
+			
+			//TODO: temp, change this later
+			bool supportsBlending = format != ImageFormat::R32_UINT;
+
+			VkPipelineColorBlendAttachmentState colorBlendAttachment =
+				VulkanAPI::PipelineColorBlendAttachmentState(supportsBlending ? m_CreateInfo.BlendConfiguration.BlendEnable : VK_FALSE,
+				m_CreateInfo.BlendConfiguration.SrcColorBlendFactor, m_CreateInfo.BlendConfiguration.DstColorBlendFactor, m_CreateInfo.BlendConfiguration.ColorBlendOp,
+				m_CreateInfo.BlendConfiguration.SrcAlphaBlendFactor, m_CreateInfo.BlendConfiguration.DstAlphaBlendFactor, m_CreateInfo.BlendConfiguration.AlphaBlendOp);
+
+			colorBlendAttachments.emplace_back(colorBlendAttachment);
+		}
 
 		VkPipelineColorBlendStateCreateInfo colorBlending = VulkanAPI::PipelineColorBlendStateCreateInfo((uint32_t)colorBlendAttachments.size(), colorBlendAttachments.data());
 
@@ -80,24 +71,41 @@ namespace Lucy {
 
 		VkPipelineDynamicStateCreateInfo dynamicState = VulkanAPI::PipelineDynamicStateCreateInfo(3, dynamicStates);
 
-		m_CreateInfo.Shader->RTLoadDescriptors(vulkanDevice, m_DescriptorPool);
-		const auto& descriptorSetsHandles = m_CreateInfo.Shader->GetDescriptorSetHandles();
-		const auto& pushConstants = m_CreateInfo.Shader->GetPushConstants();
+		const auto& shader = GetShader();
+		const auto& reflectPushConstants = shader->GetShaderPushConstants();
+		for (auto& pc : reflectPushConstants)
+			AddPushConstant(pc);
+
+		m_DescriptorSetHandles = vulkanDevice->GetResourceBindingHandles(shader);
+		const auto& pushConstants = GetPipelineConstants();
 		
 		std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
-		descriptorSetLayouts.reserve(descriptorSetsHandles.size());
-		for (auto handle : descriptorSetsHandles) {
+
+		uint32_t highestSetIndex = 0;
+
+		for (RenderDeviceResourceHandle handle : m_DescriptorSetHandles) {
 			const auto& descriptorSet = vulkanDevice->AccessResource<VulkanDescriptorSet>(handle);
-			descriptorSetLayouts.emplace_back(descriptorSet->GetDescriptorSetLayout());
+			highestSetIndex = std::max(highestSetIndex, descriptorSet->GetSetIndex());
 		}
 
+		descriptorSetLayouts.resize(highestSetIndex + 1, VK_NULL_HANDLE);
+
+		for (RenderDeviceResourceHandle handle : m_DescriptorSetHandles) {
+			const auto& descriptorSet = vulkanDevice->AccessResource<VulkanDescriptorSet>(handle);
+
+			const uint32_t setIndex = descriptorSet->GetSetIndex();
+			descriptorSetLayouts[setIndex] = descriptorSet->GetDescriptorSetLayout();
+		}
+
+		for (uint32_t i = 0; i < descriptorSetLayouts.size(); i++)
+			LUCY_ASSERT(descriptorSetLayouts[i] != VK_NULL_HANDLE, "Missing descriptor set layout for set index {0}", i);
+
 		std::vector<VkPushConstantRange> pushConstantRanges;
-		for (const VulkanPushConstant& pc : pushConstants)
+		for (const PipelineConstant& pc : pushConstants)
 			pushConstantRanges.push_back(pc.GetHandle());
 
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo = VulkanAPI::PipelineLayoutCreateInfo((uint32_t)descriptorSetLayouts.size(), descriptorSetLayouts.data(), (uint32_t)pushConstantRanges.size(), pushConstantRanges.data());
 
-		VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
 		LUCY_VK_ASSERT(vkCreatePipelineLayout(logicalDevice, &pipelineLayoutInfo, nullptr, &m_PipelineLayoutHandle));
 
 		VkPipelineDepthStencilStateCreateInfo depthStencilCreateInfo = VulkanAPI::PipelineDepthStencilStateCreateInfo(m_CreateInfo.DepthConfiguration.DepthWriteEnable, 
@@ -108,13 +116,20 @@ namespace Lucy {
 																													  m_CreateInfo.DepthConfiguration.StencilTestEnable);
 
 		VkGraphicsPipelineCreateInfo pipelineCreateInfo = VulkanAPI::GraphicsPipelineCreateInfo(&vertexInputInfo, &inputAssemblyInfo, &viewportState, &rasterizationCreateInfo,
-																								&multisamplingCreateInfo, &depthStencilCreateInfo, &colorBlending, &dynamicState,
-																								m_PipelineLayoutHandle,
-																								m_CreateInfo.Shader->As<VulkanGraphicsShader>(),
-																								renderPass);
+				&multisamplingCreateInfo, &depthStencilCreateInfo, &colorBlending, &dynamicState, m_PipelineLayoutHandle, shader->As<VulkanGraphicsShader>(), renderPass);
+
 		LUCY_VK_ASSERT(vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &m_PipelineHandle));
+		LUCY_INFO("Vulkan graphics pipeline '{0}' created successfully!", shader->GetName());
 #ifdef LUCY_DEBUG
-		LUCY_INFO("Vulkan graphics pipeline '{0}' created successfully!", m_CreateInfo.Shader->GetName());
+		std::string objectName = std::format("{0} Graphics Pipeline", shader->GetName());
+
+		VkDebugUtilsObjectNameInfoEXT nameInfo{};
+		nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+		nameInfo.objectType = VK_OBJECT_TYPE_PIPELINE;
+		nameInfo.objectHandle = reinterpret_cast<uint64_t>(m_PipelineHandle);
+		nameInfo.pObjectName = objectName.c_str();
+
+		VulkanExternalFuncLinkage::vkSetDebugUtilsObjectNameEXT(logicalDevice, &nameInfo);
 #endif
 	}
 
@@ -149,45 +164,58 @@ namespace Lucy {
 	}
 
 	VkVertexInputBindingDescription VulkanGraphicsPipeline::CreateBindingDescription() const {
-		return VulkanAPI::VertexInputBindingDescription(0, CalculateStride(m_CreateInfo.VertexShaderLayout) * sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX);
+		return Vertex::GetBindingDescription();
 	}
 
 	std::vector<VkVertexInputAttributeDescription> VulkanGraphicsPipeline::CreateAttributeDescription(uint32_t binding) {
-		std::vector<VkVertexInputAttributeDescription> vertexInputAttributeDescriptions;
+		std::vector<VkVertexInputAttributeDescription> result;
+		const auto& attributes = Vertex::GetAttributeDescriptions(binding);
+		const auto& shaderLayout = GetShader()->GetVertexShaderLayout();
 
-		uint32_t offset = 0;
-
-		std::ranges::sort(m_CreateInfo.VertexShaderLayout, {}, &VertexShaderLayoutElement::Location);
-
-		for (const auto& [name, location, type, size] : m_CreateInfo.VertexShaderLayout) {
-			VkVertexInputAttributeDescription attributeDescriptor = VulkanAPI::VertexInputAttributeDescription(binding, location, GetVulkanTypeFromSize(type, size), offset);
-			offset += size * sizeof(float);
-
-			vertexInputAttributeDescriptions.push_back(attributeDescriptor);
+		for (const auto& element : shaderLayout) {
+			for (const auto& attribute : attributes) {
+				if (element.Location == attribute.location) {
+					result.push_back(attribute);
+				}
+			}
 		}
-		return vertexInputAttributeDescriptions;
+
+		return result;
 	}
 
-	void VulkanGraphicsPipeline::RTDestroyResource() {
-		Renderer::EnqueueToRenderCommandQueue([=](const auto& device) {
-			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
-			VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
+	void VulkanGraphicsPipeline::RTDestroyResource(RenderDevice* device) {
+		Pipeline::RTDestroyResource(device);
 
-			m_DescriptorPool->RTDestroyResource();
-			m_DescriptorPool = nullptr;
-			vkDestroyPipelineLayout(logicalDevice, m_PipelineLayoutHandle, nullptr);
-			vkDestroyPipeline(logicalDevice, m_PipelineHandle, nullptr);
+		const auto& vulkanDevice = reinterpret_cast<VulkanRenderDevice*>(device);
+		VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
 
-			m_PipelineHandle = VK_NULL_HANDLE;
-			m_PipelineLayoutHandle = VK_NULL_HANDLE;
-		});
+		vkDestroyPipelineLayout(logicalDevice, m_PipelineLayoutHandle, nullptr);
+		vkDestroyPipeline(logicalDevice, m_PipelineHandle, nullptr);
+
+		m_PipelineHandle = VK_NULL_HANDLE;
+		m_PipelineLayoutHandle = VK_NULL_HANDLE;
 	}
 
-	void VulkanGraphicsPipeline::RTRecreate() {
-		RTDestroyResource();
-		Renderer::EnqueueToRenderCommandQueue([&](const auto& device) {
+	void VulkanGraphicsPipeline::RTRecreate(Ref<Shader> newShader) {
+		Renderer::EnqueueResourceRecreate([this, newShader](const Ref<RenderDevice>& device) -> RenderDeletionFunc {
 			const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+
+			VkPipeline oldPipelineHandle = std::exchange(m_PipelineHandle, VK_NULL_HANDLE);
+			VkPipelineLayout oldPipelineLayoutHandle = std::exchange(m_PipelineLayoutHandle, VK_NULL_HANDLE);
+
+			SetShader(newShader);
 			Create(vulkanDevice);
+
+			return [this, oldPipelineHandle, oldPipelineLayoutHandle](const Ref<RenderDevice>& device) {
+				const auto& vulkanDevice = device->As<VulkanRenderDevice>();
+				VkDevice logicalDevice = vulkanDevice->GetLogicalDevice();
+
+				if (oldPipelineHandle)
+					vkDestroyPipeline(logicalDevice, oldPipelineHandle, nullptr);
+
+				if (oldPipelineLayoutHandle)
+					vkDestroyPipelineLayout(logicalDevice, oldPipelineLayoutHandle, nullptr);
+			};
 		});
 	}
 }

@@ -42,7 +42,7 @@ namespace Lucy {
 		inline ApplicationArgs GetProgramArguments() const { return m_Args; }
 
 		static inline ApplicationMetrics& GetApplicationMetrics() { return s_Metrics; }
-		static inline auto GetTaskScheduler() { return s_TaskScheduler; }
+		static inline TaskScheduler* GetTaskScheduler() { return s_TaskScheduler; }
 		
 		static inline std::condition_variable& IsMainThreadReadyCondVar() { return s_MainThreadReadyCondVar; }
 		static inline const std::mutex& IsMainThreadReadyMutex() { return s_MainThreadReadyMutex; }
@@ -68,7 +68,7 @@ namespace Lucy {
 		ApplicationCreateInfo m_CreateInfo;
 		static inline ApplicationMetrics s_Metrics;
 
-		static inline auto s_TaskScheduler = new TaskScheduler(TaskSchedulerCreateInfo{ .FromThreadIndex = 1 });
+		static inline TaskScheduler* s_TaskScheduler = new TaskScheduler(TaskSchedulerCreateInfo{ .FromThreadIndex = 1 });
 
 		static inline std::condition_variable s_MainThreadReadyCondVar;
 		static inline std::mutex s_MainThreadReadyMutex;

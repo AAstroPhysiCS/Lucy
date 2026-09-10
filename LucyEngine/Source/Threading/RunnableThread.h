@@ -16,6 +16,11 @@ namespace Lucy {
 		RunnableThread(const RunnableThreadCreateInfo& createInfo);
 		virtual ~RunnableThread() = default;
 
+		RunnableThread(const RunnableThread& other) = delete;
+		RunnableThread(RunnableThread&& other) noexcept = delete;
+		RunnableThread& operator=(const RunnableThread& other) = delete;
+		RunnableThread& operator=(RunnableThread&& other) noexcept = delete;
+
 		void Start();
 
 		inline const std::string& GetDebugName() const { return m_DebugName; }

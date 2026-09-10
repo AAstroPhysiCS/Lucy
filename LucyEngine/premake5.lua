@@ -2,7 +2,7 @@ project "LucyEngine"
     location "."
     kind "StaticLib"
     language "C++"
-    cppdialect "C++20"
+    cppdialect "C++23"
     staticruntime "off"
 
     targetdir ("../bin/" .. outputdir .. "/%{prj.name}")
@@ -21,6 +21,7 @@ project "LucyEngine"
         "%{LibraryPath.spdlog}/include",
         "%{LibraryPath.GLFW}/include",
         "%{LibraryPath.entt}/include",
+        "%{LibraryPath.meshoptimizer}/src",
         "%{LibraryPath.stb}/include",
         "%{LibraryPath.assimp}/include",
         "%{LibraryPath.nativefiledialog}/include",
@@ -34,12 +35,12 @@ project "LucyEngine"
         "GLFW",
         "ImGui",
         "glm",
+        "meshoptimizer",
         
-        "%{LibraryPath.assimp}/assimp.lib",
         "%{LibraryPath.nativefiledialog}/nfd.lib"
     }
 
-    filter "platforms:win64"
+    filter "system:windows"
         systemversion "latest"
 
         defines {
@@ -56,15 +57,12 @@ project "LucyEngine"
         runtime "Debug"
 
         links {
+            "%{LibraryPath.assimp}/assimp-vc143-mtd.lib",
+
             "%{LibraryPath.VulkanLib}/vulkan-1.lib",
 
             "%{LibraryPath.SlangDebug}",
             "%{LibraryPath.SlangDebugRT}",
-
-            "%{LibraryPath.ShaderCDebug}",
-            "%{LibraryPath.SPIRVDebug}",
-            "%{LibraryPath.SPIRVGLSLDebug}",
-            "%{LibraryPath.SPIRVTools}"
         }
 
     filter "configurations:Release"
@@ -77,12 +75,10 @@ project "LucyEngine"
         runtime "Release"
 
         links {
+            "%{LibraryPath.assimp}/assimp-vc143-mt.lib",
+
             "%{LibraryPath.VulkanLib}/vulkan-1.lib",
 
             "%{LibraryPath.SlangRelease}",
             "%{LibraryPath.SlangReleaseRT}",
-
-            "%{LibraryPath.ShaderCRelease}",
-            "%{LibraryPath.SPIRVRelease}",
-            "%{LibraryPath.SPIRVGLSLRelease}"
         }
