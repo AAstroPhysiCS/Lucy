@@ -145,10 +145,7 @@ void DDGIProbeUpdateMain(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_Grou
     uint probeIndex = groupID.x;
 
     uint3 probeCounts = PushConstants.Data.ProbeCountsAndRays.xyz;
-
-    uint probeCount = probeCounts.x * probeCounts.y * probeCounts.z;
-
-    if (probeIndex >= probeCount)
+    if (probeIndex >= probeCounts.x * probeCounts.y * probeCounts.z)
         return;
 
     uint irradianceTexels = PushConstants.Data.AtlasTexelData.x;

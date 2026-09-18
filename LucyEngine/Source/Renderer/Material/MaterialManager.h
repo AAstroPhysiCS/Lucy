@@ -3,9 +3,9 @@
 
 #include "Material.h"
 
-struct aiMaterial;
-
 namespace Lucy {
+
+	struct ImportedMaterial;
 
 	class ImageSampler;
 	class PipelineManager;
@@ -20,16 +20,16 @@ namespace Lucy {
 		MaterialManager(MaterialManager&&) = delete;
 		MaterialManager& operator=(MaterialManager&&) = delete;
 
-		RenderDeviceObjectHandle CreateMaterialByPath(MaterialType materialType, aiMaterial* aiMaterial, const std::string& importedFilePath);
+		RenderDeviceObjectHandle CreateMaterialByPath(MaterialType materialType, const ImportedMaterial& importedMaterial, const std::string& importedFilePath);
 		void RTDestroyMaterial(RenderDeviceObjectHandle materialID);
 		void RTDestroyMaterials(const std::vector<RenderDeviceObjectHandle>& materialIDs);
 		void DestroyAll();
 
 		inline const Ref<Material>& GetMaterialByID(RenderDeviceObjectHandle materialID) const { return m_Materials.at(materialID); }
 	private:
-		RenderDeviceObjectHandle CreatePBRMaterial(aiMaterial* aiMaterial, const std::string& importedFilePath);
+		RenderDeviceObjectHandle CreatePBRMaterial(const ImportedMaterial& importedMaterial, const std::string& importedFilePath);
 
-		void LoadMaterialTextures(aiMaterial* aiMaterial, const std::string& importedFilePath, const Ref<Material>& material);
+		void LoadMaterialTextures(const ImportedMaterial& importedMaterial, const std::string& importedFilePath, const Ref<Material>& material);
 
 		std::map<RenderDeviceObjectHandle, Ref<Material>> m_Materials;
 

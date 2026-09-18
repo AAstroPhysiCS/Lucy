@@ -8,6 +8,8 @@ static constexpr const float GOLDEN_RATIO = 1.61803398875f;
 
 static constexpr const uint NUM_CASCADES = 4;
 
+static constexpr const uint MAX_PUNCTUAL_LIGHTS = 16;
+
 static constexpr const uint32_t NUM_PREFILTER_MIP_LEVELS = 5u;
 
 static constexpr const uint SAMPLE_COUNT = 1024u;
@@ -21,6 +23,16 @@ float4 SRGBtoLINEAR(float4 srgbIn) {
     float3 bLess = step(float3(0.04045), srgbIn.xyz);
     float3 linOut = lerp(srgbIn.xyz / float3(12.92), pow((srgbIn.xyz + float3(0.055)) / float3(1.055), float3(2.4)), bLess);
     return float4(linOut, srgbIn.w);
+}
+
+float3 ACESFilm(float3 x) {
+    const float a = 2.51f;
+    const float b = 0.03f;
+    const float c = 2.43f;
+    const float d = 0.59f;
+    const float e = 0.14f;
+
+    return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
 }
 
 float2x2 operator*(float2x2 a, float2x2 b) { return mul(b, a); }

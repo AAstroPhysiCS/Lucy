@@ -24,6 +24,9 @@ namespace Lucy {
 		static void Init();
 		static void Destroy();
 
+		static std::filesystem::path DecodeURI(const std::filesystem::path& uri);
+		static std::string DecodeURI(const std::string& uri);
+
 		static std::filesystem::path GetParentPath(const std::string& path);
 		static std::filesystem::path GetFileExtension(const std::string& file);
 
@@ -40,6 +43,8 @@ namespace Lucy {
 
 		static bool FileExists(const std::string& file);
 		static bool FileExists(const std::filesystem::path& filePath);
+
+		static std::filesystem::path WeaklyCanonical(const std::filesystem::path& filePath);
 
 		template <typename TData>
 		static inline void WriteToFile(const std::filesystem::path& path, const std::vector<TData>& data, OpenMode mode) {

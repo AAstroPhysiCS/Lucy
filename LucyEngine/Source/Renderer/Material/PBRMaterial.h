@@ -10,7 +10,7 @@ namespace Lucy {
 
 	class PBRMaterial final : public Material {
 	public:
-		PBRMaterial(const MaterialCreateInfo& createInfo);
+		PBRMaterial(const MaterialCreateInfo& createInfo, const RenderDevicePBRMaterialData& materialData);
 		virtual ~PBRMaterial() = default;
 
 		PBRMaterial(const PBRMaterial&) = delete;

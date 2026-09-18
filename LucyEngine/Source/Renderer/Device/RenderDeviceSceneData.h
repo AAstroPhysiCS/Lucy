@@ -58,7 +58,7 @@ namespace Lucy {
 
     struct RenderDevicePBRMaterialData {
         glm::vec4 BaseColor{};
-        glm::vec4 ORME{ 1.0f, 0.0f, 0.0f, 0.0f }; // x = Occlusion, y = Roughness, z = Metallic, w = Emissive
+        glm::vec4 ORME{ 1.0f, 1.0f, 0.0f, 0.0f }; // x = Occlusion, y = Roughness, z = Metallic, w = Emissive
 
         RenderDeviceTextureResource AlbedoMap;
         RenderDeviceTextureResource NormalMap;
@@ -66,7 +66,6 @@ namespace Lucy {
         RenderDeviceTextureResource AOMap;
         RenderDeviceTextureResource RoughnessMap;
         RenderDeviceTextureResource MetallicMap;
-        //RenderDeviceTextureResource ORMMap;
         RenderDeviceTextureResource EmissiveMap;
 
         float NormalStrength = 1.0f;
@@ -200,6 +199,29 @@ namespace Lucy {
         auto operator<=>(const RenderDeviceSceneAddresses&) const = default;
     };
 
+    enum class RenderDevicePunctualLightType : uint32_t {
+        Point,
+        Spot
+    };
+
+    struct RenderDevicePunctualLightsData {
+        static constexpr uint32_t MAX_PUNCTUAL_LIGHTS = 16;
+
+        struct Data {
+            glm::vec4 PositionAndRange{};
+            glm::vec4 DirectionAndType{};
+            glm::vec4 ColorAndConstantAttenuation{};
+            glm::vec4 ConeAndAttenuation{};
+
+            auto operator<=>(const Data&) const = default;
+        };
+
+        std::array<Data, MAX_PUNCTUAL_LIGHTS> Lights{};
+        uint32_t LightCount = 0; // x = light count
+
+        auto operator<=>(const RenderDevicePunctualLightsData&) const = default;
+    };
+
     struct RenderDeviceSceneGlobalData {
         static inline constexpr const uint32_t NUM_CASCADES = 4;
 
@@ -216,12 +238,15 @@ namespace Lucy {
             auto operator<=>(const LightValues&) const = default;
         } DirectionalLight{};
 
+        RenderDevicePunctualLightsData PunctualLights{};
+
         auto operator<=>(const RenderDeviceSceneGlobalData&) const = default;
 
         static inline constexpr auto Members = MembersList<
             &RenderDeviceSceneGlobalData::Camera,
             &RenderDeviceSceneGlobalData::Addresses,
-            &RenderDeviceSceneGlobalData::DirectionalLight
+            &RenderDeviceSceneGlobalData::DirectionalLight,
+            &RenderDeviceSceneGlobalData::PunctualLights
         >{};
     };
 

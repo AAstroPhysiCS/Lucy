@@ -4,14 +4,13 @@
 
 #include "vulkan/vulkan.h"
 
-#include "assimp/scene.h"
-#include "assimp/Importer.hpp"
-
 #include "Material/Material.h"
 
 #include "Device/RenderDeviceResource.h"
 
 namespace Lucy {
+
+	struct ImportedScene;
 
 	class RenderDevice;
 
@@ -138,6 +137,7 @@ namespace Lucy {
 		Mesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
 		Mesh(std::vector<Vertex>&& vertices, std::vector<uint32_t>&& indices);
 		Mesh(const std::string& path);
+		Mesh(ImportedScene& importedScene, const std::string& path);
 		~Mesh() = default;
 
 		Mesh(const Mesh& other) = delete;
@@ -182,8 +182,7 @@ namespace Lucy {
 		void Load(const Ref<RenderDevice>& device, std::vector<Vertex>& vertices, std::vector<uint32_t>& indices);
 		void Load();
 
-		void LoadProgram(const aiScene* scene);
-		void TraverseHierarchy(const aiNode* node, const glm::mat4& parentTransform);
+		void LoadImportedScene(ImportedScene& importedScene);
 	private:
 		constexpr static inline float MESHOPT_OVERDRAW_THRESHOLD = 1.05f;
 		constexpr static inline uint32_t MESH_LOD_COUNT = 4;
@@ -222,8 +221,6 @@ namespace Lucy {
 
 		uint32_t m_MyGlobalVertexOffset = 0;
 		uint32_t m_MyGlobalIndexOffset = 0;
-
-		Unique<Assimp::Importer> m_Importer = nullptr;
 	private:
 		friend glm::vec3 AllocateMeshID();
 	};

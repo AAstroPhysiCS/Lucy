@@ -197,11 +197,11 @@ namespace Lucy {
 		static constexpr float GetProbeBackfaceThreshold() { return s_ProbeBackfaceThreshold; }
 		static constexpr float GetProbeMinFrontfaceDistance() { return s_ProbeMinFrontfaceDistance; }
 	private:
-		static inline constexpr uint32_t s_RaysPerProbe = 64;
+		static constexpr uint32_t s_RaysPerProbe = 128;
 
-		static inline constexpr glm::vec3 s_ProbeCounts{ 32, 16, 32 };
-		static inline constexpr glm::vec3 s_ProbeSpacing{ 2.5f };
-		static inline constexpr glm::vec3 s_ProbeOrigin = -0.5f * glm::vec3(s_ProbeCounts - glm::vec3(1)) * s_ProbeSpacing;
+		static constexpr glm::vec3 s_ProbeCounts{ 32, 16, 32 };
+		static constexpr glm::vec3 s_ProbeSpacing{ 2.5f };
+		static constexpr glm::vec3 s_ProbeOrigin = -0.5f * glm::vec3(s_ProbeCounts - glm::vec3(1)) * s_ProbeSpacing;
 
 		static inline float s_MaxRayDistance = glm::length(glm::vec3(s_ProbeCounts - glm::vec3(1)) * s_ProbeSpacing);
 
@@ -216,8 +216,8 @@ namespace Lucy {
 
 		static constexpr uint32_t s_ProbeCount = s_ProbeColumns * s_ProbeRows;
 
-		static inline constexpr float s_ProbeBackfaceThreshold = 0.25f;
-		static inline constexpr float s_ProbeMinFrontfaceDistance = 0.5f;
+		static constexpr float s_ProbeBackfaceThreshold = 0.25f;
+		static constexpr float s_ProbeMinFrontfaceDistance = 0.5f;
 
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;

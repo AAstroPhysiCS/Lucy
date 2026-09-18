@@ -1,18 +1,18 @@
 #ifndef LUCY_RESOURCES_SLANG
 #define LUCY_RESOURCES_SLANG
 
-static const uint OBJECT_FLAG_ALIVE = 1u << 0u;
-static const uint OBJECT_FLAG_FORCE_HIGHEST_LOD = 1u << 1u;
-static const uint OBJECT_FLAG_FORCE_LOWEST_LOD = 1u << 2u;
+static constexpr uint OBJECT_FLAG_ALIVE = 1u << 0u;
+static constexpr uint OBJECT_FLAG_FORCE_HIGHEST_LOD = 1u << 1u;
+static constexpr uint OBJECT_FLAG_FORCE_LOWEST_LOD = 1u << 2u;
 
-static const uint VIEW_FLAG_FRUSTUM = 1u << 0u;
-static const uint VIEW_FLAG_CONE = 1u << 1u;
-static const uint VIEW_FLAG_OCCLUSION = 1u << 2u;
-static const uint VIEW_FLAG_ORTHOGRAPHIC = 1u << 4u;
+static constexpr uint VIEW_FLAG_FRUSTUM = 1u << 0u;
+static constexpr uint VIEW_FLAG_CONE = 1u << 1u;
+static constexpr uint VIEW_FLAG_OCCLUSION = 1u << 2u;
+static constexpr uint VIEW_FLAG_ORTHOGRAPHIC = 1u << 4u;
 
 #include "LucyCommons.slang"
 
-static constexpr const uint INVALID_BINDLESS_INDEX = 0xFFFFFFFFu;
+static constexpr uint INVALID_BINDLESS_INDEX = 0xFFFFFFFFu;
 
 enum class TextureType : uint {
     Texture,
@@ -122,7 +122,7 @@ public struct PBRMaterial {
 
     PBRMaterialSample Sample(float2 uv) {
         PBRMaterialSample result;
-        result.BaseColor = AlbedoMap.Sample2DTexture(uv, BaseColor);
+        result.BaseColor = BaseColor * AlbedoMap.Sample2DTexture(uv, BaseColor);
         result.AO = ORME.x;
         result.Roughness = ORME.y;
         result.Metallic = ORME.z;
@@ -143,9 +143,9 @@ public struct PBRMaterial {
         if (ORMMap.IsValid()) {
             float3 orm = ORMMap.Sample2DTexture(uv, ORME).xyz;
 
-            result.AO = orm.r;
-            result.Roughness = orm.g;
-            result.Metallic = orm.b;
+            result.AO *= orm.r;
+            result.Roughness *= orm.g;
+            result.Metallic *= orm.b;
 
             return result;
         }
@@ -170,7 +170,7 @@ public struct PBRMaterial {
 
     PBRMaterialSample SampleLevel(float2 uv, float level) {
         PBRMaterialSample result;
-        result.BaseColor = AlbedoMap.Sample2DTextureLevel(uv, level, BaseColor);
+        result.BaseColor = BaseColor * AlbedoMap.Sample2DTextureLevel(uv, level, float4(1.0f));
         result.AO = ORME.x;
         result.Roughness = ORME.y;
         result.Metallic = ORME.z;
@@ -192,8 +192,8 @@ public struct PBRMaterial {
             float3 orm = ORMMap.Sample2DTextureLevel(uv, level, ORME).xyz;
 
             result.AO = orm.r;
-            result.Roughness = orm.g;
-            result.Metallic = orm.b;
+            result.Roughness *= orm.g;
+            result.Metallic *= orm.b;
 
             return result;
         }
@@ -330,6 +330,24 @@ struct SceneCamera {
     float4 u_CamPos;
 };
 
+//TODO: maybe merge directional light as well...
+enum class PunctualLightType : uint {
+    Point,
+    Spot
+};
+
+struct PunctualLight {
+    float4 PositionAndRange;
+    float4 DirectionAndType;
+    float4 ColorAndConstantAttenuation;
+    float4 ConeAndAttenuation;
+};
+
+struct PunctualLights {
+    PunctualLight Lights[MAX_PUNCTUAL_LIGHTS];
+    uint LightCount;
+};
+
 struct DirectionalLight {
     float3 Direction;
     float3 Color;
@@ -341,10 +359,9 @@ struct GPUScene {
     SceneCamera Camera;
     GPUSceneAddresses Addresses;
     DirectionalLight DirectionalLight;
+    PunctualLights PunctualLights;
 };
 
-//adds 8 bytes to the already existing sizeof(T)
-//take that in to consideration okidoki!!!!
 struct PushConstantGlobal<T> {
     GPUScene* Root;
     T Data;

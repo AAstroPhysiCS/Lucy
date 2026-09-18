@@ -10,6 +10,8 @@
 
 #include "Renderer/Image/Image.h"
 
+#include "SceneImporter.h"
+
 namespace Lucy {
 
 	void TransformComponent::CalculateMatrix() {
@@ -57,5 +59,34 @@ namespace Lucy {
 			Renderer::ImportExternalRenderGraphResource(RGResource(IrradianceImage), m_IrradianceImageHandle);
 #endif
 		});
+	}
+
+	CameraComponent::CameraComponent(const ImportedCamera& importedCamera) 
+		: m_Camera(importedCamera.Position, importedCamera.NearPlane, importedCamera.FarPlane, importedCamera.VerticalFOV) {
+		m_Camera.SetAspectRatio(importedCamera.AspectRatio);
+	}
+
+	PunctualLightComponent::PunctualLightComponent(const ImportedLight& light)
+		: m_Color(light.Color), m_Attenuation(light.AttenuationConstant, light.AttenuationLinear, light.AttenuationQuadratic), 
+		m_Range(light.Range), m_InnerConeAngle(light.InnerConeAngle), m_OuterConeAngle(light.OuterConeAngle) {
+		switch (light.Type) {
+			case ImportedLightType::Point:
+				m_Type = PunctualLightType::Point;
+				break;
+			case ImportedLightType::Spot:
+				m_Type = PunctualLightType::Spot;
+				break;
+			default:
+				LUCY_ASSERT(false, "Unsupported punctual light type!");
+				break;
+		}
+
+		m_Intensity = glm::max(light.Color.r, glm::max( light.Color.g, light.Color.b));
+		if (m_Intensity > 0.0f)
+			m_Color = light.Color / m_Intensity;
+	}
+
+	PunctualLightComponent::PunctualLightComponent(PunctualLightType type) 
+		: m_Type(type) {
 	}
 }

@@ -33,6 +33,7 @@ namespace Lucy {
 
         void UpdateCamera(const CameraViewProjection& camera);
         void UpdateLightValues(const RenderDeviceSceneGlobalData::LightValues& lightValues);
+        void UpdatePunctualLights(const RenderDevicePunctualLightsData& punctualLights);
         void UpdateGlobals(const RenderDeviceSceneGlobalData& data);
         void UpdateCullView(const RenderDeviceObjectHandle& handle, const RenderDeviceCullViewData& data);
         void UpdateObjectTransform(const RenderDeviceObjectHandle& handle, const glm::mat4& transform);
@@ -103,6 +104,7 @@ namespace Lucy {
 
         void RTUpdateCamera(const CameraViewProjection& camera);
         void RTUpdateLightValues(const RenderDeviceSceneGlobalData::LightValues& lightValues);
+        void RTUpdatePunctualLights(const RenderDevicePunctualLightsData& punctualLights);
         void RTUpdateGlobals(const RenderDeviceSceneGlobalData& data);
         void RTUpdateCullView(const RenderDeviceObjectHandle& handle, const RenderDeviceCullViewData& data);
         void RTUpdateObjectTransform(const RenderDeviceObjectHandle& handle, const glm::mat4& transform);

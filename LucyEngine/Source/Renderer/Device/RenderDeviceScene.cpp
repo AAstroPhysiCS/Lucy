@@ -392,6 +392,12 @@ namespace Lucy {
             RTUpdateLightValues(lightValues);
         });
     }
+    
+    void RenderDeviceScene::UpdatePunctualLights(const RenderDevicePunctualLightsData& punctualLights) {
+        Renderer::EnqueueToRenderCommandQueue([this, punctualLights](const auto& device) {
+            RTUpdatePunctualLights(punctualLights);
+        });
+    }
 
     void RenderDeviceScene::UpdateGlobals(const RenderDeviceSceneGlobalData& data) {
         Renderer::EnqueueToRenderCommandQueue([this, data](const auto& device) {
@@ -410,7 +416,6 @@ namespace Lucy {
         LUCY_ASSERT(Renderer::IsOnRenderThread());
 
         auto& globals = m_Globals.Get(m_GlobalsHandle);
-
         if (globals.Camera == camera)
             return;
 
@@ -422,11 +427,21 @@ namespace Lucy {
         LUCY_ASSERT(Renderer::IsOnRenderThread());
 
         auto& globals = m_Globals.Get(m_GlobalsHandle);
-
         if (globals.DirectionalLight == lightValues)
             return;
 
         RTEnqueueUpdatePartly<&RenderDeviceSceneGlobalData::DirectionalLight>(m_Globals, RenderDeviceSceneBufferType::Globals, m_GlobalsHandle, lightValues);
+    }
+
+    void RenderDeviceScene::RTUpdatePunctualLights(const RenderDevicePunctualLightsData& punctualLights) {
+        LUCY_PROFILE_NEW_EVENT("RenderDeviceScene::RTUpdatePunctualLights");
+        LUCY_ASSERT(Renderer::IsOnRenderThread());
+
+        auto& globals = m_Globals.Get(m_GlobalsHandle);
+        if (globals.PunctualLights == punctualLights)
+            return;
+
+        RTEnqueueUpdatePartly<&RenderDeviceSceneGlobalData::PunctualLights>(m_Globals, RenderDeviceSceneBufferType::Globals, m_GlobalsHandle, punctualLights);
     }
 
     void RenderDeviceScene::RTUpdateGlobals(const RenderDeviceSceneGlobalData& data) {

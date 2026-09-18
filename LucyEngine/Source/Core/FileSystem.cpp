@@ -55,9 +55,51 @@ namespace Lucy {
 		return std::filesystem::exists(filePath);
 	}
 
+	std::filesystem::path FileSystem::DecodeURI(const std::filesystem::path& uri) {
+		return DecodeURI(uri.string());
+	}
+
+	std::string FileSystem::DecodeURI(const std::string& uri) {
+		std::string result;
+		result.reserve(uri.size());
+
+		const auto HexToInt = [](char character) -> int32_t {
+			if (character >= '0' && character <= '9')
+				return character - '0';
+			if (character >= 'A' && character <= 'F')
+				return character - 'A' + 10;
+			if (character >= 'a' && character <= 'f')
+				return character - 'a' + 10;
+			return -1;
+		};
+
+		for (size_t i = 0; i < uri.size(); i++) {
+			if (uri[i] == '%' && i + 2 < uri.size()) {
+				int32_t high = HexToInt(uri[i + 1]);
+				int32_t low = HexToInt(uri[i + 2]);
+
+				if (high != -1 && low != -1) {
+					result += static_cast<char>((high << 4) | low);
+					i += 2;
+					continue;
+				}
+			}
+
+			result += uri[i];
+		}
+
+		return result;
+	}
+
+	std::filesystem::path FileSystem::WeaklyCanonical(const std::filesystem::path& filePath) {
+		auto decoded = DecodeURI(filePath.string());
+		return std::filesystem::weakly_canonical(decoded);
+	}
+
 	std::filesystem::path FileSystem::GetParentPath(const std::string& path) {
 		LUCY_ASSERT(FileExists(path), "File cannot be found {0}", path);
-		std::filesystem::path relPath(path);
+		auto decoded = DecodeURI(path);
+		std::filesystem::path relPath(decoded);
 		return relPath.parent_path();
 	}
 
