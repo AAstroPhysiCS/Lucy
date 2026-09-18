@@ -23,7 +23,7 @@ Lucy is technically the older sister of [**OxyEngine**](https://github.com/AAstr
 
 ### Rendering Architecture
 - **GPU-driven rendering** with GPU-generated draw commands, indirect compute dispatch, and indirect-count drawing, keeping visibility and draw-count decisions on the GPU.
-- **Multithreaded renderer** with separate main and render threads, plus a custom job system for parallel work such as model processing.
+- **Multithreaded renderer** with separate main and render thread, plus a custom job system for parallel work such as model processing.
 - **Custom render graph** with multi-queue scheduling, automatic resource barriers, cross-queue dependency analysis, and timeline-semaphore synchronization.
 - **Bindless rendering** with globally indexed textures and samplers, and GPU-resident scene data accessed through buffer device addresses rather than per-object descriptor rebinding.
 - **Shared global vertex and index buffers** with vertex pulling, using the same geometry storage for rasterization and ray tracing. (inspired by idTech-Engine)
