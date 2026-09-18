@@ -107,15 +107,18 @@ void ClosestHit(inout DDGIRayPayload payload, BuiltInTriangleIntersectionAttribu
     payload.Distance = backfaceHit ? -RayTCurrent() : RayTCurrent();
     payload.Radiance = float3(0.0f);
 
-    if (backfaceHit)
-        return;
-
     PBRMaterial material = PushConstants.Root->Addresses.PBRMaterials[surface.MaterialIndex];
     PBRMaterialSample materialSample = material.SampleLevel(surface.UV, 0.0f);
 
     float3 surfaceNormalWS = surface.NormalWS;
     float3 normalWS = GetDDGISurfaceNormal(surface, material, materialSample);
     float3 viewDirection = normalize(-WorldRayDirection());
+
+    //for the surgical scene
+    if (backfaceHit) {
+        surfaceNormalWS = -surfaceNormalWS;
+        normalWS = -normalWS;
+    }
 
     float3 lightDirection = normalize(-PushConstants.Root->DirectionalLight.Direction);
 
@@ -135,7 +138,7 @@ void ClosestHit(inout DDGIRayPayload payload, BuiltInTriangleIntersectionAttribu
         PushConstants.Root->DirectionalLight.Color
     ) * visibility;
 
-    directLighting += EvaluatePunctualLights(
+    directLighting += EvaluatePunctualLightsDDGI(u_TLAS,
         PushConstants.Root,
         surface.PositionWS,
         viewDirection,

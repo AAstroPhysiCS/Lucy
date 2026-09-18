@@ -103,13 +103,11 @@ namespace Lucy {
 			glm::vec3 direction = -glm::vec3{ transform[2] };
 			direction = glm::normalize(direction);
 
-			const glm::vec3& attenuation = lightComponent.GetAttenuation();
-
 			RenderDevicePunctualLightsData::Data& light = punctualLights.Lights[punctualLights.LightCount];
 			light.PositionAndRange = glm::vec4{ position, lightComponent.GetRange() };
-			light.DirectionAndType = glm::vec4{ direction, static_cast<float>(lightComponent.GetType()) };
-			light.ColorAndConstantAttenuation = glm::vec4{ lightComponent.GetColor(), attenuation.x };
-			light.ConeAndAttenuation = glm::vec4{ glm::cos(lightComponent.GetInnerConeAngle()), glm::cos(lightComponent.GetOuterConeAngle()), attenuation.y, attenuation.z };
+			light.DirectionAndIntensity = glm::vec4{ direction, lightComponent.GetIntensity() };
+			light.ColorAndType = glm::vec4{ lightComponent.GetColor(), static_cast<float>(lightComponent.GetType()) };
+			light.ConeData = glm::vec4{ glm::cos(lightComponent.GetInnerConeAngle()), glm::cos(lightComponent.GetOuterConeAngle()), 0.0f, 0.0f };
 
 			punctualLights.LightCount++;
 		});

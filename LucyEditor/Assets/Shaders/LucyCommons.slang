@@ -8,7 +8,7 @@ static constexpr const float GOLDEN_RATIO = 1.61803398875f;
 
 static constexpr const uint NUM_CASCADES = 4;
 
-static constexpr const uint MAX_PUNCTUAL_LIGHTS = 16;
+static constexpr const uint MAX_PUNCTUAL_LIGHTS = 32;
 
 static constexpr const uint32_t NUM_PREFILTER_MIP_LEVELS = 5u;
 

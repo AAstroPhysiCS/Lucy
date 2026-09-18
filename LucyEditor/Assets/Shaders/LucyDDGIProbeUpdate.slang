@@ -75,7 +75,7 @@ float3 ApplyIrradianceHistory(uint2 atlasCoordinate, float3 currentIrradiance) {
 
     float baseHysteresis = PushConstants.Data.TemporalData.x;
 
-    static const float minHysteresis = 0.70f;
+    static const float minHysteresis = 0.97f;
     static const float changeThreshold = 0.10f;
     static const float fullResponseThreshold = 0.75f;
     static const float epsilon = 0.01f;

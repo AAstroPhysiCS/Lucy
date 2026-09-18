@@ -12,7 +12,21 @@
 
 #include "SceneImporter.h"
 
+#include <glm/gtx/matrix_decompose.hpp>
+
 namespace Lucy {
+
+	TransformComponent::TransformComponent(const glm::mat4& mat) 
+		: m_Mat(mat) {
+		glm::quat orientation{};
+		glm::vec3 skew{};
+		glm::vec4 perspective{};
+
+		glm::decompose(m_Mat, m_Scale, orientation, m_Position, skew, perspective);
+
+		orientation = glm::normalize(orientation);
+		m_Rotation = glm::degrees(glm::eulerAngles(orientation));
+	}
 
 	void TransformComponent::CalculateMatrix() {
 		m_Mat = glm::translate(glm::mat4(1.0f), m_Position)
@@ -67,8 +81,7 @@ namespace Lucy {
 	}
 
 	PunctualLightComponent::PunctualLightComponent(const ImportedLight& light)
-		: m_Color(light.Color), m_Attenuation(light.AttenuationConstant, light.AttenuationLinear, light.AttenuationQuadratic), 
-		m_Range(light.Range), m_InnerConeAngle(light.InnerConeAngle), m_OuterConeAngle(light.OuterConeAngle) {
+		: m_Color(light.Color), m_Range(light.Range), m_InnerConeAngle(light.InnerConeAngle), m_OuterConeAngle(light.OuterConeAngle) {
 		switch (light.Type) {
 			case ImportedLightType::Point:
 				m_Type = PunctualLightType::Point;

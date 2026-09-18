@@ -19,9 +19,7 @@ namespace Lucy {
 
 	struct TransformComponent {
 		TransformComponent() = default;
-		TransformComponent(const glm::mat4& mat)
-			: m_Mat(mat) {
-		}
+		TransformComponent(const glm::mat4& mat);
 		TransformComponent(const TransformComponent& other) = default;
 
 		const glm::mat4& GetMatrix() const { return m_Mat; }
@@ -102,19 +100,23 @@ namespace Lucy {
 		glm::vec3& GetColor() { return m_Color; }
 		const glm::vec3& GetColor() const { return m_Color; }
 
-		const glm::vec3& GetAttenuation() const { return m_Attenuation; }
-
 		float& GetRange() { return m_Range; }
-		float& GetInnerConeAngle() { return m_InnerConeAngle; }
-		float& GetOuterConeAngle() { return m_OuterConeAngle; }
+		const float& GetRange() const { return m_Range; }
+
 		float& GetIntensity() { return m_Intensity; }
+		const float& GetIntensity() const { return m_Intensity; }
+
+		float& GetInnerConeAngle() { return m_InnerConeAngle; }
+		const float& GetInnerConeAngle() const { return m_InnerConeAngle; }
+
+		float& GetOuterConeAngle() { return m_OuterConeAngle; }
+		const float& GetOuterConeAngle() const { return m_OuterConeAngle; }
 
 		bool IsValid() const { return true; }
 	private:
 		PunctualLightType m_Type = PunctualLightType::Point;
 
 		glm::vec3 m_Color = glm::vec3{ 1.0f };
-		glm::vec3 m_Attenuation = glm::vec3{ 1.0f, 0.0f, 0.0f };
 
 		float m_Range = 0.0f;
 		float m_Intensity = 1.0f;

@@ -338,9 +338,9 @@ enum class PunctualLightType : uint {
 
 struct PunctualLight {
     float4 PositionAndRange;
-    float4 DirectionAndType;
-    float4 ColorAndConstantAttenuation;
-    float4 ConeAndAttenuation;
+    float4 DirectionAndIntensity;
+    float4 ColorAndType;
+    float4 ConeData;
 };
 
 struct PunctualLights {

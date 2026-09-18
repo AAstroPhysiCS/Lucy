@@ -205,13 +205,13 @@ namespace Lucy {
     };
 
     struct RenderDevicePunctualLightsData {
-        static constexpr uint32_t MAX_PUNCTUAL_LIGHTS = 16;
+        static constexpr uint32_t MAX_PUNCTUAL_LIGHTS = 32;
 
         struct Data {
             glm::vec4 PositionAndRange{};
-            glm::vec4 DirectionAndType{};
-            glm::vec4 ColorAndConstantAttenuation{};
-            glm::vec4 ConeAndAttenuation{};
+            glm::vec4 DirectionAndIntensity{};
+            glm::vec4 ColorAndType{};
+            glm::vec4 ConeData{};
 
             auto operator<=>(const Data&) const = default;
         };
