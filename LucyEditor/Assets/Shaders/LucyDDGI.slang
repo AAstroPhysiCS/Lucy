@@ -109,17 +109,26 @@ void ClosestHit(inout DDGIRayPayload payload, BuiltInTriangleIntersectionAttribu
 
     PBRMaterial material = PushConstants.Root->Addresses.PBRMaterials[surface.MaterialIndex];
     PBRMaterialSample materialSample = material.SampleLevel(surface.UV, 0.0f);
-
+    
     float3 surfaceNormalWS = surface.NormalWS;
     float3 normalWS = GetDDGISurfaceNormal(surface, material, materialSample);
-    float3 viewDirection = normalize(-WorldRayDirection());
 
-    //for the surgical scene
+    bool doubleSided = material.IsDoubleSided();
+
     if (backfaceHit) {
+        if (!doubleSided) {
+            payload.Distance = -RayTCurrent();
+            payload.Radiance = float3(0.0f);
+            return;
+        }
         surfaceNormalWS = -surfaceNormalWS;
         normalWS = -normalWS;
     }
 
+    payload.Distance = RayTCurrent();
+    payload.Radiance = float3(0.0f);
+
+    float3 viewDirection = normalize(-WorldRayDirection());
     float3 lightDirection = normalize(-PushConstants.Root->DirectionalLight.Direction);
 
     float visibility = GetDirectionalLightVisibility(surface.PositionWS, surfaceNormalWS, lightDirection);

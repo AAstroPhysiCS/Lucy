@@ -72,6 +72,9 @@ namespace Lucy {
 		for (const ImportedCamera& importedCamera : importedScene.Cameras) {
 			Entity cameraEntity = CreateEntity();
 			cameraEntity.GetComponent<TagComponent>().SetTag(importedCamera.Name);
+			
+			//overrides the transformcomponent
+			cameraEntity.AddComponent<TransformComponent>(glm::translate(glm::mat4{ 1.0f }, importedCamera.Position) * glm::mat4_cast(importedCamera.Orientation));
 
 			CameraComponent& cameraComponent = cameraEntity.AddComponent<CameraComponent>(importedCamera);
 			if (!primaryCamera.empty() && importedCamera.Name == primaryCamera)

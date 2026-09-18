@@ -30,6 +30,12 @@ namespace Lucy {
 		glm::vec4 BaseColor = glm::vec4{ 1.0f };
 		glm::vec3 EmissiveColor = glm::vec3{ 0.0f };
 
+		glm::vec3 SpecularColor{ 1.0f };
+		float SpecularFactor = 1.0f;
+
+		float ClearcoatFactor = 0.0f;
+		float ClearcoatRoughness = 0.0f;
+
 		float AO = 1.0f;
 		float Roughness = 0.8f;
 		float Metallic = 0.0f;

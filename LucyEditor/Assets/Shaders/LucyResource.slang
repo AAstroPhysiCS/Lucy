@@ -94,6 +94,10 @@ struct PBRMaterialSample {
     float4 BaseColor;
     float4 EmissiveColorAndStrength; // xyz = color, w = strength
     float3 NormalTS;
+    float3 SpecularColor;
+    float SpecularFactor;
+    float ClearcoatFactor;
+    float ClearcoatRoughness;
     float AO;
     float Roughness;
     float Metallic;
@@ -103,6 +107,11 @@ struct PBRMaterialSample {
 public struct PBRMaterial {
     float4 BaseColor;
     float4 ORME; // x = Occlusion, y = Roughness, z = Metallic, w = Emissive
+
+    float4 Specular;
+    float2 Clearcoat;
+
+    uint Flags;
 
     GPUTextureResource AlbedoMap;
     GPUTextureResource NormalMap;
@@ -114,18 +123,25 @@ public struct PBRMaterial {
 
     float NormalStrength = 1.0f;
 
-    private static constexpr float AlphaCutoff = 0.5f;
+    private static constexpr float AlphaCutoff = 0.9f;
+    private static constexpr uint MaterialDoubleSided = 1u << 0u;
 
     public static float GetAlphaCutoff() { return AlphaCutoff; }
 
     public bool HasNormalMap() { return NormalMap.IsValid(); }
 
+    public bool IsDoubleSided() { return (Flags.x & MaterialDoubleSided) != 0; }
+
     PBRMaterialSample Sample(float2 uv) {
         PBRMaterialSample result;
-        result.BaseColor = BaseColor * AlbedoMap.Sample2DTexture(uv, BaseColor);
+        result.BaseColor = BaseColor * AlbedoMap.Sample2DTexture(uv, float4(1.0f));
         result.AO = ORME.x;
         result.Roughness = ORME.y;
         result.Metallic = ORME.z;
+        result.SpecularColor = Specular.rgb;
+        result.SpecularFactor = Specular.a;
+        result.ClearcoatFactor = Clearcoat.x;
+        result.ClearcoatRoughness = Clearcoat.y;
 
         if (HasNormalMap()) {
             float2 normalXY = NormalMap.Sample2DTexture(uv).xy * 2.0f - 1.0f;
@@ -174,6 +190,10 @@ public struct PBRMaterial {
         result.AO = ORME.x;
         result.Roughness = ORME.y;
         result.Metallic = ORME.z;
+        result.SpecularColor = Specular.rgb;
+        result.SpecularFactor = Specular.a;
+        result.ClearcoatFactor = Clearcoat.x;
+        result.ClearcoatRoughness = Clearcoat.y;
 
         if (HasNormalMap()) {
             float2 normalXY = NormalMap.Sample2DTextureLevel(uv, level).xy * 2.0f - 1.0f;

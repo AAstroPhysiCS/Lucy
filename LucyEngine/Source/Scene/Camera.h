@@ -57,7 +57,14 @@ namespace Lucy {
 		PerspectiveCamera(float nearPlane, float farPlane, float fov);
 		virtual ~PerspectiveCamera() = default;
 
-		inline float GetFov() const { return m_Fov; }
+		void SetTransform(const glm::mat4& transform);
+
+		float GetFov() const { return m_Fov; }
+		float GetAspectRatio() const { return m_AspectRatio; }
+
+		void SetFov(float fov);
+		void SetNearPlane(float nearPlane);
+		void SetFarPlane(float farPlane);
 
 		void SetAspectRatio(float aspectRatio);
 

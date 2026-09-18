@@ -146,6 +146,46 @@ namespace Lucy {
 			}
 		});
 
+		DrawComponentPanel<CameraComponent>(entityContext, [&](CameraComponent& cameraComponent) {
+			if (!ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
+				return;
+
+			PerspectiveCamera& camera = cameraComponent.GetCamera();
+			bool primary = cameraComponent.IsPrimary();
+
+			if (ImGui::Checkbox("Primary", &primary)) {
+				if (primary) {
+					const Ref<Scene>& scene = SceneExplorerPanel::GetInstance().GetActiveScene();
+					scene->ViewForEach<CameraComponent>([](CameraComponent& otherCameraComponent) {
+						otherCameraComponent.SetPrimary(false);
+					});
+				}
+				cameraComponent.SetPrimary(primary);
+			}
+
+			ImGui::SeparatorText("Projection");
+
+			float fov = camera.GetFov();
+			ImGui::Text("FOV");
+			ImGui::SameLine();
+			if (ImGui::DragFloat("##CameraFOV", &fov, 0.1f, 1.0f, 179.0f, "%.2f deg"))
+				camera.SetFov(fov);
+
+			float nearPlane = camera.GetNearPlane();
+			ImGui::Text("Near Plane");
+			ImGui::SameLine();
+			if (ImGui::DragFloat("##CameraNearPlane", &nearPlane, 0.001f, 0.0001f, camera.GetFarPlane(), "%.4f"))
+				camera.SetNearPlane(nearPlane);
+
+			float farPlane = camera.GetFarPlane();
+			ImGui::Text("Far Plane");
+			ImGui::SameLine();
+			if (ImGui::DragFloat("##CameraFarPlane", &farPlane, 0.1f, camera.GetNearPlane(), 1000000.0f, "%.3f"))
+				camera.SetFarPlane(farPlane);
+
+			ImGui::Text("Aspect Ratio: %.3f", camera.GetAspectRatio());
+		});
+
 		DrawComponentPanel<DirectionalLightComponent>(entityContext, [&](DirectionalLightComponent& lightComponent) {
 			if (ImGui::CollapsingHeader("Directional Light", ImGuiTreeNodeFlags_DefaultOpen)) {
 				const auto& dir = entityContext.GetComponent<TransformComponent>().GetRotation();

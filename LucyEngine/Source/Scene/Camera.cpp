@@ -4,6 +4,8 @@
 
 #include "Events/EventHandler.h"
 
+#include <glm/gtx/matrix_decompose.hpp>
+
 namespace Lucy {
 
 	Camera::Camera(const glm::vec3& position, const glm::vec3& rotation, float nearPlane, float farPlane)
@@ -52,6 +54,34 @@ namespace Lucy {
 
 	PerspectiveCamera::PerspectiveCamera(float nearPlane, float farPlane, float fov)
 		: Camera(nearPlane, farPlane), m_Fov(fov) {
+	}
+
+	void PerspectiveCamera::SetTransform(const glm::mat4& transform) {
+		glm::vec3 scale{};
+		glm::vec3 skew{};
+		glm::vec4 perspective{};
+
+		glm::decompose(transform, scale, m_Orientation, m_Position, skew, perspective);
+
+		m_Orientation = glm::normalize(m_Orientation);
+		m_Rotation = glm::degrees(glm::eulerAngles(m_Orientation));
+
+		UpdateView();
+	}
+
+	void PerspectiveCamera::SetFov(float fov) {
+		m_Fov = fov;
+		UpdateProjection();
+	}
+
+	void PerspectiveCamera::SetNearPlane(float nearPlane) {
+		m_NearPlane = nearPlane;
+		UpdateProjection();
+	}
+
+	void PerspectiveCamera::SetFarPlane(float farPlane) {
+		m_FarPlane = farPlane;
+		UpdateProjection();
 	}
 
 	void PerspectiveCamera::SetAspectRatio(float aspectRatio) {

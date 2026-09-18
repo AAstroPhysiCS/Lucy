@@ -56,9 +56,19 @@ namespace Lucy {
         >{};
     };
 
+    enum class RenderDevicePBRMaterialFlags : uint32_t {
+        None = 0,
+        DoubleSided = 1 << 0
+    };
+
     struct RenderDevicePBRMaterialData {
         glm::vec4 BaseColor{};
         glm::vec4 ORME{ 1.0f, 1.0f, 0.0f, 0.0f }; // x = Occlusion, y = Roughness, z = Metallic, w = Emissive
+
+        glm::vec4 Specular{ 1.0f };
+        glm::vec2 Clearcoat{ 0.0f };
+
+        uint32_t Flags;
 
         RenderDeviceTextureResource AlbedoMap;
         RenderDeviceTextureResource NormalMap;
@@ -76,6 +86,9 @@ namespace Lucy {
         static inline constexpr auto Members = MembersList<
             &RenderDevicePBRMaterialData::BaseColor,
             &RenderDevicePBRMaterialData::ORME,
+            &RenderDevicePBRMaterialData::Specular,
+            &RenderDevicePBRMaterialData::Clearcoat,
+            &RenderDevicePBRMaterialData::Flags,
             &RenderDevicePBRMaterialData::AlbedoMap,
             &RenderDevicePBRMaterialData::NormalMap,
             &RenderDevicePBRMaterialData::ORMMap,

@@ -76,8 +76,12 @@ namespace Lucy {
 	}
 
 	CameraComponent::CameraComponent(const ImportedCamera& importedCamera) 
-		: m_Camera(importedCamera.Position, importedCamera.NearPlane, importedCamera.FarPlane, importedCamera.VerticalFOV) {
+		: m_Camera(importedCamera.Position, importedCamera.Orientation, importedCamera.NearPlane, importedCamera.FarPlane, importedCamera.VerticalFOV) {
 		m_Camera.SetAspectRatio(importedCamera.AspectRatio);
+	}
+
+	void CameraComponent::UpdateTransform(const TransformComponent& transformComponent) {
+		m_Camera.SetTransform(transformComponent.GetMatrix());
 	}
 
 	PunctualLightComponent::PunctualLightComponent(const ImportedLight& light)

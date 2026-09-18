@@ -11,7 +11,7 @@ namespace Lucy {
 
 	constexpr static uint32_t ASSIMP_FLAGS = aiProcess_CalcTangentSpace |
 		aiProcess_GenSmoothNormals |
-		aiProcess_FixInfacingNormals |
+		//aiProcess_FixInfacingNormals |
 		aiProcess_FlipUVs |
 		aiProcess_LimitBoneWeights |
 		aiProcess_RemoveRedundantMaterials |
@@ -109,6 +109,22 @@ namespace Lucy {
 			int32_t doubleSided = 0;
 			sourceMaterial.Get(AI_MATKEY_TWOSIDED, doubleSided);
 
+			float specularFactor = 1.0f;
+			sourceMaterial.Get(AI_MATKEY_SPECULAR_FACTOR, specularFactor);
+
+			aiColor3D specularColor{ 1.0f };
+			sourceMaterial.Get(AI_MATKEY_COLOR_SPECULAR, specularColor);
+
+			float clearcoatFactor = 0.0f;
+			sourceMaterial.Get(AI_MATKEY_CLEARCOAT_FACTOR, clearcoatFactor);
+
+			float clearcoatRoughness = 0.0f;
+			sourceMaterial.Get(AI_MATKEY_CLEARCOAT_ROUGHNESS_FACTOR, clearcoatRoughness);
+
+			specularFactor = glm::clamp(specularFactor, 0.0f, 1.0f);
+			clearcoatFactor = glm::clamp(clearcoatFactor, 0.0f, 1.0f);
+			clearcoatRoughness = glm::clamp(clearcoatRoughness, 0.0f, 1.0f);
+
 			const auto GetTexturePath = [](const aiMaterial& material, aiTextureType textureType) -> std::string {
 				aiString path;
 				if (material.GetTexture(textureType, 0, &path) != aiReturn_SUCCESS || path.length == 0)
@@ -121,6 +137,10 @@ namespace Lucy {
 			importedMaterial.Metallic = glm::clamp(metallic, 0.0f, 1.0f);
 			importedMaterial.EmissiveColor = ConvertColor(emissiveColor);
 			importedMaterial.DoubleSided = doubleSided != 0;
+			importedMaterial.SpecularColor = { specularColor.r, specularColor.g, specularColor.b };
+			importedMaterial.SpecularFactor = specularFactor;
+			importedMaterial.ClearcoatFactor = clearcoatFactor;
+			importedMaterial.ClearcoatRoughness = clearcoatRoughness;
 			importedMaterial.Textures.Albedo = GetTexturePath(sourceMaterial, aiTextureType_BASE_COLOR);
 			importedMaterial.Textures.Diffuse = GetTexturePath(sourceMaterial, aiTextureType_DIFFUSE);
 			importedMaterial.Textures.Normal = GetTexturePath(sourceMaterial, aiTextureType_NORMALS);

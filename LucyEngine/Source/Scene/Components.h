@@ -73,6 +73,8 @@ namespace Lucy {
 		PerspectiveCamera& GetCamera() { return m_Camera; }
 		const PerspectiveCamera& GetCamera() const { return m_Camera; }
 
+		void UpdateTransform(const TransformComponent& transformComponent);
+
 		void SetPrimary(bool primary) { m_IsPrimary = primary; }
 		bool IsPrimary() const { return m_IsPrimary; }
 

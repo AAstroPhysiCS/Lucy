@@ -123,7 +123,7 @@ float3 EvaluatePunctualLightsDDGI(RaytracingAccelerationStructure tlas, GPUScene
     return result;
 }
 
-float3 EvaluatePunctualLights(GPUScene* scene, float3 positionWS, float3 viewDirection, float3 normalWS, float3 F0, float metallic, float roughness, float3 albedo) {
+float3 EvaluatePunctualLights(GPUScene* scene, float3 positionWS, float3 viewDirection, float3 normalWS, float3 F0, float metallic, float roughness, float3 albedo, float clearcoatFactor, float clearcoatRoughness) {
     float3 result = float3(0.0f);
     uint lightCount = min(scene->PunctualLights.LightCount, MAX_PUNCTUAL_LIGHTS);
 
@@ -134,7 +134,7 @@ float3 EvaluatePunctualLights(GPUScene* scene, float3 positionWS, float3 viewDir
         if (sample.Distance <= 0.0f || dot(normalWS, sample.L) <= 0.0f)
             continue;
 
-        result += BRDF(
+        result += LayeredBRDF(
             sample.L,
             viewDirection,
             normalWS,
@@ -142,7 +142,9 @@ float3 EvaluatePunctualLights(GPUScene* scene, float3 positionWS, float3 viewDir
             metallic,
             roughness,
             albedo,
-            sample.Radiance
+            sample.Radiance,
+            clearcoatFactor,
+            clearcoatRoughness
         );
     }
 

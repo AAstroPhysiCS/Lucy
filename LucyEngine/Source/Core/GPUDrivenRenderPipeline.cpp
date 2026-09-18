@@ -115,7 +115,8 @@ namespace Lucy {
 		deviceScene->UpdatePunctualLights(punctualLights);
 
 		Camera* camera = &scene->GetEditorCamera();
-		scene->ViewForEach<CameraComponent>([&](CameraComponent& cameraComponent) {
+		scene->ViewForEach<CameraComponent, TransformComponent>([&](CameraComponent& cameraComponent, TransformComponent& transformComponent) {
+			cameraComponent.UpdateTransform(transformComponent);
 			if (cameraComponent.IsPrimary())
 				camera = &cameraComponent.GetCamera();
 		});

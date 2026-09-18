@@ -55,6 +55,10 @@ namespace Lucy {
 		materialGPUData.BaseColor = importedMaterial.BaseColor;
 		materialGPUData.ORME = glm::vec4{ importedMaterial.AO, importedMaterial.Roughness, importedMaterial.Metallic, importedMaterial.EmissiveStrength };
 		materialGPUData.NormalStrength = importedMaterial.NormalStrength;
+		materialGPUData.Specular = glm::vec4{ importedMaterial.SpecularColor, importedMaterial.SpecularFactor };
+		materialGPUData.Clearcoat = glm::vec2{ importedMaterial.ClearcoatFactor, importedMaterial.ClearcoatRoughness };
+		if (importedMaterial.DoubleSided)
+			materialGPUData.Flags |= static_cast<uint32_t>(RenderDevicePBRMaterialFlags::DoubleSided);
 
 		RenderDeviceObjectHandle materialDeviceHandle = Renderer::GetRenderDevice()->GetScene()->RegisterPBRMaterial(materialGPUData);
 
