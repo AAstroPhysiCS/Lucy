@@ -39,4 +39,19 @@ Lucy is technically the older sister of [**OxyEngine**](https://github.com/AAstr
 - **Four cascaded variance shadow maps**, rendered through multiview with a dedicated GPU-driven shadow-culling pipeline, texel-snapped shadow cameras, and separable Gaussian filtering.
 - **HDR image-based lighting** with diffuse irradiance convolution, roughness-prefiltered environment reflections, and a precomputed BRDF lookup texture. DDGI handles indirect diffuse lighting inside the probe volume, while specular environment lighting remains separate.
 
-### Screenshots
+<h2 align="center">Screenshots</h2>
+
+<p align="center">
+  <img src="Content/Colon_Lucy_Render_4K.png" width="700" alt="Lucy Engine render">
+  <br>
+  <sub>Colon from a patient.</sub>
+  <sub>For comparison, see the <a href="https://github.com/AAstroPhysiCS/Lucy/blob/main/Content/Colon_Blender_PathTracer_1080.png">path-traced reference image</a>.</sub>
+</p>
+
+<p align="center">
+  <img src="Content/Lucy_Sponza_Scene_4K.png" width="700" alt="Lucy Engine render">
+  <br>
+  <sub>Sponza Atrium, rendered in Lucy's basic editor. (with Probe-Debug enabled)</sub>
+  <br>
+  <sub>Current development focuses on rendering fidelity and engine technology rather than UI. :P</sub>
+</p>
