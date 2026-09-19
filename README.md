@@ -51,7 +51,7 @@ Lucy is technically the older sister of [**OxyEngine**](https://github.com/AAstr
 <p align="center">
   <img src="Content/Lucy_Sponza_4K_2.png" width="700" alt="Lucy Engine render">
   <br>
-  <sub>Sponza Atrium, rendered in Lucy's basic editor. (with Probe-Debug enabled)</sub>
+  <sub>Sponza Atrium, rendered in Lucy's basic editor.</sub>
   <br>
   <sub>Current development focuses on rendering fidelity and engine technology rather than UI. :P</sub>
 </p>
