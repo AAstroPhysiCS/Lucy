@@ -2,6 +2,7 @@
 #include "ViewportPanel.h"
 
 #include "Events/EventHandler.h"
+#include "Utilities/Utilities.h"
 
 namespace Lucy {
 
@@ -59,6 +60,13 @@ namespace Lucy {
 			ImGui::Separator();
 			if (ImGui::Button("Create Mesh"))
 				m_Scene->CreateMesh();
+			if (ImGui::Button("Import Scene")) {
+				std::string outPath;
+				Utils::OpenDialog(outPath, Utils::MeshFilterList, 1, "Assets/");
+
+				if (!outPath.empty())
+					m_Scene->LoadScene(outPath);
+			}
 
 			ImGui::EndPopup();
 		}

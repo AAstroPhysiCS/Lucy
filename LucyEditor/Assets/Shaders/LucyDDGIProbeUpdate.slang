@@ -75,7 +75,7 @@ float3 ApplyIrradianceHistory(uint2 atlasCoordinate, float3 currentIrradiance) {
 
     float baseHysteresis = PushConstants.Data.TemporalData.x;
 
-    static const float minHysteresis = 0.70f;
+    static const float minHysteresis = 0.97f;
     static const float changeThreshold = 0.10f;
     static const float fullResponseThreshold = 0.75f;
     static const float epsilon = 0.01f;
@@ -145,10 +145,7 @@ void DDGIProbeUpdateMain(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_Grou
     uint probeIndex = groupID.x;
 
     uint3 probeCounts = PushConstants.Data.ProbeCountsAndRays.xyz;
-
-    uint probeCount = probeCounts.x * probeCounts.y * probeCounts.z;
-
-    if (probeIndex >= probeCount)
+    if (probeIndex >= probeCounts.x * probeCounts.y * probeCounts.z)
         return;
 
     uint irradianceTexels = PushConstants.Data.AtlasTexelData.x;

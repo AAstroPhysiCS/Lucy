@@ -1,18 +1,18 @@
 #ifndef LUCY_RESOURCES_SLANG
 #define LUCY_RESOURCES_SLANG
 
-static const uint OBJECT_FLAG_ALIVE = 1u << 0u;
-static const uint OBJECT_FLAG_FORCE_HIGHEST_LOD = 1u << 1u;
-static const uint OBJECT_FLAG_FORCE_LOWEST_LOD = 1u << 2u;
+static constexpr uint OBJECT_FLAG_ALIVE = 1u << 0u;
+static constexpr uint OBJECT_FLAG_FORCE_HIGHEST_LOD = 1u << 1u;
+static constexpr uint OBJECT_FLAG_FORCE_LOWEST_LOD = 1u << 2u;
 
-static const uint VIEW_FLAG_FRUSTUM = 1u << 0u;
-static const uint VIEW_FLAG_CONE = 1u << 1u;
-static const uint VIEW_FLAG_OCCLUSION = 1u << 2u;
-static const uint VIEW_FLAG_ORTHOGRAPHIC = 1u << 4u;
+static constexpr uint VIEW_FLAG_FRUSTUM = 1u << 0u;
+static constexpr uint VIEW_FLAG_CONE = 1u << 1u;
+static constexpr uint VIEW_FLAG_OCCLUSION = 1u << 2u;
+static constexpr uint VIEW_FLAG_ORTHOGRAPHIC = 1u << 4u;
 
 #include "LucyCommons.slang"
 
-static constexpr const uint INVALID_BINDLESS_INDEX = 0xFFFFFFFFu;
+static constexpr uint INVALID_BINDLESS_INDEX = 0xFFFFFFFFu;
 
 enum class TextureType : uint {
     Texture,
@@ -94,6 +94,10 @@ struct PBRMaterialSample {
     float4 BaseColor;
     float4 EmissiveColorAndStrength; // xyz = color, w = strength
     float3 NormalTS;
+    float3 SpecularColor;
+    float SpecularFactor;
+    float ClearcoatFactor;
+    float ClearcoatRoughness;
     float AO;
     float Roughness;
     float Metallic;
@@ -103,6 +107,11 @@ struct PBRMaterialSample {
 public struct PBRMaterial {
     float4 BaseColor;
     float4 ORME; // x = Occlusion, y = Roughness, z = Metallic, w = Emissive
+
+    float4 Specular;
+    float2 Clearcoat;
+
+    uint Flags;
 
     GPUTextureResource AlbedoMap;
     GPUTextureResource NormalMap;
@@ -114,18 +123,25 @@ public struct PBRMaterial {
 
     float NormalStrength = 1.0f;
 
-    private static constexpr float AlphaCutoff = 0.5f;
+    private static constexpr float AlphaCutoff = 0.9f;
+    private static constexpr uint MaterialDoubleSided = 1u << 0u;
 
     public static float GetAlphaCutoff() { return AlphaCutoff; }
 
     public bool HasNormalMap() { return NormalMap.IsValid(); }
 
+    public bool IsDoubleSided() { return (Flags.x & MaterialDoubleSided) != 0; }
+
     PBRMaterialSample Sample(float2 uv) {
         PBRMaterialSample result;
-        result.BaseColor = AlbedoMap.Sample2DTexture(uv, BaseColor);
+        result.BaseColor = BaseColor * AlbedoMap.Sample2DTexture(uv, float4(1.0f));
         result.AO = ORME.x;
         result.Roughness = ORME.y;
         result.Metallic = ORME.z;
+        result.SpecularColor = Specular.rgb;
+        result.SpecularFactor = Specular.a;
+        result.ClearcoatFactor = Clearcoat.x;
+        result.ClearcoatRoughness = Clearcoat.y;
 
         if (HasNormalMap()) {
             float2 normalXY = NormalMap.Sample2DTexture(uv).xy * 2.0f - 1.0f;
@@ -143,9 +159,9 @@ public struct PBRMaterial {
         if (ORMMap.IsValid()) {
             float3 orm = ORMMap.Sample2DTexture(uv, ORME).xyz;
 
-            result.AO = orm.r;
-            result.Roughness = orm.g;
-            result.Metallic = orm.b;
+            result.AO *= orm.r;
+            result.Roughness *= orm.g;
+            result.Metallic *= orm.b;
 
             return result;
         }
@@ -170,10 +186,14 @@ public struct PBRMaterial {
 
     PBRMaterialSample SampleLevel(float2 uv, float level) {
         PBRMaterialSample result;
-        result.BaseColor = AlbedoMap.Sample2DTextureLevel(uv, level, BaseColor);
+        result.BaseColor = BaseColor * AlbedoMap.Sample2DTextureLevel(uv, level, float4(1.0f));
         result.AO = ORME.x;
         result.Roughness = ORME.y;
         result.Metallic = ORME.z;
+        result.SpecularColor = Specular.rgb;
+        result.SpecularFactor = Specular.a;
+        result.ClearcoatFactor = Clearcoat.x;
+        result.ClearcoatRoughness = Clearcoat.y;
 
         if (HasNormalMap()) {
             float2 normalXY = NormalMap.Sample2DTextureLevel(uv, level).xy * 2.0f - 1.0f;
@@ -192,8 +212,8 @@ public struct PBRMaterial {
             float3 orm = ORMMap.Sample2DTextureLevel(uv, level, ORME).xyz;
 
             result.AO = orm.r;
-            result.Roughness = orm.g;
-            result.Metallic = orm.b;
+            result.Roughness *= orm.g;
+            result.Metallic *= orm.b;
 
             return result;
         }
@@ -330,6 +350,24 @@ struct SceneCamera {
     float4 u_CamPos;
 };
 
+//TODO: maybe merge directional light as well...
+enum class PunctualLightType : uint {
+    Point,
+    Spot
+};
+
+struct PunctualLight {
+    float4 PositionAndRange;
+    float4 DirectionAndIntensity;
+    float4 ColorAndType;
+    float4 ConeData;
+};
+
+struct PunctualLights {
+    PunctualLight Lights[MAX_PUNCTUAL_LIGHTS];
+    uint LightCount;
+};
+
 struct DirectionalLight {
     float3 Direction;
     float3 Color;
@@ -341,10 +379,9 @@ struct GPUScene {
     SceneCamera Camera;
     GPUSceneAddresses Addresses;
     DirectionalLight DirectionalLight;
+    PunctualLights PunctualLights;
 };
 
-//adds 8 bytes to the already existing sizeof(T)
-//take that in to consideration okidoki!!!!
 struct PushConstantGlobal<T> {
     GPUScene* Root;
     T Data;

@@ -3,8 +3,7 @@
 
 #include "meshoptimizer.h"
 
-#include "assimp/Importer.hpp"
-#include "assimp/postprocess.h"
+#include "Scene/SceneImporter.h"
 
 #include "Memory/Buffer/VertexBuffer.h"
 #include "Memory/Buffer/IndexBuffer.h"
@@ -20,30 +19,10 @@
 
 namespace Lucy {
 
-	//constexpr static inline uint32_t ASSIMP_FLAGS = aiProcess_FlipUVs | aiProcessPreset_TargetRealtime_Quality;
-
-	constexpr static uint32_t ASSIMP_FLAGS = aiProcess_CalcTangentSpace |
-		aiProcess_GenSmoothNormals |
-		aiProcess_FixInfacingNormals |
-		aiProcess_FlipUVs |
-		aiProcess_LimitBoneWeights |
-		aiProcess_RemoveRedundantMaterials |
-		aiProcess_ValidateDataStructure |
-		aiProcess_Triangulate |
-		//aiProcess_PreTransformVertices | (animations won't work, if you enable this)
-		aiProcess_SplitLargeMeshes |
-		aiProcess_OptimizeMeshes;
-
 	[[nodiscard]] glm::vec3 AllocateMeshID() {
 		const uint32_t id = Mesh::s_NextMeshID.fetch_add(1, std::memory_order_relaxed);
-
 		LUCY_ASSERT(id <= 0x00FFFFFFu, "Maximum mesh ID count exceeded.");
-
-		return {
-			static_cast<float>(id & 0xFFu),
-			static_cast<float>((id >> 8u) & 0xFFu),
-			static_cast<float>((id >> 16u) & 0xFFu)
-		};
+		return { static_cast<float>(id & 0xFFu), static_cast<float>((id >> 8u) & 0xFFu), static_cast<float>((id >> 16u) & 0xFFu) };
 	}
 
 	Mesh::Mesh(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices) {
@@ -69,36 +48,15 @@ namespace Lucy {
 		Load();
 	}
 
-	void Mesh::Load(const Ref<RenderDevice>& device, std::vector<Vertex>& vertices, std::vector<uint32_t>& indices) {
-		const auto& scene = device->GetScene();
-		m_MyGlobalVertexOffset = scene->GetGlobalVertexCount();
-		m_MyGlobalIndexOffset = scene->GetGlobalIndexCount();
-		m_RenderDeviceMeshHandle = scene->RTRegisterMesh(vertices, indices, m_Submeshes);
-		//need to submit since registermesh also submits
-		Renderer::EnqueueToRenderCommandQueue([this](const auto& device) {
-			ReleaseCPUData();
-		});
-	}
-
-	void Mesh::Load() {
-		ScopedTimer scopedTimer("Mesh import");
-
-		Assimp::Importer importer;
-		const aiScene* scene = importer.ReadFile(m_Path, ASSIMP_FLAGS);
-
-		if (!scene || (scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) || !scene->mRootNode) {
-			LUCY_CRITICAL("Mesh could not be imported!");
-			LUCY_CRITICAL(importer.GetErrorString());
-			return;
-		}
-
-		m_Name = scene->mRootNode->mName.C_Str();
+	Mesh::Mesh(ImportedScene& importedScene, const std::string& path) 
+		: m_Path(path) {
+		m_Name = importedScene.Name;
 		m_MetadataInfo = {};
 		m_Submeshes.clear();
 
 		m_MeshID = AllocateMeshID();
-		LoadProgram(scene);
-		TraverseHierarchy(scene->mRootNode, glm::mat4(1.0f));
+
+		LoadImportedScene(importedScene);
 
 		std::vector<Vertex> packedVertices(m_MetadataInfo.TotalVerticesSize);
 		std::vector<uint32_t> packedIndices(m_MetadataInfo.TotalMeshletIndicesSize);
@@ -113,78 +71,67 @@ namespace Lucy {
 		});
 	}
 
-	void Mesh::LoadProgram(const aiScene* scene) {
+	void Mesh::Load(const Ref<RenderDevice>& device, std::vector<Vertex>& vertices, std::vector<uint32_t>& indices) {
+		const auto& scene = device->GetScene();
+		m_MyGlobalVertexOffset = scene->GetGlobalVertexCount();
+		m_MyGlobalIndexOffset = scene->GetGlobalIndexCount();
+		m_RenderDeviceMeshHandle = scene->RTRegisterMesh(vertices, indices, m_Submeshes);
+		//need to submit since registermesh also submits
+		Renderer::EnqueueToRenderCommandQueue([this](const auto& device) {
+			ReleaseCPUData();
+		});
+	}
+
+	void Mesh::Load() {
+		ScopedTimer scopedTimer("Mesh import");
+
+		SceneImporter importer;
+		if (!importer.Import(m_Path)) {
+			LUCY_CRITICAL("Mesh could not be imported!");
+			LUCY_CRITICAL(importer.GetError());
+			return;
+		}
+
+		ImportedScene& importedScene = importer.GetScene();
+		m_Name = importedScene.Name;
+		m_MetadataInfo = {};
+		m_Submeshes.clear();
+
+		m_MeshID = AllocateMeshID();
+
+		LoadImportedScene(importedScene);
+
+		std::vector<Vertex> packedVertices(m_MetadataInfo.TotalVerticesSize);
+		std::vector<uint32_t> packedIndices(m_MetadataInfo.TotalMeshletIndicesSize);
+
+		for (const Submesh& submesh : m_Submeshes) {
+			memcpy(&packedVertices[submesh.BaseVertexCount], submesh.Vertices.data(), submesh.Vertices.size() * sizeof(Vertex));
+			memcpy(&packedIndices[submesh.BaseMeshletIndexCount], submesh.MeshletIndices.data(), submesh.MeshletIndices.size() * sizeof(uint32_t));
+		}
+
+		Renderer::EnqueueToRenderCommandQueue([this, packedVertices = std::move(packedVertices), packedIndices = std::move(packedIndices)](const Ref<RenderDevice>& device) mutable {
+			Load(device, packedVertices, packedIndices);
+		});
+	}
+
+	void Mesh::LoadImportedScene(ImportedScene& importedScene) {
 		const auto& taskScheduler = Application::GetTaskScheduler();
 
 		ScopedTimer scopedTimer(std::format("{0} data parsing", m_Name));
 
-		aiMesh** meshes = scene->mMeshes;
-		const uint32_t meshCount = scene->mNumMeshes;
+		uint32_t meshCount = static_cast<uint32_t>(importedScene.Meshes.size());
 
 		m_Submeshes.resize(meshCount);
 
-		taskScheduler->ScheduleBatch(TaskScheduler::Launch::Async, TaskPriority::High, [=](const TaskArgs& args, const TaskBatchArgs&) {
-			const uint32_t index = static_cast<uint32_t>(args.TaskIndex);
+		taskScheduler->ScheduleBatch(TaskScheduler::Launch::Async, TaskPriority::High, [this, &importedScene](const TaskArgs& args, const TaskBatchArgs&) {
+			uint32_t meshIndex = static_cast<uint32_t>(args.TaskIndex);
+			ImportedMesh& importedMesh = importedScene.Meshes[meshIndex];
+			Submesh& submesh = m_Submeshes[meshIndex];
 
-			aiMesh* mesh = meshes[index];
-			Submesh& submesh = m_Submeshes[index];
-
-			submesh.VertexCount = mesh->mNumVertices;
-			submesh.IndexCount = mesh->mNumFaces * 3;
-
-			const uint32_t vertexCount = submesh.VertexCount;
-
-			submesh.Vertices.resize(submesh.VertexCount);
-			submesh.Indices.resize(submesh.IndexCount);
-
-			aiVector3D* positions = mesh->HasPositions() ? mesh->mVertices : nullptr;
-			aiVector3D* normals = mesh->HasNormals() ? mesh->mNormals : nullptr;
-			aiVector3D* textureCoords = mesh->HasTextureCoords(0) ? mesh->mTextureCoords[0] : nullptr;
-
-			bool hasTangents = mesh->HasTangentsAndBitangents();
-			aiVector3D* tangents = hasTangents ? mesh->mTangents : nullptr;
-			aiVector3D* bitangents = hasTangents ? mesh->mBitangents : nullptr;
-
-			for (uint32_t vertexIndex = 0; vertexIndex < vertexCount; vertexIndex++) {
-				Vertex& vertex = submesh.Vertices[vertexIndex];
-				vertex = {};
-
-				if (positions) {
-					aiVector3D& position = positions[vertexIndex];
-					vertex.Position = { position.x, position.y, position.z };
-				}
-
-				if (normals) {
-					aiVector3D& normal = normals[vertexIndex];
-					vertex.Normal = { normal.x, normal.y, normal.z };
-				}
-
-				if (textureCoords) {
-					aiVector3D& textureCoordinate = textureCoords[vertexIndex];
-					vertex.TexCoords = { textureCoordinate.x, textureCoordinate.y };
-				}
-
-				if (hasTangents) {
-					aiVector3D& tangent = tangents[vertexIndex];
-					aiVector3D& bitangent = bitangents[vertexIndex];
-
-					vertex.Tangent = { tangent.x, tangent.y, tangent.z };
-					vertex.Bitangent = { bitangent.x, bitangent.y, bitangent.z };
-				}
-			}
-
-			uint32_t* destination = submesh.Indices.data();
-
-			for (uint32_t faceIndex = 0; faceIndex < mesh->mNumFaces; faceIndex++) {
-				aiFace& face = mesh->mFaces[faceIndex];
-				LUCY_ASSERT(face.mNumIndices == 3, "Mesh is expected to be triangulated.");
-
-				destination[0] = face.mIndices[0];
-				destination[1] = face.mIndices[1];
-				destination[2] = face.mIndices[2];
-
-				destination += 3;
-			}
+			submesh.VertexCount = static_cast<uint32_t>(importedMesh.Vertices.size());
+			submesh.IndexCount = static_cast<uint32_t>(importedMesh.Indices.size());
+			submesh.Vertices = std::move(importedMesh.Vertices);
+			submesh.Indices = std::move(importedMesh.Indices);
 
 			OptimizeMeshData(submesh.Vertices, submesh.Indices);
 			BuildLODs(submesh);
@@ -195,12 +142,15 @@ namespace Lucy {
 
 		taskScheduler->WaitForAllTasks();
 
+		for (const ImportedMeshInstance& instance : importedScene.MeshInstances)
+			m_Submeshes[instance.MeshIndex].Transform = instance.Transform;
+
 		uint32_t runningVertexOffset = 0;
 		uint32_t runningIndexOffset = 0;
 		uint32_t runningMeshletOffset = 0;
 		uint32_t runningMeshletIndexOffset = 0;
 
-		for (uint32_t i = 0; i < meshCount; i++) {
+		for (uint32_t i = 0; i < m_Submeshes.size(); i++) {
 			Submesh& submesh = m_Submeshes[i];
 
 			submesh.BaseVertexCount = runningVertexOffset;
@@ -234,26 +184,16 @@ namespace Lucy {
 		LUCY_INFO("TOTAL MESHLET INDICES: {}", totalMeshletIndices);
 
 		const auto& materialManager = Renderer::GetMaterialManager();
-		for (uint32_t i = 0; i < meshCount; i++) {
-			aiMesh* mesh = meshes[i];
-			m_Submeshes[i].MaterialID = materialManager->CreateMaterialByPath(MaterialType::PBR, scene->mMaterials[mesh->mMaterialIndex], m_Path);
+		std::vector<RenderDeviceObjectHandle> materialHandles(importedScene.Materials.size());
+		for (uint32_t i = 0; i < importedScene.Materials.size(); i++)
+			materialHandles[i] = materialManager->CreateMaterialByPath(MaterialType::PBR, importedScene.Materials[i], m_Path);
+
+		for (uint32_t i = 0; i < importedScene.MeshInstances.size(); i++) {
+			const ImportedMesh& importedMesh = importedScene.Meshes[i];
+			m_Submeshes[i].MaterialID = materialHandles[importedMesh.MaterialIndex];
 		}
 	}
 
-	void Mesh::TraverseHierarchy(const aiNode* node, const glm::mat4& parentTransform) {
-		glm::mat4 localTransform = glm::transpose(*(glm::mat4*)&node->mTransformation);
-		glm::mat4 transformed = parentTransform * localTransform;
-
-		for (uint32_t i = 0; i < node->mNumMeshes; i++) {
-			Submesh& submesh = m_Submeshes[node->mMeshes[i]];
-			submesh.Transform = *(glm::mat4*)&transformed;
-		}
-
-		for (uint32_t i = 0; i < node->mNumChildren; i++) {
-			aiNode* childNode = node->mChildren[i];
-			TraverseHierarchy(childNode, transformed);
-		}
-	}
 	/* 
 	* NOTE FOR FUTURE:
 	* these optimizations reorder triangles. That is correct for ordinary opaque geometry, 

@@ -1,6 +1,7 @@
 #include "LucyResource.slang"
 #include "LucySamplingUtilities.slang"
 #include "LucyDDGICommon.slang"
+#include "LucyLights.slang"
 
 [[vk::binding(0, 2)]]
 RaytracingAccelerationStructure u_TLAS;
@@ -101,14 +102,33 @@ void Miss(inout DDGIRayPayload payload) {
 [shader("closesthit")]
 void ClosestHit(inout DDGIRayPayload payload, BuiltInTriangleIntersectionAttributes attributes) {
     DDGISurface surface = GetDDGISurface(PushConstants.Root, attributes);
+    bool backfaceHit = dot(WorldRayDirection(), surface.GeometricNormalWS) > 0.0f;
+
+    payload.Distance = backfaceHit ? -RayTCurrent() : RayTCurrent();
+    payload.Radiance = float3(0.0f);
 
     PBRMaterial material = PushConstants.Root->Addresses.PBRMaterials[surface.MaterialIndex];
     PBRMaterialSample materialSample = material.SampleLevel(surface.UV, 0.0f);
-
+    
     float3 surfaceNormalWS = surface.NormalWS;
     float3 normalWS = GetDDGISurfaceNormal(surface, material, materialSample);
-    float3 viewDirection = normalize(-WorldRayDirection());
 
+    bool doubleSided = material.IsDoubleSided();
+
+    if (backfaceHit) {
+        if (!doubleSided) {
+            payload.Distance = -RayTCurrent();
+            payload.Radiance = float3(0.0f);
+            return;
+        }
+        surfaceNormalWS = -surfaceNormalWS;
+        normalWS = -normalWS;
+    }
+
+    payload.Distance = RayTCurrent();
+    payload.Radiance = float3(0.0f);
+
+    float3 viewDirection = normalize(-WorldRayDirection());
     float3 lightDirection = normalize(-PushConstants.Root->DirectionalLight.Direction);
 
     float visibility = GetDirectionalLightVisibility(surface.PositionWS, surfaceNormalWS, lightDirection);
@@ -127,6 +147,17 @@ void ClosestHit(inout DDGIRayPayload payload, BuiltInTriangleIntersectionAttribu
         PushConstants.Root->DirectionalLight.Color
     ) * visibility;
 
+    directLighting += EvaluatePunctualLightsDDGI(u_TLAS,
+        PushConstants.Root,
+        surface.PositionWS,
+        viewDirection,
+        normalWS,
+        F0,
+        materialSample.Metallic,
+        materialSample.Roughness,
+        materialSample.BaseColor.rgb
+    );
+
     float3 multiBounceLighting = float3(0.0f);
 
     if (PushConstants.Data.FrameNumber > 0) {
@@ -135,7 +166,7 @@ void ClosestHit(inout DDGIRayPayload payload, BuiltInTriangleIntersectionAttribu
         ddgiData.ProbeOffsets = PushConstants.Data.ProbeOffsets;
         ddgiData.DepthAtlas = PushConstants.Data.DepthHistory;
         ddgiData.ProbeOriginAndMaxDistance = PushConstants.Data.ProbeOriginAndMaxDistance;
-        ddgiData.ProbeSpacingAndBias = PushConstants.Data.ProbeSpacing;
+        ddgiData.ProbeSpacingAndBias = float4(PushConstants.Data.ProbeSpacing.xyz, 0.2f);
         ddgiData.ProbeCounts = PushConstants.Data.ProbeCountsAndRays.xyz;
 
         if (IsInsideDDGIVolume(ddgiData, surface.PositionWS)) {
@@ -147,10 +178,8 @@ void ClosestHit(inout DDGIRayPayload payload, BuiltInTriangleIntersectionAttribu
     }
 
     float3 emissive = materialSample.EmissiveColorAndStrength.rgb * materialSample.EmissiveColorAndStrength.a;
-    bool backfaceHit = dot(WorldRayDirection(), surface.GeometricNormalWS) > 0.0f;
 
     payload.Radiance = directLighting + multiBounceLighting + emissive;
-    payload.Distance = backfaceHit ? -RayTCurrent() : RayTCurrent();
 }
 
 [shader("anyhit")]

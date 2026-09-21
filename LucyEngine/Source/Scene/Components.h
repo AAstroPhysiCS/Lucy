@@ -7,15 +7,19 @@
 
 #include "Renderer/Renderer.h"
 
+#include "Camera.h"
+
 namespace Lucy {
 
 	class Entity;
 
+	struct ImportedScene;
+	struct ImportedCamera;
+	struct ImportedLight;
+
 	struct TransformComponent {
 		TransformComponent() = default;
-		TransformComponent(const glm::mat4& mat)
-			: m_Mat(mat) {
-		}
+		TransformComponent(const glm::mat4& mat);
 		TransformComponent(const TransformComponent& other) = default;
 
 		const glm::mat4& GetMatrix() const { return m_Mat; }
@@ -41,8 +45,9 @@ namespace Lucy {
 	struct MeshComponent {
 		MeshComponent() = default;
 		MeshComponent(const std::string& path)
-			: m_Mesh(Memory::CreateRef<Mesh>(path)) {
-		}
+			: m_Mesh(Memory::CreateRef<Mesh>(path)) {}
+		MeshComponent(ImportedScene& importedScene, const std::string& path)
+			: m_Mesh(Memory::CreateRef<Mesh>(importedScene, path)) {}
 		MeshComponent(const MeshComponent& other) = default;
 
 		void LoadMesh(const Entity& e, const std::string& path);
@@ -58,6 +63,68 @@ namespace Lucy {
 		Ref<Mesh> m_Mesh = nullptr;
 
 		RenderDeviceObjectHandle m_Handle;
+	};
+
+	struct CameraComponent {
+		CameraComponent() = default;
+		CameraComponent(const ImportedCamera& importedCamera);
+		CameraComponent(const CameraComponent& other) = default;
+
+		PerspectiveCamera& GetCamera() { return m_Camera; }
+		const PerspectiveCamera& GetCamera() const { return m_Camera; }
+
+		void UpdateTransform(const TransformComponent& transformComponent);
+
+		void SetPrimary(bool primary) { m_IsPrimary = primary; }
+		bool IsPrimary() const { return m_IsPrimary; }
+
+		bool IsValid() const { return true; }
+	private:
+		PerspectiveCamera m_Camera{ 0.01f, 1000.0f, 90.0f };
+
+		bool m_IsPrimary = false;
+	};
+
+	enum class PunctualLightType : uint32_t {
+		Point,
+		Spot
+	};
+
+	struct PunctualLightComponent {
+		PunctualLightComponent() = default;
+		PunctualLightComponent(const ImportedLight& light);
+		PunctualLightComponent(PunctualLightType type);
+		PunctualLightComponent(const PunctualLightComponent& other) = default;
+
+		PunctualLightType GetType() const { return m_Type; }
+		void SetType(PunctualLightType type) { m_Type = type; }
+
+		glm::vec3& GetColor() { return m_Color; }
+		const glm::vec3& GetColor() const { return m_Color; }
+
+		float& GetRange() { return m_Range; }
+		const float& GetRange() const { return m_Range; }
+
+		float& GetIntensity() { return m_Intensity; }
+		const float& GetIntensity() const { return m_Intensity; }
+
+		float& GetInnerConeAngle() { return m_InnerConeAngle; }
+		const float& GetInnerConeAngle() const { return m_InnerConeAngle; }
+
+		float& GetOuterConeAngle() { return m_OuterConeAngle; }
+		const float& GetOuterConeAngle() const { return m_OuterConeAngle; }
+
+		bool IsValid() const { return true; }
+	private:
+		PunctualLightType m_Type = PunctualLightType::Point;
+
+		glm::vec3 m_Color = glm::vec3{ 1.0f };
+
+		float m_Range = 0.0f;
+		float m_Intensity = 1.0f;
+
+		float m_InnerConeAngle = 0.0f;
+		float m_OuterConeAngle = 0.0f;
 	};
 
 	struct UUIDComponent {

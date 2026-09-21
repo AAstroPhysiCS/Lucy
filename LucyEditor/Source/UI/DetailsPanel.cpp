@@ -1,6 +1,8 @@
 #include "DetailsPanel.h"
 #include "SceneExplorerPanel.h"
 
+#include <glm/gtc/type_ptr.hpp>
+
 #include "Renderer/Image/Image.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/Material/PBRMaterial.h"
@@ -70,6 +72,12 @@ namespace Lucy {
 				if (ImGui::MenuItem("Directional Light")) {
 					entityContext.AddComponent<DirectionalLightComponent>();
 				}
+				if (ImGui::MenuItem("Point Light")) {
+					entityContext.AddComponent<PunctualLightComponent>(PunctualLightType::Point);
+				}
+				if (ImGui::MenuItem("Spot Light")) {
+					entityContext.AddComponent<PunctualLightComponent>(PunctualLightType::Spot);
+				}
 				if (ImGui::MenuItem("Cubemap")) {
 					entityContext.AddComponent<HDRCubemapComponent>();
 				}
@@ -138,6 +146,46 @@ namespace Lucy {
 			}
 		});
 
+		DrawComponentPanel<CameraComponent>(entityContext, [&](CameraComponent& cameraComponent) {
+			if (!ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
+				return;
+
+			PerspectiveCamera& camera = cameraComponent.GetCamera();
+			bool primary = cameraComponent.IsPrimary();
+
+			if (ImGui::Checkbox("Primary", &primary)) {
+				if (primary) {
+					const Ref<Scene>& scene = SceneExplorerPanel::GetInstance().GetActiveScene();
+					scene->ViewForEach<CameraComponent>([](CameraComponent& otherCameraComponent) {
+						otherCameraComponent.SetPrimary(false);
+					});
+				}
+				cameraComponent.SetPrimary(primary);
+			}
+
+			ImGui::SeparatorText("Projection");
+
+			float fov = camera.GetFov();
+			ImGui::Text("FOV");
+			ImGui::SameLine();
+			if (ImGui::DragFloat("##CameraFOV", &fov, 0.1f, 1.0f, 179.0f, "%.2f deg"))
+				camera.SetFov(fov);
+
+			float nearPlane = camera.GetNearPlane();
+			ImGui::Text("Near Plane");
+			ImGui::SameLine();
+			if (ImGui::DragFloat("##CameraNearPlane", &nearPlane, 0.001f, 0.0001f, camera.GetFarPlane(), "%.4f"))
+				camera.SetNearPlane(nearPlane);
+
+			float farPlane = camera.GetFarPlane();
+			ImGui::Text("Far Plane");
+			ImGui::SameLine();
+			if (ImGui::DragFloat("##CameraFarPlane", &farPlane, 0.1f, camera.GetNearPlane(), 1000000.0f, "%.3f"))
+				camera.SetFarPlane(farPlane);
+
+			ImGui::Text("Aspect Ratio: %.3f", camera.GetAspectRatio());
+		});
+
 		DrawComponentPanel<DirectionalLightComponent>(entityContext, [&](DirectionalLightComponent& lightComponent) {
 			if (ImGui::CollapsingHeader("Directional Light", ImGuiTreeNodeFlags_DefaultOpen)) {
 				const auto& dir = entityContext.GetComponent<TransformComponent>().GetRotation();
@@ -148,6 +196,62 @@ namespace Lucy {
 				ImGui::DragFloat3("##hidelabel color", (float*)&color, 0.01f, 0.0f, 100.0f, nullptr, 1.0f);
 
 				lightComponent.GetDirection() = -glm::normalize(Maths::EulerDegreesToLightDirection(dir));
+			}
+		});
+
+		DrawComponentPanel<PunctualLightComponent>(entityContext, [&](PunctualLightComponent& lightComponent) {
+			if (!ImGui::CollapsingHeader("Punctual Light", ImGuiTreeNodeFlags_DefaultOpen))
+				return;
+			
+			const char* lightTypes[] = {
+				"Point",
+				"Spot"
+			};
+			int32_t lightType = static_cast<int32_t>(lightComponent.GetType());
+			ImGui::Text("Type");
+			ImGui::SameLine();
+
+			ImGui::SetNextItemWidth(150.0f);
+
+			if (ImGui::Combo("##PunctualLightType", &lightType, lightTypes, IM_ARRAYSIZE(lightTypes)))
+				lightComponent.SetType(static_cast<PunctualLightType>(lightType));
+
+			glm::vec3& color = lightComponent.GetColor();
+			ImGui::Text("Color");
+			ImGui::SameLine();
+			ImGui::ColorEdit3("##PunctualLightColor", glm::value_ptr(color), ImGuiColorEditFlags_Float);
+
+			float& intensity = lightComponent.GetIntensity();
+			ImGui::Text("Intensity");
+			ImGui::SameLine();
+			ImGui::DragFloat("##PunctualLightIntensity", &intensity, 0.1f, 0.0f, 1000000.0f, "%.3f");
+			
+			float& range = lightComponent.GetRange();
+			ImGui::Text("Range");
+			ImGui::SameLine();
+			ImGui::DragFloat("##PunctualLightRange", &range, 0.1f, 0.0f, 1000000.0f, "%.3f");
+
+			if (ImGui::IsItemHovered())
+				ImGui::SetTooltip("0 means unlimited range.");
+
+			if (lightComponent.GetType() == PunctualLightType::Spot) {
+				ImGui::SeparatorText("Spot");
+
+				float innerConeAngle = glm::degrees(lightComponent.GetInnerConeAngle());
+				float outerConeAngle = glm::degrees(lightComponent.GetOuterConeAngle());
+				ImGui::Text("Inner Cone");
+				ImGui::SameLine();
+				if (ImGui::DragFloat("##PunctualLightInnerCone", &innerConeAngle, 0.1f, 0.0f, 90.0f, "%.2f deg")) {
+					innerConeAngle = glm::clamp(innerConeAngle, 0.0f, outerConeAngle);
+					lightComponent.GetInnerConeAngle() = glm::radians(innerConeAngle);
+				}
+
+				ImGui::Text("Outer Cone");
+				ImGui::SameLine();
+				if (ImGui::DragFloat("##PunctualLightOuterCone", &outerConeAngle, 0.1f, 0.1f, 90.0f, "%.2f deg")) {
+					outerConeAngle = glm::clamp(outerConeAngle, innerConeAngle, 90.0f);
+					lightComponent.GetOuterConeAngle() = glm::radians(outerConeAngle);
+				}
 			}
 		});
 
@@ -280,10 +384,6 @@ namespace Lucy {
 					component.IsPrimary = !component.IsPrimary;
 			}
 		});
-
-		static bool demoOpen = false;
-		if (ImGui::RadioButton("Demo Window", demoOpen)) demoOpen = !demoOpen;
-		if (demoOpen) ImGui::ShowDemoWindow();
 
 		ImGui::End();
 	}

@@ -51,20 +51,29 @@ namespace Lucy {
 
 	class PerspectiveCamera : public Camera {
 	public:
+		PerspectiveCamera(const glm::vec3& position, const glm::quat& orientation, float nearPlane, float farPlane, float fov);
 		PerspectiveCamera(const glm::vec3& position, const glm::vec3& rotation, float nearPlane, float farPlane, float fov);
 		PerspectiveCamera(const glm::vec3& position, float nearPlane, float farPlane, float fov);
 		PerspectiveCamera(float nearPlane, float farPlane, float fov);
 		virtual ~PerspectiveCamera() = default;
 
-		inline float GetFov() const { return m_Fov; }
+		void SetTransform(const glm::mat4& transform);
+
+		float GetFov() const { return m_Fov; }
+		float GetAspectRatio() const { return m_AspectRatio; }
+
+		void SetFov(float fov);
+		void SetNearPlane(float nearPlane);
+		void SetFarPlane(float farPlane);
 
 		void SetAspectRatio(float aspectRatio);
 
 		void Update(float deltaTime) override;
+		void UpdateProjection();
 	protected:
 		glm::quat m_Orientation{};
 
-		void UpdateProjection();
+		void UpdateView() override;
 	private:
 		float m_AspectRatio = 0.0f;
 		float m_Fov = 0.0f;

@@ -71,6 +71,7 @@ struct PixelInput {
     [[vk::location(4)]] float a_ViewDepthOut : TEXCOORD1;
     [[vk::location(5)]] uint a_MaterialID : TEXCOORD2;
     [[vk::location(6)]] uint a_ObjectID : TEXCOORD3;
+    bool a_IsFrontFace : SV_IsFrontFace;
 };
 
 struct PixelOutput {
@@ -94,6 +95,7 @@ static const float4 DEBUG_CASCADE_COLORS[NUM_CASCADES] = {
 };
 
 #include "LucySamplingUtilities.slang"
+#include "LucyLights.slang"
 
 float ChebyshevUpperBound(float2 moments, float t) {
     const float minVariance = 0.00001f;
@@ -173,9 +175,11 @@ PixelOutput main(PixelInput input) {
 
     float alpha = materialSample.BaseColor.a;
     if (alpha < PBRMaterial::GetAlphaCutoff())
-        discard;
+       discard;
 
     float3 normalsWS = normalize(input.a_NormalsWSOut);
+    if (input.a_IsFrontFace)
+        normalsWS = -normalsWS;
     if (material.HasNormalMap()) {
         float3 normalTS = materialSample.NormalTS;
         float3 tangentWS = normalize(input.a_TangentWSOut.xyz - normalsWS * dot(normalsWS, input.a_TangentWSOut.xyz));
@@ -186,24 +190,39 @@ PixelOutput main(PixelInput input) {
 
     SceneCamera camera = PushConstants.Root->Camera;
 
-    float3 F0 = float3(DIELECTRIC_SPECULAR);
-    F0 = lerp(F0, materialSample.BaseColor.rgb, materialSample.Metallic);
+    float3 dielectricF0 = min(float3(DIELECTRIC_SPECULAR) * materialSample.SpecularColor * materialSample.SpecularFactor, float3(1.0f));
+    float3 F0 = lerp(dielectricF0, materialSample.BaseColor.rgb, materialSample.Metallic);
 
     float3 viewDirectionLight = normalize(-PushConstants.Root->DirectionalLight.Direction);
     float3 viewDirCamera = normalize(camera.u_CamPos.xyz - input.a_PosOutWS.xyz);
 
     float4 shadow = ShadowContribution(input, input.a_PosOutWS);
 
-    float3 directLight = BRDF(
+    float3 directLight = LayeredBRDF(
         viewDirectionLight,
         viewDirCamera,
-        normalsWS, 
-        F0, 
+        normalsWS,
+        F0,
         materialSample.Metallic,
         materialSample.Roughness,
         materialSample.BaseColor.rgb,
-        PushConstants.Root->DirectionalLight.Color
+        PushConstants.Root->DirectionalLight.Color,
+        materialSample.ClearcoatFactor,
+        materialSample.ClearcoatRoughness
     ) * shadow.r;
+
+    directLight += EvaluatePunctualLights(
+        PushConstants.Root,
+        input.a_PosOutWS,
+        viewDirCamera,
+        normalsWS,
+        F0,
+        materialSample.Metallic,
+        materialSample.Roughness,
+        materialSample.BaseColor.rgb,
+        materialSample.ClearcoatFactor,
+        materialSample.ClearcoatRoughness
+    );
 
     float NdotV = saturate(dot(normalsWS, viewDirCamera));
     float3 F = F_SchlickRoughness(NdotV, F0, materialSample.Roughness);
@@ -212,7 +231,7 @@ PixelOutput main(PixelInput input) {
     float3 R = normalize(reflect(-viewDirCamera, normalsWS));
     R.xy *= -1.0f;
 
-    float3 prefilterColor = PushConstants.Data.u_PBRTextureResources[1].SampleCubeTextureLevel(R, materialSample.Roughness * (NUM_PREFILTER_MIP_LEVELS - 1)) .rgb;
+    float3 prefilterColor = PushConstants.Data.u_PBRTextureResources[1].SampleCubeTextureLevel(R, materialSample.Roughness * (NUM_PREFILTER_MIP_LEVELS - 1)).rgb;
     float2 brdf = PushConstants.Data.u_PBRTextureResources[2].Sample2DTexture_Float2(float2(NdotV, materialSample.Roughness));
 
     // Indirect diffuse (ambient term) — AO affects only diffuse IBL
@@ -229,6 +248,10 @@ PixelOutput main(PixelInput input) {
     float3 ibl = indirectDiffuse + specularIBL;
     float3 emissive = materialSample.EmissiveColorAndStrength.rgb * materialSample.EmissiveColorAndStrength.a;
     float3 outputColor = ibl + directLight + emissive;
+
+    float exposure = 0.4f; //TODO: change this maybe, aka make this dynamic
+    outputColor *= exposure;
+    outputColor = ACESFilm(outputColor);
 
     outputColor = pow(outputColor, float3(1.0f / gamma));
     output.a_Color = float4(outputColor, alpha);

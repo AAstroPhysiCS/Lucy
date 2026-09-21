@@ -4,6 +4,8 @@
 
 #include "Events/EventHandler.h"
 
+#include <glm/gtx/matrix_decompose.hpp>
+
 namespace Lucy {
 
 	Camera::Camera(const glm::vec3& position, const glm::vec3& rotation, float nearPlane, float farPlane)
@@ -37,7 +39,12 @@ namespace Lucy {
 		return mvp;
 	}
 
-	PerspectiveCamera::PerspectiveCamera(const glm::vec3& m_Position, const glm::vec3& m_Rotation, float nearPlane, float farPlane, float fov) 
+	PerspectiveCamera::PerspectiveCamera(const glm::vec3& position, const glm::quat& orientation, float nearPlane, float farPlane, float fov)
+		: Camera(position, nearPlane, farPlane), m_Orientation(orientation), m_Fov(fov) {
+		UpdateView();
+	}
+
+	PerspectiveCamera::PerspectiveCamera(const glm::vec3& m_Position, const glm::vec3& m_Rotation, float nearPlane, float farPlane, float fov)
 		: Camera(m_Position, m_Rotation, nearPlane, farPlane), m_Fov(fov) {
 	}
 
@@ -47,6 +54,34 @@ namespace Lucy {
 
 	PerspectiveCamera::PerspectiveCamera(float nearPlane, float farPlane, float fov)
 		: Camera(nearPlane, farPlane), m_Fov(fov) {
+	}
+
+	void PerspectiveCamera::SetTransform(const glm::mat4& transform) {
+		glm::vec3 scale{};
+		glm::vec3 skew{};
+		glm::vec4 perspective{};
+
+		glm::decompose(transform, scale, m_Orientation, m_Position, skew, perspective);
+
+		m_Orientation = glm::normalize(m_Orientation);
+		m_Rotation = glm::degrees(glm::eulerAngles(m_Orientation));
+
+		UpdateView();
+	}
+
+	void PerspectiveCamera::SetFov(float fov) {
+		m_Fov = fov;
+		UpdateProjection();
+	}
+
+	void PerspectiveCamera::SetNearPlane(float nearPlane) {
+		m_NearPlane = nearPlane;
+		UpdateProjection();
+	}
+
+	void PerspectiveCamera::SetFarPlane(float farPlane) {
+		m_FarPlane = farPlane;
+		UpdateProjection();
 	}
 
 	void PerspectiveCamera::SetAspectRatio(float aspectRatio) {
@@ -59,6 +94,17 @@ namespace Lucy {
 			return;
 		m_Projection = glm::mat4(1.0f);
 		m_Projection = glm::perspective(glm::radians(m_Fov), m_AspectRatio, m_NearPlane, m_FarPlane);
+	}
+
+	void PerspectiveCamera::UpdateView() {
+	/*
+		have to conjugate, since quatLookAtRH gives the camera's world orientation...
+		so for a world-space camera orientation, i need the inverse rotation
+		glm::mat4 rotation = glm::mat4_cast(m_Orientation);
+	*/
+		glm::mat4 rotation = glm::mat4_cast(glm::conjugate(m_Orientation));
+		glm::mat4 translation = glm::translate(glm::mat4{ 1.0f }, -m_Position);
+		m_ViewMatrix = rotation * translation;
 	}
 
 	void PerspectiveCamera::Update(float deltaTime) {

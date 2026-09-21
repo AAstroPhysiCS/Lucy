@@ -56,9 +56,19 @@ namespace Lucy {
         >{};
     };
 
+    enum class RenderDevicePBRMaterialFlags : uint32_t {
+        None = 0,
+        DoubleSided = 1 << 0
+    };
+
     struct RenderDevicePBRMaterialData {
         glm::vec4 BaseColor{};
-        glm::vec4 ORME{ 1.0f, 0.0f, 0.0f, 0.0f }; // x = Occlusion, y = Roughness, z = Metallic, w = Emissive
+        glm::vec4 ORME{ 1.0f, 1.0f, 0.0f, 0.0f }; // x = Occlusion, y = Roughness, z = Metallic, w = Emissive
+
+        glm::vec4 Specular{ 1.0f };
+        glm::vec2 Clearcoat{ 0.0f };
+
+        uint32_t Flags;
 
         RenderDeviceTextureResource AlbedoMap;
         RenderDeviceTextureResource NormalMap;
@@ -66,7 +76,6 @@ namespace Lucy {
         RenderDeviceTextureResource AOMap;
         RenderDeviceTextureResource RoughnessMap;
         RenderDeviceTextureResource MetallicMap;
-        //RenderDeviceTextureResource ORMMap;
         RenderDeviceTextureResource EmissiveMap;
 
         float NormalStrength = 1.0f;
@@ -77,6 +86,9 @@ namespace Lucy {
         static inline constexpr auto Members = MembersList<
             &RenderDevicePBRMaterialData::BaseColor,
             &RenderDevicePBRMaterialData::ORME,
+            &RenderDevicePBRMaterialData::Specular,
+            &RenderDevicePBRMaterialData::Clearcoat,
+            &RenderDevicePBRMaterialData::Flags,
             &RenderDevicePBRMaterialData::AlbedoMap,
             &RenderDevicePBRMaterialData::NormalMap,
             &RenderDevicePBRMaterialData::ORMMap,
@@ -200,6 +212,29 @@ namespace Lucy {
         auto operator<=>(const RenderDeviceSceneAddresses&) const = default;
     };
 
+    enum class RenderDevicePunctualLightType : uint32_t {
+        Point,
+        Spot
+    };
+
+    struct RenderDevicePunctualLightsData {
+        static constexpr uint32_t MAX_PUNCTUAL_LIGHTS = 32;
+
+        struct Data {
+            glm::vec4 PositionAndRange{};
+            glm::vec4 DirectionAndIntensity{};
+            glm::vec4 ColorAndType{};
+            glm::vec4 ConeData{};
+
+            auto operator<=>(const Data&) const = default;
+        };
+
+        std::array<Data, MAX_PUNCTUAL_LIGHTS> Lights{};
+        uint32_t LightCount = 0; // x = light count
+
+        auto operator<=>(const RenderDevicePunctualLightsData&) const = default;
+    };
+
     struct RenderDeviceSceneGlobalData {
         static inline constexpr const uint32_t NUM_CASCADES = 4;
 
@@ -216,12 +251,15 @@ namespace Lucy {
             auto operator<=>(const LightValues&) const = default;
         } DirectionalLight{};
 
+        RenderDevicePunctualLightsData PunctualLights{};
+
         auto operator<=>(const RenderDeviceSceneGlobalData&) const = default;
 
         static inline constexpr auto Members = MembersList<
             &RenderDeviceSceneGlobalData::Camera,
             &RenderDeviceSceneGlobalData::Addresses,
-            &RenderDeviceSceneGlobalData::DirectionalLight
+            &RenderDeviceSceneGlobalData::DirectionalLight,
+            &RenderDeviceSceneGlobalData::PunctualLights
         >{};
     };
 

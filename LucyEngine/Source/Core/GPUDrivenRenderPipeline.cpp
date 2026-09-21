@@ -38,7 +38,7 @@ namespace Lucy {
 		auto& settings = Renderer::GetRendererSettings();
 
 		auto& deviceScene = device->GetScene();
-		const auto& camera = scene->GetEditorCamera();
+		const auto& editorCamera = scene->GetEditorCamera();
 
 		const auto ExtractFrustumPlanes = [](const glm::mat4& viewProjection, glm::vec4(&frustumPlanes)[6]) {
 			glm::vec4 row0 = glm::row(viewProjection, 0);
@@ -94,7 +94,34 @@ namespace Lucy {
 			deviceScene->UpdateLightValues(lightValues);
 		});
 
-		const auto& cameraViewProj = camera.GetCameraViewProjection();
+		RenderDevicePunctualLightsData punctualLights{};
+		scene->ViewForEach<PunctualLightComponent, TransformComponent>([&](PunctualLightComponent& lightComponent, TransformComponent& transformComponent) {
+			if (punctualLights.LightCount >= RenderDevicePunctualLightsData::MAX_PUNCTUAL_LIGHTS)
+				return;
+			const glm::mat4& transform = transformComponent.GetMatrix();
+			glm::vec3 position = glm::vec3{ transform[3] };
+			glm::vec3 direction = -glm::vec3{ transform[2] };
+			direction = glm::normalize(direction);
+
+			RenderDevicePunctualLightsData::Data& light = punctualLights.Lights[punctualLights.LightCount];
+			light.PositionAndRange = glm::vec4{ position, lightComponent.GetRange() };
+			light.DirectionAndIntensity = glm::vec4{ direction, lightComponent.GetIntensity() };
+			light.ColorAndType = glm::vec4{ lightComponent.GetColor(), static_cast<float>(lightComponent.GetType()) };
+			light.ConeData = glm::vec4{ glm::cos(lightComponent.GetInnerConeAngle()), glm::cos(lightComponent.GetOuterConeAngle()), 0.0f, 0.0f };
+
+			punctualLights.LightCount++;
+		});
+
+		deviceScene->UpdatePunctualLights(punctualLights);
+
+		Camera* camera = &scene->GetEditorCamera();
+		scene->ViewForEach<CameraComponent, TransformComponent>([&](CameraComponent& cameraComponent, TransformComponent& transformComponent) {
+			cameraComponent.UpdateTransform(transformComponent);
+			if (cameraComponent.IsPrimary())
+				camera = &cameraComponent.GetCamera();
+		});
+
+		const auto& cameraViewProj = camera->GetCameraViewProjection();
 		deviceScene->UpdateCamera(cameraViewProj);
 
 		scene->ViewRForEach<MeshComponent, TransformComponent>([&](MeshComponent& meshComponent, TransformComponent& transformComponent) {
@@ -111,8 +138,8 @@ namespace Lucy {
 		cullView.Projection = cameraViewProj.Proj;
 		cullView.ViewProjection = cameraViewProj.Proj * cameraViewProj.View;
 
-		const glm::mat4 inverseView = glm::inverse(cameraViewProj.View);
-		cullView.CameraPosition = glm::vec4{ camera.GetPosition(), 1.0f };
+		glm::mat4 inverseView = glm::inverse(cameraViewProj.View);
+		cullView.CameraPosition = glm::vec4{ camera->GetPosition(), 1.0f};
 		cullView.Viewport = { static_cast<float>(width), static_cast<float>(height), 1.0f / static_cast<float>(width), 1.0f / static_cast<float>(height) };
 
 		ExtractFrustumPlanes(cullView.ViewProjection, cullView.FrustumPlanes);

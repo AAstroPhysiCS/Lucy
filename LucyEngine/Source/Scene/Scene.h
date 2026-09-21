@@ -7,6 +7,8 @@
 
 namespace Lucy {
 
+	struct CameraComponent;
+
 	class Entity;
 	struct Event;
 
@@ -35,6 +37,9 @@ namespace Lucy {
 		Entity GetEntityContext();
 
 		EditorCamera& GetEditorCamera() { return m_Camera; }
+		CameraComponent* GetPrimaryCamera();
+
+		bool LoadScene(const std::string& path, const std::string& primaryCamera = {});
 
 		void OnEvent(Event& e);
 		void Update(float deltaTime);
@@ -79,7 +84,7 @@ namespace Lucy {
 		void UpdateCamera(int32_t viewportWidth, int32_t viewportHeight);
 
 		entt::registry m_Registry;
-		EditorCamera m_Camera { 0.01f, 1000.0f, 90.0f };
+		EditorCamera m_Camera { 0.01f, 1000.0f, 70.0f };
 		entt::entity m_EntityContext = static_cast<entt::entity>(std::numeric_limits<uint32_t>::max());
 
 		friend class Entity;

@@ -140,4 +140,42 @@ float3 BRDF(float3 L, float3 V, float3 N, float3 F0, float metallic, float rough
 
     return (kD * albedoColor / PI + spec) * dotNL * lightColor;
 }
+
+float3 ClearcoatBRDF(float3 L, float3 V, float3 N, float clearcoatFactor, float clearcoatRoughness, float3 lightColor) {
+    if (clearcoatFactor <= 0.0f)
+        return float3(0.0f);
+
+    float3 H = normalize(V + L);
+    float dotNV = clamp(dot(N, V), 0.0, 1.0);
+    float dotNL = clamp(dot(N, L), 0.0, 1.0);
+    float dotNH = clamp(dot(N, H), 0.0, 1.0);
+    float dotHV = clamp(dot(H, V), 0.0, 1.0);
+
+    if (dotNV <= 0.0f || dotNL <= 0.0f)
+        return float3(0.0f);
+
+    float roughness = max(clearcoatRoughness, 0.045f);
+
+    float D = DistributionGGX(dotNH, roughness);
+    float G = GeometrySmith(dotNV, dotNL, roughness);
+    float3 F = F_Schlick(dotHV, float3(0.04f));
+
+    float3 spec = (D * G * F) / max(4.0 * dotNL * dotNV, 1e-6);
+    return spec * dotNL * lightColor * clearcoatFactor;
+}
+
+float3 LayeredBRDF(float3 L, float3 V, float3 N, float3 F0, float metallic, float roughness, float3 albedoColor, float3 lightColor, float clearcoatFactor, float clearcoatRoughness) {
+    float3 base = BRDF(L, V, N, F0, metallic, roughness, albedoColor, lightColor);
+    if (clearcoatFactor <= 0.0f)
+        return base;
+
+    float3 H = normalize(V + L);
+    float dotHV = clamp(dot(H, V), 0.0, 1.0);
+
+    float3 clearcoatFresnel = F_Schlick(dotHV, float3(0.04f));
+    float baseAttenuation = 1.0f - clearcoatFactor * clearcoatFresnel.x;
+
+    float3 clearcoat = ClearcoatBRDF(L, V, N, clearcoatFactor, clearcoatRoughness, lightColor);
+    return base * baseAttenuation + clearcoat;
+}
 #endif // LUCY_SAMPLING_UTILITIES_SLANG

@@ -10,7 +10,23 @@
 
 #include "Renderer/Image/Image.h"
 
+#include "SceneImporter.h"
+
+#include <glm/gtx/matrix_decompose.hpp>
+
 namespace Lucy {
+
+	TransformComponent::TransformComponent(const glm::mat4& mat) 
+		: m_Mat(mat) {
+		glm::quat orientation{};
+		glm::vec3 skew{};
+		glm::vec4 perspective{};
+
+		glm::decompose(m_Mat, m_Scale, orientation, m_Position, skew, perspective);
+
+		orientation = glm::normalize(orientation);
+		m_Rotation = glm::degrees(glm::eulerAngles(orientation));
+	}
 
 	void TransformComponent::CalculateMatrix() {
 		m_Mat = glm::translate(glm::mat4(1.0f), m_Position)
@@ -57,5 +73,37 @@ namespace Lucy {
 			Renderer::ImportExternalRenderGraphResource(RGResource(IrradianceImage), m_IrradianceImageHandle);
 #endif
 		});
+	}
+
+	CameraComponent::CameraComponent(const ImportedCamera& importedCamera) 
+		: m_Camera(importedCamera.Position, importedCamera.Orientation, importedCamera.NearPlane, importedCamera.FarPlane, importedCamera.VerticalFOV) {
+		m_Camera.SetAspectRatio(importedCamera.AspectRatio);
+	}
+
+	void CameraComponent::UpdateTransform(const TransformComponent& transformComponent) {
+		m_Camera.SetTransform(transformComponent.GetMatrix());
+	}
+
+	PunctualLightComponent::PunctualLightComponent(const ImportedLight& light)
+		: m_Color(light.Color), m_Range(light.Range), m_InnerConeAngle(light.InnerConeAngle), m_OuterConeAngle(light.OuterConeAngle) {
+		switch (light.Type) {
+			case ImportedLightType::Point:
+				m_Type = PunctualLightType::Point;
+				break;
+			case ImportedLightType::Spot:
+				m_Type = PunctualLightType::Spot;
+				break;
+			default:
+				LUCY_ASSERT(false, "Unsupported punctual light type!");
+				break;
+		}
+
+		m_Intensity = glm::max(light.Color.r, glm::max( light.Color.g, light.Color.b));
+		if (m_Intensity > 0.0f)
+			m_Color = light.Color / m_Intensity;
+	}
+
+	PunctualLightComponent::PunctualLightComponent(PunctualLightType type) 
+		: m_Type(type) {
 	}
 }

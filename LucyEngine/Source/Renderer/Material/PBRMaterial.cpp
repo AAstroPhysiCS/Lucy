@@ -6,8 +6,8 @@
 
 namespace Lucy {
 
-	PBRMaterial::PBRMaterial(const MaterialCreateInfo& createInfo) 
-		: Material(createInfo) {
+	PBRMaterial::PBRMaterial(const MaterialCreateInfo& createInfo, const RenderDevicePBRMaterialData& materialData) 
+		: Material(createInfo), m_MaterialData(materialData) {
 	}
 
 	void PBRMaterial::SetTexture(const MaterialImageType& type, RenderDeviceResourceHandle textureHandle) {
