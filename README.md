@@ -1,5 +1,7 @@
 <p align="center">
   <img width="65%" height="65%" src="Content/lucy_logo.png">
+  <br>
+  <sub>Thanks to my dearest friend for this artwork.</sub>
 </p>
 
 Welcome to Lucy, a high-fidelity game engine focused on performance and real-time graphics.
