@@ -245,6 +245,8 @@ void CullMeshlets(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_GroupThread
     GPUMeshLOD lod = PushConstants.Root->Addresses.MeshLODs[visibleSubmesh.LODIndex];
     GPUCullView view = PushConstants.Root->Addresses.CullViews[PushConstants.Data.ViewIndex];
 
+    bool doubleSided = PushConstants.Root->Addresses.PBRMaterials[submesh.Draw.w].IsDoubleSided();
+
     float4x4 modelMatrix = mul(object.Transform, submesh.Transform);
     float4x4 normalMatrix = mul(object.TransformInversedTransposed, submesh.TransformInversedTransposed);
 
@@ -266,7 +268,7 @@ void CullMeshlets(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_GroupThread
         if ((view.Data.w & VIEW_FLAG_FRUSTUM) != 0)
             visible = IsSphereInsideFrustum(worldCenter, worldRadius, view);
 
-        if (visible && (view.Data.w & VIEW_FLAG_CONE) != 0)
+        if (visible && !doubleSided && (view.Data.w & VIEW_FLAG_CONE) != 0)
             visible = !IsConeBackFacing(meshlet, modelMatrix, normalMatrix, worldCenter, worldRadius, view.CameraPosition.xyz);
 
         if (visible && (view.Data.w & VIEW_FLAG_OCCLUSION) != 0)

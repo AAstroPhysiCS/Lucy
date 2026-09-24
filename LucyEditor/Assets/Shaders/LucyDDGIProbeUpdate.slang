@@ -3,6 +3,7 @@
 
 struct DDGIProbeUpdateData {
     DDGIRayResult* RayResults;
+    float4* ProbeOffsets;
     uint* ProbeUpdateMask;
 
     // x = current irradiance
@@ -47,7 +48,10 @@ float3 CalculateProbeIrradiance(uint probeIndex, float3 texelDirection) {
     //
     // E(n) = 4*pi/N Sum{ Li * max(n dot wi, 0) }
 
-    for (uint rayIndex = 1; rayIndex < raysPerProbe; rayIndex++) {
+    // means we fix the first X rays => good for relocation... the other rays are for irr + vis
+    uint fixedRayCount = min(DDGI_FIXED_RAY_COUNT, raysPerProbe);
+
+    for (uint rayIndex = fixedRayCount; rayIndex < raysPerProbe; rayIndex++) {
         float3 rayDirection = GetDDGIRayDirection(rayIndex, raysPerProbe, PushConstants.Data.FrameNumber);
         
         float weight = max(dot(texelDirection, rayDirection), 0.0f);
@@ -63,10 +67,11 @@ float3 CalculateProbeIrradiance(uint probeIndex, float3 texelDirection) {
 }
 
 // adaptive hysteresis
-float3 ApplyIrradianceHistory(uint2 atlasCoordinate, float3 currentIrradiance) {
+float3 ApplyIrradianceHistory(uint probeIndex, uint2 atlasCoordinate, float3 currentIrradiance) {
     bool historyValid = PushConstants.Data.TemporalData.z > 0.5f;
+    bool relocated = PushConstants.Data.ProbeOffsets[probeIndex].w > 0.5f;
 
-    if (!historyValid)
+    if (!historyValid || relocated)
         return currentIrradiance;
 
     uint historyIndex = PushConstants.Data.AtlasIndices.z;
@@ -95,9 +100,11 @@ float3 ApplyIrradianceHistory(uint2 atlasCoordinate, float3 currentIrradiance) {
     return lerp(currentIrradiance, history, hysteresis);
 }
 
-float2 ApplyDepthHistory(uint2 atlasCoordinate, float2 currentMoments) {
+float2 ApplyDepthHistory(uint probeIndex, uint2 atlasCoordinate, float2 currentMoments) {
     bool historyValid = PushConstants.Data.TemporalData.z > 0.5f;
-    if (!historyValid)
+    bool relocated = PushConstants.Data.ProbeOffsets[probeIndex].w > 0.5f;
+
+    if (!historyValid || relocated)
         return currentMoments;
 
     uint historyIndex = PushConstants.Data.AtlasIndices.w;
@@ -112,30 +119,32 @@ float2 CalculateProbeDepthMoments(uint probeIndex, float3 texelDirection) {
     uint raysPerProbe = PushConstants.Data.ProbeCountsAndRays.w;
     uint firstRayIndex = probeIndex * raysPerProbe;
 
-    float maxRayDistance = PushConstants.Data.DistanceData.x;
+    float maxProbeDistance = PushConstants.Data.DistanceData.x;
     float depthSharpness = PushConstants.Data.DistanceData.y;
 
     float distanceSum = 0.0f;
     float distanceSquaredSum = 0.0f;
     float weightSum = 0.0f;
 
-    for (uint rayIndex = 1; rayIndex < raysPerProbe; rayIndex++) {
+    // means we fix the first X rays => good for relocation... the other rays are for irr + vis
+    uint fixedRayCount = min(DDGI_FIXED_RAY_COUNT, raysPerProbe);
+
+    for (uint rayIndex = fixedRayCount; rayIndex < raysPerProbe; rayIndex++) {
         float3 rayDirection = GetDDGIRayDirection(rayIndex, raysPerProbe, PushConstants.Data.FrameNumber);
 
         float cosine = max(dot(texelDirection, rayDirection), 0.0f);
         float weight = pow(cosine, depthSharpness);
 
         float distance = abs(PushConstants.Data.RayResults[firstRayIndex + rayIndex].RadianceAndDistance.w);
-
-        float normalizedDistance = saturate(distance / maxRayDistance);
-        distanceSum += normalizedDistance * weight;
-        distanceSquaredSum += normalizedDistance * normalizedDistance * weight;
+        distance = min(distance, maxProbeDistance);
+        distanceSum += distance * weight;
+        distanceSquaredSum += distance * distance * weight;
 
         weightSum += weight;
     }
 
     if (weightSum <= 0.000001f)
-        return float2(1.0f, 1.0f);
+        return float2(maxProbeDistance, maxProbeDistance * maxProbeDistance);
     return float2(distanceSum / weightSum, distanceSquaredSum / weightSum);
 }
 
@@ -181,7 +190,7 @@ void DDGIProbeUpdateMain(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_Grou
         float3 irradiance = CalculateProbeIrradiance(probeIndex, texelDirection);
         uint2 atlasCoordinate = atlasTile * irradianceTileSize + localTexel;
 
-        float3 accumulatedIrradiance = ApplyIrradianceHistory(atlasCoordinate, irradiance);
+        float3 accumulatedIrradiance = ApplyIrradianceHistory(probeIndex, atlasCoordinate, irradiance);
         BindlessTable::StorageTextures2D[NonUniformResourceIndex(PushConstants.Data.AtlasIndices.x)][atlasCoordinate] = float4(accumulatedIrradiance, 1.0f);
     }
 
@@ -193,7 +202,7 @@ void DDGIProbeUpdateMain(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_Grou
         float2 depthMoments = CalculateProbeDepthMoments(probeIndex, texelDirection);
         uint2 atlasCoordinate = atlasTile * depthTileSize + localTexel;
 
-        float2 accumulatedDepth = ApplyDepthHistory(atlasCoordinate, depthMoments);
+        float2 accumulatedDepth = ApplyDepthHistory(probeIndex, atlasCoordinate, depthMoments);
         BindlessTable::StorageTextures2D_Float2[NonUniformResourceIndex(PushConstants.Data.AtlasIndices.y)][atlasCoordinate] = accumulatedDepth;
     }
 }

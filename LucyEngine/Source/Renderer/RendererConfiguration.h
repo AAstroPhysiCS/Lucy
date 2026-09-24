@@ -25,6 +25,8 @@ namespace Lucy {
 		float EnvironmentIntensity = 1.0f;
 		float DDGIStrength = 1.0f;
 
+		float Exposure = 0.4f;
+
 		bool DDGIAdaptiveUpdates = true;
 		float DDGIProbeUpdateFraction = 0.25f;
 		float DDGINearProbeRadius = 4.0f;

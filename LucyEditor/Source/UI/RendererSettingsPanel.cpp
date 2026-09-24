@@ -21,9 +21,11 @@ namespace Lucy {
 
 		ImGui::SliderFloat("Environment LOD", &settings.EnvironmentLOD, 0.0f, PrefilterPass::MAX_MIP_LEVELS);
 		ImGui::DragFloat("Environment Intensity", &settings.EnvironmentIntensity, 0.01f, 0.0f, 10.0f, "%.3f");
-		
-		ImGui::SeparatorText("DDGI");
 
+		ImGui::SeparatorText("Post Processing");
+		ImGui::DragFloat("Exposure", &settings.Exposure, 0.01f, 0.0f, 10.0f, "%.3f");
+
+		ImGui::SeparatorText("DDGI");
 		ImGui::Checkbox("Adaptive Probe Updates", &settings.DDGIAdaptiveUpdates);
 
 		if (settings.DDGIAdaptiveUpdates) {

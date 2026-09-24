@@ -130,10 +130,11 @@ namespace Lucy {
 		derivativeFeatures.computeDerivativeGroupQuads = VK_TRUE;
 
 		//For layered rendering (cubemaps for example)
-		VkPhysicalDeviceMultiviewFeatures multiViewFeatures{};
-		multiViewFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES;
-		multiViewFeatures.multiview = VK_TRUE;
-		multiViewFeatures.pNext = &derivativeFeatures;
+		VkPhysicalDeviceVulkan11Features vulkan11Features{};
+		vulkan11Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+		vulkan11Features.shaderDrawParameters = VK_TRUE;
+		vulkan11Features.multiview = VK_TRUE;
+		vulkan11Features.pNext = &derivativeFeatures;
 
 		VkPhysicalDeviceVulkan12Features vulkan12Features{};
 		vulkan12Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
@@ -155,7 +156,7 @@ namespace Lucy {
 		vulkan12Features.timelineSemaphore = VK_TRUE;
 		//for query pool reset
 		vulkan12Features.hostQueryReset = VK_TRUE;
-		vulkan12Features.pNext = &multiViewFeatures;
+		vulkan12Features.pNext = &vulkan11Features;
 
 		//For compute shaders/pipeline
 		VkPhysicalDeviceVulkan13Features vulkan13Features{};
@@ -661,6 +662,7 @@ namespace Lucy {
 			const auto& vulkanImage = image->As<VulkanImage>();
 			const auto& imageHandle = image->GetMyHandle();
 			VkImageView imageView = mip == static_cast<uint32_t>(-1) ? vulkanImage->GetImageView().GetVulkanHandle() : vulkanImage->GetImageView().GetMipViewVulkanHandle(mip);
+			VkSampler sampler = AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle();
 
 			for (uint32_t index = 0; const auto& slot : imageSampler->Images) {
 				if (!slot.Alive) {
@@ -669,7 +671,20 @@ namespace Lucy {
 				}
 
 				if (slot.Data.ImageHandle == imageHandle && slot.Data.Mip == mip) {
-					return RenderDeviceTextureHandle{ .Index = index, .Generation = slot.Generation };
+					RenderDeviceTextureHandle handle{
+						.Index = index,
+						.Generation = slot.Generation
+					};
+
+					VkDescriptorImageInfo newImageInfo = VulkanAPI::DescriptorImageInfo(vulkanImage->GetCurrentLayout(), imageView, sampler);
+
+					if (slot.Data.ImageInfo.imageView != newImageInfo.imageView || slot.Data.ImageInfo.imageLayout != newImageInfo.imageLayout || slot.Data.ImageInfo.sampler != newImageInfo.sampler) {
+						auto& descriptor = imageSampler->Images.Get(handle);
+						descriptor.ImageInfo = newImageInfo;
+						descriptorSet->RTUpdateImageDescriptors(this, imageBufferName, handle);
+					}
+
+					return handle;
 				}
 
 				index++;
@@ -680,8 +695,8 @@ namespace Lucy {
 				.Mip = mip,
 				.ImageInfo = VulkanAPI::DescriptorImageInfo(
 					vulkanImage->GetCurrentLayout(), 
-					imageView, 
-					AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle()
+					imageView,
+					sampler
 				)}
 			);
 
@@ -703,6 +718,7 @@ namespace Lucy {
 			const auto& vulkanImage = image->As<VulkanImage>();
 			const auto& imageHandle = image->GetMyHandle();
 			VkImageView imageView = mip == static_cast<uint32_t>(-1) ? vulkanImage->GetImageView().GetVulkanHandle() : vulkanImage->GetImageView().GetMipViewVulkanHandle(mip);
+			VkSampler sampler = AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle();
 
 			for (uint32_t index = 0; const auto& slot : imageSampler->Images) {
 				if (!slot.Alive) {
@@ -711,7 +727,20 @@ namespace Lucy {
 				}
 
 				if (slot.Data.ImageHandle == imageHandle && slot.Data.Mip == mip) {
-					return RenderDeviceTextureHandle{ .Index = index, .Generation = slot.Generation };
+					RenderDeviceTextureHandle handle{
+						.Index = index,
+						.Generation = slot.Generation
+					};
+
+					VkDescriptorImageInfo newImageInfo = VulkanAPI::DescriptorImageInfo(vulkanImage->GetCurrentLayout(), imageView, sampler);
+
+					if (slot.Data.ImageInfo.imageView != newImageInfo.imageView || slot.Data.ImageInfo.imageLayout != newImageInfo.imageLayout || slot.Data.ImageInfo.sampler != newImageInfo.sampler) {
+						auto& descriptor = imageSampler->Images.Get(handle);
+						descriptor.ImageInfo = newImageInfo;
+						descriptorSet->RTUpdateImageDescriptors(this, imageBufferName, handle);
+					}
+
+					return handle;
 				}
 
 				index++;
@@ -723,7 +752,7 @@ namespace Lucy {
 				.ImageInfo = VulkanAPI::DescriptorImageInfo(
 					vulkanImage->GetCurrentLayout(),
 					imageView,
-					AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle()
+					sampler
 				)}
 			);
 
@@ -745,6 +774,7 @@ namespace Lucy {
 			const auto& vulkanImage = image->As<VulkanImage>();
 			const auto& imageHandle = image->GetMyHandle();
 			VkImageView imageView = mip == static_cast<uint32_t>(-1) ? vulkanImage->GetImageView().GetVulkanHandle() : vulkanImage->GetImageView().GetMipViewVulkanHandle(mip);
+			VkSampler sampler = AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle();
 
 			for (uint32_t index = 0; const auto& slot : imageSampler->Images) {
 				if (!slot.Alive) {
@@ -753,7 +783,20 @@ namespace Lucy {
 				}
 
 				if (slot.Data.ImageHandle == imageHandle && slot.Data.Mip == mip) {
-					return RenderDeviceTextureHandle{ .Index = index, .Generation = slot.Generation };
+					RenderDeviceTextureHandle handle{
+						.Index = index,
+						.Generation = slot.Generation
+					};
+
+					VkDescriptorImageInfo newImageInfo = VulkanAPI::DescriptorImageInfo(vulkanImage->GetCurrentLayout(), imageView, sampler);
+
+					if (slot.Data.ImageInfo.imageView != newImageInfo.imageView || slot.Data.ImageInfo.imageLayout != newImageInfo.imageLayout || slot.Data.ImageInfo.sampler != newImageInfo.sampler) {
+						auto& descriptor = imageSampler->Images.Get(handle);
+						descriptor.ImageInfo = newImageInfo;
+						descriptorSet->RTUpdateImageDescriptors(this, imageBufferName, handle);
+					}
+
+					return handle;
 				}
 
 				index++;
@@ -765,7 +808,7 @@ namespace Lucy {
 				.ImageInfo = VulkanAPI::DescriptorImageInfo(
 					vulkanImage->GetCurrentLayout(),
 					imageView,
-					AccessResource<VulkanImageSampler>(vulkanImage->GetSamplerHandle())->GetVulkanHandle()
+					sampler
 				)}
 			);
 
@@ -966,6 +1009,12 @@ namespace Lucy {
 				break;
 			}
 		}
+	}
+
+	void VulkanRenderDevice::Draw(Ref<CommandPool> cmdPool, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
+		LUCY_PROFILE_NEW_EVENT("VulkanRenderDevice::Draw");
+		const uint32_t frameIndex = Renderer::GetCurrentFrameIndex();
+		vkCmdDraw((VkCommandBuffer)cmdPool->GetCommandBuffer(frameIndex), vertexCount, instanceCount, firstVertex, firstInstance);
 	}
 
 	void VulkanRenderDevice::DrawIndexedIndirectCount(Ref<CommandPool> cmdPool, Ref<RenderDeviceBuffer> buffer, size_t offset, Ref<RenderDeviceBuffer> countBuffer, size_t countBufferOffset, uint32_t maxDrawCount, uint32_t stride) {

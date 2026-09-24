@@ -63,12 +63,7 @@ PixelOutput main(PixelInput input) {
 
     float3 envColor = BindlessTable::CubeTextures[uint(PushConstants.Data.u_Data.x)]
         .SampleLevel(BindlessTable::Samplers[uint(PushConstants.Data.u_Data.y)], input.a_PosOut, PushConstants.Data.u_Data.z).rgb;
-
     envColor *= PushConstants.Data.u_Data.w;
-
-    const float gamma = 2.2;
-    envColor = pow(envColor, 1.0 / gamma);
-    
     output.a_Color = float4(envColor, 1.0);
     return output;
 }

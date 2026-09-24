@@ -168,8 +168,6 @@ float4 ShadowContribution(in PixelInput input, float3 modelWorldPos) {
 PixelOutput main(PixelInput input) {
     PixelOutput output;
 
-    const float gamma = 2.2f;
-
     PBRMaterial material = PushConstants.Root->Addresses.PBRMaterials[input.a_MaterialID];
     PBRMaterialSample materialSample = material.Sample(input.a_TextureCoordsOut);
 
@@ -245,16 +243,11 @@ PixelOutput main(PixelInput input) {
 
     float3 indirectDiffuse = IsInsideDDGIVolume(PushConstants.Data.u_DDGI, input.a_PosOutWS) ? diffuseDDGI : diffuseIBL;
 
-    float3 ibl = indirectDiffuse + specularIBL;
+    float3 ibl = indirectDiffuse;
     float3 emissive = materialSample.EmissiveColorAndStrength.rgb * materialSample.EmissiveColorAndStrength.a;
     float3 outputColor = ibl + directLight + emissive;
 
-    float exposure = 0.4f; //TODO: change this maybe, aka make this dynamic
-    outputColor *= exposure;
-    outputColor = ACESFilm(outputColor);
-
-    outputColor = pow(outputColor, float3(1.0f / gamma));
-    output.a_Color = float4(outputColor, alpha);
+    output.a_Color = float4(outputColor, 1.0f);
     output.a_ObjectID = input.a_ObjectID + 1; //hacky workaround ik
 
     if (DEBUG_CASCADED_SHADOW_MAPS)
