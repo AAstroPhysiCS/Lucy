@@ -192,6 +192,11 @@ namespace Lucy {
 		m_RenderDevice->DrawIndexed(m_PrimaryCommandPool, mesh->GetIndicesSize(), 1, 0, 0, 0);
 	}
 
+	void RenderCommand::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
+		LUCY_PROFILE_NEW_EVENT("RenderCommand::Draw");
+		m_RenderDevice->Draw(m_PrimaryCommandPool, vertexCount, instanceCount, firstVertex, firstInstance);
+	}
+
 	void RenderCommand::DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {
 		LUCY_PROFILE_NEW_EVENT("RenderCommand::DrawIndexed");
 		m_RenderDevice->DrawIndexed(m_PrimaryCommandPool, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);

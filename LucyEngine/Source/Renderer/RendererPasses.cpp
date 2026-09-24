@@ -317,6 +317,68 @@ namespace Lucy {
 
 #pragma endregion GPUDrivenRendererPasses
 
+#pragma region PostProcessPass
+
+	PostProcessPass::PostProcessPass(uint32_t width, uint32_t height) 
+		: m_Width(width), m_Height(height) {
+	}
+
+	void PostProcessPass::AddPass(const Ref<RenderGraph>& renderGraph) {
+		renderGraph->AddPass(TargetQueueFamily::Graphics, "PostProcessPass", [=, *this](RenderGraphBuilder& build) {
+			build.SetViewportArea(m_Width, m_Height);
+			build.SetInFlightMode(true);
+
+			build.ReadImage(RGResource(GeometryImage), RenderGraphResourceAccess::ShaderSampledRead);
+
+			build.DeclareImage(RGResource(FinalImage), {
+				.Width = m_Width,
+				.Height = m_Height,
+				.ImageType = ImageType::Type2D,
+				.ImageUsage = ImageUsage::AsColorTransferAttachment,
+				.Format = ImageFormat::R8G8B8A8_UNORM,
+				.GenerateSampler = true,
+				.ImGuiUsage = true
+			}, RenderPassLoadStoreAttachments::ClearStore);
+
+			build.BindRenderTarget(RGResource(FinalImage));
+
+			return [=](RenderGraphRegistry& registry, RenderCommand& draw) {
+				LUCY_PROFILE_NEW_EVENT("RendererPasses::PostProcessPass");
+				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<GraphicsPipeline>("PostProcessPipeline");
+				const auto& settings = Renderer::GetRendererSettings();
+
+				draw.BindPipeline(pipeline);
+
+				const auto& sceneColor = draw.BindImageHandleTo("Textures2D", registry.GetImage(RGResource(GeometryImage)));
+
+				struct PostProcessData {
+					RenderDeviceTextureResource SceneColor;
+
+					float Exposure;
+				};
+
+				PostProcessData pushConstantData{
+					.SceneColor = {
+						.TextureIndex = sceneColor.Index,
+						.SamplerIndex = draw.GetLinearClampSampler().Index
+					},
+					.Exposure = settings.Exposure
+				};
+
+				auto& pushConstant = pipeline->GetPipelineConstants("PushConstants");
+				pushConstant.SetData(reinterpret_cast<uint8_t*>(&pushConstantData), sizeof(pushConstantData));
+
+				draw.UpdateDescriptorSets();
+				draw.BindAllDescriptorSets();
+				draw.BindPushConstant(pushConstant);
+
+				draw.Draw(3, 1, 0, 0);
+			};
+		});
+	}
+
+#pragma endregion PostProcessPass
+
 #pragma region ForwardPBRPass
 
 	ForwardPBRPass::ForwardPBRPass(Ref<Scene> scene, uint32_t width, uint32_t height)
@@ -334,7 +396,7 @@ namespace Lucy {
 				.Height = m_Height,
 				.ImageType = ImageType::Type2D,
 				.ImageUsage = ImageUsage::AsColorStorageTransferAttachment,
-				.Format = ImageFormat::R8G8B8A8_UNORM,
+				.Format = ImageFormat::R16G16B16A16_SFLOAT,
 				.GenerateSampler = true,
 				.ImGuiUsage = true,
 				}, RenderPassLoadStoreAttachments::ClearStore,
@@ -1428,6 +1490,7 @@ namespace Lucy {
 
 			struct DDGIProbeUpdateData {
 				RenderDeviceBufferReference RayResults;
+				RenderDeviceBufferReference ProbeOffsets;
 				RenderDeviceBufferReference ProbeUpdateMask;
 
 				glm::uvec4 AtlasIndices;
@@ -1471,11 +1534,12 @@ namespace Lucy {
 					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
 					.Data = {
 						.RayResults = registry.GetBuffer(RGResource(DDGIRayResults))->GetDeviceAddress(),
+						.ProbeOffsets = registry.GetBuffer(RGResource(DDGIProbeOffsets))->GetDeviceAddress(),
 						.ProbeUpdateMask = registry.GetBuffer(RGResource(DDGIProbeUpdateMask))->GetDeviceAddress(),
 						.AtlasIndices = glm::uvec4{ irradianceAtlasIndex, depthAtlasIndex, irradianceHistoryIndex, depthHistoryIndex },
 						.ProbeCountsAndRays = glm::uvec4{ s_ProbeCounts, s_RaysPerProbe },
 						.AtlasTexelData = glm::uvec4{ s_IrradianceTexels, s_IrradianceTileSize, s_DepthTexels, s_DepthTileSize },
-						.DistanceData = glm::vec2{ DDGIPass::GetMaxRayDistance(), 32.0f },
+						.DistanceData = glm::vec2{ glm::length(DDGIPass::GetProbeSpacing()) * 1.5f, 50.0f },
 						.TemporalData = glm::vec3{ 0.99f, 0.99f, historyValid ? 1.0f : 0.0f },
 						.FrameNumber = static_cast<uint32_t>(Renderer::GetFrameNumber())
 					}

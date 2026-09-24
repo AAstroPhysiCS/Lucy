@@ -166,7 +166,7 @@ namespace Lucy {
 												uint32_t frameBufferWidth, uint32_t frameBufferHeight, bool isInFlight) {
 			size_t framesCount = isInFlight ? Renderer::GetMaxFramesInFlight() : 1;
 			std::vector<std::vector<RenderDeviceResourceHandle>> imageBufferHandles(framesCount);
-			std::vector<RenderDeviceResourceHandle> depthImageHandles(framesCount);
+			std::vector<RenderDeviceResourceHandle> depthImageHandles;
 
 			for (const auto& rgRenderTarget : rgRenderTargetElements) {
 				const auto& image = s_RenderGraph->GetImageByRGResource(rgRenderTarget);
@@ -187,7 +187,7 @@ namespace Lucy {
 				for (uint32_t frameIndex = 0; frameIndex < framesCount; frameIndex++) {
 					const auto handle = handles[frameIndex];
 					if (isDepth) {
-						depthImageHandles[frameIndex] = handle;
+						depthImageHandles.emplace_back(handle);
 						continue;
 					}
 					imageBufferHandles[frameIndex].emplace_back(handle);
@@ -291,9 +291,9 @@ namespace Lucy {
 			};
 
 #if !USE_COMPUTE_FOR_CUBEMAP_GEN
-			constexpr size_t graphicsPipelineCount = 6;
+			constexpr size_t graphicsPipelineCount = 7;
 #else
-			constexpr size_t graphicsPipelineCount = 5;
+			constexpr size_t graphicsPipelineCount = 6;
 #endif
 			constexpr const std::array<RenderGraphPipelineCreateInfo, graphicsPipelineCount> graphicsPipelineCreateInfos = {
 				// PBR Geometry Pipeline
@@ -301,7 +301,20 @@ namespace Lucy {
 					.ShaderName = "LucyPBR",
 					.PassName = "PBRGeometryPass",
 					.PipelineName = "PBRGeometryPipeline",
-					.RasterizationConfig = {.DisableBackCulling = true, .CullingMode = CullingMode::None}
+					.RasterizationConfig = { .DisableBackCulling = true, .CullingMode = CullingMode::None }
+				},
+				{
+					.ShaderName = "LucyPostProcess",
+					.PassName = "PostProcessPass",
+					.PipelineName = "PostProcessPipeline",
+					.RasterizationConfig = { .DisableBackCulling = true, .CullingMode = CullingMode::None },
+					.DepthConfig = {
+						.DepthWriteEnable = false,
+						.DepthTestEnable = false,
+						.DepthClampEnable = false,
+						.DepthCompareOp = DepthCompareOp::Always
+					},
+					.BlendConfig = { .BlendEnable = false }
 				},
 				// Skybox Pipeline
 				{
@@ -648,6 +661,11 @@ namespace Lucy {
 			
 			{
 				const auto& [renderPassHandle, frameBufferHandle] = s_RenderFrameHandleMap.at("PBRGeometryPass");
+				AccessResource<FrameBuffer>(frameBufferHandle)->RTRecreate(newWidth, newHeight);
+			}
+			
+			{
+				const auto& [renderPassHandle, frameBufferHandle] = s_RenderFrameHandleMap.at("PostProcessPass");
 				AccessResource<FrameBuffer>(frameBufferHandle)->RTRecreate(newWidth, newHeight);
 			}
 		});

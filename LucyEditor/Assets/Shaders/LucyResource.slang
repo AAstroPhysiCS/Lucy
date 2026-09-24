@@ -123,7 +123,7 @@ public struct PBRMaterial {
 
     float NormalStrength = 1.0f;
 
-    private static constexpr float AlphaCutoff = 0.9f;
+    private static constexpr float AlphaCutoff = 0.5f;
     private static constexpr uint MaterialDoubleSided = 1u << 0u;
 
     public static float GetAlphaCutoff() { return AlphaCutoff; }

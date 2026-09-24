@@ -65,7 +65,7 @@ void DDGIProbeRelocationMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
     float closestFrontfaceDistance = maxRayDistance;
     uint closestFrontfaceIndex = 0;
 
-    for (uint rayIndex = 1; rayIndex < relocationRayCount; rayIndex++) {
+    for (uint rayIndex = 1; rayIndex < fixedRayCount; rayIndex++) {
         float distance = PushConstants.Data.RayResults[firstRayIndex + rayIndex].RadianceAndDistance.w;
 
         if (distance < 0.0f) {
@@ -155,5 +155,6 @@ void DDGIProbeRelocationMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
     }
 
     float3 newOffset = offset + movement;
-    PushConstants.Data.ProbeOffsets[probeIndex] = float4(newOffset, 0.0f);
+    float moved = length(movement) > minProbeSpacing * 0.001f ? 1.0f : 0.0f;
+    PushConstants.Data.ProbeOffsets[probeIndex] = float4(newOffset, moved);
 }

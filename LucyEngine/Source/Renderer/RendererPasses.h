@@ -63,6 +63,18 @@ namespace Lucy {
 
 #pragma endregion GPUDrivenRendererPasses
 
+#pragma region PostProcessPass
+	struct PostProcessPass final {
+		PostProcessPass(uint32_t width, uint32_t height);
+		~PostProcessPass() = default;
+
+		void AddPass(const Ref<RenderGraph>& renderGraph);
+	private:
+		uint32_t m_Width = 0;
+		uint32_t m_Height = 0;
+	};
+#pragma endregion PostProcessPass
+
 #pragma region GeometryPass
 
 	struct ForwardPBRPass final {

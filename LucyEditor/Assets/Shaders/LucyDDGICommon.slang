@@ -125,16 +125,16 @@ float2 SampleDDGIProbeDepth(DDGISamplingData data, uint3 probeCoordinate, float3
     return data.DepthAtlas.Sample2DTextureLevel_Float2(uv, 0.0f);
 }
 
-float GetDDGIProbeVisibility(float2 moments, float normalizedDistance) {
-    if (normalizedDistance <= moments.x)
+float GetDDGIProbeVisibility(float2 moments, float distance) {
+    if (distance <= moments.x)
         return 1.0f;
 
-    float variance = moments.y - moments.x * moments.x;
-    variance = max(variance, 0.00001f);
+    float variance = abs(moments.y - moments.x * moments.x);
+    float difference = distance - moments.x;
 
-    float difference = normalizedDistance - moments.x;
-
-    return saturate(variance / (variance + difference * difference));
+    float visibility = variance / (variance + difference * difference);
+    visibility *= visibility * visibility;
+    return max(0.05f, visibility);
 }
 
 bool IsInsideDDGIVolume(DDGISamplingData data, float3 positionWS) {
@@ -168,7 +168,7 @@ float3 SampleDDGIIrradiance(DDGISamplingData data, float3 positionWS, float3 nor
                 float weightY = y == 0 ? 1.0f - alpha.y : alpha.y;
                 float weightZ = z == 0 ? 1.0f - alpha.z : alpha.z;
 
-                float weight = weightX * weightY * weightZ;
+                float trilinearWeight = weightX * weightY * weightZ;
 
                 float3 probePosition = GetDDGIProbePosition(data, probeCoordinate);
                 float3 probeToPoint = biasedPosition - probePosition;
@@ -181,14 +181,19 @@ float3 SampleDDGIIrradiance(DDGISamplingData data, float3 positionWS, float3 nor
                 float3 probeToPointDirection = probeToPoint / distanceToProbe;
                 float3 pointToProbeDirection = -probeToPointDirection;
 
-                float normalWeight = saturate(dot(normalWS, pointToProbeDirection) * 0.5f + 0.5f);
-                normalWeight = normalWeight * normalWeight + 0.2f;
+                float wrapShading = (dot(normalWS, pointToProbeDirection) + 1.0f) * 0.5f;
+                float normalWeight = wrapShading * wrapShading + 0.2f;
 
                 float2 moments = SampleDDGIProbeDepth(data, probeCoordinate, probeToPointDirection);
-                float normalizedDistance = saturate(distanceToProbe / data.ProbeOriginAndMaxDistance.w);
-                float visibility = GetDDGIProbeVisibility(moments, normalizedDistance);
+                float visibility = GetDDGIProbeVisibility(moments, distanceToProbe);
 
-                weight *= normalWeight * visibility;
+                float weight = normalWeight * visibility;
+
+                const float crushThreshold = 0.2f;
+                if (weight < crushThreshold)
+                    weight *= weight * weight / (crushThreshold * crushThreshold);
+
+                weight *= trilinearWeight;
 
                 if (weight <= 0.000001f)
                     continue;

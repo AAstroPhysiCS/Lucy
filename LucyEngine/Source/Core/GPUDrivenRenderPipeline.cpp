@@ -23,6 +23,7 @@ namespace Lucy {
 		m_MainCullViewHandle = deviceScene->RegisterCullView({});
 
 		Renderer::AddRendererPass<GPUDrivenRendererPass>(createInfo.RenderDevice);
+		Renderer::AddRendererPass<PostProcessPass>(viewportWidth, viewportHeight);
 		Renderer::AddRendererPass<CubemapPass>(scene, viewportWidth, viewportHeight);
 		Renderer::AddRendererPass<IrradiancePass>(scene, CubemapPass::HDRImageSize);
 		Renderer::AddRendererPass<BRDFLutPass>(512);
@@ -165,6 +166,6 @@ namespace Lucy {
 	}
 
 	Ref<Image> GPUDrivenRenderPipeline::GetOutputImage() {
-		return Renderer::GetFrameBufferOutputOfPass("PBRGeometryPass");
+		return Renderer::GetFrameBufferOutputOfPass("PostProcessPass");
 	}
 }
