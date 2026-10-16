@@ -51,6 +51,12 @@ Lucy is technically the older sister of [**OxyEngine**](https://github.com/AAstr
 </p>
 
 <p align="center">
+  <img src="Content/Lucy_4K_Bistro.png" width="700" alt="Lucy Engine render">
+  <br>
+  <sub>Amazon Lumberyard Bistro.</sub>
+</p>
+
+<p align="center">
   <img src="Content/Lucy_Sponza_4K_2.png" width="700" alt="Lucy Engine render">
   <br>
   <sub>Sponza Atrium, rendered in Lucy's basic editor.</sub>
