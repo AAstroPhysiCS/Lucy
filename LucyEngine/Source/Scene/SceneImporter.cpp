@@ -104,7 +104,9 @@ namespace Lucy {
 			metallic = glm::clamp(metallic, 0.0f, 1.0f);
 
 			aiColor3D emissiveColor{ 0.0f };
-			sourceMaterial.Get(AI_MATKEY_COLOR_EMISSIVE, emissiveColor);
+			if (sourceMaterial.Get(AI_MATKEY_COLOR_EMISSIVE, emissiveColor) != aiReturn_SUCCESS && sourceMaterial.GetTextureCount(aiTextureType_EMISSIVE) > 0)
+				emissiveColor = aiColor3D{ 1.0f };
+			sourceMaterial.Get(AI_MATKEY_EMISSIVE_INTENSITY, importedMaterial.EmissiveStrength);
 
 			int32_t doubleSided = 0;
 			sourceMaterial.Get(AI_MATKEY_TWOSIDED, doubleSided);

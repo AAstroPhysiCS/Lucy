@@ -117,16 +117,11 @@ void ClosestHit(inout DDGIRayPayload payload, BuiltInTriangleIntersectionAttribu
 
     if (backfaceHit) {
         if (!doubleSided) {
-            payload.Distance = -RayTCurrent();
-            payload.Radiance = float3(0.0f);
             return;
         }
         surfaceNormalWS = -surfaceNormalWS;
         normalWS = -normalWS;
     }
-
-    payload.Distance = RayTCurrent();
-    payload.Radiance = float3(0.0f);
 
     float3 viewDirection = normalize(-WorldRayDirection());
     float3 lightDirection = normalize(-PushConstants.Root->DirectionalLight.Direction);
@@ -150,6 +145,7 @@ void ClosestHit(inout DDGIRayPayload payload, BuiltInTriangleIntersectionAttribu
     directLighting += EvaluatePunctualLightsDDGI(u_TLAS,
         PushConstants.Root,
         surface.PositionWS,
+        surface.GeometricNormalWS,
         viewDirection,
         normalWS,
         F0,

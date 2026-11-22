@@ -39,7 +39,7 @@ namespace Lucy {
 		float AO = 1.0f;
 		float Roughness = 0.8f;
 		float Metallic = 0.0f;
-		float EmissiveStrength = 0.0f;
+		float EmissiveStrength = 1.0f;
 		float NormalStrength = 1.0f;
 
 		bool DoubleSided = false;

@@ -26,6 +26,9 @@ namespace Lucy {
 		ImGui::DragFloat("Exposure", &settings.Exposure, 0.01f, 0.0f, 10.0f, "%.3f");
 
 		ImGui::SeparatorText("DDGI");
+		ImGui::DragFloat("Probe Backface", &settings.DDGIProbeBackfaceThreshold, 0.01f, 0.0f, 1.0f);
+		ImGui::DragFloat("Probe Frontface", &settings.DDGIProbeMinFrontFaceDistance, 0.01f, 0.0f, 1.0f);
+
 		ImGui::Checkbox("Adaptive Probe Updates", &settings.DDGIAdaptiveUpdates);
 
 		if (settings.DDGIAdaptiveUpdates) {

@@ -328,6 +328,7 @@ namespace Lucy {
 			build.SetViewportArea(m_Width, m_Height);
 			build.SetInFlightMode(true);
 
+			build.ReadImage(RGResource(GeometryDepthImage), RenderGraphResourceAccess::ShaderSampledRead);
 			build.ReadImage(RGResource(GeometryImage), RenderGraphResourceAccess::ShaderSampledRead);
 
 			build.DeclareImage(RGResource(FinalImage), {
@@ -381,8 +382,8 @@ namespace Lucy {
 
 #pragma region ForwardPBRPass
 
-	ForwardPBRPass::ForwardPBRPass(Ref<Scene> scene, uint32_t width, uint32_t height)
-		: m_Scene(scene), m_Width(width), m_Height(height) {
+	ForwardPBRPass::ForwardPBRPass(Ref<Scene> scene, Ref<RenderDevice> renderDevice, uint32_t width, uint32_t height)
+		: m_Scene(scene), m_RenderDevice(renderDevice), m_Width(width), m_Height(height) {
 	}
 
 	void ForwardPBRPass::AddPass(const Ref<RenderGraph>& renderGraph) {
@@ -492,11 +493,14 @@ namespace Lucy {
 
 				struct LocalPushConstant {
 					RenderDeviceBufferReference VisibleDraws = 0;
+					RenderDeviceBufferReference TLASAddress = 0;
 					RenderDeviceTextureResource PBRTextureResources[4];
 
 					RenderDeviceDDGISamplingData DDGI;
 				};
 
+				const auto& scene = m_RenderDevice->GetScene();
+				const auto& tlas = Renderer::AccessResource<AccelerationStructure>(scene->GetCurrentTopLevelAccelerationStructureHandle());
 				const auto& origin = DDGIPass::GetProbeOrigin();
 				const auto& spacing = DDGIPass::GetProbeSpacing();
 				const auto& counts = DDGIPass::GetProbeCounts();
@@ -505,6 +509,7 @@ namespace Lucy {
 					.Root = registry.GetBuffer(RGResource(GPUSceneBuffer))->GetDeviceAddress(),
 					.Data = {
 						.VisibleDraws = registry.GetBuffer(RGResource(VisibleDraws))->GetDeviceAddress(),
+						.TLASAddress = tlas ? tlas->GetDeviceAddress() : 0,
 						.PBRTextureResources = {
 							{ .TextureIndex = shadowImagesIndex, .SamplerIndex = draw.GetLinearRepeatSampler() },
 							{ .TextureIndex = prefilterIndex, .SamplerIndex = draw.GetLinearRepeatSampler() },
@@ -1447,12 +1452,12 @@ namespace Lucy {
 
 			return [=](RenderGraphRegistry& registry, RenderCommand& cmd) {
 				LUCY_PROFILE_NEW_EVENT("RendererPasses::DDGIProbeRelocationPass");
+				const auto& settings = Renderer::GetRendererSettings();
 
 				uint32_t currentFrameIndex = Renderer::GetCurrentFrameIndex();
 				uint32_t previousFrameIndex = (currentFrameIndex + Renderer::GetMaxFramesInFlight() - 1) % Renderer::GetMaxFramesInFlight();
 
 				const auto& pipeline = Renderer::GetPipelineManager()->GetAs<ComputePipeline>("DDGIProbeRelocationPipeline");
-
 				cmd.BindPipeline(pipeline);
 
 				GlobalPushConstant<DDGIProbeRelocationData> pushConstantData{
@@ -1462,9 +1467,9 @@ namespace Lucy {
 						.ProbeOffsets = registry.GetBuffer(RGResource(DDGIProbeOffsets), currentFrameIndex)->GetDeviceAddress(),
 						.ProbeOffsetHistory = registry.GetBuffer(RGResource(DDGIProbeOffsets), previousFrameIndex)->GetDeviceAddress(),
 						.ProbeUpdateMask = registry.GetBuffer(RGResource(DDGIProbeUpdateMask))->GetDeviceAddress(),
-						.ProbeSpacingAndMinFrontfaceDistance = glm::vec4{ DDGIPass::GetProbeSpacing(), DDGIPass::GetProbeMinFrontfaceDistance() },
+						.ProbeSpacingAndMinFrontfaceDistance = glm::vec4{ DDGIPass::GetProbeSpacing(), settings.DDGIProbeMinFrontFaceDistance },
 						.ProbeCountsAndRays = glm::uvec4{ DDGIPass::GetProbeCounts(), DDGIPass::GetRaysPerProbe() },
-						.RelocationData = glm::vec4{ DDGIPass::GetProbeBackfaceThreshold(), DDGIPass::GetMaxRayDistance(), 0.02f, 0.20f },
+						.RelocationData = glm::vec4{ settings.DDGIProbeBackfaceThreshold, DDGIPass::GetMaxRayDistance(), 0.02f, 0.20f },
 						.FrameNumber = static_cast<uint32_t>(Renderer::GetFrameNumber())
 					}
 				};

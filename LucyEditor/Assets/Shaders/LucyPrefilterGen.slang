@@ -17,6 +17,8 @@ float4 PrefilterEnvMap(float3 samplingPos, in TextureCube environmentMap, in Sam
     float3 V = R;
 
     float roughness = PushConstants.Data.PrefilterParams.z;
+    if (roughness == 0.0f)
+        return environmentMap.SampleLevel(sampler, R, 0.0f);
 
     float3 prefilteredColor = float3(0.0, 0.0, 0.0);
     float totalWeight = 0.0;

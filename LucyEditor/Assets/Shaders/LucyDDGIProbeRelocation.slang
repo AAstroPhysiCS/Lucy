@@ -4,7 +4,7 @@
 struct DDGIProbeRelocationData {
     DDGIRayResult* RayResults;
     float4* ProbeOffsets;
-    float4 *ProbeOffsetHistory;
+    float4* ProbeOffsetHistory;
     uint* ProbeUpdateMask;
 
     float4 ProbeSpacingAndMinFrontfaceDistance;
@@ -65,16 +65,27 @@ void DDGIProbeRelocationMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
     float closestFrontfaceDistance = maxRayDistance;
     uint closestFrontfaceIndex = 0;
 
+    float3 backfaceDirectionSum = float3(0.0f);
+    float backfaceWeightSum = 0.0f;
+
     for (uint rayIndex = 1; rayIndex < fixedRayCount; rayIndex++) {
         float distance = PushConstants.Data.RayResults[firstRayIndex + rayIndex].RadianceAndDistance.w;
 
         if (distance < 0.0f) {
             backfaceCount++;
+
             float backfaceDistance = -distance;
             if (backfaceDistance < closestBackfaceDistance) {
                 closestBackfaceDistance = backfaceDistance;
                 closestBackfaceIndex = rayIndex;
             }
+
+            float3 rayDirection = GetDDGIRayDirection(rayIndex, raysPerProbe, PushConstants.Data.FrameNumber);
+            float weight = 1.0f / (backfaceDistance * backfaceDistance + 0.0001f);
+
+            backfaceDirectionSum += rayDirection * weight;
+            backfaceWeightSum += weight;
+
             continue;
         }
 
@@ -82,6 +93,7 @@ void DDGIProbeRelocationMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
             continue;
 
         frontfaceCount++;
+
         if (distance < closestFrontfaceDistance) {
             closestFrontfaceDistance = distance;
             closestFrontfaceIndex = rayIndex;
@@ -91,6 +103,19 @@ void DDGIProbeRelocationMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
     float backfaceRatio = 0.0f;
     if (relocationRayCount > 0)
         backfaceRatio = float(backfaceCount) / float(relocationRayCount);
+
+    float3 escapeDirection = float3(0.0f);
+
+    if (backfaceWeightSum > 0.0f) {
+        float3 averageDirection = backfaceDirectionSum / backfaceWeightSum;
+        float directionLength = length(averageDirection);
+
+        if (directionLength > 0.0001f) {
+            escapeDirection = averageDirection / directionLength;
+        } else {
+            escapeDirection = GetDDGIRayDirection(closestBackfaceIndex, raysPerProbe, PushConstants.Data.FrameNumber);
+        }
+    }
 
     float offsetLength = length(offset);
 
@@ -107,7 +132,6 @@ void DDGIProbeRelocationMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
     float3 targetOffset = offset;
 
     if (backfaceCount > 0 && backfaceRatio > backfaceThreshold) {
-        float3 escapeDirection = GetDDGIRayDirection(closestBackfaceIndex, raysPerProbe, PushConstants.Data.FrameNumber);
         targetOffset = offset + escapeDirection * (closestBackfaceDistance + minFrontfaceDistance);
     } else if (offsetLength > 0.0001f && !returnPathBlocked) {
         targetOffset = float3(0.0f);
@@ -117,14 +141,13 @@ void DDGIProbeRelocationMain(uint3 dispatchThreadID: SV_DispatchThreadID) {
         targetOffset = offset - surfaceDirection * distanceToMove;
     }
 
-    float maxOffsetLength = minProbeSpacing * 0.45f;
+    float maxOffsetLength = minProbeSpacing * 0.9f;
     float targetLength = length(targetOffset);
 
     if (targetLength > maxOffsetLength)
         targetOffset = targetOffset / targetLength * maxOffsetLength;
 
     bool returningToOriginalPosition = length(targetOffset) < 0.0001f && length(offset) > 0.0001f;
-    
     float3 movement = float3(0.0f);
     float maxMovement = minProbeSpacing * maxMovementFraction;
 

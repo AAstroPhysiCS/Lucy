@@ -23,18 +23,43 @@ float GetPunctualLightAttenuation(PunctualLight light, float distanceToLight) {
     return attenuation;
 }
 
-float GetPunctualLightVisibility(RaytracingAccelerationStructure tlas, float3 positionWS, float3 surfaceNormalWS, float3 lightDirection, float lightDistance) {
-    float3 offsetNormal = dot(surfaceNormalWS, lightDirection) >= 0.0f ? surfaceNormalWS : -surfaceNormalWS;
-    RayDesc ray;
-    ray.Origin = positionWS + offsetNormal * 0.02f;
-    ray.Direction = lightDirection;
-    ray.TMin = 0.001f;
-    ray.TMax = max(lightDistance - 0.02f, 0.001f);
+bool RayHitPassesAlphaTest(GPUScene *scene, uint instanceID, uint geometryIndex, uint primitiveIndex, float2 barycentrics) {
+    uint submeshIndex = GetRayHitSubmeshIndex(scene, scene->Addresses.Objects[instanceID], geometryIndex);
+    GPUSubmesh submesh = scene->Addresses.Submeshes[submeshIndex];
+    PBRMaterial material = scene->Addresses.PBRMaterials[submesh.Draw.w];
 
-    RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_FORCE_OPAQUE> query;
+    if (!material.AlbedoMap.IsValid())
+        return material.BaseColor.a >= PBRMaterial::GetAlphaCutoff();
+
+    int3 indices = GetRayHitVertexIndices(scene, submesh, primitiveIndex);
+    float2 uv = scene->Addresses.Vertices[indices.x].TextureCoords * (1.0f - barycentrics.x - barycentrics.y) + 
+        scene->Addresses.Vertices[indices.y].TextureCoords * barycentrics.x + 
+        scene->Addresses.Vertices[indices.z].TextureCoords * barycentrics.y;
+
+    float alpha = material.BaseColor.a * material.AlbedoMap.Sample2DTextureLevel(uv, 0.0f).a;
+    return alpha >= PBRMaterial::GetAlphaCutoff();
+}
+
+float GetPunctualLightVisibility(RaytracingAccelerationStructure tlas, GPUScene *scene, float3 positionWS, float3 surfaceNormalWS, float3 lightPosition) {
+    float3 lightDirection = lightPosition - positionWS;
+    float3 offsetNormal = dot(surfaceNormalWS, lightDirection) >= 0.0f ? surfaceNormalWS : -surfaceNormalWS;
+
+    RayDesc ray;
+    float3 magnitude = abs(positionWS);
+    float bias = max(0.00001f, max(magnitude.x, max(magnitude.y, magnitude.z)) * 0.0000005f);
+
+    ray.Origin = positionWS + offsetNormal * bias;
+    ray.Direction = lightPosition - ray.Origin;
+    ray.TMin = 0.0f;
+    ray.TMax = 0.999999f;
+
+    // the scene AS marks its instances opaque. Inspect alpha for these shadow rays
+    RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_FORCE_NON_OPAQUE> query;
     query.TraceRayInline(tlas, RAY_FLAG_NONE, 0xFF, ray);
 
     while (query.Proceed()) {
+        if (query.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE && RayHitPassesAlphaTest(scene, query.CandidateInstanceID(), query.CandidateGeometryIndex(), query.CandidatePrimitiveIndex(), query.CandidateTriangleBarycentrics()))
+            query.CommitNonOpaqueTriangleHit();
     }
 
     return query.CommittedStatus() == COMMITTED_NOTHING ? 1.0f : 0.0f;
@@ -93,7 +118,7 @@ PunctualLightSample SamplePunctualLight(PunctualLight light, float3 positionWS) 
     return result;
 }
 
-float3 EvaluatePunctualLightsDDGI(RaytracingAccelerationStructure tlas, GPUScene* scene, float3 positionWS, float3 viewDirection, float3 normalWS, float3 F0, float metallic, float roughness, float3 albedo) {
+float3 EvaluatePunctualLightsDDGI(RaytracingAccelerationStructure tlas, GPUScene *scene, float3 positionWS, float3 geometricNormalWS, float3 viewDirection, float3 normalWS, float3 F0, float metallic, float roughness, float3 albedo) {
     float3 result = float3(0.0f);
     uint lightCount = min(scene->PunctualLights.LightCount, MAX_PUNCTUAL_LIGHTS);
 
@@ -104,7 +129,7 @@ float3 EvaluatePunctualLightsDDGI(RaytracingAccelerationStructure tlas, GPUScene
         if (sample.Distance <= 0.0f || dot(normalWS, sample.L) <= 0.0f)
             continue;
 
-        float visibility = GetPunctualLightVisibility(tlas, positionWS, normalWS, sample.L, sample.Distance);
+        float visibility = GetPunctualLightVisibility(tlas, scene, positionWS, geometricNormalWS, light.PositionAndRange.xyz);
         if (visibility <= 0.0f)
             continue;
 
@@ -123,7 +148,7 @@ float3 EvaluatePunctualLightsDDGI(RaytracingAccelerationStructure tlas, GPUScene
     return result;
 }
 
-float3 EvaluatePunctualLights(GPUScene* scene, float3 positionWS, float3 viewDirection, float3 normalWS, float3 F0, float metallic, float roughness, float3 albedo, float clearcoatFactor, float clearcoatRoughness) {
+float3 EvaluatePunctualLights(uint64_t tlasAddress, GPUScene *scene, float3 positionWS, float3 geometricNormalWS, float3 viewDirection, float3 normalWS, float3 F0, float metallic, float roughness, float3 albedo, float clearcoatFactor, float clearcoatRoughness) {
     float3 result = float3(0.0f);
     uint lightCount = min(scene->PunctualLights.LightCount, MAX_PUNCTUAL_LIGHTS);
 
@@ -133,6 +158,12 @@ float3 EvaluatePunctualLights(GPUScene* scene, float3 positionWS, float3 viewDir
 
         if (sample.Distance <= 0.0f || dot(normalWS, sample.L) <= 0.0f)
             continue;
+
+        if (tlasAddress != 0) {
+            RaytracingAccelerationStructure tlas = RaytracingAccelerationStructure(tlasAddress);
+            if (GetPunctualLightVisibility(tlas, scene, positionWS, geometricNormalWS, light.PositionAndRange.xyz) == 0.0f)
+                continue;
+        }
 
         result += LayeredBRDF(
             sample.L,

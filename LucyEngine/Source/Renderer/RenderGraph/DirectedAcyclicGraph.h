@@ -313,7 +313,7 @@ namespace Lucy {
 
 			for (NodeID outputNodeID : m_AdjacentList[nodeID].OutputNodes) {
 				uint32_t& dependencyCount = remainingDependencies[outputNodeID];
-				LUCY_ASSERT(dependencyCount > 0);
+				LUCY_ASSERT(dependencyCount > 0, "Dependency count somehow <= 0... should not be the case, bug!");
 
 				dependencyCount--;
 				if (dependencyCount != 0)

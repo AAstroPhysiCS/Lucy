@@ -426,13 +426,12 @@ namespace Lucy {
 
 		for (const auto& batch : batches) {
 			const VulkanExecutionBatch& vkBatch = batch.AsVulkanBatch();
+			auto queueFamily = vkBatch.QueueFamily;
 			
 			std::vector<RenderSubmitFunc> passExecuteFuncs;
 			passExecuteFuncs.reserve(vkBatch.Passes.size());
 
 			for (const auto& pass : vkBatch.Passes) {
-				auto queueFamily = pass->GetTargetQueueFamily();
-
 				switch (queueFamily) {
 					case TargetQueueFamily::Compute: {
 						passExecuteFuncs.push_back([=](RenderCommandList& cmdList) {
@@ -444,15 +443,6 @@ namespace Lucy {
 						break;
 					}
 					case TargetQueueFamily::Graphics: {
-						if (!renderFrameHandleMap.contains(pass->GetName())) {
-							passExecuteFuncs.push_back([=](RenderCommandList& cmdList) {
-								LUCY_PROFILE_NEW_EVENT("RendererBackend::SubmitToCompute");
-								RenderCommand cmd = cmdList.BeginRenderCommand();
-								pass->Execute(cmd);
-								cmdList.EndRenderCommand(pass->GetName(), cmd);
-							});
-							break;
-						}
 						const auto& [renderPassHandle, frameBufferHandle] = renderFrameHandleMap.at(pass->GetName());
 						passExecuteFuncs.push_back([=](RenderCommandList& cmdList) {
 							LUCY_PROFILE_NEW_EVENT("RendererBackend::SubmitToRender");

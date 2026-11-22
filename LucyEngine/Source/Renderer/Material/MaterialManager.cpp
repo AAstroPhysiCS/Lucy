@@ -53,6 +53,7 @@ namespace Lucy {
 	RenderDeviceObjectHandle MaterialManager::CreatePBRMaterial(const ImportedMaterial& importedMaterial, const std::string& importedFilePath) {
 		RenderDevicePBRMaterialData materialGPUData{};
 		materialGPUData.BaseColor = importedMaterial.BaseColor;
+		materialGPUData.EmissiveColor = importedMaterial.EmissiveColor;
 		materialGPUData.ORME = glm::vec4{ importedMaterial.AO, importedMaterial.Roughness, importedMaterial.Metallic, importedMaterial.EmissiveStrength };
 		materialGPUData.NormalStrength = importedMaterial.NormalStrength;
 		materialGPUData.Specular = glm::vec4{ importedMaterial.SpecularColor, importedMaterial.SpecularFactor };

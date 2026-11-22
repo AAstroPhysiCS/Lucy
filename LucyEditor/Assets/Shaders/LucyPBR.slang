@@ -14,6 +14,7 @@ struct VertexOutput {
 
 struct LocalPushConstant {
     GPUVisibleDraw* u_VisibleDraws;
+    uint64_t u_TLASAddress;
     GPUTextureResource u_PBRTextureResources[4];
 
     DDGISamplingData u_DDGI;
@@ -171,6 +172,8 @@ PixelOutput main(PixelInput input) {
     PBRMaterial material = PushConstants.Root->Addresses.PBRMaterials[input.a_MaterialID];
     PBRMaterialSample materialSample = material.Sample(input.a_TextureCoordsOut);
 
+    float3 geometricNormalWS = normalize(cross(ddx(input.a_PosOutWS), ddy(input.a_PosOutWS)));
+
     float alpha = materialSample.BaseColor.a;
     if (alpha < PBRMaterial::GetAlphaCutoff())
        discard;
@@ -210,8 +213,10 @@ PixelOutput main(PixelInput input) {
     ) * shadow.r;
 
     directLight += EvaluatePunctualLights(
+        PushConstants.Data.u_TLASAddress,
         PushConstants.Root,
         input.a_PosOutWS,
+        geometricNormalWS,
         viewDirCamera,
         normalsWS,
         F0,
@@ -243,7 +248,7 @@ PixelOutput main(PixelInput input) {
 
     float3 indirectDiffuse = IsInsideDDGIVolume(PushConstants.Data.u_DDGI, input.a_PosOutWS) ? diffuseDDGI : diffuseIBL;
 
-    float3 ibl = indirectDiffuse;
+    float3 ibl = indirectDiffuse + specularIBL;
     float3 emissive = materialSample.EmissiveColorAndStrength.rgb * materialSample.EmissiveColorAndStrength.a;
     float3 outputColor = ibl + directLight + emissive;
 

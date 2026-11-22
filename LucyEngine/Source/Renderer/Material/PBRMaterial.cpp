@@ -22,6 +22,7 @@ namespace Lucy {
 		const auto& albedo = HasImage(PBRMaterial::ALBEDO_TYPE) ? GetImage(PBRMaterial::ALBEDO_TYPE) : nullptr;
 		const auto& normals = HasImage(PBRMaterial::NORMALS_TYPE) ? GetImage(PBRMaterial::NORMALS_TYPE) : nullptr;
 		const auto& orm = HasImage(PBRMaterial::ORM_TYPE) ? GetImage(PBRMaterial::ORM_TYPE) : nullptr;
+		const auto& emissive = HasImage(PBRMaterial::EMISSIVE_TYPE) ? GetImage(PBRMaterial::EMISSIVE_TYPE) : nullptr;
 
 		const auto BindTexture = [&](const Ref<Image>& image, RenderDeviceTextureResource& resource) {
 			if (!image) {
@@ -37,6 +38,7 @@ namespace Lucy {
 
 		BindTexture(albedo, m_MaterialData.AlbedoMap);
 		BindTexture(normals, m_MaterialData.NormalMap);
+		BindTexture(emissive, m_MaterialData.EmissiveMap);
 		bool ormBound = BindTexture(orm, m_MaterialData.ORMMap);
 		if (!ormBound) {
 			const auto& metallic = HasImage(PBRMaterial::METALLIC_TYPE) ? GetImage(PBRMaterial::METALLIC_TYPE) : nullptr;

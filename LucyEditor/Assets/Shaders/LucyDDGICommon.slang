@@ -228,25 +228,12 @@ DDGISurface GetDDGISurface(GPUScene *scene, BuiltInTriangleIntersectionAttribute
     uint objectIndex = InstanceID();
     GPUObject object = scene->Addresses.Objects[objectIndex];
 
-    uint meshIndex = object.Data.x;
-    GPUMesh mesh = scene->Addresses.Meshes[meshIndex];
-
-    uint localSubmeshIndex = GeometryIndex();
-    uint submeshIndex = mesh.Data.z + localSubmeshIndex;
+    uint submeshIndex = GetRayHitSubmeshIndex(scene, object, GeometryIndex());
     GPUSubmesh submesh = scene->Addresses.Submeshes[submeshIndex];
-
-    uint triangleIndex = PrimitiveIndex();
-    uint firstIndex = submesh.Draw.x + triangleIndex * 3;
-
-    uint index0 = scene->Addresses.Indices[firstIndex];
-    uint index1 = scene->Addresses.Indices[firstIndex + 1];
-    uint index2 = scene->Addresses.Indices[firstIndex + 2];
-
-    int vertexOffset = asint(submesh.Draw.z);
-
-    GPUVertex vertex0 = scene->Addresses.Vertices[vertexOffset + int(index0)];
-    GPUVertex vertex1 = scene->Addresses.Vertices[vertexOffset + int(index1)];
-    GPUVertex vertex2 = scene->Addresses.Vertices[vertexOffset + int(index2)];
+    int3 indices = GetRayHitVertexIndices(scene, submesh, PrimitiveIndex());
+    GPUVertex vertex0 = scene->Addresses.Vertices[indices.x];
+    GPUVertex vertex1 = scene->Addresses.Vertices[indices.y];
+    GPUVertex vertex2 = scene->Addresses.Vertices[indices.z];
 
     surface.PositionWS = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
 

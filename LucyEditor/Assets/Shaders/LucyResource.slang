@@ -122,6 +122,7 @@ public struct PBRMaterial {
     GPUTextureResource EmissiveMap;
 
     float NormalStrength = 1.0f;
+    float3 EmissiveColor;
 
     private static constexpr float AlphaCutoff = 0.5f;
     private static constexpr uint MaterialDoubleSided = 1u << 0u;
@@ -152,7 +153,7 @@ public struct PBRMaterial {
             result.NormalTS = normalize(float3(normalXY, normalZ));
         }
 
-        float3 emissive = EmissiveMap.Sample2DTexture(uv, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+        float3 emissive = EmissiveColor * EmissiveMap.Sample2DTexture(uv, float4(1.0f)).rgb;
         result.EmissiveColorAndStrength = float4(emissive, ORME.w);
         result.AlphaCutoff = AlphaCutoff;
 
@@ -204,7 +205,7 @@ public struct PBRMaterial {
             result.NormalTS = normalize(float3(normalXY, normalZ));
         }
 
-        float3 emissive = EmissiveMap.Sample2DTextureLevel(uv, level, float4(0.0f, 0.0f, 0.0f, 1.0f)).xyz;
+        float3 emissive = EmissiveColor * EmissiveMap.Sample2DTextureLevel(uv, level, float4(1.0f)).rgb;
         result.EmissiveColorAndStrength = float4(emissive, ORME.w);
         result.AlphaCutoff = AlphaCutoff;
 
@@ -426,6 +427,16 @@ namespace BindlessTable {
 
     [[vk::binding(12, 0)]]
     SamplerState Samplers[];
+}
+
+uint GetRayHitSubmeshIndex(GPUScene *scene, GPUObject object, uint geometryIndex) {
+    GPUMesh mesh = scene->Addresses.Meshes[object.Data.x];
+    return mesh.Data.z + geometryIndex;
+}
+
+int3 GetRayHitVertexIndices(GPUScene *scene, GPUSubmesh submesh, uint primitiveIndex) {
+    uint first = submesh.Draw.x + 3 * primitiveIndex;
+    return asint(submesh.Draw.z) + int3(scene->Addresses.Indices[first], scene->Addresses.Indices[first + 1], scene->Addresses.Indices[first + 2]);
 }
 
 float GetMaximumScale(float4x4 transform) {

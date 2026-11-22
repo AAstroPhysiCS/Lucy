@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Scene/Camera.h"
+#include "Mesh.h"
 
 #include "Memory/Buffer/RenderDeviceBuffer.h"
 #include "Device/RenderDeviceHandles.h"
@@ -78,12 +79,14 @@ namespace Lucy {
 #pragma region GeometryPass
 
 	struct ForwardPBRPass final {
-		ForwardPBRPass(Ref<Scene> scene, uint32_t width, uint32_t height);
+		ForwardPBRPass(Ref<Scene> scene, Ref<RenderDevice> renderDevice, uint32_t width, uint32_t height);
 		~ForwardPBRPass() = default;
 
 		void AddPass(const Ref<RenderGraph>& renderGraph);
 	private:
 		Ref<Scene> m_Scene;
+		Ref<RenderDevice> m_RenderDevice;
+
 		uint32_t m_Width;
 		uint32_t m_Height;
 	};
@@ -205,9 +208,6 @@ namespace Lucy {
 		static constexpr uint32_t GetDepthTileSize() { return s_DepthTileSize; }
 
 		static constexpr float GetMaxRayDistance() { return s_MaxRayDistance; }
-
-		static constexpr float GetProbeBackfaceThreshold() { return s_ProbeBackfaceThreshold; }
-		static constexpr float GetProbeMinFrontfaceDistance() { return s_ProbeMinFrontfaceDistance; }
 	private:
 		static constexpr uint32_t s_RaysPerProbe = 128;
 
@@ -227,9 +227,6 @@ namespace Lucy {
 		static constexpr uint32_t s_ProbeRows = s_ProbeCounts.y;
 
 		static constexpr uint32_t s_ProbeCount = s_ProbeColumns * s_ProbeRows;
-
-		static constexpr float s_ProbeBackfaceThreshold = 0.25f;
-		static constexpr float s_ProbeMinFrontfaceDistance = 0.5f;
 
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;

@@ -79,6 +79,7 @@ namespace Lucy {
         RenderDeviceTextureResource EmissiveMap;
 
         float NormalStrength = 1.0f;
+        glm::vec3 EmissiveColor{ 0.0f };
 
         auto operator<=>(const RenderDevicePBRMaterialData&) const = default;
 
@@ -96,7 +97,8 @@ namespace Lucy {
             &RenderDevicePBRMaterialData::RoughnessMap,
             &RenderDevicePBRMaterialData::MetallicMap,
             &RenderDevicePBRMaterialData::EmissiveMap,
-            &RenderDevicePBRMaterialData::NormalStrength
+            &RenderDevicePBRMaterialData::NormalStrength,
+            &RenderDevicePBRMaterialData::EmissiveColor
         >{};
     };
 

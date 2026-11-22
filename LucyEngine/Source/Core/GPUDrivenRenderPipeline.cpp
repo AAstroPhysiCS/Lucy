@@ -30,7 +30,7 @@ namespace Lucy {
 		Renderer::AddRendererPass<PrefilterPass>(scene, CubemapPass::HDRImageSize);
 		Renderer::AddRendererPass<ShadowPass>(createInfo.RenderDevice, scene, 2048);
 		Renderer::AddRendererPass<DDGIPass>(scene, viewportWidth, viewportHeight);
-		Renderer::AddRendererPass<ForwardPBRPass>(scene, viewportWidth, viewportHeight);
+		Renderer::AddRendererPass<ForwardPBRPass>(scene, createInfo.RenderDevice, viewportWidth, viewportHeight);
 		Renderer::AddRendererPass<DDGIProbeDebugPass>(scene, viewportWidth, viewportHeight);
 	}
 

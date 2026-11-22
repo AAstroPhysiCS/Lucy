@@ -33,6 +33,9 @@ namespace Lucy {
 		float DDGIMidProbeRadius = 10.0f;
 		uint32_t DDGIMaxProbeAge = 16;
 
+		float DDGIProbeMinFrontFaceDistance = 0.0f;
+		float DDGIProbeBackfaceThreshold = 0.5f;
+
 		uint32_t CullViewFlags = static_cast<uint32_t>(GPUCullViewFlags::EnableFrustumCulling) | static_cast<uint32_t>(GPUCullViewFlags::EnableConeCulling);
 		bool ShowProbeSpheres = false;
 	};
